@@ -71,7 +71,11 @@
     lastRecordingMime: '',
     recordingStartedAt: 0,
     autoArmTried: false,
-    incompleteHoldCount: 0
+    incompleteHoldCount: 0,
+    speechGeneration: 0,
+    interruptProbeText: '',
+    interruptProbeAt: 0,
+    interruptProbeHits: 0
   };
 
   function $(id){ return document.getElementById(id); }
@@ -155,16 +159,29 @@
     return /\b(zuzu|susu|suzu|oye|ey|escucha|espera|esperate|para|para un momento|un momento|un segundo|no espera|no no|perdona|perdon|disculpa|mejor|una cosa)\b/.test(wakeNorm(value));
   }
   function naturalInterruptCandidate(value,confidence,echoScore){
-    // Además de «perdona/espera», permitimos una interrupción natural cuando el
-    // reconocedor ya tiene una frase con contenido y es MUY distinta de lo que Zuzu
-    // está pronunciando. El umbral de eco es estricto: prima no auto-interrumpirse.
+    // Interrupción natural sin palabra clave. Seguimos siendo prudentes con el eco,
+    // pero no esperamos a que el reconocedor cierre la frase: dos resultados provisionales
+    // coherentes bastan para considerar que quien habla es el usuario.
     var tokens=contentTokens(value),conf=Number(confidence||0);
-    if(tokens.length<3)return false;
-    if(conf&&conf<0.52)return false;
-    if(Number(echoScore||0)>=0.14)return false;
+    if(tokens.length<2)return false;
+    if(conf&&conf<0.38)return false;
+    if(Number(echoScore||0)>=0.30)return false;
     var n=wakeNorm(value);
     if(!n||/^(si|sí|no|vale|gracias|de acuerdo|claro)$/.test(n))return false;
     return true;
+  }
+  function resetInterruptProbe(){
+    state.interruptProbeText='';state.interruptProbeAt=0;state.interruptProbeHits=0;
+  }
+  function confirmedNaturalInterrupt(value,confidence,echoScore){
+    if(!naturalInterruptCandidate(value,confidence,echoScore)){resetInterruptProbe();return false;}
+    var key=wakeNorm(value),now=Date.now(),prev=state.interruptProbeText;
+    var related=!!prev&&(key.indexOf(prev)>=0||prev.indexOf(key)>=0||fuzzyTokenCoverage(key,prev)>=0.72);
+    if(related&&now-Number(state.interruptProbeAt||0)<=850)state.interruptProbeHits+=1;
+    else state.interruptProbeHits=1;
+    state.interruptProbeText=key;state.interruptProbeAt=now;
+    var tokens=contentTokens(value),conf=Number(confidence||0),echo=Number(echoScore||0);
+    return state.interruptProbeHits>=2||(tokens.length>=4&&(!conf||conf>=0.58)&&echo<0.16);
   }
   function voiceAliasNormalize(value){
     var out=clean(value);if(!out)return out;
@@ -359,26 +376,29 @@
   function processConversationSpeech(text,isFinal,confidence){
     text=voiceAliasNormalize(text);if(!text)return;
     var echoScore=maxOwnVoiceSimilarity(text),echoTail=Date.now()<=Number(state.speechEchoUntil||0);
-    if(isLikelyOwnVoice(text))return;
     if(state.speaking){
-      // Los resultados provisionales son la principal fuente de auto-interrupciones:
-      // no cortamos a Zuzu hasta tener una frase final claramente distinta de lo que está diciendo.
-      if(!isFinal){
-        if((explicitInterruptCue(text)&&echoScore<0.25)||naturalInterruptCandidate(text,confidence,echoScore)){
-          stopSpeaking(false);state.speechEchoUntil=Date.now()+650;setVoiceStatus('Te escucho. Continúa; esperaré dos segundos cuando termines.','ok');resetVoiceUtterance();
-          state.voiceInterim=text;showVoicePrompt(text);
-        }
+      // BARGE-IN real: en cuanto hay evidencia suficiente de voz humana se SILENCIA primero
+      // la síntesis y después se limpia su cola. No esperamos al resultado final del STT.
+      // Una palabra explícita de interrupción corta con un único resultado provisional siempre
+      // que no coincida claramente con lo que la propia Zuzu está pronunciando.
+      var explicit=explicitInterruptCue(text),explicitHuman=explicit&&echoScore<0.62;
+      var naturalHuman=confirmedNaturalInterrupt(text,confidence,echoScore);
+      var confOk=!confidence||Number(confidence)>=0.36;
+      var finalHuman=isFinal&&contentTokens(text).length>=2&&echoScore<0.38&&confOk;
+      if(explicitHuman||naturalHuman||finalHuman){
+        stopSpeaking(false);resetInterruptProbe();state.speechEchoUntil=Date.now()+520;
+        setVoiceStatus('Te escucho. Habla; cuando calles dos segundos te respondo.','ok');resetVoiceUtterance();
+        state.voiceInterim=text;showVoicePrompt(text);
+      }else{
+        // Si se parece a nuestra propia locución, lo descartamos sin contaminar el turno.
+        if(isLikelyOwnVoice(text))return;
+        if(!isFinal)return;
         return;
       }
-      // Para cortar una locución sin palabra de interrupción exigimos una frase final
-      // suficientemente distinta, con contenido real y una confianza razonable. Así un eco
-      // deformado por el altavoz no convierte a Zuzu en su propia interlocutora.
-      var confOk=!confidence||Number(confidence)>=0.40;
-      var userLike=explicitInterruptCue(text)||naturalInterruptCandidate(text,confidence,echoScore)||(contentTokens(text).length>=3&&echoScore<0.30&&confOk);
-      if(!userLike)return;
-      stopSpeaking(false);state.speechEchoUntil=Date.now()+650;setVoiceStatus('Te escucho. Continúa; esperaré dos segundos cuando termines.','ok');resetVoiceUtterance();
-    }else if(echoTail&&echoScore>=0.28){
-      return;
+    }else{
+      resetInterruptProbe();
+      if(isLikelyOwnVoice(text))return;
+      if(echoTail&&echoScore>=0.28)return;
     }
     state.incompleteHoldCount=0;
     if(isFinal){appendVoiceFinal(text);state.voiceInterim='';}else state.voiceInterim=text;
@@ -890,21 +910,44 @@
     if(stop) stop.disabled=!state.speaking;
   }
   function stopSpeaking(showMessage){
-    state.stopRequested=true;
-    state.currentUtterance=null;
-    if(supportsDeviceSpeech()){ try{ window.speechSynthesis.cancel(); }catch(_){ } }
-    state.speaking=false; state.paused=false; state.engine=''; state.speechChunks=[]; state.speechIndex=0;state.speechEchoUntil=Date.now()+700;
+    // Corte de prioridad máxima. speechSynthesis.cancel() puede tardar perceptiblemente en
+    // algunos Chrome/Edge si hay una locución larga en cola; pause() silencia el audio antes
+    // de vaciarla. La generación invalida cualquier onend/onerror antiguo que llegue tarde.
+    var stopGen=Number(state.speechGeneration||0)+1;state.speechGeneration=stopGen;
+    state.stopRequested=true;state.speaking=false;state.paused=false;state.engine='';
+    state.speechChunks=[];state.speechIndex=0;state.currentSpokenChunk='';
+    try{if(state.currentUtterance)state.currentUtterance.volume=0;}catch(_){ }
+    var synth=supportsDeviceSpeech()?window.speechSynthesis:null;
+    if(synth){
+      try{synth.pause();}catch(_){ }
+      try{synth.cancel();}catch(_){ }
+      // Segundo vaciado únicamente si no ha comenzado una nueva locución después del corte.
+      setTimeout(function(){
+        if(Number(state.speechGeneration||0)!==stopGen||state.speaking)return;
+        try{synth.cancel();}catch(_){ }
+        try{if(synth.paused)synth.resume();}catch(_){ }
+      },0);
+      setTimeout(function(){
+        if(Number(state.speechGeneration||0)!==stopGen||state.speaking)return;
+        try{synth.cancel();}catch(_){ }
+        try{if(synth.paused)synth.resume();}catch(_){ }
+      },55);
+    }
+    state.currentUtterance=null;state.speechEchoUntil=Date.now()+520;
     updateSpeechButtons();
-    setTimeout(function(){state.stopRequested=false;},80);
+    setTimeout(function(){if(Number(state.speechGeneration||0)===stopGen)state.stopRequested=false;},520);
     if(showMessage!==false) setVoiceStatus('Lectura detenida.','');
   }
 
   function speechChunkLimit(){
+    // Bloques cortos reducen la cantidad de voz que el motor puede tener prebufferizada.
+    // El pause()+cancel() es el corte principal; esto es una segunda red de seguridad.
     var ua=String(navigator.userAgent||'');
     var apple=/iPhone|iPad|iPod/i.test(ua)||(/Macintosh/i.test(ua)&&Number(navigator.maxTouchPoints||0)>1);
-    return apple?155:220;
+    return apple?90:120;
   }
-  function speakDeviceNext(){
+  function speakDeviceNext(expectedGeneration){
+    if(expectedGeneration!=null&&Number(expectedGeneration)!==Number(state.speechGeneration||0))return;
     if(!state.speaking||state.engine!=='local'||state.paused) return;
     if(state.speechIndex>=state.speechChunks.length){
       state.speaking=false; state.paused=false; state.currentUtterance=null; updateSpeechButtons(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok'); return;
@@ -919,16 +962,19 @@
     if(voice) utter.voice=voice;
     state.currentUtterance=utter;
     utter.onstart=function(){
+      if(expectedGeneration!=null&&Number(expectedGeneration)!==Number(state.speechGeneration||0))return;
       if(!state.speaking||state.engine!=='local')return;
       setVoiceStatus('Zuzu está leyendo con '+(voice?clean(voice.name):'la voz del dispositivo')+'…','ok');
     };
     utter.onend=function(){
-      state.speechEchoUntil=Date.now()+900;
+      state.speechEchoUntil=Date.now()+700;
+      if(expectedGeneration!=null&&Number(expectedGeneration)!==Number(state.speechGeneration||0))return;
       if(!state.speaking||state.engine!=='local'||state.stopRequested) return;
       state.currentUtterance=null; state.speechIndex++;
-      setTimeout(speakDeviceNext,45);
+      setTimeout(function(){speakDeviceNext(expectedGeneration);},20);
     };
     utter.onerror=function(ev){
+      if(expectedGeneration!=null&&Number(expectedGeneration)!==Number(state.speechGeneration||0))return;
       if(state.stopRequested||!state.speaking) return;
       var code=String(ev&&ev.error||'');
       if(code==='canceled'||code==='interrupted') return;
@@ -943,9 +989,11 @@
       state.speaking=false; updateSpeechButtons(); setVoiceStatus('Este dispositivo no dispone de lectura por voz.','err'); return;
     }
     loadLocalVoices(false);
+    var generation=Number(state.speechGeneration||0)+1;state.speechGeneration=generation;
+    try{if(window.speechSynthesis.paused)window.speechSynthesis.resume();}catch(_){ }
     state.engine='local'; state.lastSpokenText=clean(text); state.speechChunks=splitSpeech(text,speechChunkLimit()); state.speechIndex=0; state.speaking=true; state.paused=false; state.stopRequested=false;
-    updateSpeechButtons();
-    speakDeviceNext();
+    resetInterruptProbe();updateSpeechButtons();
+    speakDeviceNext(generation);
   }
 
   function speakText(rawText, isPreview){
