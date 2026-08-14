@@ -148,7 +148,21 @@
     return maxOwnVoiceSimilarity(n)>=0.46;
   }
   function explicitInterruptCue(value){
-    return /\b(zuzu|susu|suzu|oye|ey|espera|esperate|para|para un momento|no espera|no no|perdona|perdon|una cosa)\b/.test(wakeNorm(value));
+    // Palabras de barge-in muy reconocibles. Se mantienen deliberadamente concretas para
+    // no volver al problema de que Zuzu se interrumpa con el eco de su propia locución.
+    return /\b(zuzu|susu|suzu|oye|ey|escucha|espera|esperate|para|para un momento|un momento|un segundo|no espera|no no|perdona|perdon|disculpa|mejor|una cosa)\b/.test(wakeNorm(value));
+  }
+  function naturalInterruptCandidate(value,confidence,echoScore){
+    // Además de «perdona/espera», permitimos una interrupción natural cuando el
+    // reconocedor ya tiene una frase con contenido y es MUY distinta de lo que Zuzu
+    // está pronunciando. El umbral de eco es estricto: prima no auto-interrumpirse.
+    var tokens=contentTokens(value),conf=Number(confidence||0);
+    if(tokens.length<3)return false;
+    if(conf&&conf<0.52)return false;
+    if(Number(echoScore||0)>=0.14)return false;
+    var n=wakeNorm(value);
+    if(!n||/^(si|sí|no|vale|gracias|de acuerdo|claro)$/.test(n))return false;
+    return true;
   }
   function voiceAliasNormalize(value){
     var out=clean(value);if(!out)return out;
@@ -267,7 +281,7 @@
   function updateWakeBadge(){
     var b=$('ceZuzuWakeBadge'); if(!b) return;
     var listening=!!state.wantListening;
-    if(state.conversationMode){b.className='ce-zuzu-wake-badge is-conversation';b.textContent='🎙 Conversando con Zuzu';b.title='Conversación oral activa. Puedes interrumpir a Zuzu hablando.';return;}
+    if(state.conversationMode){b.className='ce-zuzu-wake-badge is-conversation';b.textContent='🎙 Conversando con Zuzu';b.title='Conversación oral activa. Puedes interrumpir hablando; «Perdona» o «Espera» fuerzan la interrupción.';return;}
     if(listening){b.className='ce-zuzu-wake-badge is-listening';b.textContent='👂 Hola Zuzu';b.title='Escucha ambiental activa. Di «Hola Zuzu» desde cualquier pantalla.';}
     else{b.className='ce-zuzu-wake-badge';b.textContent='👂 Activar Zuzu';b.title='Pulsa para activar la escucha ambiental.';}
   }
@@ -333,7 +347,7 @@
       // Los resultados provisionales son la principal fuente de auto-interrupciones:
       // no cortamos a Zuzu hasta tener una frase final claramente distinta de lo que está diciendo.
       if(!isFinal){
-        if(explicitInterruptCue(text)&&echoScore<0.25){
+        if((explicitInterruptCue(text)&&echoScore<0.25)||naturalInterruptCandidate(text,confidence,echoScore)){
           stopSpeaking(false);state.speechEchoUntil=Date.now()+650;setVoiceStatus('Te escucho. Continúa; esperaré dos segundos cuando termines.','ok');resetVoiceUtterance();
           state.voiceInterim=text;showVoicePrompt(text);
         }
@@ -343,7 +357,7 @@
       // suficientemente distinta, con contenido real y una confianza razonable. Así un eco
       // deformado por el altavoz no convierte a Zuzu en su propia interlocutora.
       var confOk=!confidence||Number(confidence)>=0.40;
-      var userLike=explicitInterruptCue(text)||(contentTokens(text).length>=3&&echoScore<0.30&&confOk);
+      var userLike=explicitInterruptCue(text)||naturalInterruptCandidate(text,confidence,echoScore)||(contentTokens(text).length>=3&&echoScore<0.30&&confOk);
       if(!userLike)return;
       stopSpeaking(false);state.speechEchoUntil=Date.now()+650;setVoiceStatus('Te escucho. Continúa; esperaré dos segundos cuando termines.','ok');resetVoiceUtterance();
     }else if(echoTail&&echoScore>=0.28){
