@@ -1,4 +1,4 @@
-/* ControlEvent v1.0_exp · Zuzu Voice V2
+/* ControlEvent v1.0_exp · Zuzu Voice · Transporte de turnos limpio
    Dócil + fluida + exacta en la captura de turnos.
    Arquitectura de audio deliberadamente simple:
    AMBIENTE -> captura completa de "Hola Zuzu ..." -> USUARIO -> ESPERA IA -> ZUZU HABLA.
@@ -6,10 +6,10 @@
 */
 (function(){
   'use strict';
-  if(window.__ceZuzuVoiceV2) return;
-  window.__ceZuzuVoiceV2=true;
+  if(window.__ceZuzuVoiceTurns) return;
+  window.__ceZuzuVoiceTurns=true;
 
-  var BUILD='v1.0_exp-VOICE-V2';
+  var BUILD='v1.0_exp-VOICE-TURNS-CLEAN';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -150,7 +150,7 @@
     '<button type="button" id="ceVoz3RecordDownload" class="ce-voz3-btn">⬇ Grabación</button><button type="button" id="ceVoz3Preview" class="ce-voz3-btn">▶ Prueba</button>'+
     '<select id="ceVoz3VoiceMode"><option value="female"'+(mode==='female'?' selected':'')+'>♀ Femenina</option><option value="male"'+(mode==='male'?' selected':'')+'>♂ Masculina</option></select>'+
     '<select id="ceVoz3VoiceChoice"><option value="auto">Voz automática</option></select><select id="ceVoz3Rate"><option value="0.82"'+(rate==='0.82'?' selected':'')+'>Lento</option><option value="0.92"'+(rate==='0.92'?' selected':'')+'>Normal</option><option value="1.06"'+(rate==='1.06'?' selected':'')+'>Rápido</option></select>'+
-    '<span id="ceVoz3Status" class="ce-voz3-status">Conversación V2</span></div>';}
+    '<span id="ceVoz3Status" class="ce-voz3-status">Conversación por voz</span></div>';}
   function bindPanel(){
     var b=$('ceVoz3Mic');if(b)b.onclick=function(){if(state.conversationMode){if(state.recognition)stopRecognition();else startUser();}else startAmbient();};
     b=$('ceVoz3AutoRead');if(b)b.onchange=function(){safeSet(STORAGE.auto,b.checked?'1':'0');};
@@ -172,12 +172,13 @@
   function install(){injectStyle();injectBadge();injectPanel();state.ambientEnabled=safeGet(STORAGE.ambient,'1')!=='0';if(supportsSpeech()){loadVoices();try{window.speechSynthesis.onvoiceschanged=loadVoices;}catch(_){}}if(state.ambientEnabled)setTimeout(startAmbient,500);if(window.MutationObserver){new MutationObserver(function(){if($('ceGeminiLibreOverlay'))injectPanel();}).observe(document.documentElement,{childList:true,subtree:true});}window.addEventListener('beforeunload',function(){stopRecognition();stopBarge();try{state.recorder&&state.recordingActive&&state.recorder.stop();}catch(_){}try{state.recorderStream&&state.recorderStream.getTracks().forEach(function(t){t.stop();});}catch(_){}});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 
-  window.ControlEventVoiceV2={
-    version:BUILD,conversationV2:true,isConversationalMode:function(){return !!state.conversationMode;},
+  window.ControlEventVoiceTurns={
+    version:BUILD,isConversationalMode:function(){return !!state.conversationMode;},
     startAmbientListening:startAmbient,endVoiceConversation:endConversation,downloadConversationRecording:downloadRecording,
     speakResponse:speakResponse,stopSpeaking:stopSpeaking,supportsRecognition:supportsRecognition,supportsDeviceSpeech:supportsSpeech
   };
   // Compatibilidad mínima con el módulo Zuzu sin cargar el controlador histórico.
-  window.ControlEventV22Voz4=window.ControlEventVoiceV2;
-  window.ControlEventV22Voz3=window.ControlEventVoiceV2;
+  window.ControlEventVoiceV2=window.ControlEventVoiceTurns;
+  window.ControlEventV22Voz4=window.ControlEventVoiceTurns;
+  window.ControlEventV22Voz3=window.ControlEventVoiceTurns;
 })();

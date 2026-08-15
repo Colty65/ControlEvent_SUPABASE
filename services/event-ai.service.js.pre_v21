@@ -9049,26 +9049,18 @@ function v26LocalCapabilitiesHelp(userPrompt,{usuarioLogado,user,authUser,ce_acc
 // No hay datos de negocio hardcodeados: se resuelven evento, catálogo y TK desde el estado.
 // ============================================================================
 function v281EventNameInText(state,value){
-  // Resolución nominal, no enrutado: compara exclusivamente contra títulos REALES del catálogo.
-  // Además de espacios/acentos normales, tolera fragmentación típica de Web Speech
-  // ("fun ción 20 25" -> compactado "funcion2025") y las variantes fonéticas genéricas
-  // ya normalizadas por semanticSpokenEntityNorm.
-  const spoken=semanticSpokenEntityNorm(value,'event');if(!spoken)return'';
-  const compact=x=>semanticSpokenEntityNorm(x,'event').replace(/[^a-z0-9ñ]+/g,'');
-  const blobCompact=compact(spoken),matches=[];
+  const blob=norm(value);if(!blob)return'';
+  const matches=[];
   for(const e of arr(state?.eventos)){
-    const name=trim(e?.titulo),key=semanticSpokenEntityNorm(name,'event');if(!name||!key)continue;
+    const name=trim(e?.titulo),key=norm(name);if(!name||!key)continue;
     const variants=[key];
     // «Función 25» puede ser una transcripción natural de «Función 2025». Solo aceptamos la
     // abreviatura si deriva de un título REAL del catálogo, por lo que no se hardcodea ningún evento.
     const shortYear=key.replace(/\b20(\d{2})\b/g,'$1');if(shortYear!==key)variants.push(shortYear);
-    for(const v of variants){
-      if(!v)continue;
-      const vc=compact(v);
-      if(spoken.includes(v)||(vc&&blobCompact.includes(vc)))matches.push({name,key:v.length,compact:vc.length});
-    }
+    const hit=variants.filter(v=>v&&blob.includes(v)).sort((a,b)=>b.length-a.length)[0];
+    if(hit)matches.push({name,key:hit});
   }
-  matches.sort((a,b)=>(b.compact-a.compact)||(b.key-a.key));
+  matches.sort((a,b)=>b.key.length-a.key.length);
   return matches[0]?.name||'';
 }
 function v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory=[],allowHistory=true){
