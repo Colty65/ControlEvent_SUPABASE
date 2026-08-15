@@ -2564,8 +2564,11 @@ function cleanGeminiError(error) {
   return (status + (raw || detailMsg || 'Error desconocido de Zuzu')).slice(0, 1200);
 }
 
-async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000) {
+async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000, externalSignal = null) {
   const controller = new AbortController();
+  const abortFromExternal = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener?.('abort', abortFromExternal, { once: true });
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(body), signal: controller.signal });
@@ -2580,6 +2583,7 @@ async function geminiFetchJsonWithTimeout(url, body, apiKey, timeoutMs = 35000) 
     throw error;
   } finally {
     clearTimeout(timer);
+    externalSignal?.removeEventListener?.('abort', abortFromExternal);
   }
 }
 
@@ -8056,7 +8060,7 @@ async function v261ExecuteAgentTool(call,state,selectedEventId,flowTrace=[]){
   return v26ExecuteTool(tool,state,selectedEventId);
 }
 
-async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto'}){
+async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto',externalSignal=null}){
   const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para Zuzu.');e.status=503;throw e;}
   // v1.0_exp · calidad conversacional antes que microahorro: un turno con herramientas necesita
   // poder completar su segunda Interaction. Mantenemos normalmente máximo 2 llamadas exitosas por turno; una gráfica bancaria puede necesitar una tercera Interaction para materializarse, pero
@@ -8076,7 +8080,7 @@ async function v261CallInteraction({input,previousInteractionId='',model,systemI
   if(trim(previousInteractionId))body.previous_interaction_id=trim(previousInteractionId);
   const url='https://generativelanguage.googleapis.com/v1/interactions';
   let res,payload;
-  try{({res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_INTERACTIONS_TIMEOUT_MS||45000)));}
+  try{({res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_INTERACTIONS_TIMEOUT_MS||45000),externalSignal));}
   catch(error){zuzuTracePush(flowTrace,stage,'KO',cleanGeminiError(error));throw error;}
   const usage=v261UsageSmall(payload,model);
   if(!res.ok){const e=new Error(payload?.error?.message||`Gemini Interactions HTTP ${res.status}`);e.status=res.status;e.details=payload;zuzuTracePush(flowTrace,stage,'KO',cleanGeminiError(e),{model,usage});throw e;}
@@ -8987,7 +8991,7 @@ function v30PersonDeterministicChartSpecs(userPrompt='',dossier=null){
   return specs.slice(0,v30WantsSingleChart(userPrompt)?1:4);
 }
 
-async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone}){
+async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
   // Compatibilidad de regresión v1.4: V27.1.4 · Garantía de cobertura; la lógica vigente es V27.1.5.
   const requestedChartIntent=v273ConversationRequestsCharts(userPrompt,conversationHistory);
   const chartIntent=voiceConversation?false:requestedChartIntent;
@@ -9056,13 +9060,13 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   if(hasNativeThread)zuzuTracePush(flowTrace,'v30 · Memoria Gemini nativa','OK',`Continuación con previous_interaction_id=${currentId.slice(0,40)}…; Gemini recupera el historial del servidor.`);
   else if(arr(conversationHistory).length)zuzuTracePush(flowTrace,'v30 · Recuperación de contexto','OK','No hay Interaction nativa utilizable; se aporta una cápsula local de los últimos turnos para reconstruir el hilo sin pedir al usuario que repita nada.');
   try{
-    payload=await v261CallInteraction({input:initialInput,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'v30 · Gemini interpreta y decide herramientas',toolChoice:'auto'});
+    payload=await v261CallInteraction({input:initialInput,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'v30 · Gemini interpreta y decide herramientas',toolChoice:'auto',externalSignal});
   }catch(error){
     if(currentId&&v261PreviousIdFailure(error)){
       resetInteractionId=true;
       zuzuTracePush(flowTrace,'v30 · Recuperación de Interaction','WARN','El previous_interaction_id anterior ya no es válido. Se reconstruye el hilo con los últimos turnos locales y se crea una nueva cadena sin interrumpir al usuario.');
       currentId='';
-      payload=await v261CallInteraction({input:v261EmergencyConversationInput(groundedUserInput,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'v30 · Gemini reconstruye conversación',toolChoice:'auto'});
+      payload=await v261CallInteraction({input:v261EmergencyConversationInput(groundedUserInput,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'v30 · Gemini reconstruye conversación',toolChoice:'auto',externalSignal});
     }else throw error;
   }
   currentId=trim(payload?.id)||currentId;
@@ -9093,7 +9097,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
       }
     }));
     try{
-      payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:`V27.1.5 · Gemini tras herramientas ${cycle}`});
+      payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:`V27.1.5 · Gemini tras herramientas ${cycle}`,externalSignal});
     }catch(error){error.canonicalResults=[...allResults];error.canonicalEventFocus=eventFocus;throw error;}
     currentId=trim(payload?.id)||currentId;
   }
@@ -10927,7 +10931,7 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
 }
 
 
-export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, clientNowIso, clientLocalDateTime, clientTimeZone } = {}) {
+export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, clientNowIso, clientLocalDateTime, clientTimeZone, externalSignal } = {}) {
   const flowTrace = [];
   const userPrompt = trim(prompt);
   zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
@@ -10966,8 +10970,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   // Esto evita errores como «Ahora háblame de SySA 2025» heredando PURCHASES del turno anterior.
   zuzuTracePush(flowTrace,'v1.0_exp · ARQUITECTURA NUEVA ACTIVA','OK',`Gemini interpreta todos los turnos y mantiene el hilo nativo; ControlEvent ejecuta herramientas y materializa datos canónicos. No existe una ruta semántica determinista previa que pueda arrastrar el dominio anterior. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
   try{
-    return await runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(0,14000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80)});
+    return await runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(0,14000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
   }catch(error){
+    if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
     zuzuTracePush(flowTrace,'v30 · Respaldo por indisponibilidad','WARN',`Gemini no completó el turno por un fallo real de servicio/ejecución; CE conserva los hechos canónicos como respaldo. ${cleanGeminiError(error)}`);
     try{
       const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false);

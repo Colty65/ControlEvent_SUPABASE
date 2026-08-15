@@ -25,14 +25,17 @@ router.post('/zuzu-tests/run-stream', async (req,res,next)=>{
     const controller=new AbortController();
     res.on('close',()=>{ if(!res.writableEnded) controller.abort(); });
     const send=payload=>{ if(!res.writableEnded){res.write(`${JSON.stringify(payload)}\n`);res.flush?.();} };
-    await runZuzuTestStream({
-      mode:req.body?.mode||'FAST',
-      maxCostEur:req.body?.maxCostEur,
-      maxCases:req.body?.maxCases,
-      caseIds:req.body?.caseIds,
-      send,
-      signal:controller.signal
-    });
+    const keepAlive=setInterval(()=>send({type:'keepalive',at:new Date().toISOString()}),10000);
+    try{
+      await runZuzuTestStream({
+        mode:req.body?.mode||'FAST',
+        maxCostEur:req.body?.maxCostEur,
+        maxCases:req.body?.maxCases,
+        caseIds:req.body?.caseIds,
+        send,
+        signal:controller.signal
+      });
+    }finally{clearInterval(keepAlive);}
     if(!res.writableEnded)res.end();
   }catch(error){
     if(res.headersSent){try{res.write(`${JSON.stringify({type:'error',error:error?.message||String(error)})}\n`);res.end();}catch(_){ }return;}
