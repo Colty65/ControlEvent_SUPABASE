@@ -7762,6 +7762,10 @@ function v307CurrentStructuredDomain(userPrompt='',history=[],dataReq={},results
   // estructurado inmediatamente anterior. Así «revísalo» tras un resumen general no dispara
   // una fuente incidental mencionada en la redacción previa.
   const immediate=v307ImmediateStructuredDomain(history);
+  // Una revisión explícita («¿estás segura?», «revísalo», «compruébalo») conserva el dominio
+  // estructurado inmediatamente anterior. No deducimos nada de la prosa de Zuzu: usamos el
+  // resultContext/herramienta del turno previo.
+  if(immediate&&v306ReviewCue(userPrompt))return immediate;
   if(immediate==='donation'&&(dataReq?.donationExactLines||dataReq?.donationDetail||dataReq?.structuredDetailFollowUp))return'donation';
   if(immediate==='purchase'&&(dataReq?.purchaseDetail||dataReq?.purchaseStructured||dataReq?.exactPurchaseLines||dataReq?.structuredDetailFollowUp))return'purchase';
   return'';
@@ -7781,7 +7785,7 @@ function v274DataAccessRequirement(prompt='',history=[]){
   const tableOnly=/\b(simplemente|solo|únicamente|unicamente)\b[^.\n]{0,25}\btabla\b/.test(p)||/^\s*(?:dame|pon|muestra)?\s*(?:simplemente|solo)?\s*la\s+tabla\b/.test(p);
   const inferCatalog=value=>{if(!catalogCue(value))return'';if(productWord(value)||/\balmacen|almacén\b/.test(value))return'products';if(/\b(tienda|tiendas|proveedor|proveedores)\b/.test(value))return'stores';if(/\b(persona|personas|socio|socios|colaborador|colaboradores)\b/.test(value))return'people';if(/\b(evento|eventos)\b/.test(value))return'events';return'';};
   let catalogEntity=inferCatalog(p);if(!catalogEntity&&followUpTransform)catalogEntity=inferCatalog(hist);
-  const structuredDetailFollowUp=/^(?:y|ahora|adem[aá]s|tamb[ié]n|perdona|perd[oó]n|espera|vale|eh)?\s*(?:dame|dime|pon|muestra)?\s*(?:tamb[ié]n\s+)?(?:la\s+|el\s+|los\s+|las\s+)?(?:cantidad(?:es)?|precio(?:s)?|importe(?:s)?|sumatorio|total|lista|listado|detalle|nombres?)\b/.test(p)
+  const structuredDetailFollowUp=/^(?:y|ahora|adem[aá]s|tamb[ié]n|perdona|perd[oó]n|espera|vale|eh)?\s*(?:dame|dime|pon|muestra)?\s*(?:tamb[ié]n\s+)?(?:la\s+|el\s+|los\s+|las\s+)?(?:cantidad(?:es)?|cu[aá]nt(?:a|as|o|os)|precio(?:s)?|importe(?:s)?|sumatorio|total|lista|listado|detalle|nombres?)\b/.test(p)
     || /\b(una\s+por\s+una|uno\s+por\s+uno|vuelve\s+a\s+(?:sac|mostr|dec)\w*|lista\s+real|revis\w*|no\s+cuadr\w*|falt\w*|incomplet\w*)\b/.test(p)
     || /^(?:perdona|perd[oó]n|oye|eh|vale)?\s*(?:dime|dame)?\s*(?:qui[eé]n|qui[eé]nes|cu[aá]l|cu[aá]les)\b/.test(p);
   const directPurchase=purchaseCue(p);
@@ -8033,15 +8037,20 @@ function v307DonorFromContext(userPrompt,state,history=[],existingDonation=null)
 }
 function v306PurchaseFiltersFromContext(userPrompt,state,history=[]){
   const values=(field)=>[...new Set(arr(state?.productos).map(x=>trim(x?.[field])).filter(Boolean))].sort((a,b)=>norm(b).length-norm(a).length);
-  const contexts=[norm(userPrompt)];
-  // Un follow-up elíptico puede heredar Segmento/Destino, pero solo del último turno de compras.
+  const contexts=[norm(userPrompt)];let inheritedProduct='';
+  // Un follow-up elíptico hereda filtros SOLO del último turno real de compras. El producto se
+  // toma del resultContext estructurado, nunca de una palabra incidental en la respuesta de Zuzu.
   for(const turn of arr(history).slice().reverse()){
     const domain=v307DomainFromResultContext(turn?.resultContext)||v307StructuredDomainFromText(turn?.user)||v307StructuredDomainFromText(turn?.title);if(!domain)continue;
-    if(domain==='purchase')contexts.push(norm(turn?.user));
+    if(domain==='purchase'){
+      contexts.push(norm(turn?.user));
+      inheritedProduct=trim(turn?.resultContext?.filters?.product)||'';
+    }
     break;
   }
   const pick=field=>{const candidates=values(field);for(const blob of contexts){const hit=candidates.find(v=>{const k=norm(v);return k.length>=3&&blob.includes(k);});if(hit)return hit;}return'';};
-  return{segment:pick('segmento'),destination:pick('destino')};
+  const namedProduct=values('nombre').find(v=>{const k=norm(v);return k.length>=4&&norm(userPrompt).includes(k);})||'';
+  return{segment:pick('segmento'),destination:pick('destino'),product:namedProduct||inheritedProduct};
 }
 async function v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventId,conversationHistory,dataReq,allResults,flowTrace}){
   const domain=v307CurrentStructuredDomain(userPrompt,conversationHistory,dataReq,allResults);
@@ -8060,12 +8069,12 @@ async function v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventI
     return;
   }
   if(domain!=='purchase')return;
-  const purchaseListCue=/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(norm(userPrompt));
+  const purchaseListCue=/\b(lista|listado|enumer\w*|una\s+por\s+una|uno\s+por\s+uno|1\s*(?:a|por)\s*1|cantidad|cantidades|cu[aá]nt(?:a|as|o|os)|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(norm(userPrompt));
   if(!(dataReq?.purchaseDetail||dataReq?.purchaseStructured||dataReq?.structuredDetailFollowUp||purchaseListCue||v306ReviewCue(userPrompt)))return;
   const filters=v306PurchaseFiltersFromContext(userPrompt,state,conversationHistory);
   const existingPurchase=arr(allResults).slice().reverse().find(r=>r?.ok&&r?.name==='event_purchase_lines');
-  const filterMismatch=!!existingPurchase&&((filters.segment&&norm(existingPurchase?.facts?.segment)!==norm(filters.segment))||(filters.destination&&norm(existingPurchase?.facts?.destination)!==norm(filters.destination)));
-  const needsPurchaseRefresh=!existingPurchase||filterMismatch||((filters.segment||filters.destination)&&!trim(existingPurchase?.facts?.segment)&&!trim(existingPurchase?.facts?.destination));
+  const filterMismatch=!!existingPurchase&&((filters.segment&&norm(existingPurchase?.facts?.segment)!==norm(filters.segment))||(filters.destination&&norm(existingPurchase?.facts?.destination)!==norm(filters.destination))||(filters.product&&norm(existingPurchase?.facts?.product)!==norm(filters.product)));
+  const needsPurchaseRefresh=!existingPurchase||filterMismatch||((filters.segment||filters.destination||filters.product)&&!trim(existingPurchase?.facts?.segment)&&!trim(existingPurchase?.facts?.destination)&&!trim(existingPurchase?.facts?.product));
   if(needsPurchaseRefresh){
     const event=v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory,true);
     if(event){
@@ -8108,16 +8117,26 @@ function v306VoiceCanonicalStructuredAnswer(userPrompt,history=[],results=[],dat
     }
   }
   if(domain==='purchase'){
-    const purchaseListCue=/\b(lista|listado|una\s+por\s+una|uno\s+por\s+uno|cantidad|cantidades|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(p)||dataReq?.structuredDetailFollowUp||v306ReviewCue(userPrompt);
+    const purchaseListCue=/\b(lista|listado|enumer\w*|una\s+por\s+una|uno\s+por\s+uno|1\s*(?:a|por)\s*1|cantidad|cantidades|precio|precios|importe|importes|sumatorio|bebidas?|cubatas?|productos?)\b/.test(p)||dataReq?.structuredDetailFollowUp||v306ReviewCue(userPrompt);
     const r=latest('event_purchase_lines'),rows=arr(table(r,'by_product')?.rows);
     if(purchaseListCue&&r&&rows.length&&rows.length<=80){
       const f=r.facts||{},event=trim(f.event)||'este evento';
-      const wantsQty=/\b(cantidad|cantidades|unidad|unidades|una\s+por\s+una|uno\s+por\s+uno)\b/.test(blob);
+      const wantsQty=/\b(cantidad|cantidades|cu[aá]nt(?:a|as|o|os)|unidad|unidades|enumer\w*|una\s+por\s+una|uno\s+por\s+uno|1\s*(?:a|por)\s*1)\b/.test(blob);
       const wantsPrice=/\b(precio|precios)\b/.test(blob);
       const wantsAmount=/\b(importe|importes|sumatorio|total)\b/.test(blob);
-      const detail=rows.map(x=>{const parts=[trim(x?.Producto)||'Producto'];if(wantsQty)parts.push(`${num(x?.Unidades)} unidad${Math.abs(num(x?.Unidades)-1)<0.001?'':'es'}`);if(wantsPrice&&trim(x?.['Precios registrados']))parts.push(`precio ${trim(x['Precios registrados'])}`);if(wantsAmount)parts.push(`importe ${v26FormatEuro(num(x?.Importe))}`);return parts.join(', ');}).join('; ');
+      const exhaustive=/\b(lista|listado|enumer\w*|una\s+por\s+una|uno\s+por\s+uno|1\s*(?:a|por)\s*1|cada\s+|todos?\s+los?|todas?\s+las?|detalle\w*)\b/.test(p)||(wantsPrice&&wantsQty)||(wantsAmount&&wantsQty);
       const filters=[trim(f.segment)&&`segmento ${trim(f.segment)}`,trim(f.destination)&&`destino ${trim(f.destination)}`,trim(f.product)&&`producto ${trim(f.product)}`].filter(Boolean).join(', ');
-      return{title:`Compras · ${event}`,answer:`He consultado el detalle real de compras${filters?` para ${filters}`:''} en ${event}. Son ${rows.length} producto${rows.length===1?'':'s'}: ${detail}. El importe total de este conjunto es ${v26FormatEuro(num(f.total_amount))}.`,warnings:[],showTables:[],chartSpecs:[]};
+      const asksHowMany=/\bcu[aá]nt(?:a|as|o|os)\b/.test(p)&&!exhaustive&&!wantsPrice&&!wantsAmount;
+      if(asksHowMany){
+        const units=rows.reduce((a,x)=>a+num(x?.Unidades),0);
+        return{title:`Compras · ${event}`,answer:`En ${event}${filters?`, para ${filters}`:''}, se compraron ${units} unidades repartidas en ${rows.length} producto${rows.length===1?'':'s'} distinto${rows.length===1?'':'s'}.`,warnings:[],showTables:[],chartSpecs:[]};
+      }
+      if(!exhaustive&&rows.length>8){
+        const examples=rows.slice(0,5).map(x=>trim(x?.Producto)).filter(Boolean);
+        return{title:`Compras · ${event}`,answer:`En ${event}${filters?`, para ${filters}`:''}, hay ${rows.length} productos distintos por un importe total de ${v26FormatEuro(num(f.total_amount))}.${examples.length?` Por ejemplo: ${examples.join(', ')}${rows.length>examples.length?', entre otros':''}.`:''}`,warnings:[],showTables:[],chartSpecs:[]};
+      }
+      const detail=rows.map(x=>{const parts=[trim(x?.Producto)||'Producto'];if(wantsQty)parts.push(`${num(x?.Unidades)} unidad${Math.abs(num(x?.Unidades)-1)<0.001?'':'es'}`);if(wantsPrice&&trim(x?.['Precios registrados']))parts.push(`precio ${trim(x['Precios registrados'])}`);if(wantsAmount)parts.push(`importe ${v26FormatEuro(num(x?.Importe))}`);return parts.join(', ');}).join('; ');
+      return{title:`Compras · ${event}`,answer:`En ${event}${filters?`, para ${filters}`:''}, son ${rows.length} producto${rows.length===1?'':'s'}: ${detail}. El importe total de este conjunto es ${v26FormatEuro(num(f.total_amount))}.`,warnings:[],showTables:[],chartSpecs:[]};
     }
   }
   return null;
@@ -8947,7 +8966,17 @@ function v26LocalCapabilitiesHelp(userPrompt,{usuarioLogado,user,authUser,ce_acc
 // ============================================================================
 function v281EventNameInText(state,value){
   const blob=norm(value);if(!blob)return'';
-  const matches=arr(state?.eventos).map(e=>({name:trim(e?.titulo),key:norm(e?.titulo)})).filter(x=>x.name&&x.key&&blob.includes(x.key)).sort((a,b)=>b.key.length-a.key.length);
+  const matches=[];
+  for(const e of arr(state?.eventos)){
+    const name=trim(e?.titulo),key=norm(name);if(!name||!key)continue;
+    const variants=[key];
+    // «Función 25» puede ser una transcripción natural de «Función 2025». Solo aceptamos la
+    // abreviatura si deriva de un título REAL del catálogo, por lo que no se hardcodea ningún evento.
+    const shortYear=key.replace(/\b20(\d{2})\b/g,'$1');if(shortYear!==key)variants.push(shortYear);
+    const hit=variants.filter(v=>v&&blob.includes(v)).sort((a,b)=>b.length-a.length)[0];
+    if(hit)matches.push({name,key:hit});
+  }
+  matches.sort((a,b)=>b.key.length-a.key.length);
   return matches[0]?.name||'';
 }
 function v281PromptEventName(state,selectedEventId,userPrompt,conversationHistory=[],allowHistory=true){
