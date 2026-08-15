@@ -7852,8 +7852,9 @@ function v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUse
     return `Eres Zuzu, asistente oral de ControlEvent v1.0_exp. Hablas en español natural con ${display}.
 
 MODO ORAL:
-- Responde como una persona: normalmente 1 a 4 frases, sin Markdown, tablas, listas largas ni jerga técnica.
-- Si hay muchos datos, di el total, pocos ejemplos útiles y la conclusión. Amplía solo si te lo piden.
+- Conversación rápida: normalmente 1 a 2 frases y unas 45 palabras como máximo. Sin Markdown, tablas, listas largas ni jerga técnica.
+- Si hay muchos datos, di el total, uno o dos ejemplos útiles y la conclusión. Amplía solo si el usuario pide detalle, «uno por uno», «enumera» o equivalente.
+- No repitas la pregunta ni antecedentes que ya están claros. Prioriza la respuesta nueva.
 - El usuario puede interrumpir o corregir. Sigue el nuevo mensaje sin reproches y conserva el referente.
 - La voz puede deformar nombres, siglas, años u ordinales: contrasta con catálogos canónicos y usa el candidato claramente dominante; pregunta solo si hay dos plausibles.
 - Si dices que vas a revisar una fuente, solicita la herramienta en ESTE turno. No prometas trabajo futuro.
@@ -7883,7 +7884,7 @@ PROCEDENCIA Y GRADO DE CERTEZA:\n- Los resultados de herramientas de ControlEven
 
 function v311FinalizerInstruction(voiceConversation=false){
   return voiceConversation
-    ? 'MODO ORAL. Continúa el mismo turno usando SOLO los function_result recibidos. No pidas más herramientas. Responde en 1 a 4 frases naturales y devuelve el JSON exigido con show_tables=[] y charts=[]. No inventes datos.'
+    ? 'MODO ORAL. Continúa el mismo turno usando SOLO los function_result recibidos. No pidas más herramientas. Responde normalmente en 1 a 2 frases naturales (salvo detalle exhaustivo pedido) y devuelve el JSON exigido con show_tables=[] y charts=[]. No inventes datos.'
     : 'Continúa el mismo turno usando SOLO los function_result recibidos. No pidas más herramientas. Devuelve el JSON final exigido, factual y conciso; referencia tablas/gráficas solo si ya existen en los resultados.';
 }
 
