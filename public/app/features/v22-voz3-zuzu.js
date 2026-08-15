@@ -1,4 +1,4 @@
-/* ControlEvent v1.0_exp · VOZ12 MAQUINA DE TURNOS ESTABLE
+/* ControlEvent v1.0_exp · VOZ13 WAKE COMPLETO + TURNOS LIMPIOS
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -87,7 +87,10 @@
     conversationTurnFinalSeen: false,
     conversationTurnFallback: null,
     awaitingResponse: false,
-    bargeSeedText: ''
+    bargeSeedText: '',
+    wakePending: false,
+    wakePendingTimer: null,
+    wakePendingStartedAt: 0
   };
 
   function $(id){ return document.getElementById(id); }
@@ -462,14 +465,34 @@ function processConversationSpeech(text,isFinal,confidence){
   }
 }
 
-  function processAmbientSpeech(text){
+  function clearPendingWake(){
+    clearTimeout(state.wakePendingTimer);state.wakePendingTimer=null;state.wakePending=false;state.wakePendingStartedAt=0;
+  }
+  function commitPendingWake(){
+    if(!state.wakePending)return;
+    var heard=voiceAliasNormalize(state.ambientHeard),match=wakeMatch(heard);
+    clearPendingWake();
+    if(!match.matched)return;
+    var first=match.rest?('Hola Zuzu. '+match.rest):'Hola Zuzu';
+    state.ambientHeard='';
+    beginVoiceConversation(first);
+  }
+  function processAmbientSpeech(text,isFinal){
     text=voiceAliasNormalize(text);if(!text||isLikelyOwnVoice(text))return;
-    state.ambientHeard=joinText(state.ambientHeard,text).slice(-180);
+    // No abrimos Zuzu en cuanto aparece «Hola Zuzu»: Web Speech puede cerrar ese fragmento
+    // y entregar el resto de la misma frase unas décimas después. Si invalidamos el recognizer
+    // al primer fragmento, se pierde justo «dame info de FUNCION 2025». Conservamos una
+    // ventana muy corta de cola y arrancamos con TODA la orden de activación.
+    state.ambientHeard=joinText(state.ambientHeard,text).slice(-260);
     var match=wakeMatch(state.ambientHeard);
     if(match.matched){
-      var first=match.rest?('Hola Zuzu. '+match.rest):'Hola Zuzu';
-      state.ambientHeard='';beginVoiceConversation(first);return;
+      state.wakePending=true;if(!state.wakePendingStartedAt)state.wakePendingStartedAt=Date.now();
+      clearTimeout(state.wakePendingTimer);
+      var delay=match.rest?(isFinal?360:520):(isFinal?720:900);
+      state.wakePendingTimer=setTimeout(commitPendingWake,delay);
+      return;
     }
+    if(state.wakePending)return;
     // Mantener solo unas pocas palabras evita activar por frases antiguas acumuladas.
     var words=state.ambientHeard.split(/\s+/);if(words.length>10)state.ambientHeard=words.slice(-10).join(' ');
   }
@@ -539,13 +562,13 @@ function processConversationSpeech(text,isFinal,confidence){
     // Cerrar la ventana NO finaliza la sesión oral ni la grabación. Se aparca el diálogo y
     // se reconstruye el reconocedor en modo ambiental para no depender de una instancia STT
     // que hubiera quedado asociada al modal/conversación anterior.
-    clearTimeout(state.silenceTimer);state.silenceTimer=null;stopBargeRecognition();stopSpeaking(false);resetVoiceUtterance();state.ambientHeard='';
+    clearTimeout(state.silenceTimer);state.silenceTimer=null;clearPendingWake();stopBargeRecognition();stopSpeaking(false);resetVoiceUtterance();state.ambientHeard='';
     state.conversationMode=false;state.conversationParked=hadVoiceSession;state.recognitionMode='ambient';state.awaitingResponse=false;state.queuedUtterance='';
     state.wantListening=state.ambientEnabled;updateWakeBadge();
     if(state.ambientEnabled)restartAmbientRecognizerAfterClose();
   }
   function finishVoiceConversationState(reason){
-    state.conversationMode=false;state.conversationParked=false;state.recognitionMode='ambient';state.requestInFlight=false;state.awaitingResponse=false;state.queuedUtterance='';resetVoiceUtterance();state.ambientHeard='';updateWakeBadge();
+    clearPendingWake();state.conversationMode=false;state.conversationParked=false;state.recognitionMode='ambient';state.requestInFlight=false;state.awaitingResponse=false;state.queuedUtterance='';resetVoiceUtterance();state.ambientHeard='';updateWakeBadge();
     if(state.ambientEnabled){state.wantListening=true;startRecognitionEngine();}
     setVoiceStatus(reason==='pdf'?'Conversación oral finalizada al preparar el PDF. Di «Hola Zuzu» cuando quieras volver.':'Escucha ambiental activa. Di «Hola Zuzu» cuando quieras.','ok');
   }
@@ -747,7 +770,7 @@ function buildRecognition(){
       if(state.conversationMode&&state.recognitionMode==='conversation')processConversationSpeech(text,isFinal,picked.confidence);
       else if(state.recognitionMode==='manual'){
         if(isFinal)appendFinalTranscript(text);else state.voiceInterim=text;updatePrompt(isFinal?'':text);
-      }else processAmbientSpeech(text);
+      }else processAmbientSpeech(text,isFinal);
     }
   };
   rec.onerror=function(ev){
