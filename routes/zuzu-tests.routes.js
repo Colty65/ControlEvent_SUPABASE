@@ -11,7 +11,7 @@ function actorFromRequest(req){
 
 router.get('/zuzu-tests/preview', asyncHandler(async (req,res)=>{
   await assertGdActor(actorFromRequest(req));
-  res.json(await previewZuzuBattery());
+  res.json(await previewZuzuBattery({seed:req.query?.seed}));
 }));
 
 router.post('/zuzu-tests/run-case', async (req,res,next)=>{
@@ -20,7 +20,7 @@ router.post('/zuzu-tests/run-case', async (req,res,next)=>{
     const controller=new AbortController();
     req.on('aborted',()=>controller.abort());
     res.on('close',()=>{if(!res.writableEnded)controller.abort();});
-    const result=await runZuzuTestCase({mode:req.body?.mode,caseId:req.body?.caseId,conversationState:req.body?.conversationState||{},signal:controller.signal});
+    const result=await runZuzuTestCase({mode:req.body?.mode,caseId:req.body?.caseId,conversationState:req.body?.conversationState||{},seed:req.body?.seed,signal:controller.signal});
     if(!res.writableEnded)res.json(result);
   }catch(error){if(error?.name==='AbortError'&&res.headersSent)return;next(error);}
 });
@@ -43,6 +43,7 @@ router.post('/zuzu-tests/run-stream', async (req,res,next)=>{
         maxCostEur:req.body?.maxCostEur,
         maxCases:req.body?.maxCases,
         caseIds:req.body?.caseIds,
+        seed:req.body?.seed,
         send,
         signal:controller.signal
       });
