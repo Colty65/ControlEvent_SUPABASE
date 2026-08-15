@@ -55,6 +55,11 @@ function findTable(result,keyName){ return arr(result?.tables).find(t=>trim(t?.k
 function toolTable(tool,keyName){ return arr(tool?.tables).find(t=>trim(t?.key)===keyName) || null; }
 function compactCase(c){ return {id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',meta:c.meta||{}}; }
 
+function publicBatteryCase(c,mode=''){
+  const expected = trim(c?.expected) || (trim(c?.expectedEvent)?`Evento: ${trim(c.expectedEvent)}`:'') || (arr(c?.expectedEvents).length?`Eventos: ${arr(c.expectedEvents).join(' ↔ ')}`:'') || (trim(c?.expectedPerson)?`Persona: ${trim(c.expectedPerson)}`:'') || (trim(c?.event)?`Evento: ${trim(c.event)}`:'') || (arr(c?.events).length?`Eventos: ${arr(c.events).join(' ↔ ')}`:'') || (trim(c?.person)?`Persona: ${trim(c.person)}`:'') || 'Regla/invariante satisfecha';
+  return {id:trim(c?.id),group:trim(c?.group)||'CONVERSACIÓN',label:trim(c?.label)||trim(c?.scenario)||trim(c?.prompt),prompt:trim(c?.prompt),expected,scenario:trim(c?.scenario),mode:trim(mode)};
+}
+
 function makeCase({id,group,label,prompt='',expected='',meta={},run}){ return {id,group,label,prompt,expected,meta,run}; }
 function outcome(c,status,actual,extra={}){ return {id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:trim(actual),status,...extra}; }
 
@@ -206,7 +211,7 @@ async function batteryBlueprint(state){
 
 export async function previewZuzuBattery(){
   const state=await getState(); const b=await batteryBlueprint(state);
-  return {ok:true,generatedAt:nowIso(),source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},estimated:{'AI-SMOKE':{cases:Math.min(24,b.smoke.length),costEurRange:'0,05–0,25 €',hardCapSuggested:0.25},'FULL-CERT':{turns:Math.min(18,b.full.length),costEurRange:'0,10–0,50 €',hardCapSuggested:0.50}},notes:['FAST usa datos reales y 0 llamadas IA.','AI-SMOKE prueba interpretación/selección sobre casos reales, con presupuesto duro.','FULL-CERT ejecuta conversaciones reales multiturmo, con presupuesto duro.','Ningún modo modifica datos de producción.']};
+  return {ok:true,generatedAt:nowIso(),source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(24,b.smoke.length),costEurRange:'0,05–0,25 €',hardCapSuggested:0.25},'FULL-CERT':{turns:Math.min(18,b.full.length),costEurRange:'0,10–0,50 €',hardCapSuggested:0.50}},notes:['FAST usa datos reales y 0 llamadas IA.','AI-SMOKE se ejecuta caso a caso para no agotar la duración máxima de una función serverless.','FULL-CERT puede ejecutarse turno a turno conservando el contexto de conversación en el cliente.','Ningún modo modifica datos de producción.']};
 }
 
 function streamWrite(send,type,payload={}){ send({type,at:nowIso(),...payload}); }
@@ -223,9 +228,15 @@ async function runTimedAiCase({caseDef,send,parentSignal,index,total,timeoutMs,t
   const guard=timedCaseController(parentSignal,timeoutMs),started=Date.now();
   streamWrite(send,'case_start',{case:{id:caseDef.id,group:caseDef.group,label:caseDef.label,prompt:caseDef.prompt||''},index,total,timeoutMs});
   const heartbeat=setInterval(()=>streamWrite(send,'heartbeat',{caseId:caseDef.id,index,total,elapsedMs:Date.now()-started,timeoutMs}),2500);
-  try{return{value:await task(guard.signal),timedOut:false};}
-  catch(error){return{error,timedOut:guard.timedOut()};}
-  finally{clearInterval(heartbeat);guard.cleanup();}
+  let hardTimer=null;
+  const taskPromise=Promise.resolve().then(()=>task(guard.signal)).then(value=>({kind:'value',value}),error=>({kind:'error',error}));
+  const hardTimeout=new Promise(resolve=>{hardTimer=setTimeout(()=>resolve({kind:'timeout'}),Math.max(5100,Number(timeoutMs)||60000)+150);});
+  try{
+    const winner=await Promise.race([taskPromise,hardTimeout]);
+    if(winner?.kind==='timeout') return {error:new Error(`Tiempo máximo de ${Math.round((Number(timeoutMs)||60000)/1000)} s superado.`),timedOut:true};
+    if(winner?.kind==='error') return {error:winner.error,timedOut:guard.timedOut()};
+    return {value:winner?.value,timedOut:false};
+  } finally { if(hardTimer)clearTimeout(hardTimer);clearInterval(heartbeat);guard.cleanup(); }
 }
 
 async function runFast({state,cases,send,signal}){
@@ -240,7 +251,7 @@ async function runFast({state,cases,send,signal}){
 
 async function runSmoke({state,cases,send,signal,maxCostEur=0.25,maxCases=24}){
   const selected=cases.slice(0,Math.max(1,Math.min(80,Number(maxCases)||24))), total=selected.length; let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0; const failures=[];
-  const timeoutMs=Math.max(30000,Math.min(120000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||60000));
+  const timeoutMs=Math.max(30000,Math.min(120000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000));
   for(let i=0;i<selected.length;i++){
     const c=selected[i]; if(signal?.aborted)break;
     const reserve=0.012; if(costEur>0 && costEur+reserve>maxCostEur){streamWrite(send,'budget',{message:`Presupuesto protegido: no se inicia otra prueba porque quedan menos de ${reserve.toFixed(3)} € de margen.`,costEur});break;}
@@ -267,7 +278,7 @@ async function runSmoke({state,cases,send,signal,maxCostEur=0.25,maxCases=24}){
 
 async function runFull({state,turns,send,signal,maxCostEur=0.50,maxCases=18}){
   const selected=turns.slice(0,Math.max(1,Math.min(40,Number(maxCases)||18))),total=selected.length;let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0;const failures=[];
-  const timeoutMs=Math.max(45000,Math.min(150000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||75000));
+  const timeoutMs=Math.max(45000,Math.min(150000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
   let previousInteractionId='',history=[],activeScenario='';
   for(let i=0;i<selected.length;i++){
     const c=selected[i]; if(signal?.aborted)break;
@@ -292,6 +303,43 @@ async function runFull({state,turns,send,signal,maxCostEur=0.50,maxCases=18}){
     if(costEur>=maxCostEur){streamWrite(send,'budget',{message:'Se ha alcanzado el presupuesto máximo configurado.',costEur});break;}
   }
   return {done,total,ok,warn,ko,failures,costEur,calls,tokens,aborted:!!signal?.aborted,caseTimeoutMs:timeoutMs};
+}
+
+
+function safeConversationState(raw={}){
+  return {previousInteractionId:trim(raw?.previousInteractionId).slice(0,500),scenario:trim(raw?.scenario).slice(0,160),history:arr(raw?.history).slice(-8).map(h=>({user:trim(h?.user).slice(0,1600),assistant:trim(h?.assistant).slice(0,1200),assistantTail:trim(h?.assistantTail).slice(0,900),title:trim(h?.title).slice(0,240),provider:trim(h?.provider).slice(0,80),selectedEventId:trim(h?.selectedEventId).slice(0,160),pendingAction:h?.pendingAction||null,resultContext:h?.resultContext||null}))};
+}
+
+export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationState={},signal}={}){
+  const m=trim(mode).toUpperCase();
+  if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('run-case solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
+  const state=await getState(),b=await batteryBlueprint(state),all=m==='AI-SMOKE'?b.smoke:b.full,c=all.find(x=>trim(x.id)===trim(caseId));
+  if(!c){const e=new Error('Caso de ITV no encontrado en la batería actual. Actualiza datos y batería.');e.status=404;throw e;}
+  if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+  const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
+  let r,nextConversationState=null;
+  if(m==='AI-SMOKE'){
+    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,conversationHistory:[],conversationTurnNumber:1,externalSignal})});
+    if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+    if(timed.timedOut) r=outcome(c,'WARN',`TIEMPO MÁXIMO: el caso superó ${Math.round(timeoutMs/1000)} s. Se cancela este caso y el cliente puede continuar con el siguiente.`,{timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});
+    else if(timed.error) r=outcome(c,'KO',timed.error?.message||String(timed.error),{usage:{calls:1,tokens:0,costEur:reserve}});
+    else {const result=timed.value,u=usageOf(result),valid=c.validate?!!c.validate(result):!!result?.ok;r=outcome(c,valid?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,320)}`,{usage:u,tools:arr(result?.meta?.tools)});}
+  } else {
+    let cs=safeConversationState(conversationState);
+    if(cs.scenario!==trim(c.scenario)) cs={previousInteractionId:'',history:[],scenario:trim(c.scenario)};
+    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,previousInteractionId:cs.previousInteractionId,conversationHistory:cs.history,conversationTurnNumber:cs.history.length+1,externalSignal})});
+    if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+    if(timed.timedOut){r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno superó ${Math.round(timeoutMs/1000)} s. El siguiente turno reiniciará la cadena del escenario.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
+    else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
+    else {
+      const result=timed.value,u=usageOf(result);let valid=!!result?.ok;if(c.event)valid=valid&&resultHasEvent(result,c.event);if(c.events)valid=valid&&c.events.every(n=>resultHasEvent(result,n));if(c.person)valid=valid&&resultHasPerson(result,c.person);
+      r=outcome(c,valid?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario});
+      const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});
+      nextConversationState={previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};
+    }
+  }
+  r.durationMs=Date.now()-started;
+  return {ok:true,mode:m,case:r,conversationState:nextConversationState,timeoutMs};
 }
 
 export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,caseIds,send,signal}){
