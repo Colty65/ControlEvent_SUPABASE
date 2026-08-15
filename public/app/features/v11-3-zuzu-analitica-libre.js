@@ -454,13 +454,9 @@
       pdfBtn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation();} printZuzuPdf(); };
     }
     restoreConversationScreen();
-    try{window.dispatchEvent(new CustomEvent('controlevent:zuzu-opened'));}catch(_){try{window.dispatchEvent(new Event('controlevent:zuzu-opened'));}catch(__){ }}
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
-  function closeModal(){
-    closeZuzuPdfPicker(); clearZuzuThinkingTimer(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove();
-    try{window.dispatchEvent(new CustomEvent('controlevent:zuzu-closed',{detail:{manual:true}}));}catch(_){try{window.dispatchEvent(new Event('controlevent:zuzu-closed'));}catch(__){ }}
-  }
+  function closeModal(){ closeZuzuPdfPicker(); clearZuzuThinkingTimer(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
   function setStatus(msg, kind){ var el=$('ceAiStatus'); if(!el) return; el.className='ce-ai-status '+(kind||''); el.textContent=msg||''; }
   function zuzuPromptFlags(prompt){
     var p=String(prompt||'').toLowerCase();
@@ -625,7 +621,7 @@
     // sigue siendo contexto ambiental y ControlEvent aporta herramientas/hechos canónicos.
     setStatus('', '');
     var resEl=$('ceAiResult');
-    var voiceApi=window.ControlEventVoiceTurns||window.ControlEventVoiceV2||window.ControlEventV22Voz4; var voiceConversation=!!(voiceApi&&typeof voiceApi.isConversationalMode==='function'&&voiceApi.isConversationalMode());
+    var voiceConversation=!!(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.isConversationalMode==='function'&&window.ControlEventV22Voz4.isConversationalMode());
     var conversationTurnNumber=loadZuzuConversation().length+1;
     try{document.dispatchEvent(new CustomEvent('ce:zuzu-request-started',{detail:{prompt:prompt,voiceConversation:voiceConversation,turnNumber:conversationTurnNumber}}));}catch(_){ }
     startZuzuThinking(prompt);
