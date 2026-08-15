@@ -8275,31 +8275,57 @@ function v311PersonDonationProductsRequest(userPrompt=''){
   const p=norm(userPrompt);
   return /\b(donaci\w*|don[oó]|donad\w*)\b/.test(p)&&/\b(productos?|art[ií]culos?|qu[eé]\s+don[oó]|exactamente|uno\s+por\s+uno|detalle\s+de\s+productos?)\b/.test(p);
 }
+function v312DonationRepresentationsByEvent(dossier){
+  const out=new Map();
+  const rows=arr(arr(dossier?.tables).find(t=>trim(t?.key)==='donations')?.rows);
+  for(const row of rows){
+    const event=trim(row?.Evento),donor=trim(row?.Donante);if(!event||!donor)continue;
+    const key=norm(event),set=out.get(key)||new Set();set.add(donor);out.set(key,set);
+  }
+  return out;
+}
 async function v311PersonDonationProducts({userPrompt,personalGrounding,state,selectedEventId,flowTrace=[],previousInteractionId=''}){
   if(!personalGrounding?.result||!v311PersonDonationProductsRequest(userPrompt))return null;
   const dossier=personalGrounding.result,subject=trim(dossier?.facts?.person||personalGrounding?.subject);if(!subject)return null;
   const byEvent=arr(arr(dossier?.tables).find(t=>trim(t?.key)==='donations_by_event')?.rows).filter(r=>trim(r?.Evento));
   if(!byEvent.length||byEvent.length>10)return null;
-  const detailResults=[];
+
+  // FIX2.3: person_dossier ya acredita tanto los eventos como la representación literal del
+  // donante (individual, pareja o entidad compuesta). Usamos esas filas canónicas para consultar
+  // exactamente los eventos/representaciones correctos; el evento de pantalla queda fuera.
+  const donorByEvent=v312DonationRepresentationsByEvent(dossier),detailResults=[];
   for(let i=0;i<byEvent.length;i++){
     const event=trim(byEvent[i]?.Evento);if(!event)continue;
-    try{
-      const r=await v29ToolEventDonationLines({id:`v311_person_donation_${i+1}`,name:'event_donation_lines',scope:'named_event',event,donor:subject,detail:'full'},state,selectedEventId);
-      if(arr(r?.tables).some(t=>trim(t?.key)==='donor_products'&&arr(t?.rows).length))detailResults.push(r);
-    }catch(error){zuzuTracePush(flowTrace,'v1.0_exp · Detalle personal de donaciones','WARN',`${event}: ${cleanGeminiError(error)}`);}
+    const canonicalDonors=[...(donorByEvent.get(norm(event))||new Set())].filter(Boolean);
+    const donors=canonicalDonors.length?canonicalDonors:[subject];
+    for(let j=0;j<donors.length;j++){
+      const donor=trim(donors[j]);if(!donor)continue;
+      try{
+        const r=await v29ToolEventDonationLines({id:`v312_person_donation_${i+1}_${j+1}`,name:'event_donation_lines',scope:'named_event',event,donor,detail:'full'},state,selectedEventId);
+        if(arr(r?.tables).some(t=>trim(t?.key)==='donor_products'&&arr(t?.rows).length))detailResults.push(r);
+      }catch(error){zuzuTracePush(flowTrace,'v1.0_exp · Detalle personal de donaciones','WARN',`${event} · ${donor}: ${cleanGeminiError(error)}`);}
+    }
   }
-  const rows=[];
+
+  // Una misma representación flexible puede coincidir por más de una vía. Dedupe por hechos
+  // de negocio, no por id técnico, para no duplicar productos en la respuesta.
+  const rowMap=new Map();
   for(const r of detailResults){
     const event=trim(r?.facts?.event),prodRows=arr(arr(r?.tables).find(t=>trim(t?.key)==='donor_products')?.rows);
-    for(const x of prodRows)rows.push({Evento:event,Donante:trim(x?.Donante),Producto:trim(x?.Producto),Segmento:trim(x?.Segmento),Destino:trim(x?.Destino),Unidades:round(x?.Unidades,3),Valor:v26Money(x?.Valor)});
+    for(const x of prodRows){
+      const row={Evento:event,Donante:trim(x?.Donante),Producto:trim(x?.Producto),Segmento:trim(x?.Segmento),Destino:trim(x?.Destino),Unidades:round(x?.Unidades,3),Valor:v26Money(x?.Valor)};
+      const key=[norm(row.Evento),norm(row.Donante),norm(row.Producto),norm(row.Segmento),norm(row.Destino)].join('|');
+      if(!rowMap.has(key))rowMap.set(key,row);
+    }
   }
-  if(!rows.length)return null;
+  const rows=[...rowMap.values()];if(!rows.length)return null;
   const total=v26Money(rows.reduce((a,r)=>a+num(r?.Valor),0)),events=[...new Set(rows.map(r=>trim(r.Evento)).filter(Boolean))],donors=[...new Set(rows.map(r=>trim(r.Donante)).filter(Boolean))];
-  const local={id:'v311_person_donation_products',name:'person_donation_products',ok:true,title:`Productos donados · ${subject}`,facts:{person:subject,event_count:events.length,product_rows:rows.length,total_value:total,donor_representations:donors},tables:[v26Table('donated_products',`Productos donados vinculados a ${subject}`,rows,{Evento:v26TextSchema(),Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema()})]};
+  const local={id:'v312_person_donation_products',name:'person_donation_products',ok:true,title:`Productos donados · ${subject}`,facts:{person:subject,event_count:events.length,product_rows:rows.length,total_value:total,donor_representations:donors},tables:[v26Table('donated_products',`Productos donados vinculados a ${subject}`,rows,{Evento:v26TextSchema(),Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema()})]};
   const names=rows.map(r=>trim(r.Producto)).filter(Boolean),uniqueNames=[...new Set(names)];
-  zuzuTracePush(flowTrace,'v1.0_exp · Detalle personal de donaciones','OK',`${subject}: ${rows.length} producto(s)/agrupaciones en ${events.length} evento(s), consultados directamente desde los eventos ya acreditados por person_dossier; no se usa el evento de pantalla.`);
-  const answer=`${subject} tiene vinculados ${rows.length} registros/agrupaciones de producto donado en ${events.length} eventos, por ${v26FormatEuro(total)}. Los productos son: ${uniqueNames.join(', ')}.`;
-  return v281LocalResponse({title:`Productos donados · ${subject}`,answer,results:[local],showTables:[{tool_id:local.id,table_key:'donated_products'}],flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'person',subject,focus:'donations',events,evidence:{donationProductCount:rows.length,totalAmount:total}}});
+  zuzuTracePush(flowTrace,'v1.0_exp · Persona global · donaciones','OK',`${subject}: person_dossier acredita ${byEvent.length} evento(s) y ${donors.length} representación(es) canónica(s) de donante. Se consultan esos eventos directamente y se suspende cualquier foco de evento heredado/de pantalla.`);
+  zuzuTracePush(flowTrace,'v1.0_exp · Detalle personal de donaciones','OK',`${subject}: ${rows.length} producto(s)/agrupaciones en ${events.length} evento(s), sin pedir otra confirmación al usuario ni pasar por Gemini.`);
+  const answer=`${subject} tiene vinculados ${rows.length} productos/agrupaciones de producto donado en ${events.length} eventos, por ${v26FormatEuro(total)}. Los productos son: ${uniqueNames.join(', ')}.`;
+  return v281LocalResponse({title:`Productos donados · ${subject}`,answer,results:[local],showTables:[{tool_id:local.id,table_key:'donated_products'}],flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'person',subject,focus:'donations',events,evidence:{donationProductCount:rows.length,totalAmount:total,donorRepresentations:donors}}});
 }
 
 
@@ -8381,7 +8407,10 @@ function v30PersonalRecheckRequested(userPrompt=''){
 }
 function v30LikelyPersonalFollowUp(userPrompt=''){
   const p=norm(userPrompt);
-  return /\b(mi|mis|su|sus|responsabilidad|responsable|compras?|tickets?|tkxx|hitos?|tareas?|\blg\b|donaciones?|ingresos?|participacion|participación|eventos?|tablas?|listados?|datos?|detalle|formato|grafic\w*|gráfic\w*|dime\s+mas|dime\s+m[aá]s|mas\s+cosas|m[aá]s\s+cosas|solo|solamente|unicamente|únicamente|busca|revisa|comprueba|verifica|hablame|háblame)\b/.test(p);
+  // FIX2.3: los seguimientos personales sobre «qué productos/artículos donó» deben conservar
+  // la identidad canónica aunque el pronombre/nombre ya no aparezca en el turno actual.
+  // No se decide el dominio aquí: solo se mantiene disponible el person_dossier reciente.
+  return /\b(mi|mis|su|sus|responsabilidad|responsable|compras?|productos?|articulos?|tickets?|tkxx|hitos?|tareas?|\blg\b|donaciones?|donante|donado|donada|dono|donaron|ingresos?|participacion|participación|eventos?|tablas?|listados?|datos?|detalle|formato|grafic\w*|gráfic\w*|dime\s+mas|dime\s+m[aá]s|mas\s+cosas|m[aá]s\s+cosas|solo|solamente|unicamente|únicamente|busca|revisa|comprueba|verifica|hablame|háblame)\b/.test(p);
 }
 function v30ConversationEventForPerson(state,userPrompt,conversationHistory=[],subject='',explicitSubject=false,selectedEventId=''){
   const direct=v281EventNameInText(state,userPrompt);if(direct)return direct;
