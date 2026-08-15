@@ -8,6 +8,7 @@ import { canonicalAttendanceFromContext, buildCanonicalAttendance } from './zuzu
 import { buildRelevantPeopleContext } from './zuzu-people-context.service.js';
 import { listAllHitosState } from './hitos.service.js';
 import { exportBankData } from './bank-reconciliation.service.js';
+import { zuzuV2PlanSchema, zuzuV2PlannerSystem, zuzuV2PlannerInput, normalizeZuzuV2Plan, zuzuV2ResultContext, zuzuV2DirectVoiceAnswer, zuzuV2SynthesisSystem, zuzuV2SynthesisInput } from './zuzu-conversation-v2.service.js';
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -10573,7 +10574,168 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
 }
 
 
-export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, clientNowIso, clientLocalDateTime, clientTimeZone } = {}) {
+
+// ============================================================================
+// v1.0_exp · ZUZU CONVERSATION V2 (VOZ)
+// Flujo limpio: voz completa -> planner JSON pequeño -> CE resuelve/consulta -> evidencia mínima
+// -> respuesta oral directa o síntesis Lite solo cuando aporta valor.
+// No reutiliza el enrutado conversacional histórico; sí reutiliza las herramientas canónicas
+// de solo lectura de ControlEvent como capa de datos oficial.
+// ============================================================================
+function v2StripWakePhrase(value=''){
+  return trim(value).replace(/^\s*(?:hola|ola|oye|ey|eh|buenas)\s+(?:zuzu|susu|suzu|zusu|yuyu|zulu)\b[\s,;:.!?¿¡-]*/i,'').trim();
+}
+function v2LastStructuredContext(history=[]){
+  for(const turn of arr(history).slice().reverse()){
+    const c=turn?.resultContext;
+    if(c&&typeof c==='object'&&trim(c.domain))return c;
+  }
+  return {};
+}
+function v2PlannerEventHints(state,selectedEventId,userPrompt,lastContext={}){
+  const out=[]; const add=x=>{x=trim(x);if(x&&!out.some(y=>norm(y)===norm(x)))out.push(x);};
+  add(v281EventNameInText(state,userPrompt));
+  add(lastContext?.event);
+  add(v26EventById(state,selectedEventId)?.titulo);
+  return out.slice(0,6);
+}
+function v2ParseJsonPayload(payload){
+  const raw=v261OutputText(payload);if(!raw)throw new Error('El planificador V2 no devolvió contenido.');
+  try{return parsePlanJsonLenientHf37(raw).parsed||{};}catch(_){return JSON.parse(raw);}
+}
+async function v2CallPlanner({userPrompt,state,selectedEventId,lastContext,flowTrace=[]}){
+  const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para Zuzu.');e.status=503;throw e;}
+  const model=trim(process.env.CONTROLEVENT_ZUZU_V2_PLANNER_MODEL||'gemini-2.5-flash-lite');
+  const input=zuzuV2PlannerInput({prompt:v2StripWakePhrase(userPrompt)||userPrompt,lastContext,eventNames:v2PlannerEventHints(state,selectedEventId,userPrompt,lastContext)});
+  const body={model,input,system_instruction:zuzuV2PlannerSystem(),response_format:{type:'text',mime_type:'application/json',schema:zuzuV2PlanSchema()},generation_config:{thinking_summaries:'none',max_output_tokens:650},store:false};
+  const started=Date.now();
+  const {res,payload}=await geminiFetchJsonWithTimeout('https://generativelanguage.googleapis.com/v1/interactions',body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_V2_TIMEOUT_MS||22000));
+  const usage=v261UsageSmall(payload,model);
+  if(!res.ok){const e=new Error(payload?.error?.message||`Gemini V2 planner HTTP ${res.status}`);e.status=res.status;e.details=payload;zuzuTracePush(flowTrace,'V2 · Planificador','KO',cleanGeminiError(e),{model,usage});throw e;}
+  const plan=normalizeZuzuV2Plan(v2ParseJsonPayload(payload),lastContext);
+  zuzuTracePush(flowTrace,'V2 · Planificador','OK',`Plan en ${Date.now()-started} ms · confianza=${round(plan.confidence,2)} · ${plan.steps.map(x=>`${x.domain}/${x.operation}`).join(' + ')}.`,{model,usage});
+  return{plan,model};
+}
+function v2StepEventArgs(step,state,selectedEventId,userPrompt,lastContext={}){
+  const direct=v281EventNameInText(state,userPrompt);
+  const event=direct||trim(step?.event)||trim(lastContext?.event);
+  if(event){
+    const rr=semanticResolveEntity(state,'event',event);
+    if(!rr.ok)throw new Error(rr.ambiguous?`El evento «${event}» es ambiguo: ${arr(rr.candidates).map(x=>x.nombre).join(' / ')}`:`No encuentro con seguridad el evento «${event}».`);
+    return{event:rr.nombre,scope:'named_event'};
+  }
+  if(trim(selectedEventId))return{scope:'active_event'};
+  throw new Error('No tengo un evento suficientemente identificado para consultar esos datos.');
+}
+function v2RequestedFieldSet(step,userPrompt=''){
+  const set=new Set(arr(step?.fields).map(norm));const p=norm(userPrompt);
+  if(/\b(cantidad|cantidades|cuantas|cuántas|cuantos|cuántos|unidades?)\b/.test(p))set.add('units');
+  if(/\b(precio|precios)\b/.test(p))set.add('price');
+  if(/\b(importe|importes|total|sumatorio|dinero|gasto|gastado|coste|costo)\b/.test(p))set.add('amount');
+  if(/\b(ticket|tkxx|tienda|responsable)\b/.test(p))set.add('record');
+  return set;
+}
+function v2CompactEvidence(result,step,userPrompt=''){
+  const name=trim(result?.name),facts=result?.facts||{},fieldSet=v2RequestedFieldSet(step,userPrompt);let items=[];
+  const table=key=>arr(result?.tables).find(t=>trim(t?.key)===key);
+  if(name==='event_purchase_lines'){
+    const detailed=fieldSet.has('record')||trim(step?.detail)==='full';
+    const rows=arr(table(detailed?'purchase_lines':'by_product')?.rows);
+    items=rows.slice(0,detailed?20:30).map(r=>({
+      label:trim(r?.Producto),
+      ...(fieldSet.has('units')||['list','detail','verify'].includes(trim(step?.operation))?{units:num(r?.Unidades)}:{}),
+      ...(fieldSet.has('price')?{price:trim(r?.['Precios registrados'])||v26FormatEuro(num(r?.Precio))}:{}),
+      ...(fieldSet.has('amount')||['amount','detail','verify'].includes(trim(step?.operation))?{amount:num(r?.Importe)}:{}),
+      ...(detailed?{ticket:trim(r?.['Ticket u otros gastos']),store:trim(r?.Tienda),responsible:trim(r?.Responsable)}:{})
+    }));
+    return{source:name,facts:{event:trim(facts.event),purchase_line_count:num(facts.purchase_line_count),product_count:num(facts.product_count),total_amount:num(facts.total_amount),segment:trim(facts.segment),destination:trim(facts.destination),product:trim(facts.product),store:trim(facts.store),ticket:trim(facts.ticket)},items,resultCount:rows.length,totalUnits:rows.reduce((a,r)=>a+num(r?.Unidades),0),truncated:rows.length>items.length};
+  }
+  if(name==='event_donation_lines'){
+    const wantsProducts=trim(step?.filters?.donor)||/\b(producto|productos|que dono|qué donó|qué donaron|que donaron)\b/.test(norm(userPrompt));
+    const rows=arr(table(wantsProducts?'donor_products':'donors')?.rows);
+    items=rows.slice(0,24).map(r=>({label:trim(r?.Donante||r?.Producto),units:r?.Unidades!==undefined?num(r.Unidades):undefined,amount:r?.Valor!==undefined?num(r.Valor):undefined}));
+    return{source:name,facts:{event:trim(facts.event),donor:trim(facts.donor),donation_record_count:num(facts.donation_record_count),donor_count:num(facts.donor_count),total_value:num(facts.total_value)},items,resultCount:rows.length,truncated:rows.length>items.length};
+  }
+  if(name==='event_people'){
+    const attendance=trim(step?.domain)==='attendance',rows=arr(table(attendance?'attendance':'people')?.rows);
+    items=rows.slice(0,24).map(r=>({label:trim(r?.Asistente||r?.Persona),range:trim(r?.Rango),people:r?.Personas!==undefined?num(r.Personas):undefined,amount:r?.['Importe total']!==undefined?num(r['Importe total']):undefined}));
+    return{source:name,facts:{event:trim(facts.event),attendees_canonical:num(facts.attendees_canonical),members_attending:num(facts.members_attending),nonmembers_attending:num(facts.nonmembers_attending),income_total:num(facts.income_total)},items,resultCount:rows.length,truncated:rows.length>items.length};
+  }
+  if(name==='event_management'){
+    const rows=arr(table('tasks')?.rows);items=rows.slice(0,20).map(r=>({label:trim(r?.Descripción||r?.Descripcion||r?.Tarea||r?.Hito),status:trim(r?.Estado||r?.Situación||r?.Situacion)}));
+    return{source:name,facts:{event:trim(facts.event),hitos_count:num(facts.hitos_count),lg_count:num(facts.lg_count),lg_completed:num(facts.lg_completed),lg_pending:num(facts.lg_pending)},items,resultCount:rows.length,truncated:rows.length>items.length};
+  }
+  if(name==='event_bank'){
+    return{source:name,facts:{event:trim(facts.event),movement_count:num(facts.movement_count||facts.movements),bank_impact:num(facts.bank_impact),opening_balance:num(facts.opening_balance),closing_balance:num(facts.closing_balance),justified_count:num(facts.justified_count)},items:[],resultCount:num(facts.movement_count||facts.movements)};
+  }
+  if(name==='event_dossier'){
+    return{source:name,facts:{event:trim(facts.event),status:trim(facts.status),start:trim(facts.start),end:trim(facts.end),price:num(facts.price),income_total:num(facts.income_total),purchases_realized:num(facts.purchases_realized),purchases_pending:num(facts.purchases_pending),donations_value:num(facts.donations_value),operating_balance:num(facts.operating_balance),event_valuation:num(facts.event_valuation),attendees_canonical:num(facts.attendees_canonical),members_attending:num(facts.members_attending),nonmembers_attending:num(facts.nonmembers_attending),hitos_count:num(facts.hitos_count),lg_count:num(facts.lg_count)},items:[],resultCount:1};
+  }
+  if(name==='person_dossier'){
+    const rows=arr(result?.tables).flatMap(t=>arr(t?.rows).slice(0,8)).slice(0,20);
+    items=rows.map(r=>({label:trim(r?.Evento||r?.Producto||r?.Descripción||r?.Descripcion),amount:r?.Importe!==undefined?num(r.Importe):undefined})).filter(x=>x.label);
+    return{source:name,facts:{person:trim(facts.person||facts.query),event_count:num(facts.event_count),income_linked_total:num(facts.income_linked_total),purchase_responsibility_total:num(facts.purchase_responsibility_total),donations_value:num(facts.donations_value),hitos_count:num(facts.hitos_count),lg_count:num(facts.lg_count)},items,resultCount:items.length};
+  }
+  const compact=v261CompactToolResult(result,trim(step?.detail)||'brief');
+  return{source:name,facts:compact?.facts||facts,items:arr(compact?.tables).flatMap(t=>arr(t?.rows).slice(0,8)).slice(0,20),resultCount:arr(compact?.tables).reduce((a,t)=>a+arr(t?.rows).length,0)};
+}
+async function v2ExecuteStep(step,{state,selectedEventId,userPrompt,lastContext,flowTrace}){
+  if(step.domain==='conversation')return{result:null,evidence:{source:'conversation',facts:{},items:[],resultCount:0}};
+  const ea=['catalog','person'].includes(step.domain)?{}:v2StepEventArgs(step,state,selectedEventId,userPrompt,lastContext);
+  const id=`v2_${step.domain}_${Date.now().toString(36)}`;
+  const filters=step.filters||{};let result;
+  if(step.domain==='event')result=await v26ToolEventDossier({id,name:'event_dossier',...ea,detail:'brief'},state,selectedEventId);
+  else if(step.domain==='purchases')result=await v274ToolEventPurchaseLines({id,name:'event_purchase_lines',...ea,status:trim(filters.status)||'realized',product:trim(filters.product),segment:trim(filters.segment),destination:trim(filters.destination),store:trim(filters.store),ticket:trim(filters.ticket),detail:trim(step.detail)||'standard'},state,selectedEventId);
+  else if(step.domain==='donations')result=await v29ToolEventDonationLines({id,name:'event_donation_lines',...ea,donor:trim(filters.donor),detail:trim(step.detail)||'standard'},state,selectedEventId);
+  else if(step.domain==='attendance'||step.domain==='incomes')result=await v26ToolEventPeople({id,name:'event_people',...ea,detail:trim(step.detail)||'standard'},state,selectedEventId);
+  else if(step.domain==='documents')result=await v26ToolEventDocumentation({id,name:'event_documentation',...ea,detail:trim(step.detail)||'standard'},state,selectedEventId);
+  else if(step.domain==='management')result=await v261EventManagementTool({id,name:'event_management',...ea,detail:trim(step.detail)||'standard'},state,selectedEventId);
+  else if(step.domain==='bank')result=await v261EventBankTool({id,name:'event_bank',...ea,detail:trim(step.detail)==='full'?'full':'brief'},state,selectedEventId);
+  else if(step.domain==='person')result=await v26ExecuteTool({id,name:'person_dossier',person:trim(step.person||step.entity),scope:'all_events',detail:trim(step.detail)||'brief'},state,selectedEventId);
+  else if(step.domain==='catalog')result=await v274ToolMasterCatalog({id,name:'master_catalog',entity:trim(step.entity)||'products',query:trim(filters.product||filters.store),detail:trim(step.detail)||'brief'},state,selectedEventId);
+  else throw new Error(`El dominio «${step.domain}» todavía no tiene una fuente V2 segura.`);
+  const evidence=v2CompactEvidence(result,step,userPrompt);
+  return{result,evidence};
+}
+async function v2SynthesizeVoice({userPrompt,plan,evidence,flowTrace=[]}){
+  const model=trim(process.env.CONTROLEVENT_ZUZU_V2_PRESENTER_MODEL||'gemini-2.5-flash-lite');
+  const started=Date.now();
+  const payload=await v261CallInteraction({input:zuzuV2SynthesisInput({prompt:v2StripWakePhrase(userPrompt)||userPrompt,plan,evidence}),model,systemInstruction:zuzuV2SynthesisSystem(),tools:[],flowTrace,stage:'V2 · Presentador IA',toolChoice:'none'});
+  const parsed=v261ParseFinal(payload);const answer=trim(parsed.answer)||trim(v261OutputText(payload));
+  zuzuTracePush(flowTrace,'V2 · Presentador','OK',`Síntesis oral en ${Date.now()-started} ms; evidencia=${JSON.stringify(evidence).length} caracteres.`);
+  return{answer,model};
+}
+async function runZuzuConversationV2({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[]}){
+  const t0=Date.now(),lastContext=v2LastStructuredContext(conversationHistory),spoken=v2StripWakePhrase(userPrompt);
+  zuzuTracePush(flowTrace,'V2 · Entrada oral','OK',`Turno completo recibido: ${userPrompt.length} caracteres; contenido tras wake=${spoken.length} caracteres.`);
+  if(!spoken){
+    zuzuTracePush(flowTrace,'V2 · Presentador','OK','Wake sin petición adicional: saludo local, sin llamada de datos.');
+    return{ok:true,rejected:false,title:'Zuzu',answer:'¡Hola! Te escucho.',warnings:[],charts:[],tables:[],files:[],provider:'zuzu-conversation-v2-local',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v1.0_exp',voiceConversation:true,conversationV2:true,resultContext:lastContext||null,geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};
+  }
+  const {plan,model:plannerModel}=await v2CallPlanner({userPrompt:spoken,state,selectedEventId,lastContext,flowTrace});
+  if(plan.mode==='clarify'){
+    const answer=trim(plan.clarification)||'Necesito concretar una cosa antes de consultar los datos.';
+    return{ok:true,rejected:false,title:'Necesito concretar',answer,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-conversation-v2',model:plannerModel,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v1.0_exp',voiceConversation:true,conversationV2:true,resultContext:lastContext||null,geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};
+  }
+  const results=[],evidence=[];const execStart=Date.now();
+  for(const step of plan.steps){const out=await v2ExecuteStep(step,{state,selectedEventId,userPrompt:spoken,lastContext,flowTrace});if(out.result)results.push(out.result);evidence.push(out.evidence);}
+  zuzuTracePush(flowTrace,'V2 · Herramientas CE','OK',`${results.length} fuente(s) ejecutada(s) en ${Date.now()-execStart} ms: ${results.map(r=>trim(r.name)).join(', ')||'ninguna'}.`);
+  const evidenceChars=JSON.stringify(evidence).length,evidenceRows=evidence.reduce((a,e)=>a+num(e?.resultCount),0);
+  zuzuTracePush(flowTrace,'V2 · Evidencia mínima','OK',`${evidenceRows} filas/elementos relevantes; ${evidenceChars} caracteres entregables al presentador. No se envía el estado completo.`);
+  let answer=zuzuV2DirectVoiceAnswer(plan,evidence),presenterModel='';
+  if(answer)zuzuTracePush(flowTrace,'V2 · Presentador','OK','Respuesta oral directa desde evidencia canónica; no hace falta segunda llamada IA.');
+  else if(plan.steps[0]?.domain==='conversation'){
+    const synth=await v2SynthesizeVoice({userPrompt:spoken,plan,evidence,flowTrace});answer=synth.answer;presenterModel=synth.model;
+  }else{
+    const synth=await v2SynthesizeVoice({userPrompt:spoken,plan,evidence,flowTrace});answer=synth.answer;presenterModel=synth.model;
+  }
+  if(!trim(answer))answer='He consultado la fuente, pero no encuentro datos suficientes para responder con precisión.';
+  const resultContext=zuzuV2ResultContext(plan,evidence);
+  zuzuTracePush(flowTrace,'V2 · Tiempo total','OK',`${Date.now()-t0} ms desde entrada backend hasta respuesta; planner=${plannerModel}${presenterModel?`, presenter=${presenterModel}`:', cierre canónico CE'}.`);
+  return{ok:true,rejected:false,title:results[0]?.title||'Respuesta de Zuzu',answer:trim(answer),warnings:[],charts:[],tables:[],files:[],provider:'zuzu-conversation-v2',model:presenterModel||plannerModel,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v1.0_exp',voiceConversation:true,conversationV2:true,architecture:'V2: turno completo -> planner JSON compacto -> herramientas CE -> evidencia mínima -> presentador por canal',interactionId:'',resetInteractionId:true,resultContext,tools:[...new Set(results.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+}
+
+export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, conversationV2, clientNowIso, clientLocalDateTime, clientTimeZone } = {}) {
   const flowTrace = [];
   const userPrompt = trim(prompt);
   zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
@@ -10604,6 +10766,15 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const safeHistory=arr(conversationHistory).slice(-6).map(x=>({
     user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,1000),assistantTail:trim(x?.assistantTail).slice(-900),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null,resultContext:(x?.resultContext&&typeof x.resultContext==='object')?x.resultContext:null
   }));
+
+  if(voiceConversation===true && conversationV2===true){
+    zuzuTracePush(flowTrace,'v1.0_exp · CONVERSACIÓN V2 ACTIVA','OK','Canal oral aislado: planner estructurado pequeño, herramientas canónicas y evidencia mínima. El agente conversacional histórico no interviene en este turno.');
+    try{return await runZuzuConversationV2({userPrompt,state,selectedEventId,flowTrace,conversationHistory:safeHistory});}
+    catch(error){
+      zuzuTracePush(flowTrace,'V2 · Error seguro','KO',cleanGeminiError(error));
+      return{ok:true,rejected:false,title:'No he podido completar esa consulta',answer:'No he podido cerrar esta consulta con suficiente seguridad. Repítemela una vez y conservaré el contexto estructurado anterior.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-conversation-v2-safe-error',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v1.0_exp',voiceConversation:true,conversationV2:true,resultContext:v2LastStructuredContext(safeHistory)||null,geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    }
+  }
 
   // v1.0_exp · CORTE A ARQUITECTURA NUEVA.
   // Todos los turnos de Zuzu pasan primero por Gemini: interpreta el hilo y decide qué

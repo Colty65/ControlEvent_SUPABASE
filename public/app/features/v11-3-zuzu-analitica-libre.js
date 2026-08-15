@@ -625,7 +625,7 @@
     // sigue siendo contexto ambiental y ControlEvent aporta herramientas/hechos canónicos.
     setStatus('', '');
     var resEl=$('ceAiResult');
-    var voiceConversation=!!(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.isConversationalMode==='function'&&window.ControlEventV22Voz4.isConversationalMode());
+    var voiceApi=window.ControlEventVoiceV2||window.ControlEventV22Voz4; var voiceConversation=!!(voiceApi&&typeof voiceApi.isConversationalMode==='function'&&voiceApi.isConversationalMode()); var conversationV2=!!(voiceConversation&&voiceApi&&voiceApi.conversationV2===true);
     var conversationTurnNumber=loadZuzuConversation().length+1;
     try{document.dispatchEvent(new CustomEvent('ce:zuzu-request-started',{detail:{prompt:prompt,voiceConversation:voiceConversation,turnNumber:conversationTurnNumber}}));}catch(_){ }
     startZuzuThinking(prompt);
@@ -633,7 +633,7 @@
       var history=conversationHistoryForApi();
       var previousInteractionId=loadZuzuInteractionId();
       var conversationContext=loadZuzuConversationContext();
-      var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();} var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
+      var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();} var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationV2:conversationV2,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
