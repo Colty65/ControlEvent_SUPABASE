@@ -77,7 +77,20 @@
     speechGeneration: 0,
     interruptProbeText: '',
     interruptProbeAt: 0,
-    interruptProbeHits: 0
+    interruptProbeHits: 0,
+    speechStartedAt: 0,
+    vadStream: null,
+    vadContext: null,
+    vadAnalyser: null,
+    vadSource: null,
+    vadData: null,
+    vadRaf: 0,
+    vadFloor: 0.015,
+    vadHighSince: 0,
+    vadPauseTimer: null,
+    vadPausedForUser: false,
+    acousticBargeInUntil: 0,
+    bargeInCaptureUntil: 0
   };
 
   function $(id){ return document.getElementById(id); }
@@ -162,13 +175,35 @@
     if(now<=Number(state.speechEchoUntil||0))return score>=0.36;
     // Incluso si el resultado final llega tarde, una repetición casi literal de lo que Zuzu acaba
     // de decir no puede convertirse en una nueva pregunta. La ventana es temporal y genérica.
-    if(endedAt&&now-endedAt<=10000&&score>=0.72)return true;
+    if(endedAt&&now-endedAt<=12000&&score>=0.56)return true;
     return false;
   }
   function explicitInterruptCue(value){
-    // Palabras de barge-in muy reconocibles. Se mantienen deliberadamente concretas para
-    // no volver al problema de que Zuzu se interrumpa con el eco de su propia locución.
-    return /\b(zuzu|susu|suzu|oye|ey|escucha|espera|esperate|para|para un momento|un momento|un segundo|no espera|no no|perdona|perdon|disculpa|mejor|una cosa)\b/.test(wakeNorm(value));
+    // Palabras de barge-in reconocibles. Evitamos usar «para» aislado porque aparece mucho
+    // en respuestas normales (p. ej. «bebidas para cubatas») y puede ser eco del altavoz.
+    return /\b(zuzu|susu|suzu|oye|ey|escucha|espera|esperate|para ya|para un momento|para un segundo|un momento|un segundo|no espera|no no|perdona|perdon|disculpa|mejor|una cosa)\b/.test(wakeNorm(value));
+  }
+  function extractInterruptTail(value){
+    // Cuando el STT mezcla el final de la voz de Zuzu con la intervención humana
+    // ("... valoración de seis, perdona, dime ..."), nunca arrastramos el prefijo de eco.
+    // Elegimos la ÚLTIMA orden de corte porque es la más próxima a lo que el usuario quiere decir.
+    var raw=clean(value);if(!raw)return raw;
+    var re=/\b(perdona|perdón|perdon|disculpa|espera|espérate|esperate|oye|escucha|zuzu|susu|suzu|mejor|una cosa|un momento|un segundo|para ya|para un momento|para un segundo)\b/gi;
+    var m,last=-1;while((m=re.exec(raw)))last=m.index;
+    return last>=0?clean(raw.slice(last)):raw;
+  }
+  function stripLikelyOwnVoicePrefix(value){
+    var raw=clean(value);if(!raw)return raw;
+    var baseScore=maxOwnVoiceSimilarity(raw);if(baseScore<0.38)return raw;
+    var words=raw.split(/\s+/),best=raw;
+    // Solo se usa tras una pausa acústica de barge-in. Buscamos un sufijo claramente menos
+    // parecido a la voz de Zuzu, sin inventar ni corregir el contenido del usuario.
+    for(var i=1;i<Math.min(words.length,14);i++){
+      var rest=clean(words.slice(i).join(' '));if(contentTokens(rest).length<1)continue;
+      var score=maxOwnVoiceSimilarity(rest);
+      if(score<0.22){best=rest;break;}
+    }
+    return best;
   }
   function explicitInterruptIsClearlyHuman(value,echoScore){
     var n=wakeNorm(value);if(!explicitInterruptCue(n))return false;
@@ -322,7 +357,7 @@
   function updateWakeBadge(){
     var b=$('ceZuzuWakeBadge'); if(!b) return;
     var listening=!!state.wantListening;
-    if(state.conversationMode){b.className='ce-zuzu-wake-badge is-conversation';b.textContent='🎙 Conversando con Zuzu';b.title='Conversación oral activa. Puedes interrumpir hablando; «Perdona» o «Espera» fuerzan la interrupción.';return;}
+    if(state.conversationMode){b.className='ce-zuzu-wake-badge is-conversation';b.textContent='🎙 Conversando con Zuzu';b.title='Conversación oral activa. Si empiezas a hablar, Zuzu intentará silenciarse; «Perdona» o «Espera» son cortes seguros.';return;}
     if(listening){b.className='ce-zuzu-wake-badge is-listening';b.textContent='👂 Hola Zuzu';b.title=state.conversationParked?'La conversación quedó aparcada al cerrar la ventana. Di «Hola Zuzu» para reabrirla y continuar.':'Escucha ambiental activa. Di «Hola Zuzu» desde cualquier pantalla.';}
     else{b.className='ce-zuzu-wake-badge';b.textContent='👂 Activar Zuzu';b.title='Pulsa para activar la escucha ambiental.';}
   }
@@ -395,7 +430,7 @@
   function beginVoiceConversation(initialText){
     if(state.conversationMode)return;
     state.conversationMode=true;state.conversationParked=false;state.recognitionMode='conversation';state.wakeStartedAt=Date.now();state.queuedUtterance='';state.ambientHeard='';
-    resetVoiceUtterance();updateWakeBadge();startSessionRecording();
+    resetVoiceUtterance();updateWakeBadge();ensureVadStream();startSessionRecording();
     openZuzuForVoice(function(){
       var first=clean(initialText)||'Hola Zuzu';
       appendVoiceFinal(first);showVoicePrompt(first);setVoiceStatus('Hola. Te escucho; cuando calles dos segundos te respondo.','ok');scheduleVoiceSubmission();
@@ -403,24 +438,33 @@
   }
   function processConversationSpeech(text,isFinal,confidence){
     text=voiceAliasNormalize(text);if(!text)return;
-    var echoScore=maxOwnVoiceSimilarity(text),echoTail=Date.now()<=Number(state.speechEchoUntil||0);
+    var now=Date.now(),echoScore=maxOwnVoiceSimilarity(text),echoTail=now<=Number(state.speechEchoUntil||0);
     if(state.speaking){
-      // Con altavoces altos no hay una señal acústica fiable que permita distinguir una frase
-      // humana cualquiera del propio TTS usando Web Speech. Por estabilidad, durante la locución
-      // SOLO abrimos el turno cuando aparece una orden explícita de interrupción. Esas órdenes
-      // cortan desde el primer resultado provisional; todo lo demás se descarta y nunca se acumula.
-      var explicit=explicitInterruptCue(text),explicitHuman=explicit&&explicitInterruptIsClearlyHuman(text,echoScore);
-      if(!explicitHuman)return;
+      var explicit=explicitInterruptCue(text),humanText=extractInterruptTail(text);
+      var acousticWindow=state.vadPausedForUser&&now<=Number(state.acousticBargeInUntil||0);
+      if(acousticWindow){
+        // El VAD ya ha silenciado los altavoces. Si no hay palabra de corte, solo aceptamos
+        // una frase claramente ajena a la voz de Zuzu; ante la duda reanudamos la locución.
+        // Con «Perdona/Espera/Oye…» sí retiramos de forma segura todo el prefijo de eco.
+        var humanScore=maxOwnVoiceSimilarity(humanText);
+        if(!explicit&&(contentTokens(humanText).length<2||humanScore>=0.20))return;
+      }else{
+        var explicitHuman=explicit&&explicitInterruptIsClearlyHuman(text,echoScore);
+        if(!explicitHuman)return;
+      }
+      clearVadPauseTimer();state.vadPausedForUser=false;state.acousticBargeInUntil=0;
       stopSpeaking(false);resetInterruptProbe();
-      state.speechEchoUntil=Date.now()+900;state.echoGuardUntil=Date.now()+1500;
+      state.bargeInCaptureUntil=Date.now()+5000;state.speechEchoUntil=Date.now()+900;state.echoGuardUntil=Date.now()+1800;
       setVoiceStatus('Te escucho. Habla; cuando calles dos segundos te respondo.','ok');resetVoiceUtterance();
-      state.voiceInterim=text;showVoicePrompt(text);
+      state.voiceInterim=humanText;showVoicePrompt(humanText);text=humanText;
     }else{
       resetInterruptProbe();
-      // Los resultados finales del eco pueden aparecer 1-3 s después de terminar la locución.
-      // No se convierten en turno aunque lleguen como "final".
+      if(now<=Number(state.bargeInCaptureUntil||0)&&explicitInterruptCue(text))text=extractInterruptTail(text);
+      // Los resultados finales del eco pueden aparecer varios segundos después de terminar.
+      // Se descartan antes de tocar el buffer de la pregunta.
       if(isLikelyOwnVoice(text))return;
-      if(echoTail&&echoScore>=0.24)return;
+      echoScore=maxOwnVoiceSimilarity(text);
+      if(echoTail&&echoScore>=0.22)return;
     }
     state.incompleteHoldCount=0;
     if(isFinal){appendVoiceFinal(text);state.voiceInterim='';}else state.voiceInterim=text;
@@ -441,6 +485,61 @@
     if(!window.MediaRecorder)return'';var list=['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/ogg;codecs=opus'];
     for(var i=0;i<list.length;i++){try{if(!MediaRecorder.isTypeSupported||MediaRecorder.isTypeSupported(list[i]))return list[i];}catch(_){ }}return'';
   }
+  function clearVadPauseTimer(){clearTimeout(state.vadPauseTimer);state.vadPauseTimer=null;}
+  function acousticPauseForBargeIn(){
+    if(!state.speaking||state.paused||Date.now()-Number(state.speechStartedAt||0)<420)return;
+    // Pausa, no cancela todavía: el silencio es prácticamente instantáneo y si el detector
+    // acústico se equivocó por un pico del altavoz, la locución puede reanudarse sola.
+    try{if(supportsDeviceSpeech())window.speechSynthesis.pause();}catch(_){ }
+    state.paused=true;state.vadPausedForUser=true;state.acousticBargeInUntil=Date.now()+1900;
+    state.vadHighSince=0;updateSpeechButtons();setVoiceStatus('Te escucho…','ok');
+    clearVadPauseTimer();
+    state.vadPauseTimer=setTimeout(function(){
+      if(!state.vadPausedForUser||!state.speaking)return;
+      state.vadPausedForUser=false;state.acousticBargeInUntil=0;
+      try{if(supportsDeviceSpeech())window.speechSynthesis.resume();}catch(_){ }
+      state.paused=false;updateSpeechButtons();setVoiceStatus('Zuzu continúa hablando…','ok');
+    },1450);
+  }
+  function startVadMonitor(stream){
+    if(!stream||state.vadAnalyser)return;
+    var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+    try{
+      var ctx=new AC();try{if(ctx.state==='suspended')ctx.resume();}catch(_){ }var src=ctx.createMediaStreamSource(stream),an=ctx.createAnalyser();
+      an.fftSize=512;an.smoothingTimeConstant=0.15;src.connect(an);
+      state.vadContext=ctx;state.vadSource=src;state.vadAnalyser=an;state.vadData=new Float32Array(an.fftSize);
+      var tick=function(){
+        state.vadRaf=requestAnimationFrame(tick);
+        if(!state.vadAnalyser)return;
+        var data=state.vadData,rms=0;
+        try{state.vadAnalyser.getFloatTimeDomainData(data);}catch(_){return;}
+        for(var i=0;i<data.length;i++)rms+=data[i]*data[i];rms=Math.sqrt(rms/Math.max(1,data.length));
+        var now=Date.now();
+        if(!state.speaking){
+          if(rms<0.045)state.vadFloor=Math.max(0.004,Math.min(0.05,state.vadFloor*0.97+rms*0.03));
+          state.vadHighSince=0;return;
+        }
+        if(state.paused||now-Number(state.speechStartedAt||0)<420){state.vadHighSince=0;return;}
+        // El flujo VAD usa un micrófono con cancelación de eco. Aprendemos el residuo real del
+        // altavoz y exigimos un salto sostenido por encima de él antes de silenciar a Zuzu.
+        if(rms<Math.max(0.05,state.vadFloor*2.0))state.vadFloor=Math.max(0.004,Math.min(0.05,state.vadFloor*0.992+rms*0.008));
+        var threshold=Math.max(0.030,state.vadFloor*2.7+0.006);
+        if(rms>=threshold){
+          if(!state.vadHighSince)state.vadHighSince=now;
+          if(now-state.vadHighSince>=85)acousticPauseForBargeIn();
+        }else state.vadHighSince=0;
+      };
+      tick();
+    }catch(_){ }
+  }
+  function ensureVadStream(){
+    if(state.vadStream&&state.vadStream.active){startVadMonitor(state.vadStream);return Promise.resolve(state.vadStream);}
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return Promise.resolve(null);
+    // Fluidez primero: esta pista NO se graba. Se usa solo para detectar la voz humana con
+    // cancelación de eco y poder pausar a Zuzu antes de que Web Speech termine de transcribir.
+    return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:false}}).then(function(stream){state.vadStream=stream;startVadMonitor(stream);return stream;}).catch(function(){return null;});
+  }
+
   function ensureRecorderStream(){
     if(state.recorderStream&&state.recorderStream.active)return Promise.resolve(state.recorderStream);
     if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia)return Promise.resolve(null);
@@ -627,7 +726,7 @@
   function startAmbientListening(fromGesture){
     if(!supportsRecognition()){updateWakeBadge();return;}
     state.ambientEnabled=true;safeSet(STORAGE.ambientWake,'1');if(!state.conversationMode)state.recognitionMode='ambient';state.wantListening=true;updateWakeBadge();
-    if(fromGesture)ensureRecorderStream();startRecognitionEngine();
+    if(fromGesture){ensureRecorderStream();ensureVadStream();}startRecognitionEngine();
   }
   function stopAmbientListening(){
     state.ambientEnabled=false;safeSet(STORAGE.ambientWake,'0');state.wantListening=false;state.recognitionStarting=false;try{state.recognition&&state.recognition.stop();}catch(_){try{state.recognition&&state.recognition.abort();}catch(__){ }}setMicUi(false);updateWakeBadge();setVoiceStatus('Escucha ambiental pausada.','');
@@ -957,6 +1056,7 @@
     // algunos Chrome/Edge si hay una locución larga en cola; pause() silencia el audio antes
     // de vaciarla. La generación invalida cualquier onend/onerror antiguo que llegue tarde.
     var stopGen=Number(state.speechGeneration||0)+1;state.speechGeneration=stopGen;
+    clearVadPauseTimer();state.vadPausedForUser=false;state.acousticBargeInUntil=0;
     state.stopRequested=true;state.speaking=false;state.paused=false;state.engine='';
     state.speechChunks=[];state.speechIndex=0;state.currentSpokenChunk='';
     try{
@@ -992,7 +1092,7 @@
     if(!state.speaking||state.engine!=='local'||state.paused) return;
     if(state.speechIndex>=state.speechChunks.length){
       state.speaking=false; state.paused=false; state.currentUtterance=null;
-      state.lastSpeechEndedAt=Date.now();state.speechEchoUntil=Date.now()+1400;state.echoGuardUntil=Date.now()+3600;
+      state.lastSpeechEndedAt=Date.now();state.speechEchoUntil=Date.now()+1800;state.echoGuardUntil=Date.now()+5200;
       updateSpeechButtons(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok'); return;
     }
     var spokenChunk=state.speechChunks[state.speechIndex];
@@ -1034,7 +1134,7 @@
     loadLocalVoices(false);
     var generation=Number(state.speechGeneration||0)+1;state.speechGeneration=generation;
     try{if(window.speechSynthesis.paused)window.speechSynthesis.resume();}catch(_){ }
-    state.engine='local'; state.lastSpokenText=clean(text); state.lastSpeechEndedAt=0; state.echoGuardUntil=0; state.speechChunks=splitSpeech(text,speechChunkLimit()); state.speechIndex=0; state.speaking=true; state.paused=false; state.stopRequested=false;
+    ensureVadStream();state.engine='local'; state.lastSpokenText=clean(text); state.lastSpeechEndedAt=0; state.echoGuardUntil=0; state.speechStartedAt=Date.now(); state.speechChunks=splitSpeech(text,speechChunkLimit()); state.speechIndex=0; state.speaking=true; state.paused=false; state.stopRequested=false;
     resetInterruptProbe();updateSpeechButtons();
     speakDeviceNext(generation);
   }
