@@ -8628,27 +8628,201 @@ function v30PersonDeterministicChartSpecs(userPrompt='',dossier=null){
   return specs.slice(0,v30WantsSingleChart(userPrompt)?1:4);
 }
 
-function v307InteractionResultContext(userPrompt,results=[],history=[]){
-  if(v307MetaCorrectionCue(userPrompt))return{domain:'meta'};
-  const successful=arr(results).filter(r=>r?.ok);
-  const mapped={
-    event_purchase_lines:'purchases',event_donation_lines:'donations',event_bank:'bank',event_people:'attendance',
-    event_documentation:'documents',event_management:'management',person_dossier:'person',event_dossier:'event',event_breakdowns:'event',master_catalog:'catalog'
-  };
-  for(const r of successful.slice().reverse()){
-    const domain=mapped[trim(r?.name)];if(!domain)continue;
-    const out={domain};
-    const event=trim(r?.facts?.event);if(event)out.event=event;
-    if(domain==='person'){out.subject=trim(r?.facts?.person)||trim(r?.facts?.query)||'';}
-    if(domain==='donations'&&trim(r?.facts?.donor))out.filters={donor:trim(r.facts.donor)};
-    if(domain==='purchases')out.filters={segment:trim(r?.facts?.segment),destination:trim(r?.facts?.destination),product:trim(r?.facts?.product),store:trim(r?.facts?.store)};
-    return out;
+
+// ============================================================================
+// v1.0_exp · BROKER CONVERSACIONAL FIX15
+// Objetivo: Gemini sigue interpretando y eligiendo herramientas, pero CE controla el coste y
+// conserva el estado factual del ÚLTIMO resultado canónico. No hay rutas por personas/eventos
+// concretos: solo continuidad estructurada, deduplicación de llamadas y reutilización de evidencia.
+// ============================================================================
+function v315LastUsefulResultContext(history=[]){
+  for(const turn of arr(history).slice().reverse()){
+    const ctx=turn?.resultContext;
+    if(!ctx||typeof ctx!=='object')continue;
+    if(norm(ctx?.domain)==='meta')continue;
+    if(trim(ctx?.domain))return ctx;
   }
-  const immediate=arr(history).slice(-1)[0]?.resultContext;
-  // Los turnos conversacionales muy breves («vale», «perdona», «y quiénes fueron los…»)
-  // mantienen el referente estructurado, pero nunca lo deducen de la prosa de Zuzu.
-  if(immediate&&typeof immediate==='object'&&trim(immediate.domain)&&trim(userPrompt).length<=120)return{...immediate,inherited:true};
   return null;
+}
+function v315TableRows(result,key){return arr(arr(result?.tables).find(t=>trim(t?.key)===key)?.rows);}
+function v315UniqueBy(rows,keyFn){
+  const out=[],seen=new Set();
+  for(const row of arr(rows)){
+    const key=trim(keyFn(row));if(!key||seen.has(key))continue;seen.add(key);out.push(row);
+  }
+  return out;
+}
+function v315PurchaseResultScore(result,index=0){
+  const f=result?.facts||{};let score=index/1000;
+  ['product','store','segment','destination','ticket'].forEach(k=>{if(trim(f?.[k]))score+=10;});
+  const n=num(f?.purchase_line_count);if(n>0)score+=Math.max(0,5-Math.log10(n+1));
+  return score;
+}
+function v315BuildEvidenceSnapshot({domain,userPrompt='',results=[],history=[],state={}}={}){
+  const ok=arr(results).filter(r=>r?.ok),prior=v315LastUsefulResultContext(history),directPeople=arr(v26PersonHintsFromPrompt(userPrompt,state));
+  const directSubject=trim(directPeople[0]);
+  if(domain==='purchases'){
+    const prs=ok.filter(r=>trim(r?.name)==='event_purchase_lines');if(!prs.length)return null;
+    const best=prs.map((r,i)=>({r,score:v315PurchaseResultScore(r,i)})).sort((a,b)=>b.score-a.score)[0]?.r||prs.at(-1);
+    const f=best?.facts||{},rows=v315TableRows(best,'by_product').slice(0,24).map(x=>({
+      Producto:trim(x?.Producto),Unidades:round(num(x?.Unidades),3),'Precios registrados':trim(x?.['Precios registrados']),Importe:v26Money(num(x?.Importe))
+    })).filter(x=>x.Producto);
+    return{kind:'products',rows,rowCount:v315TableRows(best,'by_product').length,truncated:v315TableRows(best,'by_product').length>rows.length,metrics:{totalAmount:v26Money(f.total_amount),recordCount:num(f.purchase_line_count),productCount:num(f.product_count),totalUnits:round(rows.reduce((a,x)=>a+num(x.Unidades),0),3)}};
+  }
+  if(domain==='donations'){
+    const ds=ok.filter(r=>trim(r?.name)==='event_donation_lines');if(!ds.length)return null;
+    const personResult=ok.slice().reverse().find(r=>trim(r?.name)==='person_dossier');
+    const subject=directSubject||trim(ds.slice().reverse().find(r=>trim(r?.facts?.donor))?.facts?.donor)||trim(personResult?.facts?.person)||trim(prior?.subject)||trim(prior?.filters?.donor);
+    let selected=ds;
+    if(subject){const exact=ds.filter(r=>trim(r?.facts?.donor)&&nameMatches(r?.facts?.donor,subject));if(exact.length)selected=exact;else selected=ds.filter(r=>!trim(r?.facts?.donor));}
+    else selected=[ds.at(-1)];
+    const byEvent=new Map();
+    for(const r of selected){const key=`${norm(r?.facts?.event)}|${norm(r?.facts?.donor)}`;if(!byEvent.has(key))byEvent.set(key,r);}
+    selected=[...byEvent.values()];
+    const rows=[];let total=0,records=0;
+    for(const r of selected){
+      const f=r?.facts||{},ev=trim(f.event);total+=num(f.total_value);records+=num(f.donation_record_count);
+      for(const x of v315TableRows(r,'donor_products'))rows.push({Evento:ev,Producto:trim(x?.Producto),Unidades:round(num(x?.Unidades),3),Valor:v26Money(num(x?.Valor))});
+    }
+    const clean=v315UniqueBy(rows,x=>`${norm(x.Evento)}|${norm(x.Producto)}|${num(x.Unidades)}|${num(x.Valor)}`).slice(0,30);
+    if(clean.length)return{kind:'donation_products',rows:clean,rowCount:rows.length,truncated:rows.length>clean.length,metrics:{totalValue:v26Money(total),recordCount:records,eventCount:selected.length},subject};
+    const donorRows=v315TableRows(selected.at(-1),'donors').slice(0,30).map(x=>({Donante:trim(x?.Donante),Valor:v26Money(num(x?.Valor)),'Nº registros':num(x?.['Nº registros'])})).filter(x=>x.Donante);
+    return{kind:'donors',rows:donorRows,rowCount:v315TableRows(selected.at(-1),'donors').length,truncated:v315TableRows(selected.at(-1),'donors').length>donorRows.length,metrics:{totalValue:v26Money(num(selected.at(-1)?.facts?.total_value)),donorCount:donorRows.length},subject};
+  }
+  if(domain==='person'){
+    const r=ok.slice().reverse().find(x=>trim(x?.name)==='person_dossier');if(!r)return null;
+    const f=r?.facts||{},summary=v315TableRows(r,'summary_by_event').slice(0,20);
+    return{kind:'person_summary',rows:summary,rowCount:v315TableRows(r,'summary_by_event').length,truncated:v315TableRows(r,'summary_by_event').length>summary.length,subject:trim(f.person),metrics:{eventCount:num(f.event_count),incomeTotal:v26Money(f.income_linked_total),purchaseTotal:v26Money(f.purchase_responsibility_total),donationTotal:v26Money(f.donations_total)}};
+  }
+  if(domain==='attendance'){
+    const r=ok.slice().reverse().find(x=>trim(x?.name)==='event_people');if(!r)return null;
+    const rows=v315TableRows(r,'attendance').slice(0,50);return{kind:'attendance',rows,rowCount:v315TableRows(r,'attendance').length,truncated:v315TableRows(r,'attendance').length>rows.length,metrics:{attendees:num(r?.facts?.attendees_canonical)}};
+  }
+  if(domain==='event'){
+    const r=ok.slice().reverse().find(x=>trim(x?.name)==='event_dossier');if(!r)return null;const f=r?.facts||{};
+    return{kind:'event_kpis',rows:[],rowCount:0,truncated:false,metrics:{income:v26Money(f.income_total),purchases:v26Money(f.purchases_realized),pending:v26Money(f.purchases_pending),donations:v26Money(f.donations_value),operatingBalance:v26Money(f.operating_balance),valuation:v26Money(f.event_valuation),attendees:num(f.attendees_canonical)}};
+  }
+  if(domain==='bank'){
+    const r=ok.slice().reverse().find(x=>trim(x?.name)==='event_bank');if(!r)return null;const f=r?.facts||{};
+    return{kind:'bank_summary',rows:[],rowCount:0,truncated:false,metrics:{opening:v26Money(f.opening_balance),closing:v26Money(f.closing_balance),impact:v26Money(f.bank_impact),movementCount:num(f.included_movement_count),unlinked:num(f.unlinked_movement_count)}};
+  }
+  return null;
+}
+function v315ResultContext(userPrompt,results=[],history=[],state={}){
+  const prior=v315LastUsefulResultContext(history);
+  if(v307MetaCorrectionCue(userPrompt))return{domain:'meta',previous:prior?{domain:trim(prior.domain),event:trim(prior.event),events:arr(prior.events),subject:trim(prior.subject),filters:prior.filters||{}}:null};
+  const successful=arr(results).filter(r=>r?.ok),mapped={event_purchase_lines:'purchases',event_donation_lines:'donations',event_bank:'bank',event_people:'attendance',event_documentation:'documents',event_management:'management',person_dossier:'person',event_dossier:'event',event_breakdowns:'event',master_catalog:'catalog'};
+  const explicitStructured=v307CurrentStructuredDomain(userPrompt,history,{},successful);
+  let domain=explicitStructured==='purchase'?'purchases':explicitStructured==='donation'?'donations':'';
+  if(!domain){
+    const preferred=successful.slice().reverse().find(r=>mapped[trim(r?.name)]);domain=preferred?mapped[trim(preferred.name)]:'';
+  }
+  if(!domain&&prior&&trim(userPrompt).length<=120)return{...prior,inherited:true};
+  if(!domain)return null;
+  const eventNames=v315UniqueBy(successful.map(r=>({name:trim(r?.facts?.event)})).filter(x=>x.name),x=>norm(x.name)).map(x=>x.name);
+  const personResult=successful.slice().reverse().find(r=>trim(r?.name)==='person_dossier');
+  const directPeople=arr(v26PersonHintsFromPrompt(userPrompt,state));
+  const donationDonor=successful.slice().reverse().find(r=>trim(r?.name)==='event_donation_lines'&&trim(r?.facts?.donor));
+  const subject=trim(directPeople[0])||trim(donationDonor?.facts?.donor)||trim(personResult?.facts?.person)||((domain==='donations'||domain==='person')?trim(prior?.subject):'');
+  const out={version:2,domain};if(eventNames.length===1)out.event=eventNames[0];if(eventNames.length>1)out.events=eventNames;if(subject)out.subject=subject;
+  if(domain==='purchases'){
+    const prs=successful.filter(r=>trim(r?.name)==='event_purchase_lines');const best=prs.map((r,i)=>({r,score:v315PurchaseResultScore(r,i)})).sort((a,b)=>b.score-a.score)[0]?.r;
+    if(best)out.filters={segment:trim(best?.facts?.segment),destination:trim(best?.facts?.destination),product:trim(best?.facts?.product),store:trim(best?.facts?.store),ticket:trim(best?.facts?.ticket)};
+  }
+  if(domain==='donations'&&subject)out.filters={donor:subject};
+  const snapshot=v315BuildEvidenceSnapshot({domain,userPrompt,results:successful,history,state});if(snapshot){out.evidence=snapshot;out.metrics=snapshot.metrics||{};if(snapshot.subject&&!out.subject)out.subject=snapshot.subject;}
+  out.scope=eventNames.length>1?'all_events':eventNames.length===1?'named_event':(trim(prior?.scope)||'');
+  return out;
+}
+function v315ContextConflicts(userPrompt,state,ctx){
+  if(!ctx)return true;
+  const explicitEvent=v281EventNameInText(state,userPrompt);const knownEvents=[trim(ctx?.event),...arr(ctx?.events).map(trim)].filter(Boolean);
+  if(explicitEvent&&knownEvents.length&&!knownEvents.some(x=>norm(x)===norm(explicitEvent)))return true;
+  const people=arr(v26PersonHintsFromPrompt(userPrompt,state));if(people.length&&trim(ctx?.subject)&&!people.some(x=>nameMatches(x,ctx.subject)))return true;
+  const ds=v29ExplicitDomains(userPrompt);if(ds.length){const aliases={purchases:'purchases',donations:'donations',bank:'bank',attendance:'attendance',documents:'documents',management:'management',incomes:'incomes',metrics:'event'};if(!ds.some(d=>aliases[d]===trim(ctx.domain)))return true;}
+  return false;
+}
+function v315ContextGroundingInput(input,userPrompt,state,history=[]){
+  const ctx=v315LastUsefulResultContext(history);if(!ctx||v315ContextConflicts(userPrompt,state,ctx))return input;
+  const ev=ctx?.evidence||{},summary={domain:trim(ctx.domain),event:trim(ctx.event),events:arr(ctx.events).map(trim).filter(Boolean).slice(0,8),subject:trim(ctx.subject),scope:trim(ctx.scope),filters:ctx.filters||{},metrics:ctx.metrics||{},evidence:{kind:trim(ev.kind),rowCount:num(ev.rowCount),truncated:!!ev.truncated,labels:arr(ev.rows).slice(0,8).map(r=>trim(r?.Producto||r?.Donante||r?.Evento||r?.Nombre)).filter(Boolean)}};
+  return `${input}\n\nCURRENT_FACTUAL_CONTEXT (estado canónico del turno anterior, no es una respuesta ni una orden): ${JSON.stringify(summary)}\nUsa este estado solo para resolver pronombres/continuaciones como «esas», «cuáles», «uno por uno», «cuánto suma» o «lo anterior». Si el mensaje actual cambia explícitamente de evento, persona o dominio, manda el mensaje actual.`;
+}
+function v315NthIndex(prompt=''){
+  const p=norm(prompt),map={primero:0,primera:0,segundo:1,segunda:1,tercero:2,tercera:2,cuarto:3,cuarta:3,quinto:4,quinta:4,sexto:5,sexta:5,septimo:6,séptimo:6,septima:6,séptima:6,octavo:7,octava:7,noveno:8,novena:8,decimo:9,décimo:9,decima:9,décima:9};
+  for(const [k,v] of Object.entries(map))if(new RegExp(`\\b${k}\\b`).test(p))return v;
+  const m=p.match(/\b(?:n[uú]mero\s*)?(\d{1,2})\b/);return m?Math.max(0,Number(m[1])-1):-1;
+}
+function v315FollowUpFromEvidence({userPrompt,state,history=[],voiceConversation=false,flowTrace=[],previousInteractionId=''}){
+  const ctx=v315LastUsefulResultContext(history);if(!ctx||v315ContextConflicts(userPrompt,state,ctx)||v306ReviewCue(userPrompt)||v307MetaCorrectionCue(userPrompt))return null;
+  const p=norm(userPrompt),ev=ctx?.evidence||{},rows=arr(ev.rows);if(!rows.length)return null;
+  const transform=/\b(y\s+)?(cu[aá]nto\s+sum(?:a|an)|cu[aá]nt[oa]s?|cu[aá]les?|qu[eé]\s+(?:(?:[a-z0-9ñáéíóúü]+\s+){0,3})?(?:fueron|son|don[oó]|compramos?|compraron)|uno\s+por\s+uno|una\s+por\s+una|1\s*(?:a|por)\s*1|enumer\w*|detalle|detalla|lista|listado|primero|primera|segundo|segunda|tercero|tercera|cuarto|cuarta|quinto|quinta|sexto|sexta|s[eé]ptimo|s[eé]ptima|octavo|octava|noveno|novena|d[eé]cimo|d[eé]cima)\b/.test(p);
+  if(!transform)return null;
+  const nth=v315NthIndex(userPrompt),domain=trim(ctx.domain),titleBase=trim(ctx.event)||arr(ctx.events).map(trim).filter(Boolean).join(' · ')||'contexto anterior';
+  const makeResult=(title,answer,tableRows=[],columns=[])=>{
+    let tables=[];if(!voiceConversation&&tableRows.length&&columns.length){tables=[{title,columns,rows:tableRows.map(r=>columns.map(c=>r[c]??''))}];}
+    zuzuTracePush(flowTrace,'v1.0_exp · Broker conversacional','OK',`Seguimiento resuelto desde el result-set canónico anterior (${domain}; ${rows.length} filas cacheadas). 0 llamadas IA y 0 consultas de datos.`);
+    return{ok:true,rejected:false,title,answer,warnings:[],charts:[],tables,files:[],provider:'control-event-conversation-broker',model:'calculo-local-oficial',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v1.0_exp',architecture:'Gemini interpreta consultas nuevas; Broker CE reutiliza únicamente el result-set canónico inmediato para transformaciones elípticas',interactionId:'',resetInteractionId:!!trim(previousInteractionId),resultContext:{...ctx,inherited:true},tools:[],geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  };
+  if(domain==='purchases'&&ev.kind==='products'){
+    const total=v26Money(ev?.metrics?.totalAmount??rows.reduce((a,r)=>a+num(r?.Importe),0)),units=round(rows.reduce((a,r)=>a+num(r?.Unidades),0),3);
+    if(/cu[aá]nto\s+sum(?:a|an)|\btotal\b/.test(p))return makeResult(`Compras · ${titleBase}`,`El conjunto que acabamos de consultar suma ${v26FormatEuro(total)}.`);
+    if(/cu[aá]nt[oa]s?\s+(?:unidades?)?/.test(p))return makeResult(`Compras · ${titleBase}`,`En ese conjunto hay ${v26FormatPlainNumber(units,3)} unidades repartidas en ${rows.length} productos distintos.`);
+    if(nth>=0&&rows[nth]){const r=rows[nth];return makeResult(`Compras · ${titleBase}`,`${r.Producto}: ${v26FormatPlainNumber(r.Unidades,3)} unidades${trim(r['Precios registrados'])?`, precio registrado ${trim(r['Precios registrados'])}`:''}, importe ${v26FormatEuro(r.Importe)}.`);}
+    const wantsDetail=/uno\s+por\s+uno|una\s+por\s+una|enumer\w*|detalle|detalla|lista|listado/.test(p);const names=rows.map(r=>trim(r.Producto)).filter(Boolean);
+    const answer=wantsDetail?rows.map((r,i)=>`${i+1}. ${r.Producto}: ${v26FormatPlainNumber(r.Unidades,3)} uds${trim(r['Precios registrados'])?`, ${trim(r['Precios registrados'])}`:''}, ${v26FormatEuro(r.Importe)}`).join(voiceConversation?'; ':'\n'):`Fueron ${names.join(', ')}.`;
+    return makeResult(`Compras · ${titleBase}`,answer,rows,['Producto','Unidades','Precios registrados','Importe']);
+  }
+  if(domain==='donations'&&ev.kind==='donation_products'){
+    const total=v26Money(ev?.metrics?.totalValue??rows.reduce((a,r)=>a+num(r?.Valor),0)),subject=trim(ctx.subject)||'el sujeto consultado';
+    if(/cu[aá]nto\s+sum(?:a|an)|\btotal\b/.test(p))return makeResult(`Donaciones · ${titleBase}`,`Las donaciones que acabamos de consultar suman ${v26FormatEuro(total)}.`);
+    if(nth>=0&&rows[nth]){const r=rows[nth];return makeResult(`Donaciones · ${titleBase}`,`${r.Producto}${r.Evento?` en ${r.Evento}`:''}: ${v26FormatPlainNumber(r.Unidades,3)} unidades, ${v26FormatEuro(r.Valor)}.`);}
+    const detail=rows.map((r,i)=>`${i+1}. ${r.Producto}${r.Evento?` · ${r.Evento}`:''}: ${v26FormatPlainNumber(r.Unidades,3)} uds, ${v26FormatEuro(r.Valor)}`).join(voiceConversation?'; ':'\n');
+    return makeResult(`Donaciones · ${subject}`,detail,rows,['Evento','Producto','Unidades','Valor']);
+  }
+  if(domain==='donations'&&ev.kind==='donors'){
+    const names=rows.map(r=>trim(r.Donante)).filter(Boolean);if(/cu[aá]les?|qui[eé]nes?|lista|listado|detalle/.test(p))return makeResult(`Donantes · ${titleBase}`,`Los donantes fueron ${names.join(', ')}.`,rows,['Donante','Valor','Nº registros']);
+  }
+  return null;
+}
+function v315BankSemantics(prompt=''){
+  const p=norm(prompt);return /\b(banco|bancari\w*|concili\w*|cuadre|movim\w*|mvtos?|saldo\s+bancario|cuenta\s+bancaria|transferencia|abono\s+bancario|cargo\s+bancario)\b/.test(p);
+}
+function v315BreakdownSemantics(prompt=''){
+  const p=norm(prompt);return /\b(desglos\w*|por\s+tienda|tiendas?|segmentos?|destinos?|por\s+producto|productos?\s+m[aá]s|ranking|top\s*\d*|en\s+qu[eé]\s+se\s+gast[oó]|d[oó]nde\s+se\s+gast[oó]|c[oó]mo\s+se\s+reparti[oó]\s+el\s+gasto|qu[eé]\s+se\s+compr[oó])\b/.test(p);
+}
+function v315ToolSuppressionReason(call,calls,userPrompt=''){
+  const name=trim(call?.name),names=arr(calls).map(c=>trim(c?.name));
+  if(['event_bank','event_bank_timeline'].includes(name)&&names.includes('event_dossier')&&!v315BankSemantics(userPrompt))return'El dossier ya cubre el panorama económico pedido y el usuario no ha solicitado Banco/conciliación.';
+  if(name==='event_breakdowns'&&names.includes('event_dossier')&&!v315BreakdownSemantics(userPrompt))return'El dossier ya cubre el resumen solicitado y no se pidió un desglose por dimensión.';
+  return'';
+}
+function v315WrittenCanonicalFastAnswer(userPrompt,results=[],history=[]){
+  const p=norm(userPrompt);if(/\b(por\s+qu[eé]|explica|analiza|opini[oó]n|compara|comparativa|versus|vs\.?|curios\w*|rar\w*|mejorar\w*)\b/.test(p))return null;
+  const latest=name=>arr(results).slice().reverse().find(r=>r?.ok&&trim(r?.name)===name),table=(r,key)=>arr(r?.tables).find(t=>trim(t?.key)===key);
+  const purchaseResults=arr(results).filter(r=>r?.ok&&trim(r?.name)==='event_purchase_lines');
+  const donationResults=arr(results).filter(r=>r?.ok&&trim(r?.name)==='event_donation_lines');
+  const multiPurchaseEvents=new Set(purchaseResults.map(r=>norm(r?.facts?.event)).filter(Boolean)).size>1;
+  const multiDonationEvents=new Set(donationResults.map(r=>norm(r?.facts?.event)).filter(Boolean)).size>1;
+  const purchase=multiPurchaseEvents?null:latest('event_purchase_lines');
+  if(purchase){const f=purchase.facts||{},event=trim(f.event)||'este evento',rows=arr(table(purchase,'by_product')?.rows);const filters=[trim(f.product)&&`producto «${trim(f.product)}»`,trim(f.store)&&`tienda «${trim(f.store)}»`,trim(f.segment)&&`segmento «${trim(f.segment)}»`,trim(f.destination)&&`destino «${trim(f.destination)}»`].filter(Boolean).join(', ');
+    if(/\b(cu[aá]nto|importe|total|gast\w*|coste|costo)\b/.test(p)&&!(/\b(lista|listado|uno\s+por\s+uno|una\s+por\s+una|enumer\w*)\b/.test(p)))return{title:`Compras · ${event}`,answer:`En ${event}${filters?`, para ${filters}`:''}, el importe total es ${v26FormatEuro(f.total_amount)} (${v26CountPhrase(f.purchase_line_count,'registro','registros')}, ${v26CountPhrase(f.product_count,'producto distinto','productos distintos')}).`,warnings:[],showTables:[],chartSpecs:[]};
+    if(/\b(cu[aá]les?|qu[eé]\s+(?:cervezas?|productos?|fueron)|lista|listado|uno\s+por\s+uno|una\s+por\s+una|enumer\w*)\b/.test(p)&&rows.length){return{title:`Compras · ${event}`,answer:`He encontrado ${rows.length} productos en el conjunto solicitado: ${rows.map(x=>trim(x?.Producto)).filter(Boolean).join(', ')}. Importe total: ${v26FormatEuro(f.total_amount)}.`,warnings:[],showTables:[{tool_id:purchase.id,table_key:'by_product'}],chartSpecs:[]};}
+  }
+  const donation=multiDonationEvents?null:latest('event_donation_lines');
+  if(donation){const f=donation.facts||{},event=trim(f.event)||'este evento',donor=trim(f.donor);if(/\b(donaciones?|donantes?|donado|productos?)\b/.test(p)){
+    const prodRows=arr(table(donation,'donor_products')?.rows),donorRows=arr(table(donation,'donors')?.rows);
+    if(donor&&prodRows.length&&/\b(detalle|productos?|qu[eé]\s+don[oó]|lista|uno\s+por\s+uno|una\s+por\s+una)\b/.test(p))return{title:`Donaciones · ${event}`,answer:`${donor} tiene ${prodRows.length} productos donados en ${event}, por ${v26FormatEuro(f.total_value)}.`,warnings:[],showTables:[{tool_id:donation.id,table_key:'donor_products'}],chartSpecs:[]};
+    if(/\bdonantes?\b/.test(p)&&donorRows.length)return{title:`Donantes · ${event}`,answer:`En ${event} constan ${donorRows.length} donantes por ${v26FormatEuro(f.total_value)}.`,warnings:[],showTables:[{tool_id:donation.id,table_key:'donors'}],chartSpecs:[]};
+  }}
+  const dossier=latest('event_dossier');
+  if(dossier&&/\b(h[aá]blame|cu[eé]ntame|informaci[oó]n|info|resumen|c[oó]mo\s+qued[oó]|datos\s+del\s+evento)\b/.test(p)){
+    const f=dossier.facts||{},event=trim(f.event)||'este evento',period=trim(f.start)&&trim(f.end)?` del ${trim(f.start)} al ${trim(f.end)}`:'';
+    return{title:`Resumen · ${event}`,answer:`${event}${trim(f.status)?` está ${trim(f.status)}`:''}${period}. Ingresos: ${v26FormatEuro(f.income_total)}; compras realizadas: ${v26FormatEuro(f.purchases_realized)}${num(f.purchases_pending)>0?`; compras pendientes: ${v26FormatEuro(f.purchases_pending)}`:''}; donaciones: ${v26FormatEuro(f.donations_value)}; saldo operativo: ${v26FormatEuro(f.operating_balance)}; valoración: ${v26FormatEuro(f.event_valuation)}; asistencia confirmada: ${v26FormatPlainNumber(f.attendees_canonical,0)} personas.`,warnings:[],showTables:[],chartSpecs:[]};
+  }
+  return null;
+}
+function v307InteractionResultContext(userPrompt,results=[],history=[],state={}){
+  return v315ResultContext(userPrompt,results,history,state);
 }
 function v307CanonicalEventReferenceInput(userPrompt,state,eventName=''){
   const event=trim(eventName)||v281EventNameInText(state,userPrompt);if(!event)return userPrompt;
@@ -8665,11 +8839,16 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   const groundingRequired=v313NeedsCanonicalGrounding(userPrompt,state,conversationHistory);
   const model=v261InteractionModel(),tools=v261AgentTools(),systemInstruction=v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,userPrompt,conversationHistory,voiceConversation});
   if(groundingRequired)zuzuTracePush(flowTrace,'v1.0_exp · Guardia de grounding','OK','Turno factual: Gemini-Lite debe elegir al menos una herramienta canónica; ControlEvent no decide cuál.');
+  // FIX15 · antes de volver a preguntar a Gemini/BBDD, el Broker puede resolver ÚNICAMENTE
+  // transformaciones claras sobre el result-set canónico inmediato (sumar, enumerar, elegir fila...).
+  // No interpreta consultas nuevas ni cambia de evento/persona/dominio.
+  const reused=v315FollowUpFromEvidence({userPrompt,state,history:conversationHistory,voiceConversation,flowTrace,previousInteractionId});
+  if(reused)return reused;
   // v1.0_exp: Gemini conserva el hilo nativo en servidor mediante previous_interaction_id.
   // CE no decide la respuesta; sí puede preconsultar un dossier personal compacto para conservar
   // la identidad y asegurar una fuente fresca cuando el usuario revisa/corrige un dato personal.
   let currentId=trim(previousInteractionId),payload,resetInteractionId=false,agentToolSuccessCount=0;
-  const cache=new Map(),allResults=[];
+  const cache=new Map(),allResults=[],executedCanonicalKeys=new Set();
   const turnNo=Math.max(0,Number(conversationTurnNumber)||0);
   // v1.0_exp · economía de contexto: cada seis turnos largos se abre una Interaction nueva,
   // pero se inyecta una memoria compacta de todo el hilo para no perder referencias ni resúmenes.
@@ -8710,6 +8889,9 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   let groundedUserInput=v30PersonGroundingInput(userPrompt,personalGrounding);
   groundedUserInput=v304EventStatusGroundingInput(groundedUserInput,eventStatusGrounding);
   groundedUserInput=v304BankGroundingInput(groundedUserInput,bankFollowUpGrounding);
+  // FIX15 · estado factual explícito y pequeño. Gemini no tiene que reconstruir «esas donaciones»,
+  // «cuáles» o «lo anterior» leyendo prosa histórica; recibe el marco canónico inmediatamente previo.
+  groundedUserInput=v315ContextGroundingInput(groundedUserInput,userPrompt,state,conversationHistory);
   const canonicalEventReference=v281EventNameInText(state,userPrompt);
   if(canonicalEventReference){groundedUserInput=v307CanonicalEventReferenceInput(groundedUserInput,state,canonicalEventReference);zuzuTracePush(flowTrace,'v1.0_exp · Referencia nominal canónica','OK',`El nombre escrito por el usuario se resuelve a «${canonicalEventReference}» ignorando mayúsculas y acentos; la IA conserva libertad para decidir qué herramienta necesita.`);}
   const initialInput=hasNativeThread?groundedUserInput:v284ConversationCapsuleInput(groundedUserInput,userPrompt,conversationHistory,conversationDigest);
@@ -8729,39 +8911,49 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   // v1.0_exp: no hay enrutado semántico de CE antes de las herramientas.
   // Si Gemini necesita hechos de ControlEvent, los solicita él mismo en esta Interaction.
   const maxToolCycles=(chartIntent&&bankContext)?2:1;
-  let voiceFastClosure=null;
+  let fastClosure=null;
   for(let cycle=1;cycle<=maxToolCycles;cycle++){
     let calls=v261FunctionCalls(payload);
-    // v1.0_exp: Gemini decide si necesita herramientas y cuáles. CE no fuerza una fuente por palabras clave.
     if(!calls.length)break;
-    zuzuTracePush(flowTrace,`V27.1.5 · Herramientas · ronda ${cycle}`,'OK',`Gemini solicitó ${calls.length} herramienta(s): ${calls.map(c=>trim(c.name)).join(', ')}.`);
+    const suppressions=new Map();
+    for(const call of calls){const reason=v315ToolSuppressionReason(call,calls,userPrompt);if(reason)suppressions.set(trim(call.id),reason);}
+    const effectiveCount=calls.length-suppressions.size;
+    zuzuTracePush(flowTrace,`V27.1.5 · Herramientas · ronda ${cycle}`,'OK',`Gemini solicitó ${calls.length} herramienta(s): ${calls.map(c=>trim(c.name)).join(', ')}.${suppressions.size?` Broker CE ejecutará ${effectiveCount} y descartará ${suppressions.size} redundante(s).`:''}`);
     const functionResults=await Promise.all(calls.map(async call=>{
       const args=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{};const key=`${trim(call.name)}:${JSON.stringify(args)}`;
+      const suppressed=suppressions.get(trim(call.id));
+      if(suppressed){
+        zuzuTracePush(flowTrace,`v1.0_exp · Broker CE · ${trim(call.name)}`,'OK',`Llamada no ejecutada por redundancia: ${suppressed}`);
+        return{type:'function_result',name:trim(call.name),call_id:trim(call.id),result:{ok:true,redundant:true,reason:suppressed}};
+      }
       try{
-        // v1.0_exp: ejecutar exactamente la herramienta elegida por Gemini; CE solo valida parámetros dentro de la propia herramienta.
-        let full=cache.get(key);if(!full){full=await v261ExecuteAgentTool(call,state,selectedEventId,flowTrace);cache.set(key,full);}else{full={...full,id:trim(call.id),name:trim(call.name)};}
-        full={...full,id:trim(call.id),name:trim(call.name)};allResults.push(full);if(full?.ok!==false)agentToolSuccessCount+=1;
+        let full=cache.get(key),fromCache=!!full;
+        if(!full){full=await v261ExecuteAgentTool(call,state,selectedEventId,flowTrace);cache.set(key,full);}
+        full={...full,id:trim(call.id),name:trim(call.name)};
+        // El mismo call exacto puede aparecer varias veces en una respuesta de Gemini. Se responde
+        // a todos sus call_id, pero el resultado canónico se incorpora UNA sola vez al estado del turno.
+        if(!executedCanonicalKeys.has(key)){allResults.push(full);executedCanonicalKeys.add(key);if(full?.ok!==false)agentToolSuccessCount+=1;}
+        else zuzuTracePush(flowTrace,'v1.0_exp · Broker CE · deduplicación','OK',`${trim(call.name)} con los mismos argumentos ya estaba ejecutada; se reutiliza el resultado sin duplicar filas ni contexto.`);
         const requestedDetail=trim(args?.detail)||'standard';
         const effectiveDetail=voiceConversation?v306VoiceEffectiveToolDetail(trim(call.name),requestedDetail,userPrompt,conversationHistory,dataAccessReq):requestedDetail;
         const compact=v261CompactToolResult(full,effectiveDetail);
-        zuzuTracePush(flowTrace,`V27.1.5 · Tool ${trim(call.name)}`,'OK',`${trim(full?.title)||'Resultado'}; tablas=${arr(full?.tables).length}.`);
+        zuzuTracePush(flowTrace,`V27.1.5 · Tool ${trim(call.name)}`,'OK',`${trim(full?.title)||'Resultado'}; tablas=${arr(full?.tables).length}${fromCache?' · reutilizada':''}.`);
         return{type:'function_result',name:trim(call.name),call_id:trim(call.id),result:compact};
       }catch(error){
         const msg=cleanGeminiError(error);zuzuTracePush(flowTrace,`V27.1.5 · Tool ${trim(call.name)}`,'WARN',msg);
         return{type:'function_result',name:trim(call.name),call_id:trim(call.id),is_error:true,result:{ok:false,error:msg}};
       }
     }));
-    // En voz, si las fuentes del turno ya permiten una respuesta canónica sencilla, no pagamos
-    // ni esperamos una segunda llamada solo para redactar. Primero completamos, si hace falta,
-    // la fuente estructurada exacta (p. ej. una familia de producto) y cerramos localmente.
-    if(voiceConversation&&cycle===1){
-      await v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventId,conversationHistory,dataReq:dataAccessReq,allResults,flowTrace});
-      voiceFastClosure=v306VoiceCanonicalStructuredAnswer(userPrompt,conversationHistory,allResults,dataAccessReq)||v313VoiceCanonicalEventAnswer(userPrompt,conversationHistory,allResults);
-      if(voiceFastClosure){
-        resetInteractionId=true;currentId='';
-        zuzuTracePush(flowTrace,'v1.0_exp · Respuesta oral rápida','OK','La herramienta ya entregó hechos suficientes: CE responde en el mismo turno sin una segunda llamada de redacción.');
-        break;
+    if(cycle===1){
+      if(voiceConversation){
+        await v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventId,conversationHistory,dataReq:dataAccessReq,allResults,flowTrace});
+        fastClosure=v306VoiceCanonicalStructuredAnswer(userPrompt,conversationHistory,allResults,dataAccessReq)||v313VoiceCanonicalEventAnswer(userPrompt,conversationHistory,allResults);
+        if(fastClosure)zuzuTracePush(flowTrace,'v1.0_exp · Respuesta oral rápida','OK','La herramienta ya entregó hechos suficientes: CE responde en el mismo turno sin una segunda llamada de redacción.');
+      }else{
+        fastClosure=v315WrittenCanonicalFastAnswer(userPrompt,allResults,conversationHistory);
+        if(fastClosure)zuzuTracePush(flowTrace,'v1.0_exp · Broker CE · cierre factual','OK','Consulta factual simple cerrada desde la herramienta canónica elegida por Gemini; se evita una segunda llamada de redacción sin perder detalle verificable.');
       }
+      if(fastClosure){resetInteractionId=true;currentId='';break;}
     }
     const finalCycle=(cycle>=maxToolCycles);
     payload=await v261CallInteraction({
@@ -8772,9 +8964,9 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     });
     currentId=trim(payload?.id)||currentId;
   }
-  if(voiceConversation&&!voiceFastClosure)await v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventId,conversationHistory,dataReq:dataAccessReq,allResults,flowTrace});
-  let canonicalClosure=voiceFastClosure;
-  if(!voiceFastClosure&&v261FunctionCalls(payload).length){
+  if(voiceConversation&&!fastClosure)await v306EnsureVoiceStructuredSources({userPrompt,state,selectedEventId,conversationHistory,dataReq:dataAccessReq,allResults,flowTrace});
+  let canonicalClosure=fastClosure;
+  if(!fastClosure&&v261FunctionCalls(payload).length){
     canonicalClosure=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
     if(canonicalClosure){
       resetInteractionId=true;
@@ -8944,7 +9136,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   zuzuTracePush(flowTrace,'v30 · Control de coste',turnCost>0.030?'WARN':turnCost>0.015?'WARN':'OK',`Turno: ${num(turnUsage?.calls)} llamada(s), ${num(turnUsage?.totalTokens)} tokens, coste estimado ${turnCost.toFixed(6)} €. La continuidad y la finalización de herramientas tienen prioridad; normalmente máximo 2 llamadas exitosas por turno (hasta 3 solo cuando una gráfica bancaria exige una segunda ronda de herramienta).`);
   const finalStatus=trim(payload?.status)||'completed';
   const completedInteractionId=finalStatus==='completed'?currentId:'';
-  const resultContext=v307InteractionResultContext(userPrompt,allResults,conversationHistory);
+  const resultContext=v307InteractionResultContext(userPrompt,allResults,conversationHistory,state);
   if(completedInteractionId)zuzuTracePush(flowTrace,'v30 · Memoria de conversación','OK',`Interaction completada y guardable para el siguiente turno: ${completedInteractionId.slice(0,40)}…`);
   return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-interactions-v1-0-exp',model,interactionId:completedInteractionId,meta:{generatedAt:new Date().toISOString(),version:'v1.0_exp',voiceConversation:!!voiceConversation,architecture:'Gemini mantiene el hilo nativo y decide la respuesta/herramientas; ControlEvent aporta grounding canónico compacto cuando hace falta preservar identidad o verificar una corrección, ejecuta cálculos, verifica y presenta',interactionId:completedInteractionId,resetInteractionId,pendingAction,resultContext,tools:[...new Set(allResults.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
@@ -13952,6 +14144,11 @@ export const __zuzuStructuralTesting = Object.freeze({
   v306VoiceCanonicalStructuredAnswer,
   v313NeedsCanonicalGrounding,
   v313VoiceCanonicalEventAnswer,
+  v315ResultContext,
+  v315FollowUpFromEvidence,
+  v315ContextGroundingInput,
+  v315ToolSuppressionReason,
+  v315WrittenCanonicalFastAnswer,
   v30CurrentTurnRequestsTablesOnly,
   v30WantsSingleChart,
   v30PersonRequestedTableKeys,
