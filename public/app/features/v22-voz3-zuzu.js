@@ -1,4 +1,4 @@
-/* ControlEvent v1.0_exp · VOZ4 MOVIL ESTABLE
+/* ControlEvent v1.0_exp · VOZ11 TURNOS SIMPLES + ECO AISLADO
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -204,17 +204,23 @@
   // corte. Todo lo que diga Zuzu por los altavoces se descarta por diseño salvo una orden
   // inequívoca del usuario. Esto evita que Zuzu se transcriba y se responda a sí misma.
   function strictBargeCue(value){
-    return /\b(perdona|perdon|espera|esperate|oye\s+(?:zuzu|susu|suzu)|para\s+ya|no\s+espera)\b/.test(wakeNorm(value));
+    // FIX11 · dos palabras reservadas y nada más. Cuanto menos vocabulario de corte,
+    // menor probabilidad de que el altavoz se haga pasar por el usuario.
+    return /\b(perdona|perdon|espera|esperate)\b/.test(wakeNorm(value));
   }
   function extractStrictBargeTail(value){
     var raw=clean(value);if(!raw)return'';
-    var m=raw.match(/(?:^|\b)(?:perdona|perd[oó]n|espera|esp[eé]rate|oye\s+(?:zuzu|susu|suzu)|para\s+ya|no\s+espera)\b[\s,;:.!?-]*(.*)$/i);
-    return clean(m&&m[1]||'');
+    // Tomamos lo que venga DESPUÉS de la última palabra de corte. Todo lo anterior puede
+    // ser eco de la propia Zuzu y jamás se incorpora al turno del usuario.
+    var re=/\b(perdona|perd[oó]n|espera|esp[eé]rate)\b/gi,m,last=null;
+    while((m=re.exec(raw)))last={end:re.lastIndex};
+    return last?clean(raw.slice(last.end).replace(/^[\s,;:.!?-]+/,'')):'';
   }
   function conversationSpeechSafeText(value){
     var out=clean(value);if(!state.conversationMode)return out;
-    // Las palabras reservadas para interrumpir no deben salir por los altavoces de Zuzu.
-    return out.replace(/\bperdona\b/gi,'disculpa').replace(/\bespera\b/gi,'aguarda un momento').replace(/\bpara\s+ya\b/gi,'detente');
+    // Reservamos «perdona» y «espera» para el usuario. Zuzu no las pronuncia en modo oral,
+    // así su propio altavoz no puede generar accidentalmente una orden de interrupción.
+    return out.replace(/\bperdona\b/gi,'disculpa').replace(/\bperd[oó]n\b/gi,'disculpa').replace(/\bespera\b/gi,'aguarda').replace(/\besp[eé]rate\b/gi,'aguarda');
   }
 
   function voiceAliasNormalize(value){
@@ -376,25 +382,29 @@
     return false;
   }
   function scheduleVoiceSubmission(delay){
+    // FIX11 · temporizador puro por INACTIVIDAD DE RESULTADOS. No dependemos de
+    // onspeechend/onspeechstart porque Chromium deja de emitirlos de forma consistente
+    // tras varios ciclos de síntesis + reconocimiento. Cada interim/final aceptado rearma
+    // estos dos segundos; si el usuario continúa, el reloj vuelve a cero.
     clearTimeout(state.silenceTimer);
-    state.silenceTimer=setTimeout(function(){
-      // No enviar mientras el navegador siga detectando voz ni si acaba de llegar actividad.
-      // Esto evita empezar a procesar en una pausa breve dentro de la misma frase.
+    var armedAt=Date.now();
+    state.lastSpeechActivityAt=armedAt;
+    state.silenceTimer=setTimeout(function fire(){
+      if(state.speaking)return;
       var since=Date.now()-Number(state.lastSpeechActivityAt||0);
-      if(state.userSpeechActive||(state.lastSpeechActivityAt&&since<1850)){
-        scheduleVoiceSubmission(Math.max(260,1900-since));return;
-      }
+      if(since<1950){state.silenceTimer=setTimeout(fire,Math.max(120,2050-since));return;}
       var text=currentVoiceUtterance();
       if(!clean(text))return;
       if(likelyIncompleteVoiceUtterance(text)&&state.incompleteHoldCount<1){
         state.incompleteHoldCount+=1;
-        setVoiceStatus('Parece que la frase ha quedado a medias. Sigo escuchando un momento…','ok');
-        scheduleVoiceSubmission(1800);
+        setVoiceStatus('La frase parece quedar a medias; sigo escuchando un instante…','ok');
+        state.lastSpeechActivityAt=Date.now();
+        state.silenceTimer=setTimeout(fire,1750);
         return;
       }
       resetVoiceUtterance();
       submitVoiceUtterance(text);
-    },Number(delay)||2000);
+    },Math.max(400,Number(delay)||2050));
   }
   function submitVoiceUtterance(text){
     text=voiceAliasNormalize(text);if(!text)return;
@@ -416,32 +426,32 @@
   }
   function processConversationSpeech(text,isFinal,confidence){
     text=voiceAliasNormalize(text);if(!text)return;
-    // Mientras Zuzu habla, el reconocedor sigue abierto para conservar la fluidez de las
-    // primeras versiones, pero TODO el eco se descarta. Solo «Perdona/Espera…» puede cruzar
-    // esta puerta y cortar la locución. Al usar el mismo reconocedor no perdemos la continuación.
+    // Mientras Zuzu habla NO existe dictado de usuario normal. Solo vigilamos las dos
+    // palabras reservadas. Así el eco nunca llega al textarea ni a la conversación.
     if(state.speaking){
       if(strictBargeCue(text))handleBargeInterrupt(text,isFinal);
       return;
     }
     if(state.bargeActive)return;
-    var echoScore=maxOwnVoiceSimilarity(text),echoTail=Date.now()<=Number(state.speechEchoUntil||0);
-    var humanTakeover=Date.now()<=Number(state.humanBargeUntil||0);
-    resetInterruptProbe();
-    // Tras un «Perdona/Espera» confirmado damos prioridad temporal a la voz humana. Así una
-    // continuación como «solo las ginebras» no se descarta por compartir palabras con la frase
-    // que Zuzu acababa de pronunciar.
-    if(!humanTakeover&&isLikelyOwnVoice(text))return;
-    if(!humanTakeover&&echoTail&&echoScore>=0.28)return;
-    state.incompleteHoldCount=0;state.lastSpeechActivityAt=Date.now();
-    if(isFinal){
-      appendVoiceFinal(text);state.voiceInterim='';
-      // Fallback por si el navegador no dispara onspeechend: espera algo más de dos segundos.
-      if(!state.userSpeechActive)scheduleVoiceSubmission(2300);
-    }else{
-      state.voiceInterim=text;
-      clearTimeout(state.silenceTimer);state.silenceTimer=null;
+
+    // Si acabamos de cortar a Zuzu, un resultado tardío puede contener
+    // «...eco... perdona, mi pregunta». Nos quedamos únicamente con la cola humana.
+    if(Date.now()<=Number(state.humanBargeUntil||0)&&strictBargeCue(text)){
+      text=voiceAliasNormalize(extractStrictBargeTail(text));
+      if(!text)return;
     }
+
+    // Cuarentena corta SOLO para repeticiones muy parecidas a lo último pronunciado.
+    // El umbral alto evita tragarnos una pregunta legítima que comparta una palabra.
+    var echoScore=maxOwnVoiceSimilarity(text);
+    if(Date.now()<=Number(state.speechEchoUntil||0)&&echoScore>=0.65)return;
+
+    state.incompleteHoldCount=0;
+    if(isFinal){appendVoiceFinal(text);state.voiceInterim='';}
+    else state.voiceInterim=text;
+    state.lastSpeechActivityAt=Date.now();
     showVoicePrompt(currentVoiceUtterance());
+    scheduleVoiceSubmission(2050);
   }
   function processAmbientSpeech(text){
     text=voiceAliasNormalize(text);if(!text||isLikelyOwnVoice(text))return;
@@ -625,20 +635,21 @@
   }
   function handleBargeInterrupt(text,isFinal){
     if(!state.conversationMode||!state.speaking||!strictBargeCue(text))return;
-    // FIX10 estable: usamos EL MISMO reconocedor que ya estaba escuchando. Mientras Zuzu
-    // habla se ignora todo salvo una palabra de corte; al detectarla cancelamos el TTS y el
-    // reconocedor continúa oyendo la frase del usuario sin reinicios ni cambios de micrófono.
     var tail=voiceAliasNormalize(extractStrictBargeTail(text));
-    state.bargeTriggered=true;state.bargeActive=false;state.humanBargeUntil=Date.now()+2600;
+    state.bargeTriggered=true;state.bargeActive=false;state.humanBargeUntil=Date.now()+3200;
     stopSpeaking(false);
-    state.recognitionMode='conversation';state.wantListening=state.ambientEnabled;state.userSpeechActive=true;state.lastSpeechActivityAt=Date.now();
+    state.recognitionMode='conversation';state.wantListening=state.ambientEnabled;
     resetVoiceUtterance();
     if(tail){
       if(isFinal)appendVoiceFinal(tail);else state.voiceInterim=tail;
+      state.lastSpeechActivityAt=Date.now();
       showVoicePrompt(currentVoiceUtterance());
-    }else showVoicePrompt('');
-    clearTimeout(state.silenceTimer);state.silenceTimer=null;
-    setVoiceStatus('Te escucho. Continúa; esperaré dos segundos cuando termines.','ok');
+      scheduleVoiceSubmission(2050);
+    }else{
+      showVoicePrompt('');
+      clearTimeout(state.silenceTimer);state.silenceTimer=null;
+    }
+    setVoiceStatus('Te escucho. Sigue hablando; enviaré cuando lleves dos segundos en silencio.','ok');
   }
   function buildBargeRecognition(){
     var Ctor=window.SpeechRecognition||window.webkitSpeechRecognition;if(!Ctor)return null;
@@ -685,17 +696,6 @@
       state.recognitionStarting=false;setMicUi(true);updateWakeBadge();
       setVoiceStatus(state.conversationMode?'Te escucho. Habla con naturalidad; enviaré al detectar dos segundos de silencio.':state.recognitionMode==='manual'?'Escuchando dictado.':'Escucha ambiental activa: di «Hola Zuzu».','ok');
     };
-    rec.onspeechstart=function(){
-      if(state.conversationMode&&!state.speaking&&!state.bargeActive){
-        state.userSpeechActive=true;state.lastSpeechActivityAt=Date.now();clearTimeout(state.silenceTimer);state.silenceTimer=null;
-      }
-    };
-    rec.onspeechend=function(){
-      if(state.conversationMode&&!state.speaking&&!state.bargeActive){
-        state.userSpeechActive=false;state.lastSpeechActivityAt=Date.now();
-        if(clean(currentVoiceUtterance()))scheduleVoiceSubmission(2000);
-      }
-    };
     rec.onresult = function(ev){
       for(var i=ev.resultIndex;i<ev.results.length;i++){
         var isFinal=!!ev.results[i].isFinal;
@@ -727,7 +727,7 @@
       state.recognitionStarting=false;resolveRecognitionEnd();
       if(state.bargeActive){setMicUi(true);updateWakeBadge();return;}
       if(state.wantListening&&(state.ambientEnabled||state.conversationMode||state.recognitionMode==='manual')){
-        setMicUi(true);updateWakeBadge();setTimeout(function(){if(state.wantListening&&!state.bargeActive)startRecognitionEngine();},260);
+        setMicUi(true);updateWakeBadge();setTimeout(function(){if(state.wantListening&&!state.bargeActive)startRecognitionEngine();},120);
       }else{setMicUi(false);updateWakeBadge();}
     };
     return rec;
@@ -1109,7 +1109,7 @@
       state.speaking=false; state.paused=false; state.currentUtterance=null;stopBargeRecognition(); updateSpeechButtons(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok');
       // El reconocedor normal ya seguía abierto durante la locución. Solo mantenemos una
       // cuarentena para desechar resultados finales retardados del propio altavoz.
-      if(state.conversationMode)state.speechEchoUntil=Date.now()+1800;
+      if(state.conversationMode){state.speechEchoUntil=Date.now()+3000;state.wantListening=state.ambientEnabled;state.recognitionMode='conversation';setTimeout(function(){if(state.conversationMode&&state.wantListening)startRecognitionEngine();},80);}
       return;
     }
     var spokenChunk=state.speechChunks[state.speechIndex];
@@ -1118,7 +1118,7 @@
     state.speechEchoUntil=Date.now()+500;
     var utter=new SpeechSynthesisUtterance(spokenChunk);
     var voice=selectedDeviceVoice();
-    utter.lang=(voice&&voice.lang)||'es-ES'; utter.rate=selectedRate(); utter.pitch=1; utter.volume=1;
+    utter.lang=(voice&&voice.lang)||'es-ES'; utter.rate=selectedRate(); utter.pitch=1; utter.volume=0.82;
     if(voice) utter.voice=voice;
     state.currentUtterance=utter;
     utter.onstart=function(){
