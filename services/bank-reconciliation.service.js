@@ -611,7 +611,7 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
   const enriched=arr(rows).map(row=>traced.get(row.id)||row);
   const positive=enriched.filter(row=>num(row.amount)>0&&row.included);
   const matchedIds=new Set();
-  for(const row of positive) for(const link of arr(row.incomeLinks)) if(trim(link?.id)) matchedIds.add(trim(link.id));
+  for(const row of positive) for(const link of arr(row.incomeLinks)) if(text(link?.id)) matchedIds.add(text(link.id));
   const total=arr(incomeCatalog).length;
   const reconciled=[...matchedIds].filter(id=>catalogById.has(id)).length;
   const movementReconciled=positive.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
