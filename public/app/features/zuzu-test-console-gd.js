@@ -256,6 +256,12 @@
     if(onlyIssues){const ids=issueIds();list=list.filter(c=>ids.has(String(c.id)));}
     const max=Math.max(1,num($('ztMaxCases').value)||24);return list.slice(0,max);
   }
+  function fullCertScenarioStart(list,index){
+    if(!Array.isArray(list)||index<0||index>=list.length)return index;
+    const scenario=trim(list[index]?.scenario);let start=index;
+    while(start>0&&trim(list[start-1]?.scenario)===scenario)start--;
+    return start;
+  }
   function localCaseOutcome(c,status,actual,usage={}){return{id:c.id,group:c.group||'IA',label:c.label||c.prompt,prompt:c.prompt||'',expected:c.expected||'Regla/invariante satisfecha',actual,status,usage,durationMs:0};}
 
   async function fetchPaidCase(caseDef,conversationState,timeoutMs){
@@ -278,14 +284,65 @@
     const cases=paidCases(onlyIssues);if(!cases.length){setPhase(onlyIssues?'No hay KO/avisos que repetir.':'No hay casos generados para este modo.',true);return;}
     resetRun();stopRequested=false;currentAbort=new AbortController();setRunning(true);
     const total=cases.length,maxCost=Math.max(.02,num($('ztMaxCost').value)||.25),reserve=lastMode==='AI-SMOKE'?.012:.015,clientTimeout=lastMode==='AI-SMOKE'?46000:50000;
+    const fullCases=lastMode==='FULL-CERT'&&onlyIssues&&Array.isArray(preview?.cases?.['FULL-CERT'])?preview.cases['FULL-CERT'].slice():[];
+    const fullIndex=new Map(fullCases.map((c,i)=>[String(c?.id||''),i]));
+    let fullBlockStart=-1,fullThrough=-1,contextWarmups=0,contextWarmupFailures=0;
     let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0,budgetStopped=false,conversationState={previousInteractionId:'',history:[],scenario:''};
-    setPhase(`${lastMode}: ${fmtN(total)} casos · ejecución troceada, una petición corta por caso. Presupuesto máximo ${fmtE(maxCost)}.`);
+    setPhase(lastMode==='FULL-CERT'&&onlyIssues?`${lastMode}: ${fmtN(total)} KO/avisos · se reconstruirá automáticamente su contexto conversacional antes de evaluarlos.`:`${lastMode}: ${fmtN(total)} casos · ejecución troceada, una petición corta por caso. Presupuesto máximo ${fmtE(maxCost)}.`);
+    let stopLoop=false;
     try{
       for(let i=0;i<cases.length;i++){
-        if(stopRequested||currentAbort.signal.aborted)break;
-        if(costEur>0&&costEur+reserve>maxCost){budgetStopped=true;setPhase(`Presupuesto protegido: no se inicia el caso ${i+1}. Coste acumulado ${fmtE(costEur)}.`);break;}
+        if(stopRequested||currentAbort.signal.aborted||stopLoop)break;
         const c=cases[i];currentCase=c;
-        if(lastMode==='FULL-CERT'&&conversationState.scenario&&conversationState.scenario!==c.scenario)conversationState={previousInteractionId:'',history:[],scenario:c.scenario||''};
+
+        // FULL-CERT es conversacional. Al repetir solo KO/avisos, una pregunta como
+        // «¿Y el impacto neto?» no puede ejecutarse aislada. Reproducimos en silencio
+        // todos los turnos anteriores del mismo bloque de escenario y solo puntuamos
+        // el caso que el usuario pidió repetir. Los turnos de preparación sí suman su
+        // coste/llamadas/tokens reales, pero no alteran OK/KO ni el total visible.
+        if(lastMode==='FULL-CERT'&&onlyIssues&&fullCases.length){
+          const targetIdx=fullIndex.has(String(c.id))?fullIndex.get(String(c.id)):-1;
+          if(targetIdx>=0){
+            const blockStart=fullCertScenarioStart(fullCases,targetIdx);
+            if(blockStart!==fullBlockStart){
+              conversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};
+              fullBlockStart=blockStart;fullThrough=blockStart-1;
+            }
+            let contextFailed=false;
+            for(let j=Math.max(blockStart,fullThrough+1);j<targetIdx;j++){
+              if(stopRequested||currentAbort.signal.aborted){stopLoop=true;break;}
+              if(costEur>0&&costEur+reserve>maxCost){budgetStopped=true;setPhase(`Presupuesto protegido durante la reconstrucción del contexto. Coste acumulado ${fmtE(costEur)}.`);stopLoop=true;break;}
+              const prep=fullCases[j],prepStarted=Date.now();
+              setLive(`Preparando contexto de ${c.label||c.prompt||'KO'} · turno ${j-blockStart+1}/${targetIdx-blockStart} · ${prep.prompt||prep.label||''}`);
+              const prepGot=await fetchPaidCase(prep,conversationState,clientTimeout);
+              if(prepGot.kind==='stopped'||stopRequested||currentAbort.signal.aborted){stopLoop=true;break;}
+              if(prepGot.kind==='timeout'){
+                costEur=Number((costEur+reserve).toFixed(6));calls+=1;contextWarmupFailures++;contextFailed=true;
+                setPhase(`No se pudo reconstruir el contexto previo de «${c.prompt||c.label}»: un turno preparatorio agotó el tiempo.`,true);
+                break;
+              }
+              if(prepGot.kind==='error'){
+                contextWarmupFailures++;contextFailed=true;
+                setPhase(`No se pudo reconstruir el contexto previo de «${c.prompt||c.label}»: ${prepGot.error?.message||prepGot.error}.`,true);
+                break;
+              }
+              const prepResult=prepGot.data?.case||{};const pu=prepResult.usage||{};
+              costEur=Number((costEur+num(pu.costEur)).toFixed(6));calls+=num(pu.calls);tokens+=num(pu.tokens);
+              conversationState=prepGot.data?.conversationState||conversationState;fullThrough=j;contextWarmups++;
+              setLive(`Contexto reconstruido · ${Math.round((Date.now()-prepStarted)/1000)} s · preparando el KO solicitado…`);
+            }
+            if(stopLoop)break;
+            if(contextFailed){
+              const r=localCaseOutcome(c,'WARN','ITV: no se ha evaluado este KO porque no fue posible reconstruir de forma fiable los turnos conversacionales anteriores.',{calls:0,tokens:0,costEur:0});
+              r.contextReplay=true;r.contextWarmupFailed=true;rows.push(r);appendRow(r);done++;warn++;updateProgress({done,total,ok,warn,ko,percent:Math.round(done*100/total),costEur,calls,tokens});renderFilters();cacheCurrent();currentCase=null;setLive('');
+              continue;
+            }
+          }
+        }else if(lastMode==='FULL-CERT'&&conversationState.scenario&&conversationState.scenario!==c.scenario){
+          conversationState={previousInteractionId:'',history:[],scenario:c.scenario||''};
+        }
+
+        if(costEur>0&&costEur+reserve>maxCost){budgetStopped=true;setPhase(`Presupuesto protegido: no se inicia el caso ${i+1}. Coste acumulado ${fmtE(costEur)}.`);break;}
         const started=Date.now();let elapsed=0;setLive(`Procesando ${i+1}/${total} · ${c.group||''} · ${c.label||c.prompt||''} · 0 s`);
         const ticker=setInterval(()=>{elapsed=Math.round((Date.now()-started)/1000);setLive(`Procesando ${i+1}/${total} · ${c.group||''} · ${c.label||c.prompt||''} · ${elapsed} s · DETENER está disponible`);},1000);
         const got=await fetchPaidCase(c,conversationState,clientTimeout);clearInterval(ticker);
@@ -300,12 +357,13 @@
           r=got.data?.case||localCaseOutcome(c,'KO','Respuesta del servidor sin resultado de prueba.',{});
           if(lastMode==='FULL-CERT')conversationState=got.data?.conversationState||{previousInteractionId:'',history:[],scenario:c.scenario||''};
         }
+        if(lastMode==='FULL-CERT'&&onlyIssues){const idx=fullIndex.has(String(c.id))?fullIndex.get(String(c.id)):-1;if(idx>=0){fullThrough=idx;r.contextReplay=true;}}
         r.durationMs=num(r.durationMs)||Date.now()-started;const u=r.usage||{};costEur=Number((costEur+num(u.costEur)).toFixed(6));calls+=num(u.calls);tokens+=num(u.tokens);done++;
         if(r.status==='OK')ok++;else if(r.status==='WARN')warn++;else ko++;
         rows.push(r);appendRow(r);updateProgress({done,total,ok,warn,ko,percent:Math.round(done*100/total),costEur,calls,tokens});renderFilters();cacheCurrent();currentCase=null;setLive('');
       }
       const aborted=stopRequested||currentAbort.signal.aborted,incomplete=done<total;
-      lastSummary={type:'summary',mode:lastMode,done,total,ok,warn,ko,costEur,calls,tokens,aborted,incomplete,budgetStopped,finishedAt:new Date().toISOString(),certified:ko===0&&!aborted&&!incomplete&&done>0};
+      lastSummary={type:'summary',mode:lastMode,done,total,ok,warn,ko,costEur,calls,tokens,aborted,incomplete,budgetStopped,contextWarmups,contextWarmupFailures,finishedAt:new Date().toISOString(),certified:ko===0&&!aborted&&!incomplete&&done>0};
       updateProgress(lastSummary);releaseControls();finish(lastSummary);
     }catch(e){if(stopRequested||e.name==='AbortError')setPhase('Prueba detenida. Puedes continuar con otro chequeo sin cerrar la ventana.');else setPhase('Error de ejecución: '+(e.message||e),true);}
     finally{currentFetchAbort=null;currentCaseCancel=null;currentAbort=null;releaseControls();cacheCurrent();currentCase=null;}
