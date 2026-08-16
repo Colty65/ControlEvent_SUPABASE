@@ -9095,7 +9095,8 @@ function v326DeterministicBankStatusAnswer(userPrompt='',grounding=null){
   if(/\bsaldo\s+final|\bc[oó]mo\s+qued[oó]\s+el\s+saldo/.test(p))return [lifecycle,`${event}: saldo final calculado del Cuadre ${v26FormatEuro(closing)}.`].filter(Boolean).join('\n\n');
   // Consulta general de Cuadre: devolvemos la fotografía canónica y, ante todo, el estado exacto.
   const ignoredIncome=num(inc.ignoredTotal);
-  const detail=`${event}: ${total} movimientos incluidos · impacto ${v26FormatEuro(impact)} · TKxx ${num(tk.linked)}/${num(tk.total)} · ingresos ${num(inc.reconciled)}/${num(inc.total)}${ignoredIncome>0?` · Peña El Arrastre excluido del criterio: ${ignoredIncome}`:''}.`;
+  const incomeDetail=num(inc.total)===0?'sin ingresos que conciliar':`ingresos ${num(inc.reconciled)}/${num(inc.total)}`;
+  const detail=`${event}: ${total} movimientos incluidos · impacto ${v26FormatEuro(impact)} · TKxx ${num(tk.linked)}/${num(tk.total)} · ${incomeDetail}${ignoredIncome>0?` · Peña El Arrastre excluido del criterio: ${ignoredIncome}`:''}.`;
   return [lifecycle,detail].filter(Boolean).join('\n\n');
 }
 

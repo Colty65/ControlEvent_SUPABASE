@@ -533,7 +533,10 @@
     if(incomeTrafficNode){
       incomeTrafficNode.className=`ce-bank-traffic ce-bank-income-traffic ${incomeTraffic.className}`;
       const ignoredIncomeNote=num(incomes.ignoredTotal)>0?` · ${num(incomes.ignoredTotal)} Peña El Arrastre excluido${num(incomes.ignoredTotal)===1?'':'s'} del criterio`:'';
-      incomeTrafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(incomes.reconciled)} / ${num(incomes.total)} ingresos</b><small>${esc(incomeTraffic.label)} · ${num(incomes.percentage)}%${esc(ignoredIncomeNote)}</small></div>`;
+      const noCountableIncomes=num(incomes.total)===0;
+      const incomeHeadline=noCountableIncomes?'SIN INGRESOS':`${num(incomes.reconciled)} / ${num(incomes.total)} ingresos`;
+      const incomeCaption=noCountableIncomes?'No hay ingresos computables':`${incomeTraffic.label} · ${num(incomes.percentage)}%`;
+      incomeTrafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${esc(incomeHeadline)}</b><small>${esc(incomeCaption)}${esc(ignoredIncomeNote)}</small></div>`;
     }
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
     $('ceBankOverlay')?.classList.toggle('ce-bank-readonly-mode',store.readOnly);
@@ -559,7 +562,7 @@
         <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo antes de la primera fila almacenada</span><strong>${money(s.openingBalance)}</strong><small>Referencia calculada únicamente desde el primer movimiento guardado del Cuadre.</small></article>
         <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo tras la última fila almacenada</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} incluidas · ${num(s.excludedCount)} excluidas · ${storedCount} fila(s) guardada(s)</small></div></article>
         <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal del Cuadre almacenado"><span>Movimientos almacenados incluidos</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Impacto de las filas incluidas ${money(economicVariation)}</small><em class="ce-bank-chart-hint">Ver foto temporal ↗</em></article>
-        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Estado al cerrar el evento</span><strong>${esc(rec.message||'CUADRE BANCARIO')}</strong><small>TKxx asociados: ${num(tickets.linked)}/${num(tickets.total)} · ingresos computables asociados: ${num(incomes.reconciled)}/${num(incomes.total)}${num(incomes.ignoredTotal)>0?` · Peña El Arrastre excluido del criterio: ${num(incomes.ignoredTotal)}`:''}.</small></article>`;
+        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Estado al cerrar el evento</span><strong>${esc(rec.message||'CUADRE BANCARIO')}</strong><small>TKxx asociados: ${num(tickets.linked)}/${num(tickets.total)} · ${num(incomes.total)===0?'sin ingresos computables':`ingresos computables asociados: ${num(incomes.reconciled)}/${num(incomes.total)}`}${num(incomes.ignoredTotal)>0?` · Peña El Arrastre excluido del criterio: ${num(incomes.ignoredTotal)}`:''}.</small></article>`;
     }else{
       $('ceBankSummary').innerHTML=`
         <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo bancario inicial del periodo</span><strong>${money(s.openingBalance)}</strong><small>Saldo anterior al movimiento más antiguo del periodo de trabajo</small><div class="ce-bank-kpi-formula">Saldo posterior − importe (en un cargo se suma su valor absoluto)</div></article>

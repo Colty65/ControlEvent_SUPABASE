@@ -637,8 +637,12 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
   const movementReconciled=positiveRequired.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
   const allCatalogLinked=total===0||reconciled===total;
   const allMovementsReconciled=positiveRequired.length===0||movementReconciled===positiveRequired.length;
-  const allReconciled=allCatalogLinked&&allMovementsReconciled;
-  const percentage=total?Math.round(reconciled/total*100):(allMovementsReconciled?100:0);
+  // v2.0_exp · Si el evento no tiene NINGÚN ingreso computable, no existe nada que
+  // conciliar en este bloque. Ese 0/0 es funcionalmente un requisito cumplido, no un
+  // pendiente. Las aportaciones internas de Peña El Arrastre ya están fuera del catálogo
+  // computable y tampoco deben impedir el cierre del Cuadre.
+  const allReconciled=total===0?true:(allCatalogLinked&&allMovementsReconciled);
+  const percentage=total?Math.round(reconciled/total*100):100;
   const traffic=allReconciled?'GREEN':(percentage>50?'ORANGE':'RED');
   return {movements:enriched,summary:{
     total,reconciled,pending:Math.max(0,total-reconciled),percentage,ratio:total?reconciled/total:(allMovementsReconciled?1:0),traffic,allReconciled,
@@ -778,9 +782,18 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const movements=visibleScoped.map(row=>({...row,...(movementById.get(row.id)||{})}));
     const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
     const ticketSummary=eventTicketSummary(catalog,event.id,tracedScoped);
+    const noCountableIncomes=num(incomeTrace.summary?.total)===0;
+    // En eventos sin ingresos computables, la finalización contable se decide por la
+    // cobertura del gasto: todos los TKxx deben estar asociados. Las diferencias de
+    // efectivo que el gestor haya aceptado mediante Cuadre forzado no rebajan el estado
+    // a incompleto. Para eventos con ingresos se mantiene la exigencia estricta habitual.
+    const ticketsCompleteForLifecycle=ticketSummary.allJustified===true||(
+      noCountableIncomes&&num(ticketSummary.total)>0&&ticketSummary.allCatalogLinked===true
+    );
+    const incomesCompleteForLifecycle=noCountableIncomes?true:incomeTrace.summary.allReconciled===true;
     const lifecycle=bankLifecycle(event,reconciliationRowCount,{
-      ticketsComplete:ticketSummary.allJustified===true,
-      incomesComplete:incomeTrace.summary.allReconciled===true
+      ticketsComplete:ticketsCompleteForLifecycle,
+      incomesComplete:incomesCompleteForLifecycle
     });
     const cashIncome=cashIncomeTotal(event,collaboratorRows,personRows,eventPersonSnapshotRows);
     const eventIncome=cents(ledger.summary.income+cashIncome);
@@ -797,8 +810,8 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         message:lifecycle.message,
         eventFinalized:event.finalized,
         complete:lifecycle.complete===true,
-        ticketsComplete:ticketSummary.allJustified===true,
-        incomesComplete:incomeTrace.summary.allReconciled===true,
+        ticketsComplete:ticketsCompleteForLifecycle,
+        incomesComplete:incomesCompleteForLifecycle,
         evidence:reconciliationEvidence,
         periodSource:periodExplicit?'MANUAL':(period?.saved===true?'INICIALIZACION_AUTOMATICA':'CALCULADO_NO_GUARDADO')
       },
