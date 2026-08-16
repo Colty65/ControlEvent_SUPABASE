@@ -144,8 +144,8 @@
         <button type="button" class="tab" id="tabGraficasBtn" title="Gráficas del evento"><span class="tabicon">📊</span></button>
         <button type="button" class="tab ce-zuzu-test-tab hidden" id="ceZuzuTestBtn" style="display:none!important" title="PRUEBAS ZUZU · ITV automática · solo GD" aria-label="PRUEBAS ZUZU" aria-hidden="true"><span class="tabicon">🧪</span></button>
       </div>
-      <!-- ITV Zuzu: carga inmediata junto al botón; no espera a los bundles pesados de ControlEvent. -->
-      <script src="./app/features/zuzu-test-console-gd.js?v=20260816-V1.0-EXP-ZUZU-ITV-BOTON-INMEDIATO-FIX4"></script>
+      <!-- ITV Zuzu: carga inmediata, aislada del bloqueo modal nativo y del polling. -->
+      <script src="./app/features/zuzu-test-console-gd.js?v=20260816-V1.0-EXP-ZUZU-ITV-UI-STABLE-FIX5"></script>
 
       <div id="noEventMessage" class="card hidden">
         <div class="empty">No hay eventos. Crea uno desde mantenimiento.</div>
