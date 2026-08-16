@@ -840,6 +840,52 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
   }catch(error){ throw friendlyDbError(error); }
 }
 
+async function persistAppliedPeriodMovementSnapshot(eventId,accountId='',actor={}){
+  const selectedEvent=text(eventId);
+  if(!selectedEvent) return {removed:0,created:0,keptExplicit:0};
+  const actorName=text(actor.identificacion||actor.nombre)||'SISTEMA';
+  const snapshotTag=`PERIODO_APLICADO:${actorName}`;
+
+  // v2.0_exp FIX2 · Aplicar fechas debe congelar también la selección En saldo/excluido
+  // del periodo. En curso la UI puede reconstruir candidatos desde el histórico, pero al
+  // Finalizar solo se permite leer la foto persistida. Sin esta instantánea desaparecían
+  // precisamente los cargos todavía sin TKxx, aunque el usuario los hubiera dejado En saldo.
+  const existingRows=await selectPaged(EVENT_MOVEMENT_STATE_TABLE,{
+    columns:'event_id,movement_id,included,updated_by,updated_at',
+    order:'updated_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)
+  });
+  const generatedRows=arr(existingRows).filter(row=>/^PERIODO_APLICADO(?::|$)/i.test(text(row.updated_by)));
+  if(generatedRows.length){
+    const ids=[...new Set(generatedRows.map(row=>text(row.movement_id)).filter(Boolean))];
+    for(let i=0;i<ids.length;i+=200){
+      const {error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).delete().eq('event_id',selectedEvent).in('movement_id',ids.slice(i,i+200));
+      if(error) throw error;
+    }
+  }
+
+  // Recalcula la misma vista que ve el usuario DESPUÉS de aplicar el periodo y de persistir
+  // los ingresos automáticos. Los estados manuales/AUTO_INGRESO existentes mandan y no se pisan.
+  const current=await listBankReconciliation({eventId:selectedEvent,accountId:text(accountId)});
+  const remainingRows=await selectPaged(EVENT_MOVEMENT_STATE_TABLE,{
+    columns:'event_id,movement_id,included,updated_by,updated_at',
+    order:'updated_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)
+  });
+  const explicitIds=new Set(arr(remainingRows).map(row=>text(row.movement_id)).filter(Boolean));
+  const rows=arr(current.movements)
+    .filter(row=>text(row.id)&&!explicitIds.has(text(row.id)))
+    .map(row=>({
+      event_id:selectedEvent,
+      movement_id:text(row.id),
+      included:row.included===true,
+      updated_by:snapshotTag
+    }));
+  for(let i=0;i<rows.length;i+=200){
+    const {error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).upsert(rows.slice(i,i+200),{onConflict:'event_id,movement_id'});
+    if(error) throw error;
+  }
+  return {removed:generatedRows.length,created:rows.length,keptExplicit:explicitIds.size};
+}
+
 async function persistAutomaticIncomeReconciliation(eventId,accountId='',actor={}){
   const selectedEvent=text(eventId);
   if(!selectedEvent) return {removedLinks:0,removedStates:0,createdLinks:0,createdStates:0};
@@ -924,7 +970,8 @@ export async function setBankEventPeriod(eventId,dateFrom,dateTo,actor={},accoun
     const {data,error}=await db().from(EVENT_SETTINGS_TABLE).upsert(row,{onConflict:'event_id'}).select('*').single();
     if(error) throw error;
     const automaticIncomePersistence=await persistAutomaticIncomeReconciliation(selectedEvent,accountId,actor);
-    return {ok:true,period:eventSettingFromDb(data),automaticIncomePersistence};
+    const periodMovementSnapshot=await persistAppliedPeriodMovementSnapshot(selectedEvent,accountId,actor);
+    return {ok:true,period:eventSettingFromDb(data),automaticIncomePersistence,periodMovementSnapshot};
   }catch(error){ throw friendlyDbError(error); }
 }
 
