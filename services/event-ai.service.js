@@ -8228,7 +8228,7 @@ function v325RelativeYearRequested(userPrompt='',priorYear=0){
   const explicit=v325YearInText(p);if(explicit)return explicit;
   if(!priorYear)return 0;
   if(/\b(?:ano|año)\s+anterior\b|\bdel\s+(?:ano|año)\s+anterior\b|\banterior\b/.test(p))return priorYear-1;
-  if(/\b(?:ano|año)\s+siguiente\b|\bdel\s+(?:ano|año)\s+siguiente\b|\bsiguiente\b/.test(p))return priorYear+1;
+  if(/\b(?:ano|año)\s+(?:siguiente|posterior)\b|\bdel\s+(?:ano|año)\s+(?:siguiente|posterior)\b|\b(?:siguiente|posterior)\b/.test(p))return priorYear+1;
   return 0;
 }
 function v325ResolveRelativeYearSibling(state,userPrompt='',conversationHistory=[]){
@@ -8237,7 +8237,7 @@ function v325ResolveRelativeYearSibling(state,userPrompt='',conversationHistory=
   const p=norm(userPrompt);
   // Solo aplica cuando el turno expresa continuidad temporal/elipsis; un año aislado dentro de
   // otro título explícito se resuelve por la vía normal de catálogo.
-  const relativeCue=/\b(?:ano|año)\s+(?:anterior|siguiente)\b|\b(?:el|la|los|las)\s+de\s+(?:19|20)\d{2}\b|^\s*(?:19|20)\d{2}\s*$/.test(p);
+  const relativeCue=/\b(?:ano|año)\s+(?:anterior|siguiente|posterior)\b|\b(?:el|la|los|las)\s+de\s+(?:19|20)\d{2}\b|^\s*(?:19|20)\d{2}\s*$/.test(p);
   if(!relativeCue)return'';
   const priorCore=v314EventCoreTokens(prior);if(!priorCore.length)return'';
   const candidates=[];
@@ -8337,7 +8337,7 @@ function v314LooksLikeCurrentEventMention(userPrompt=''){
   const raw=text(userPrompt).trim(),p=norm(raw);
   if(!raw)return false;
   if(/\b(?:19|20)\d{2}\b/.test(p)||v314RomanFromPrompt(raw))return true;
-  if(/\b(?:ano|año)\s+(?:anterior|siguiente)\b|\b(?:el|la|los|las)\s+de\s+(?:19|20)\d{2}\b/.test(p))return true;
+  if(/\b(?:ano|año)\s+(?:anterior|siguiente|posterior)\b|\b(?:el|la|los|las)\s+de\s+(?:19|20)\d{2}\b/.test(p))return true;
   return /^(?:ahora\s+)?(?:h[aá]blame|dime|cu[eé]ntame|informame|inf[oó]rmame)\s+(?:de|del|sobre)\s+.+/i.test(raw)||/^(?:ahora\s+)?(?:vuelve|volvamos|regresa|regresemos|cambia|cambiamos)\s+(?:a|al)\s+.+/i.test(raw)||/\bme\s+refer[ií]a\s+(?:a|al)\b/i.test(raw);
 }
 function v310ExplicitEventFocus(state,userPrompt='',conversationHistory=[]){
@@ -10299,10 +10299,16 @@ function v29ProductSearchTerm(state,prompt){
     arr(state?.productos).forEach(prod=>{
       [prod?.segmento,prod?.destino].forEach(v=>norm(v).split(/[^a-z0-9ñ]+/).filter(Boolean).forEach(tok=>stop.add(tok)));
     });
-    // Los tokens del nombre del evento tampoco son productos. Evita que «SySA 2026»
-    // se convierta en filtros como producto=2026 o producto=SySA.
-    arr(state?.eventos).forEach(ev=>norm(ev?.titulo||ev?.nombre).split(/[^a-z0-9ñ]+/).filter(Boolean).forEach(tok=>stop.add(tok)));
   }
+  // FIX2.11: las palabras que forman parte del nombre de un EVENTO citado nunca son un
+  // filtro de producto implícito, incluso si la frase contiene «productos». De lo contrario
+  // «detalle de productos de Fiesta X» podía terminar como filterProduct=fiesta.
+  // Se resuelve el evento por catálogo y solo se bloquean los tokens de esa entidad; si no se
+  // logra resolver con seguridad, se bloquean los tokens de títulos completos que aparecen
+  // literalmente en el prompt. No hay aliases/nombres particulares codificados.
+  const citedEvent=v314ResolveEventMention(state,prompt,[]);
+  const eventNames=citedEvent?[citedEvent]:arr(state?.eventos).map(ev=>trim(ev?.titulo||ev?.nombre)).filter(n=>n&&v29WordBoundaryContains(p,n));
+  eventNames.forEach(name=>norm(name).split(/[^a-z0-9ñ]+/).filter(Boolean).forEach(tok=>stop.add(tok)));
   const tokens=[...new Set(p.split(/[^a-z0-9ñ]+/).map(trim).filter(x=>x.length>=4&&!stop.has(x)&&!/^(?:19|20)\d{2}$/.test(x)))],scores=[];
   for(const token of tokens){let hits=0;for(const prod of arr(state?.productos)){const name=norm(prod?.nombre);if(name&&v29WordBoundaryContains(name,token))hits++;}if(hits)scores.push({token,hits,len:token.length});}
   return scores.sort((a,b)=>a.hits-b.hits||b.len-a.len)[0]?.token||'';
@@ -10970,7 +10976,27 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   // Esto evita errores como «Ahora háblame de SySA 2025» heredando PURCHASES del turno anterior.
   zuzuTracePush(flowTrace,'v1.0_exp · ARQUITECTURA NUEVA ACTIVA','OK',`Gemini interpreta todos los turnos y mantiene el hilo nativo; ControlEvent ejecuta herramientas y materializa datos canónicos. No existe una ruta semántica determinista previa que pueda arrastrar el dominio anterior. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
   try{
-    return await runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(0,14000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
+    let primary=await runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(0,14000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
+    // FIX2.11 · Contrato mínimo de salida: una ejecución con hechos canónicos no puede
+    // terminar con answer vacío. Si la respuesta se vacía durante auditoría/redacción,
+    // reconstruimos únicamente desde una persona explícita y única del turno actual.
+    if(!trim(primary?.answer)){
+      const pnorm=norm(userPrompt),mentioned=arr(state?.personas).filter(pe=>{const n=trim(pe?.nombre||pe?.Nombre);return n&&v29WordBoundaryContains(pnorm,n);});
+      const uniq=[];for(const pe of mentioned){if(!uniq.some(x=>norm(x?.nombre||x?.Nombre)===norm(pe?.nombre||pe?.Nombre)))uniq.push(pe);}
+      if(uniq.length===1){
+        const person=trim(uniq[0]?.nombre||uniq[0]?.Nombre);
+        try{
+          const pd=await v26ToolPersonDossier({id:'v1_empty_answer_person_fallback',name:'person_dossier',person,scope:'all_events',status:'all',detail:'brief'},state,selectedEventId);
+          const fb=v26FallbackFromTools([pd],userPrompt);
+          if(trim(fb?.answer)){
+            zuzuTracePush(flowTrace,'v1.0_exp · Contrato de respuesta','WARN',`La redacción principal quedó vacía; CE recompone la respuesta desde person_dossier del sujeto explícito «${person}».`);
+            primary=v281LocalResponse({title:fb.title||`Información sobre ${person}`,answer:fb.answer,results:[pd],showTables:arr(fb.showTables),flowTrace,previousInteractionId:trim(primary?.interactionId||primary?.meta?.interactionId||previousInteractionId),traceDirect:false,resultContext:primary?.meta?.resultContext||{person,domain:'person'}});
+            primary.provider='control-event-empty-answer-fallback';
+          }
+        }catch(_){ /* si el respaldo tampoco puede materializarse, se conserva el resultado para que el oráculo lo marque */ }
+      }
+    }
+    return primary;
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
     zuzuTracePush(flowTrace,'v30 · Respaldo por indisponibilidad','WARN',`Gemini no completó el turno por un fallo real de servicio/ejecución; CE conserva los hechos canónicos como respaldo. ${cleanGeminiError(error)}`);
@@ -14295,6 +14321,7 @@ export const __zuzuStructuralTesting = Object.freeze({
   sanitizeStructure: sanitizeResultStructure,
   v26ExecuteTool,
   v26ExecuteTools,
+  v261ExecuteAgentTool,
   v26BuildPresentation,
   v26FallbackFromTools,
   v26ResolvePersonFamily,

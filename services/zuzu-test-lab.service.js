@@ -4,6 +4,7 @@
 import { getState } from './state.service.js';
 import { listUsers } from './auth.service.js';
 import { analyzeEventPrompt, __zuzuStructuralTesting as Z } from './event-ai.service.js';
+import { listBankReconciliation } from './bank-reconciliation.service.js';
 
 const arr = v => Array.isArray(v) ? v : [];
 const text = v => v == null ? '' : String(v);
@@ -85,9 +86,47 @@ function findTable(result,keyName){ return arr(result?.tables).find(t=>trim(t?.k
 function toolTable(tool,keyName){ return arr(tool?.tables).find(t=>trim(t?.key)===keyName) || null; }
 function compactCase(c){ return {id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',meta:c.meta||{}}; }
 
+async function execCanonicalTool(state,toolOrName,argsOrState={},selectedEventId=''){
+  const tool=(toolOrName&&typeof toolOrName==='object')?{...toolOrName}:{id:`itv_${trim(toolOrName)}`,name:trim(toolOrName),...(argsOrState&&typeof argsOrState==='object'?argsOrState:{})};
+  const name=trim(tool.name),id=trim(tool.id)||`itv_${name}`;
+  if(typeof Z.v261ExecuteAgentTool==='function'){
+    const args={...tool};delete args.id;delete args.name;
+    return Z.v261ExecuteAgentTool({id,name,arguments:args},state,selectedEventId,[]);
+  }
+  return Z.v26ExecuteTool({id,name,...tool},state,selectedEventId);
+}
+
 function publicBatteryCase(c,mode=''){
   const expected = trim(c?.expected) || (trim(c?.expectedEvent)?`Evento: ${trim(c.expectedEvent)}`:'') || (arr(c?.expectedEvents).length?`Eventos: ${arr(c.expectedEvents).join(' ↔ ')}`:'') || (trim(c?.expectedPerson)?`Persona: ${trim(c.expectedPerson)}`:'') || (trim(c?.event)?`Evento: ${trim(c.event)}`:'') || (arr(c?.events).length?`Eventos: ${arr(c.events).join(' ↔ ')}`:'') || (trim(c?.person)?`Persona: ${trim(c.person)}`:'') || 'Regla/invariante satisfecha';
-  return {id:trim(c?.id),group:trim(c?.group)||'CONVERSACIÓN',label:trim(c?.label)||trim(c?.scenario)||trim(c?.prompt),prompt:trim(c?.prompt),expected,scenario:trim(c?.scenario),mode:trim(mode)};
+  // Se guarda también el contrato verificable de la pregunta. Así una batería histórica
+  // puede repetirse EXACTAMENTE aunque en una versión futura cambien las plantillas de texto.
+  const validationRule=trim(c?.validationRule)||(
+    trim(c?.id)==='ai-nonexistent-event'?'nonexistent-event':
+    trim(c?.id)==='ai-nondeducible-consumption'?'nondeducible-consumption':''
+  );
+  return {
+    id:trim(c?.id),group:trim(c?.group)||'CONVERSACIÓN',label:trim(c?.label)||trim(c?.scenario)||trim(c?.prompt),
+    prompt:trim(c?.prompt),expected,scenario:trim(c?.scenario),mode:trim(mode),
+    event:trim(c?.event),events:arr(c?.events).map(trim).filter(Boolean),person:trim(c?.person),
+    expectedEvent:trim(c?.expectedEvent),expectedEvents:arr(c?.expectedEvents).map(trim).filter(Boolean),expectedPerson:trim(c?.expectedPerson),
+    oracle:c?.oracle&&typeof c.oracle==='object'?c.oracle:null,requireAnswer:c?.requireAnswer!==false,validationRule
+  };
+}
+
+function restoredHistoricalCase(raw={},mode=''){
+  const c={
+    id:trim(raw?.id),group:trim(raw?.group)||'HISTÓRICO',label:trim(raw?.label)||trim(raw?.prompt),prompt:trim(raw?.prompt),expected:trim(raw?.expected),
+    scenario:trim(raw?.scenario),mode:trim(mode||raw?.mode).toUpperCase(),event:trim(raw?.event||raw?.expectedEvent),
+    events:arr(raw?.events).length?arr(raw.events).map(trim).filter(Boolean):arr(raw?.expectedEvents).map(trim).filter(Boolean),
+    person:trim(raw?.person||raw?.expectedPerson),oracle:raw?.oracle&&typeof raw.oracle==='object'?raw.oracle:null,requireAnswer:raw?.requireAnswer!==false
+  };
+  const rule=trim(raw?.validationRule);
+  if(rule==='nonexistent-event') c.validate=r=>{
+    const answer=text(r?.answer),denied=/(?:no\s+(?:lo\s+)?(?:encuentro|existe|figura|consta)|no\s+se\s+(?:encuentra|localiza)|no\s+est[aá]\s+registrad[oa]|no\s+hay\s+un\s+evento|ning[uú]n\s+evento[^.]{0,100}(?:coincid|parec|registr))/i.test(answer);
+    return denied;
+  };
+  else if(rule==='nondeducible-consumption') c.validate=r=>/no (?:registra|puede|se puede)|no.*deduc|no.*acredit|no.*saber|no.*determinar/i.test(text(r?.answer))||/Dato no deducible/i.test(text(r?.title));
+  return c;
 }
 
 function makeCase({id,group,label,prompt='',expected='',meta={},run}){ return {id,group,label,prompt,expected,meta,run}; }
@@ -133,6 +172,7 @@ function looksEmptyOrDeferred(result){
   return /control\s*event ha conservado los datos canonicos|se ha omitido una interpretacion|voy a (?:consultar|revisar|buscar)|necesito (?:revisar|consultar) los registros/.test(b);
 }
 function claimsNoProducts(result){ return /no\s+(?:se\s+)?(?:encontraron|hay|hubo|constan|aparecen)[^.]{0,90}(?:productos?|compras?)/i.test(resultBlob(result)); }
+function claimsKnownEventMissing(result,name=''){ const b=resultBlob(result); if(!hasNameInText(b,name))return false; return /(?:no\s+(?:hay|existe|figura|consta|encuentro)|no\s+se\s+(?:encuentra|localiza)|no\s+est[aá]\s+registrad[oa]|no\s+hay\s+un\s+evento|parece\s+que\s+no\s+hay\s+un\s+evento)/i.test(b); }
 function hasNameInText(value,name){ const h=norm(value),toks=significant(name); if(yearOf(name)&&!h.includes(yearOf(name)))return false; return toks.length>0&&toks.filter(t=>h.includes(t)).length>=Math.min(2,toks.length); }
 
 function purchaseOracle(state,event){
@@ -151,14 +191,53 @@ function purchaseOracle(state,event){
   return{event:rr.nombre,eventId:rr.id,total:round(total,2),totalUnits:round(totalUnits,3),records,productCount:rows.length,rows,max:byAmountDesc[0]||null,min:byAmountAsc[0]||null};
 }
 async function eventOracle(state,event){
-  try{const r=await Z.v26ExecuteTool({id:'itv_oracle_event',name:'event_dossier',event,scope:'named_event',detail:'brief'},state,'');return{event:trim(r?.facts?.event)||event,income:round(r?.facts?.income_total,2),purchases:round(r?.facts?.purchases_realized,2),pending:round(r?.facts?.purchases_pending,2),donations:round(r?.facts?.donations_value,2),balance:round(r?.facts?.operating_balance,2),valuation:round(r?.facts?.event_valuation,2),attendees:round(r?.facts?.attendees_canonical,3),status:trim(r?.facts?.status)};}catch(_){return null;}
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_event',name:'event_dossier',event,scope:'named_event',detail:'brief'},state,'');return{event:trim(r?.facts?.event)||event,income:round(r?.facts?.income_total,2),purchases:round(r?.facts?.purchases_realized,2),pending:round(r?.facts?.purchases_pending,2),donations:round(r?.facts?.donations_value,2),balance:round(r?.facts?.operating_balance,2),valuation:round(r?.facts?.event_valuation,2),attendees:round(r?.facts?.attendees_canonical,3),status:trim(r?.facts?.status)};}catch(_){return null;}
 }
 async function comparisonOracle(state,events=[]){
-  try{const r=await Z.v26ExecuteTool({id:'itv_oracle_compare',name:'compare_events',events:arr(events),detail:'standard'},state,'');const rows=arr(toolTable(r,'comparison')?.rows).map(x=>({event:trim(x?.Evento),income:round(x?.Ingresos,2),purchases:round(x?.['Compras realizadas'],2),pending:round(x?.['Compras pendientes'],2),donations:round(x?.['Donaciones valoradas'],2),balance:round(x?.['Saldo operativo'],2),valuation:round(x?.['Valoración del evento'],2),attendees:round(x?.['Asistentes canónicos'],3)}));return rows.length>=2?{events:rows.map(x=>x.event),rows}:null;}catch(_){return null;}
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_compare',name:'compare_events',events:arr(events),detail:'standard'},state,'');const rows=arr(toolTable(r,'comparison')?.rows).map(x=>({event:trim(x?.Evento),income:round(x?.Ingresos,2),purchases:round(x?.['Compras realizadas'],2),pending:round(x?.['Compras pendientes'],2),donations:round(x?.['Donaciones valoradas'],2),balance:round(x?.['Saldo operativo'],2),valuation:round(x?.['Valoración del evento'],2),attendees:round(x?.['Asistentes canónicos'],3)}));return rows.length>=2?{events:rows.map(x=>x.event),rows}:null;}catch(_){return null;}
 }
 async function personOracle(state,person,event=''){
-  try{const args={id:'itv_oracle_person',name:'person_dossier',person,scope:event?'named_event':'all_events',detail:'brief'};if(event)args.event=event;const r=await Z.v26ExecuteTool(args,state,'');const f=r?.facts||{};return{person:trim(f.person)||person,event:trim(f.scope_event),eventCount:num(f.event_count),income:round(f.income_linked_total,2),purchases:round(f.purchase_responsibility_total,2),donations:round(f.donations_value,2),purchaseRecords:num(f.purchase_responsibility_records),donationRecords:num(f.donation_records),summaryRows:arr(toolTable(r,'summary_by_event')?.rows),incomeRows:arr(toolTable(r,'income_by_event')?.rows)};}catch(_){return null;}
+  try{const args={id:'itv_oracle_person',name:'person_dossier',person,scope:event?'named_event':'all_events',detail:'brief'};if(event)args.event=event;const r=await execCanonicalTool(state,args,state,'');const f=r?.facts||{};return{person:trim(f.person)||person,event:trim(f.scope_event),eventCount:num(f.event_count),income:round(f.income_linked_total,2),purchases:round(f.purchase_responsibility_total,2),donations:round(f.donations_value,2),purchaseRecords:num(f.purchase_responsibility_records),donationRecords:num(f.donation_records),summaryRows:arr(toolTable(r,'summary_by_event')?.rows),incomeRows:arr(toolTable(r,'income_by_event')?.rows)};}catch(_){return null;}
 }
+
+async function documentationOracle(state,event){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_docs',name:'event_documentation',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,incomeRecords:num(f.income_records),incomeWithReceipt:num(f.income_with_receipt),tickets:num(f.purchase_tickets),ticketsWithImage:num(f.purchase_tickets_with_image),documents:num(f.documents),documentsWithAttachment:num(f.documents_with_attachment),missing:num(f.missing_evidence_count),ticketRows:arr(toolTable(r,'purchase_tickets')?.rows),documentRows:arr(toolTable(r,'documents')?.rows),incomeRows:arr(toolTable(r,'income_receipts')?.rows)};}catch(_){return null;}
+}
+async function bankOracle(state,event){
+  const rr=Z.semanticResolveEntity(state,'event',event);if(!rr?.ok)return null;
+  try{const r=await listBankReconciliation({eventId:rr.id});const s=r?.summary||{};return{event:rr.nombre,eventId:rr.id,movements:arr(r?.movements).length,included:num(s.movementCount||s.includedMovementCount||arr(r?.movements).filter(x=>x?.included!==false).length),income:round(s.income,2),expense:round(s.expense,2),impact:round(s.impact??s.netMovement??(num(s.income)-num(s.expense)),2),opening:round(s.openingBalance,2),closing:round(s.closingBalance,2),cashIncome:round(s.cashIncome,2),eventIncome:round(s.eventIncome,2),period:r?.period||{},ticketSummary:r?.ticketSummary||{},hasData:arr(r?.movements).length>0};}catch(_){return null;}
+}
+async function managementOracle(state,event){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_management',name:'event_management',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,hitos:num(f.hitos_count),lg:num(f.lg_count),completed:num(f.lg_completed),pending:num(f.lg_pending)};}catch(_){return null;}
+}
+async function donationOracle(state,event){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_donations',name:'event_donation_lines',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,records:num(f.donation_record_count),donors:num(f.donor_count),products:num(f.product_count),total:round(f.total_value,2),donorRows:arr(toolTable(r,'donors')?.rows),productRows:arr(toolTable(r,'donor_products')?.rows)};}catch(_){return null;}
+}
+function attendanceOracle(eventData,event){return eventData?{event,attendees:num(eventData.attendees)}:null;}
+
+function catalogOracle(state,entity){
+  const map={events:arr(state?.eventos),people:arr(state?.personas),products:arr(state?.productos),stores:arr(state?.tiendas)};return{entity,count:arr(map[entity]).length};
+}
+async function eventsOverviewOracle(state){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_events_overview',name:'events_overview',detail:'full'},state,'');return{count:num(r?.facts?.event_count),rows:arr(toolTable(r,'events_overview')?.rows)};}catch(_){return null;}
+}
+async function peopleActivityOracle(state){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_people_activity',name:'people_activity',detail:'full'},state,'');return{count:num(r?.facts?.entities),rows:arr(toolTable(r,'people_activity')?.rows)};}catch(_){return null;}
+}
+async function canonicalSociosOracle(state){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_socios',name:'canonical_socios',detail:'full'},state,'');return{records:num(r?.facts?.canonical_records),people:num(r?.facts?.people_count),rows:arr(toolTable(r,'socios')?.rows)};}catch(_){return null;}
+}
+async function participationOracle(state,person){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_participation',name:'participation_events',person,detail:'full'},state,'');return{person:trim(r?.facts?.person)||person,eventCount:num(r?.facts?.event_count),rows:arr(toolTable(r,'events')?.rows)};}catch(_){return null;}
+}
+async function storePurchasesOracle(state,store){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_store',name:'store_purchases',store,scope:'all_events',status:'realized',include_empty:false,detail:'full'},state,'');return{store:trim(r?.facts?.store)||store,eventCount:num(r?.facts?.event_count),records:num(r?.facts?.total_records),total:round(r?.facts?.total_amount,2),rows:arr(toolTable(r,'by_event')?.rows)};}catch(_){return null;}
+}
+async function bankTimelineOracle(state,event){
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_bank_timeline',name:'event_bank_timeline',event,scope:'named_event',detail:'full'},state,'');return{event:trim(r?.facts?.event)||event,points:num(r?.facts?.timeline_movement_count),opening:round(r?.facts?.opening_balance,2),closing:round(r?.facts?.closing_balance,2),impact:round(r?.facts?.bank_impact,2),rows:arr(toolTable(r,'balance_timeline')?.rows)};}catch(_){return null;}
+}
+function donationCountForEvent(state,eventId){return arr(state?.compras).filter(r=>eventIdOf(r)===trim(eventId)&&isDonationTicketLocal(ticketTextLocal(r))).length;}
+
 function metricWinner(compare,metric){
   const rows=arr(compare?.rows); if(rows.length<2)return null; const sorted=rows.slice().sort((a,b)=>num(b?.[metric])-num(a?.[metric])||trim(a.event).localeCompare(trim(b.event),'es'));const winner=sorted[0],runner=sorted[1];return{winner,runner,diff:round(num(winner?.[metric])-num(runner?.[metric]),metric==='attendees'?3:2)};
 }
@@ -171,6 +250,21 @@ function expectedOracleText(oracle){
   if(oracle.kind==='person-income'&&oracle.known!==false)return `${oracle.person}: ${euro(oracle.total)}`;
   if(oracle.kind==='person-relation'&&oracle.known!==false)return `${oracle.person} ${oracle.related?'SÍ':'NO'} tiene relación con ${oracle.event}`;
   if(oracle.kind==='event-economy')return `${oracle.event}: ingresos ${euro(oracle.data?.income)} · compras ${euro(oracle.data?.purchases)} · saldo ${euro(oracle.data?.balance)}`;
+  if(oracle.kind==='documentation')return `${oracle.event}: ingresos ${oracle.data?.incomeRecords||0} (${oracle.data?.incomeWithReceipt||0} justificantes) · TKxx ${oracle.data?.tickets||0} (${oracle.data?.ticketsWithImage||0} imágenes) · DOC ${oracle.data?.documents||0} (${oracle.data?.documentsWithAttachment||0} adjuntos) · faltan ${oracle.data?.missing||0}`;
+  if(oracle.kind==='ticket-detail')return `${oracle.event}: ${oracle.ticket}`;
+  if(oracle.kind==='catalog-count')return `${oracle.entity}: ${oracle.count} registros`;
+  if(oracle.kind==='bank-summary')return `${oracle.event}: ${oracle.data?.movements||0} movimientos${oracle.data?.hasData?` · impacto ${euro(oracle.data?.impact||0)}`:''}`;
+  if(oracle.kind==='attendance')return `${oracle.event}: ${oracle.data?.attendees||0} asistentes`;
+  if(oracle.kind==='management')return `${oracle.event}: ${oracle.data?.hitos||0} hitos · ${oracle.data?.lg||0} LG · ${oracle.data?.pending||0} pendientes`;
+  if(oracle.kind==='donations')return `${oracle.event}: ${oracle.data?.records||0} donaciones · ${oracle.data?.donors||0} donantes · ${euro(oracle.data?.total||0)}`;
+  if(oracle.kind==='documentation-field')return `${oracle.event}: ${oracle.label} = ${oracle.value}`;
+  if(oracle.kind==='event-metric')return `${oracle.event}: ${oracle.label} = ${euro(oracle.value)}`;
+  if(oracle.kind==='events-overview')return `Panorama: ${oracle.count} eventos`;
+  if(oracle.kind==='people-activity')return `Actividad global: ${oracle.count} personas canónicas`;
+  if(oracle.kind==='canonical-socios')return `Socios canónicos: ${oracle.records} registros · ${oracle.people} personas`;
+  if(oracle.kind==='store-purchases')return `${oracle.store}: ${euro(oracle.total)} · ${oracle.records} registros en ${oracle.eventCount} eventos`;
+  if(oracle.kind==='participation-events')return `${oracle.person}: ${oracle.eventCount} eventos`;
+  if(oracle.kind==='bank-timeline')return `${oracle.event}: ${oracle.points} puntos · impacto ${euro(oracle.impact)}`;
   return'';
 }
 function oracleFail(reasons=[]){return{ok:false,reasons:arr(reasons).filter(Boolean)};}
@@ -180,6 +274,7 @@ function validateOracle(caseDef,result){
   if(!result?.ok)reasons.push('result.ok=false');
   if(caseDef?.requireAnswer!==false&&looksEmptyOrDeferred(result))reasons.push(!trim(result?.answer)?'respuesta vacía':'respuesta aplazada/genérica sin resolver el dato');
   if(caseDef?.event&&!resultHasEvent(result,caseDef.event))reasons.push(`foco de evento distinto de ${caseDef.event}`);
+  if(caseDef?.event&&claimsKnownEventMissing(result,caseDef.event))reasons.push(`niega que exista un evento canónico real: ${caseDef.event}`);
   if(arr(caseDef?.events).length&&!arr(caseDef.events).every(n=>resultHasEvent(result,n)))reasons.push('la comparación no conserva todos los eventos');
   if(caseDef?.person&&!resultHasPerson(result,caseDef.person))reasons.push(`sujeto distinto de ${caseDef.person}`);
   if(!oracle)return reasons.length?oracleFail(reasons):oraclePass();
@@ -225,6 +320,37 @@ function validateOracle(caseDef,result){
     if(oracle.known!==false){const neg=/\bno\s+(?:figura|aparece|tiene|consta|se\s+encuentra)|ninguna\s+relaci[oó]n|no\s+se\s+encontr/i.test(blob),pos=/\bsi\b|\bsí\b|figura|aparece|tiene\s+relaci[oó]n|vinculad/i.test(blob);
     if(oracle.related&&neg&&!pos)reasons.push('niega una relación que sí existe');
     if(!oracle.related&&!neg)reasons.push('no niega una relación que CE no registra');}
+  }else if(oracle.kind==='documentation'){
+    const d=oracle.data;if(d){const nums=[d.incomeRecords,d.incomeWithReceipt,d.tickets,d.ticketsWithImage,d.documents,d.documentsWithAttachment,d.missing];if(!nums.some(n=>new RegExp(`\\b${Number(n)}\\b`).test(blob)))reasons.push('no refleja ningún recuento documental canónico');}
+  }else if(oracle.kind==='ticket-detail'){
+    if(oracle.ticket&&!norm(blob).includes(norm(oracle.ticket)))reasons.push(`no conserva el TKxx esperado ${oracle.ticket}`);
+  }else if(oracle.kind==='catalog-count'){
+    if(!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`catálogo: no acredita ${oracle.count} registros`);
+  }else if(oracle.kind==='bank-summary'){
+    const d=oracle.data;if(d?.hasData&&d.movements>0&&!new RegExp(`\\b${Number(d.movements)}\\b`).test(blob)&&!hasMoney(blob,d.impact)&&!hasMoney(blob,d.closing))reasons.push('no devuelve ninguna magnitud bancaria canónica');
+  }else if(oracle.kind==='attendance'){
+    const d=oracle.data;if(d&&d.attendees>=0&&!new RegExp(`\\b${Number(d.attendees)}\\b`).test(blob))reasons.push(`asistencia: no acredita ${d.attendees} personas`);
+  }else if(oracle.kind==='management'){
+    const d=oracle.data;if(d&&![d.hitos,d.lg,d.pending,d.completed].some(n=>new RegExp(`\\b${Number(n)}\\b`).test(blob)))reasons.push('gestión: no refleja ningún recuento canónico de Hitos/LG');
+  }else if(oracle.kind==='donations'){
+    const d=oracle.data;if(d){if(d.records>0&&claimsNoProducts(result))reasons.push('donaciones: afirma ausencia de producto pese a existir registros');if(d.total>0&&!hasMoney(blob,d.total)&&!new RegExp(`\\b${Number(d.records)}\\b`).test(blob))reasons.push(`donaciones: no acredita ${euro(d.total)} ni ${d.records} registros`);}
+  }else if(oracle.kind==='documentation-field'){
+    if(!new RegExp(`\\b${Number(oracle.value)}\\b`).test(blob))reasons.push(`documentación: ${oracle.label} esperado ${oracle.value}`);
+  }else if(oracle.kind==='event-metric'){
+    if(!hasMoney(blob,oracle.value))reasons.push(`${oracle.label}: no devuelve ${euro(oracle.value)}`);
+  }else if(oracle.kind==='events-overview'){
+    if(!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`panorama global: no acredita ${oracle.count} eventos`);
+  }else if(oracle.kind==='people-activity'){
+    if(oracle.count>0&&!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`actividad global: no acredita ${oracle.count} personas canónicas`);
+  }else if(oracle.kind==='canonical-socios'){
+    if(oracle.records>0&&!new RegExp(`\\b${Number(oracle.records)}\\b`).test(blob)&&!new RegExp(`\\b${Number(oracle.people)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.records)))reasons.push(`socios canónicos: no acredita ${oracle.records} registros / ${oracle.people} personas`);
+  }else if(oracle.kind==='store-purchases'){
+    if(!hasNameInText(blob,oracle.store)&&!arr(result?.tables).length)reasons.push(`tienda no acreditada: ${oracle.store}`);
+    if(oracle.total>0&&!hasMoney(blob,oracle.total)&&!arr(result?.tables).length)reasons.push(`compras de tienda: no acredita ${euro(oracle.total)}`);
+  }else if(oracle.kind==='participation-events'){
+    if(oracle.eventCount>0&&!new RegExp(`\\b${Number(oracle.eventCount)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.eventCount)))reasons.push(`participación: no acredita ${oracle.eventCount} eventos`);
+  }else if(oracle.kind==='bank-timeline'){
+    if(oracle.points>0&&!new RegExp(`\\b${Number(oracle.points)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length>=Number(oracle.points)))reasons.push(`cronología bancaria: no acredita ${oracle.points} puntos/movimientos`);
   }
   return reasons.length?oracleFail(reasons):oraclePass();
 }
@@ -240,34 +366,95 @@ async function buildRealFastCases(state,seed){
   for(const r of arr(state?.compras)){ const eid=eventIdOf(r); if(eid) purchasesByEvent.set(eid,(purchasesByEvent.get(eid)||0)+1); }
   const cases=[];
 
+  for(const entity of ['events','people','products','stores']){
+    const o=catalogOracle(state,entity);
+    cases.push(makeCase({id:`catalog-${entity}`,group:'TABLAS GENERALES',label:`Catálogo general · ${entity}`,expected:`${o.count} registros`,run:async function(){
+      const r=await execCanonicalTool(state,{id:`fast_catalog_${entity}`,name:'master_catalog',entity,detail:'full'},state,'');
+      const rows=arr(r?.tables).flatMap(t=>arr(t?.rows));
+      return outcome(this,r?.ok!==false&&rows.length===o.count?'OK':'KO',`${entity}: ${rows.length} registros; esperado=${o.count}`);
+    }}));
+  }
+  cases.push(makeCase({id:'global-events-overview',group:'TABLAS GENERALES',label:'Panorama económico de todos los eventos',expected:`${events.length} eventos`,run:async function(){
+    const o=await eventsOverviewOracle(state);return outcome(this,o&&o.count===events.length?'OK':'KO',`eventos=${o?.count??'—'}; esperado=${events.length}`);
+  }}));
+  cases.push(makeCase({id:'global-people-activity',group:'TABLAS GENERALES',label:'Implicación global de personas canónicas',expected:'Actividad global de personas disponible',run:async function(){
+    const o=await peopleActivityOracle(state);return outcome(this,o&&o.count>=0?'OK':'KO',`personas canónicas=${o?.count??'—'}; filas=${o?.rows?.length??0}`);
+  }}));
+  cases.push(makeCase({id:'global-canonical-socios',group:'TABLAS GENERALES',label:'Censo de socios canónicos',expected:'Censo canónico disponible',run:async function(){
+    const o=await canonicalSociosOracle(state);return outcome(this,o&&o.records>=0&&o.people>=0?'OK':'KO',`registros=${o?.records??'—'}; personas=${o?.people??'—'}`);
+  }}));
+
+  for(const store of shuffled(arr(state?.tiendas).filter(s=>trim(s?.id)&&trim(s?.nombre)),seed,'fast-stores').slice(0,Math.min(8,arr(state?.tiendas).length))){
+    const name=trim(store?.nombre);cases.push(makeCase({id:`store-purchases-${key(store?.id||name)}`,group:'TIENDAS',label:`Compras históricas de tienda · ${name}`,expected:'Consulta de tienda coherente',run:async function(){
+      const o=await storePurchasesOracle(state,name);return outcome(this,o?'OK':'KO',o?`${o.store}: ${o.records} registros · ${euro(o.total)} · ${o.eventCount} eventos`:'No resuelta');
+    }}));
+  }
+
+  for(const p of shuffled(people,seed,'fast-participation-people').slice(0,Math.min(10,people.length))){
+    const name=personName(p);cases.push(makeCase({id:`participation-events-${key(p?.id||name)}`,group:'PERSONAS',label:`Eventos de participación · ${name}`,expected:'Participación personal coherente',run:async function(){
+      const o=await participationOracle(state,name);return outcome(this,o?'OK':'KO',o?`${o.person}: ${o.eventCount} eventos`:'No resuelta');
+    }}));
+  }
+
   for(const ev of events){
     const title=eventName(ev), eid=trim(ev.id);
     cases.push(makeCase({id:`event-resolve-${key(eid)}`,group:'EVENTOS',label:`Resolver evento exacto · ${title}`,expected:title,run:async function(){
       const r=Z.semanticResolveEntity(state,'event',title); return outcome(this,r?.ok&&trim(r.id)===eid?'OK':'KO',r?.ok?`${r.nombre} [${r.id}]`:r?.error||'No resuelto');
     }}));
     cases.push(makeCase({id:`event-dossier-${key(eid)}`,group:'EVENTOS',label:`Dossier canónico · ${title}`,expected:`event=${title}`,run:async function(){
-      const r=await Z.v26ExecuteTool({id:'fast_d',name:'event_dossier',event:title,scope:'named_event',detail:'brief'},state,eid);
+      const r=await execCanonicalTool(state,{id:'fast_d',name:'event_dossier',event:title,scope:'named_event',detail:'brief'},state,eid);
       const ok=r?.ok!==false && norm(r?.facts?.event)===norm(title);
       return outcome(this,ok?'OK':'KO',`${r?.facts?.event||'sin evento'} · ingresos=${r?.facts?.income_total??'—'} · compras=${r?.facts?.purchases_realized??'—'}`);
     }}));
     cases.push(makeCase({id:`event-people-${key(eid)}`,group:'PERSONAS',label:`Asistencia/dossier coherentes · ${title}`,expected:'Mismo evento y asistencia no negativa',run:async function(){
       const [d,p]=await Promise.all([
-        Z.v26ExecuteTool({id:'fast_d',name:'event_dossier',event:title,scope:'named_event',detail:'brief'},state,eid),
-        Z.v26ExecuteTool({id:'fast_p',name:'event_people',event:title,scope:'named_event',detail:'brief'},state,eid)
+        execCanonicalTool(state,{id:'fast_d',name:'event_dossier',event:title,scope:'named_event',detail:'brief'},state,eid),
+        execCanonicalTool(state,{id:'fast_p',name:'event_people',event:title,scope:'named_event',detail:'brief'},state,eid)
       ]);
       const same=norm(d?.facts?.event)===norm(p?.facts?.event), dv=num(d?.facts?.attendees_canonical), pv=num(p?.facts?.attendees_canonical);
       return outcome(this,same&&dv>=0&&pv>=0&&Math.abs(dv-pv)<0.001?'OK':'KO',`dossier=${dv}; people=${pv}; evento=${p?.facts?.event||'—'}`);
     }}));
+    cases.push(makeCase({id:`event-docs-${key(eid)}`,group:'DOCUMENTOS',label:`Documentos / TKxx / justificantes · ${title}`,expected:'Recuentos documentales coherentes',run:async function(){
+      const r=await execCanonicalTool(state,{id:'fast_doc',name:'event_documentation',event:title,scope:'named_event',detail:'full'},state,eid),f=r?.facts||{};
+      const ok=r?.ok!==false&&num(f.income_with_receipt)<=num(f.income_records)&&num(f.purchase_tickets_with_image)<=num(f.purchase_tickets)&&num(f.documents_with_attachment)<=num(f.documents)&&num(f.missing_evidence_count)>=0;
+      return outcome(this,ok?'OK':'KO',`ingresos=${f.income_records||0}; justificantes=${f.income_with_receipt||0}; TKxx=${f.purchase_tickets||0}; fototickets=${f.purchase_tickets_with_image||0}; DOC=${f.documents||0}; adjuntos=${f.documents_with_attachment||0}; faltan=${f.missing_evidence_count||0}`);
+    }}));
+    cases.push(makeCase({id:`event-management-${key(eid)}`,group:'HITOS/LG',label:`Gestión · ${title}`,expected:'Hitos/LG coherentes',run:async function(){
+      const r=await execCanonicalTool(state,{id:'fast_mgmt',name:'event_management',event:title,scope:'named_event',detail:'brief'},state,eid),f=r?.facts||{};
+      const vals=Object.values(f).filter(v=>typeof v==='number');const ok=r?.ok!==false&&vals.every(v=>Number.isFinite(v)&&v>=0);
+      return outcome(this,ok?'OK':'KO',`evento=${f.event||title}; hitos=${f.hitos_count??f.hitos??'—'}; LG=${f.lg_count??f.lgs??'—'}`);
+    }}));
+    if(donationCountForEvent(state,eid)>0) cases.push(makeCase({id:`event-donations-${key(eid)}`,group:'DONACIONES',label:`Donaciones · ${title}`,expected:'Donaciones del evento coherentes',run:async function(){
+      const r=await execCanonicalTool(state,{id:'fast_don',name:'event_donation_lines',event:title,scope:'named_event',detail:'full'},state,eid),f=r?.facts||{};
+      const ok=r?.ok!==false&&num(f.donation_line_count||f.records||0)>=0&&num(f.total_value||f.donations_value||0)>=0;
+      return outcome(this,ok?'OK':'KO',`evento=${f.event||title}; registros=${f.donation_line_count??f.records??'—'}; valor=${f.total_value??f.donations_value??'—'}`);
+    }}));
+
     if(purchasesByEvent.get(eid)) cases.push(makeCase({id:`event-purchases-${key(eid)}`,group:'COMPRAS',label:`Compras coherentes · ${title}`,expected:'Dossier = desglose; MAX/MIN/SUM consistentes',run:async function(){
       const [d,b]=await Promise.all([
-        Z.v26ExecuteTool({id:'fast_d',name:'event_dossier',event:title,scope:'named_event',detail:'brief'},state,eid),
-        Z.v26ExecuteTool({id:'fast_b',name:'event_breakdowns',event:title,scope:'named_event',detail:'full'},state,eid)
+        execCanonicalTool(state,{id:'fast_d',name:'event_dossier',event:title,scope:'named_event',detail:'brief'},state,eid),
+        execCanonicalTool(state,{id:'fast_b',name:'event_breakdowns',event:title,scope:'named_event',detail:'full'},state,eid)
       ]);
       const rows=arr(toolTable(b,'products_cost')?.rows), sum=round(rows.reduce((a,r)=>a+num(r.Importe),0),2), max=rows.slice().sort((a,b)=>num(b.Importe)-num(a.Importe))[0], min=rows.filter(r=>Number.isFinite(Number(r.Importe))).slice().sort((a,b)=>num(a.Importe)-num(b.Importe))[0];
       const base=round(d?.facts?.purchases_realized,2), breakdown=round(b?.facts?.purchases_realized,2);
       const sumCheck=rows.length<20 ? moneyEq(sum,breakdown) : sum<=breakdown+0.011; // tabla puede estar limitada a top20
       const ok=moneyEq(base,breakdown)&&sumCheck&&(!max||num(max.Importe)>=num(min?.Importe));
       return outcome(this,ok?'OK':'KO',`dossier=${base}; desglose=${breakdown}; productos=${rows.length}; suma_tabla=${sum}; max=${max?.Producto||'—'} ${max?.Importe??'—'}; min=${min?.Producto||'—'} ${min?.Importe??'—'}`);
+    }}));
+  }
+
+  // Cuadre Banco vive en tablas normalizadas separadas del estado general. Se prueba por una
+  // muestra reproducible de eventos para cubrir la fuente sin multiplicar el coste/tiempo de FAST.
+  const fastBankEvents=shuffled(events,seed,'fast-bank-events').slice(0,Math.min(6,events.length));
+  for(const ev of fastBankEvents){
+    const title=eventName(ev),eid=trim(ev.id);
+    cases.push(makeCase({id:`event-bank-${key(eid)}`,group:'BANCO',label:`Cuadre Banco · ${title}`,expected:'Lectura bancaria segura y coherente',run:async function(){
+      try{const b=await listBankReconciliation({eventId:eid}),s=b?.summary||{},m=arr(b?.movements);const ok=b?.ok!==false&&m.every(x=>Number.isFinite(Number(x?.amount)));return outcome(this,ok?'OK':'KO',`movimientos=${m.length}; ingresos=${round(s.income,2)}; gastos=${round(s.expense,2)}; saldoFinal=${round(s.closingBalance,2)}`);}catch(error){return outcome(this,'WARN',`Sin fuente bancaria utilizable para este evento: ${trim(error?.message)||'sin datos'}`);}
+    }}));
+  }
+  for(const ev of fastBankEvents.slice(0,Math.min(2,fastBankEvents.length))){
+    const title=eventName(ev);cases.push(makeCase({id:`event-bank-timeline-${key(ev.id)}`,group:'BANCO',label:`Cronología bancaria · ${title}`,expected:'Cronología bancaria segura',run:async function(){
+      const o=await bankTimelineOracle(state,title);return outcome(this,o?'OK':'WARN',o?`puntos=${o.points}; apertura=${euro(o.opening)}; cierre=${euro(o.closing)}; impacto=${euro(o.impact)}`:'Sin cronología bancaria utilizable');
     }}));
   }
 
@@ -280,7 +467,7 @@ async function buildRealFastCases(state,seed){
     for(let i=1;i<sorted.length;i++){
       const a=sorted[i-1], b=sorted[i], an=eventName(a), bn=eventName(b); pairNo++;
       cases.push(makeCase({id:`compare-family-${pairNo}-${key(a.id)}-${key(b.id)}`,group:'COMPARACIONES',label:`Comparación misma familia · ${an} / ${bn}`,expected:'Dos eventos distintos conservados',run:async function(){
-        const r=await Z.v26ExecuteTool({id:'fast_cmp',name:'compare_events',events:[an,bn],scope:'named_event'},state,'');
+        const r=await execCanonicalTool(state,{id:'fast_cmp',name:'compare_events',events:[an,bn],scope:'named_event'},state,'');
         const names=arr(r?.facts?.event_names), ok=names.length===2 && new Set(names.map(norm)).size===2 && names.some(x=>norm(x)===norm(an)) && names.some(x=>norm(x)===norm(bn));
         return outcome(this,ok?'OK':'KO',names.join(' ↔ ')||'sin comparación');
       }}));
@@ -295,7 +482,7 @@ async function buildRealFastCases(state,seed){
     const a=mixedEvents[i%mixedEvents.length], b=mixedEvents[(i*7+3+pickIndex(mixedEvents.length,seed,`fast-pair-${i}`))%mixedEvents.length]; if(a.id===b.id) continue;
     const an=eventName(a),bn=eventName(b);
     cases.push(makeCase({id:`compare-mixed-${i}-${key(a.id)}-${key(b.id)}`,group:'COMPARACIONES',label:`Comparación cruzada · ${an} / ${bn}`,expected:'A y B distintos',run:async function(){
-      const r=await Z.v26ExecuteTool({id:'fast_cmp',name:'compare_events',events:[an,bn],scope:'named_event'},state,'');
+      const r=await execCanonicalTool(state,{id:'fast_cmp',name:'compare_events',events:[an,bn],scope:'named_event'},state,'');
       const names=arr(r?.facts?.event_names); const ok=names.length===2&&new Set(names.map(norm)).size===2;
       return outcome(this,ok?'OK':'KO',names.join(' ↔ ')||'sin comparación');
     }}));
@@ -308,7 +495,7 @@ async function buildRealFastCases(state,seed){
       return outcome(this,ok?'OK':'KO',r?.ok?`${r.nombre} [${r.id}]`:r?.error||'No resuelta');
     }}));
     cases.push(makeCase({id:`person-dossier-${key(pid)}`,group:'PERSONAS',label:`Dossier global · ${name}`,expected:'Totales coherentes y no negativos',run:async function(){
-      const r=await Z.v26ExecuteTool({id:'fast_pd',name:'person_dossier',person:name,scope:'all_events',status:'all',detail:'brief'},state,'');
+      const r=await execCanonicalTool(state,{id:'fast_pd',name:'person_dossier',person:name,scope:'all_events',status:'all',detail:'brief'},state,'');
       const f=r?.facts||{}; const ok=r?.ok!==false && num(f.event_count)>=0 && num(f.purchase_responsibility_total)>=0 && num(f.donations_value)>=0;
       return outcome(this,ok?'OK':'KO',`persona=${f.person||'—'}; eventos=${f.event_count??'—'}; compras=${f.purchase_responsibility_total??'—'}; donaciones=${f.donations_value??'—'}`);
     }}));
@@ -380,31 +567,122 @@ const TPL={
   compareIncomeFollow:['¿Cuál tuvo más ingresos?','Entre los dos, ¿quién ingresó más?','¿Y de ingresos cuál quedó por encima?'],
   comparePurchasesFollow:['¿Y cuál tuvo más compras?','¿Cuál gastó más en compras?','Entre esos dos, ¿dónde hubo más compras?'],
   relationFollow:['¿Tuvo alguna relación con ese evento?','¿Aparece relacionado con ese evento?','¿Tuvo algo que ver con ese evento?','¿Figura en ese evento de alguna manera?'],
-  relativeNext:['¿Y el del año siguiente?','Ahora el del año posterior.','¿Qué pasa con el del siguiente año?','Vete al de {year}.']
+  relativeNext:['¿Y el del año siguiente?','Ahora el del año posterior.','¿Qué pasa con el del siguiente año?','Vete al de {year}.'],
+  catalog:[
+    'Dame la lista general de {entity}.','¿Cuántos {entity} hay registrados?','Enséñame el catálogo de {entity}.','Quiero consultar todos los {entity}.',
+    'Repasa la tabla general de {entity}.','¿Qué contiene el maestro de {entity}?'
+  ],
+  documentation:[
+    'Revisa la documentación de {event}.','¿Cómo está de justificantes y documentos {event}?','Comprueba las evidencias documentales de {event}.',
+    'Dime si faltan justificantes, fototickets o documentos en {event}.','Hazme una radiografía documental de {event}.','¿Qué documentación consta en {event}?'
+  ],
+  receipts:[
+    '¿Cuántos ingresos tienen justificante en {event}?','Dime los justificantes de ingresos de {event}.','¿Qué cobertura de justificantes de ingreso tiene {event}?',
+    'En {event}, ¿cuántos registros de ingreso llevan justificante?'
+  ],
+  tickets:[
+    '¿Cuántos TKxx tienen fototicket en {event}?','Repasa los tickets de compra y sus imágenes en {event}.','¿Qué TKxx están documentados en {event}?',
+    'Dime la situación de los fototickets de {event}.'
+  ],
+  ticketDetail:[
+    'Háblame del {ticket} de {event}.','Dame el detalle del {ticket} en {event}.','Busca el {ticket} de {event}.','¿Qué consta sobre el {ticket} de {event}?'
+  ],
+  attendance:[
+    '¿Cuánta gente asistió a {event}?','Dime la asistencia de {event}.','¿Cuántas personas constan como asistentes en {event}?','Repasa la asistencia de {event}.'
+  ],
+  incomes:[
+    '¿Cuánto ingresó {event}?','Dime los ingresos de {event}.','¿Qué ingresos constan en {event}?','Repasa las aportaciones económicas de {event}.'
+  ],
+  pendingPurchases:[
+    '¿Cuánto queda pendiente de compra en {event}?','Dime el Pte.Compra de {event}.','¿Qué importe de compras pendientes tiene {event}?','¿Queda gasto pendiente por comprar en {event}?'
+  ],
+  donations:[
+    '¿Qué donaciones hubo en {event}?','Repasa las donaciones de {event}.','¿Cuánto producto donado recibió {event}?','Dime donantes y valor de las donaciones de {event}.'
+  ],
+  management:[
+    '¿Cómo van los hitos y tareas LG de {event}?','Repasa la gestión de {event}.','Dime los hitos y LG de {event}.','¿Qué tareas de gestión constan en {event}?'
+  ],
+  bank:[
+    'Dame el Cuadre Banco de {event}.','¿Cómo quedó el banco en {event}?','Repasa los movimientos bancarios de {event}.','¿Qué impacto bancario tuvo {event}?',
+    'Dime movimientos, ingresos y cargos bancarios de {event}.'
+  ],
+  overview:[
+    'Dame un panorama económico de todos los eventos.','¿Cómo están los eventos en conjunto?','Hazme una visión global de los eventos registrados.','Sácame la matriz económica general de eventos.'
+  ],
+  peopleActivity:[
+    '¿Qué personas tienen más actividad en ControlEvent?','Repasa la implicación global de las personas.','Dame una visión de actividad por persona.','¿Cómo se reparte la actividad entre las personas canónicas?'
+  ],
+  socios:[
+    'Dame el censo de socios canónicos.','¿Cuántos socios canónicos constan?','Repasa la lista de socios según el criterio canónico.','Quiero consultar los socios canónicos.'
+  ],
+  storePurchases:[
+    '¿Qué compras se han hecho en {store}?','Repasa las compras históricas de {store}.','¿Cuánto se ha comprado en {store} y en qué eventos?','Dime la actividad de compras de la tienda {store}.'
+  ],
+  participation:[
+    '¿En qué eventos aparece {person}?','Dime los eventos en los que participa {person}.','¿Dónde figura {person} a lo largo de los eventos?','Lista los eventos vinculados a {person}.'
+  ],
+  bankTimeline:[
+    'Dame la cronología bancaria de {event}.','Quiero ver la evolución temporal del banco en {event}.','Repasa el saldo bancario movimiento a movimiento de {event}.','Sácame la línea temporal bancaria de {event}.'
+  ],
+  docsFollow:['¿Y los documentos del evento?','¿Qué DOC constan?','Dime los documentos y adjuntos.','¿Hay documentación sin adjuntar?'],
+  ticketsFollow:['¿Y los TKxx?','¿Qué tickets tienen imagen?','Repasa ahora los fototickets.','¿Cuántos tickets están documentados?'],
+  bankFollow:['¿Cuántos movimientos hubo?','¿Y el impacto neto?','¿Cómo quedó el saldo final?','¿Están justificados los movimientos?'],
+  donationFollow:['¿Cuánto suman las donaciones y cuántos donantes hay?','¿Qué valor total aportaron y cuántos donantes fueron?','¿Cuántos registros de donación constan y por qué valor?','Resúmeme en cifras las donaciones.'],
+  managementFollow:['¿Cuántas tareas LG quedan pendientes?','¿Qué queda pendiente de gestión?','Dime el reparto entre LG terminadas y pendientes.','¿Cuántos hitos y tareas constan?'],
+  attendanceFollow:['¿Y cuántas personas fueron en total?','Dame solo el total de asistentes.','¿Cuánta gente consta finalmente?','Resúmeme la asistencia en una cifra.']
 };
 
-function buildAiSmokeCases(state,max=40,seed=1){
+async function buildAiSmokeCases(state,max=40,seed=1){
   const {events,withPurchases,sibling}=chooseEvents(state,seed),{sample:people}=choosePeople(state,seed),cases=[];
-  const add=c=>{if(!trim(c?.expected))c.expected=trim(c?.expectedEvent)?`Evento: ${trim(c.expectedEvent)}`:arr(c?.expectedEvents).length?`Eventos: ${arr(c.expectedEvents).join(' ↔ ')}`:trim(c?.expectedPerson)?`Persona: ${trim(c.expectedPerson)}`:'Regla/invariante satisfecha';if(cases.length<max)cases.push(c);};
-  const eventSample=events.slice(0,Math.min(6,events.length));
-  eventSample.forEach((e,i)=>{const name=eventName(e),prompt=variant(TPL.event,seed,`smoke-event-${i}`,{event:name});add({id:`ai-event-${i}-${key(e.id)}`,group:'EVENTOS',label:`IA identifica evento · ${name}`,prompt,expectedEvent:name,validate:r=>resultHasEvent(r,name)});});
-  withPurchases.slice(0,Math.min(5,withPurchases.length)).forEach((e,i)=>{const name=eventName(e),prompt=variant(TPL.purchases,seed,`smoke-purchase-${i}`,{event:name});add({id:`ai-purchases-${i}-${key(e.id)}`,group:'COMPRAS',label:`IA selecciona compras · ${name}`,prompt,expectedEvent:name,validate:r=>resultHasEvent(r,name) && arr(r?.meta?.tools).some(t=>/event_(?:breakdowns|purchase_lines|dossier)/.test(t))});});
-  if(sibling.length>=2){const a=sibling[0],b=sibling[1],an=eventName(a),bn=eventName(b);add({id:`ai-compare-${key(a.id)}-${key(b.id)}`,group:'COMPARACIONES',label:'IA conserva dos eventos parecidos',prompt:variant(TPL.compare,seed,'smoke-compare-family',{a:an,b:bn}),expectedEvents:[an,bn],validate:r=>[an,bn].every(n=>resultHasEvent(r,n)) || /compare_events/.test(arr(r?.meta?.tools).join(' '))});}
-  if(events.length>=2){const a=events[0],b=events.find(x=>trim(x.id)!==trim(a.id));if(b){const an=eventName(a),bn=eventName(b);add({id:`ai-compare-mixed-${key(a.id)}-${key(b.id)}`,group:'COMPARACIONES',label:'IA compara dos eventos distintos',prompt:variant(TPL.compare,seed,'smoke-compare-mixed',{a:an,b:bn}),expectedEvents:[an,bn],validate:r=>[an,bn].every(n=>resultHasEvent(r,n)) || /compare_events/.test(arr(r?.meta?.tools).join(' '))});}}
-  people.slice(0,Math.min(6,people.length)).forEach((p,i)=>{const name=personName(p),prompt=variant(TPL.person,seed,`smoke-person-${i}`,{person:name});add({id:`ai-person-${i}-${key(p.id)}`,group:'PERSONAS',label:`IA identifica persona · ${name}`,prompt,expectedPerson:name,validate:r=>resultHasPerson(r,name)});});
-  if(events[0]){const name=eventName(events[0]);add({id:'ai-nondeducible-consumption',group:'SEGURIDAD',label:'IA no inventa consumo individual',prompt:variant(TPL.consumption,seed,'smoke-consumption',{event:name}),validate:r=>/no (?:registra|puede|se puede)|no.*deduc|no.*acredit|no.*saber|no.*determinar/i.test(text(r?.answer)) || /Dato no deducible/i.test(text(r?.title))});}
+  const add=c=>{if(!trim(c?.expected))c.expected=expectedOracleText(c?.oracle)||(trim(c?.expectedEvent)?`Evento: ${trim(c.expectedEvent)}`:arr(c?.expectedEvents).length?`Eventos: ${arr(c.expectedEvents).join(' ↔ ')}`:trim(c?.expectedPerson)?`Persona: ${trim(c.expectedPerson)}`:'Regla/invariante satisfecha');if(cases.length<max)cases.push(c);};
+  const eventSample=events.slice(0,Math.min(4,events.length));
+  eventSample.forEach((e,i)=>{const name=eventName(e),prompt=variant(TPL.event,seed,`smoke-event-${i}`,{event:name});add({id:`ai-event-${i}-${key(e.id)}`,group:'EVENTOS',label:`IA identifica evento · ${name}`,prompt,expectedEvent:name,event:name,validate:r=>resultHasEvent(r,name)});});
+  withPurchases.slice(0,Math.min(4,withPurchases.length)).forEach((e,i)=>{const name=eventName(e),prompt=variant(TPL.purchases,seed,`smoke-purchase-${i}`,{event:name});add({id:`ai-purchases-${i}-${key(e.id)}`,group:'COMPRAS',label:`IA selecciona compras · ${name}`,prompt,expectedEvent:name,event:name,validate:r=>resultHasEvent(r,name) && arr(r?.meta?.tools).some(t=>/event_(?:breakdowns|purchase_lines|dossier)/.test(t))});});
+
+  // Catálogos generales: la semilla rota qué maestros se preguntan, pero el oráculo conoce el recuento real.
+  const catalogLabels={events:'eventos',people:'personas',products:'productos',stores:'tiendas'};
+  shuffled(Object.keys(catalogLabels),seed,'smoke-catalogs').slice(0,2).forEach((entity,i)=>{const o=catalogOracle(state,entity);add({id:`ai-catalog-${entity}`,group:'TABLAS GENERALES',label:`IA consulta catálogo · ${catalogLabels[entity]}`,prompt:variant(TPL.catalog,seed,`smoke-catalog-${i}`,{entity:catalogLabels[entity]}),oracle:{kind:'catalog-count',...o},expected:expectedOracleText({kind:'catalog-count',...o}),validate:r=>arr(r?.meta?.tools).some(t=>/master_catalog|events_catalog/.test(t))||new RegExp(`\\b${o.count}\\b`).test(resultBlob(r))});});
+  const overview=await eventsOverviewOracle(state);if(overview)add({id:'ai-events-overview',group:'TABLAS GENERALES',label:'IA consulta panorama global de eventos',prompt:variant(TPL.overview,seed,'smoke-overview'),oracle:{kind:'events-overview',count:overview.count},validate:r=>arr(r?.meta?.tools).includes('events_overview')||arr(r?.tables).length>0});
+  const pa=await peopleActivityOracle(state);if(pa)add({id:'ai-people-activity',group:'TABLAS GENERALES',label:'IA consulta actividad global de personas',prompt:variant(TPL.peopleActivity,seed,'smoke-people-activity'),oracle:{kind:'people-activity',count:pa.count},validate:r=>arr(r?.meta?.tools).includes('people_activity')||arr(r?.tables).length>0});
+  const socios=await canonicalSociosOracle(state);if(socios)add({id:'ai-canonical-socios',group:'TABLAS GENERALES',label:'IA consulta socios canónicos',prompt:variant(TPL.socios,seed,'smoke-socios'),oracle:{kind:'canonical-socios',records:socios.records,people:socios.people},validate:r=>arr(r?.meta?.tools).includes('canonical_socios')||arr(r?.tables).length>0});
+  const store=pick(arr(state?.tiendas).filter(s=>trim(s?.nombre)),seed,'smoke-store');if(store){const so=await storePurchasesOracle(state,trim(store.nombre));if(so)add({id:`ai-store-${key(store?.id||store?.nombre)}`,group:'TIENDAS',label:`IA consulta compras de tienda · ${so.store}`,prompt:variant(TPL.storePurchases,seed,'smoke-store-prompt',{store:so.store}),oracle:{kind:'store-purchases',...so},validate:r=>arr(r?.meta?.tools).includes('store_purchases')||arr(r?.tables).length>0});}
+  if(people[0]){const pn=personName(people[0]),po=await participationOracle(state,pn);if(po)add({id:`ai-participation-${key(people[0]?.id||pn)}`,group:'PERSONAS',label:`IA consulta eventos de participación · ${pn}`,prompt:variant(TPL.participation,seed,'smoke-participation',{person:pn}),person:pn,oracle:{kind:'participation-events',...po},validate:r=>arr(r?.meta?.tools).some(t=>/participation_events|person_dossier/.test(t))||arr(r?.tables).length>0});}
+
+  // Documentación/TKxx/justificantes: elegimos reproduciblemente un evento con la mayor evidencia encontrada entre una muestra real.
+  let docPick=null;
+  for(const e of shuffled(events,seed,'smoke-doc-events').slice(0,Math.min(6,events.length))){const d=await documentationOracle(state,eventName(e));if(!d)continue;const score=d.incomeRecords+d.tickets+d.documents+d.incomeWithReceipt+d.ticketsWithImage+d.documentsWithAttachment;if(!docPick||score>docPick.score)docPick={e,d,score};}
+  if(docPick){const en=eventName(docPick.e),d=docPick.d;
+    add({id:`ai-docs-${key(docPick.e.id)}`,group:'DOCUMENTOS',label:`IA revisa documentación · ${en}`,prompt:variant(TPL.documentation,seed,'smoke-doc-summary',{event:en}),event:en,oracle:{kind:'documentation',event:en,data:d}});
+    add({id:`ai-receipts-${key(docPick.e.id)}`,group:'JUSTIFICANTES',label:`IA revisa justificantes de ingresos · ${en}`,prompt:variant(TPL.receipts,seed,'smoke-receipts',{event:en}),event:en,oracle:{kind:'documentation-field',event:en,label:'justificantes de ingreso',value:d.incomeWithReceipt}});
+    add({id:`ai-tickets-${key(docPick.e.id)}`,group:'TKXX',label:`IA revisa TKxx/fototickets · ${en}`,prompt:variant(TPL.tickets,seed,'smoke-tickets',{event:en}),event:en,oracle:{kind:'documentation-field',event:en,label:'TKxx con imagen',value:d.ticketsWithImage}});
+    const ticket=trim(pick(d.ticketRows.filter(r=>trim(r?.TKxx)),seed,'smoke-ticket-row')?.TKxx);if(ticket)add({id:`ai-ticket-detail-${key(docPick.e.id)}-${key(ticket)}`,group:'TKXX',label:`IA localiza ${ticket} · ${en}`,prompt:variant(TPL.ticketDetail,seed,'smoke-ticket-detail',{event:en,ticket}),event:en,oracle:{kind:'ticket-detail',event:en,ticket}});
+  }
+
+  if(events[0]){const en=eventName(events[0]),eo=await eventOracle(state,en);if(eo)add({id:`ai-attendance-${key(events[0].id)}`,group:'ASISTENCIA',label:`IA consulta asistencia · ${en}`,prompt:variant(TPL.attendance,seed,'smoke-attendance',{event:en}),event:en,oracle:{kind:'attendance',event:en,data:attendanceOracle(eo,en)}});}
+  if(events[1]){const en=eventName(events[1]),eo=await eventOracle(state,en);if(eo){add({id:`ai-incomes-${key(events[1].id)}`,group:'INGRESOS',label:`IA consulta ingresos · ${en}`,prompt:variant(TPL.incomes,seed,'smoke-incomes',{event:en}),event:en,oracle:{kind:'event-metric',event:en,label:'ingresos',value:eo.income}});add({id:`ai-pending-${key(events[1].id)}`,group:'COMPRAS',label:`IA consulta Pte.Compra · ${en}`,prompt:variant(TPL.pendingPurchases,seed,'smoke-pending',{event:en}),event:en,oracle:{kind:'event-metric',event:en,label:'compras pendientes',value:eo.pending}});}}
+
+  const donationEvents=events.filter(e=>donationCountForEvent(state,trim(e.id))>0);
+  if(donationEvents.length){const e=pick(donationEvents,seed,'smoke-donation-event'),en=eventName(e),d=await donationOracle(state,en);if(d)add({id:`ai-donations-${key(e.id)}`,group:'DONACIONES',label:`IA consulta donaciones · ${en}`,prompt:variant(TPL.donations,seed,'smoke-donations',{event:en}),event:en,oracle:{kind:'donations',event:en,data:d}});}
+
+  const managementEvents=events.filter(e=>arr(state?.hitos).some(h=>eventIdOf(h)===trim(e.id))||arr(state?.lgs).some(l=>eventIdOf(l)===trim(e.id)));
+  if(managementEvents.length){const e=pick(managementEvents,seed,'smoke-management-event'),en=eventName(e),m=await managementOracle(state,en);if(m)add({id:`ai-management-${key(e.id)}`,group:'HITOS/LG',label:`IA consulta gestión · ${en}`,prompt:variant(TPL.management,seed,'smoke-management',{event:en}),event:en,oracle:{kind:'management',event:en,data:m}});}
+
+  // Banco vive en tablas separadas. Probamos una pequeña muestra reproducible hasta encontrar datos; si no, se mantiene una consulta de ausencia segura.
+  let bankPick=null;
+  for(const e of shuffled(events,seed,'smoke-bank-events').slice(0,Math.min(4,events.length))){const b=await bankOracle(state,eventName(e));if(!b)continue;if(!bankPick)bankPick={e,b};if(b.hasData){bankPick={e,b};break;}}
+  if(bankPick){const en=eventName(bankPick.e);add({id:`ai-bank-${key(bankPick.e.id)}`,group:'BANCO',label:`IA consulta Cuadre Banco · ${en}`,prompt:variant(TPL.bank,seed,'smoke-bank',{event:en}),event:en,oracle:{kind:'bank-summary',event:en,data:bankPick.b}});}
+  if(bankPick?.b?.hasData){const en=eventName(bankPick.e),bt=await bankTimelineOracle(state,en);if(bt)add({id:`ai-bank-timeline-${key(bankPick.e.id)}`,group:'BANCO',label:`IA consulta cronología bancaria · ${en}`,prompt:variant(TPL.bankTimeline,seed,'smoke-bank-timeline',{event:en}),event:en,oracle:{kind:'bank-timeline',...bt},validate:r=>arr(r?.meta?.tools).some(t=>/event_bank(?:_timeline)?/.test(t))||arr(r?.tables).length>0});}
+
+  if(sibling.length>=2){const a=sibling[0],b=sibling[1],an=eventName(a),bn=eventName(b);add({id:`ai-compare-${key(a.id)}-${key(b.id)}`,group:'COMPARACIONES',label:'IA conserva dos eventos parecidos',prompt:variant(TPL.compare,seed,'smoke-compare-family',{a:an,b:bn}),expectedEvents:[an,bn],events:[an,bn],validate:r=>[an,bn].every(n=>resultHasEvent(r,n)) || /compare_events/.test(arr(r?.meta?.tools).join(' '))});}
+  if(events.length>=2){const a=events[0],b=events.find(x=>trim(x.id)!==trim(a.id));if(b){const an=eventName(a),bn=eventName(b);add({id:`ai-compare-mixed-${key(a.id)}-${key(b.id)}`,group:'COMPARACIONES',label:'IA compara dos eventos distintos',prompt:variant(TPL.compare,seed,'smoke-compare-mixed',{a:an,b:bn}),expectedEvents:[an,bn],events:[an,bn],validate:r=>[an,bn].every(n=>resultHasEvent(r,n)) || /compare_events/.test(arr(r?.meta?.tools).join(' '))});}}
+  people.slice(0,Math.min(4,people.length)).forEach((p,i)=>{const name=personName(p),prompt=variant(TPL.person,seed,`smoke-person-${i}`,{person:name});add({id:`ai-person-${i}-${key(p.id)}`,group:'PERSONAS',label:`IA identifica persona · ${name}`,prompt,expectedPerson:name,person:name,validate:r=>resultHasPerson(r,name)});});
+  if(events[0]){const name=eventName(events[0]);add({id:'ai-nondeducible-consumption',group:'SEGURIDAD',label:'IA no inventa consumo individual',prompt:variant(TPL.consumption,seed,'smoke-consumption',{event:name}),event:name,requireAnswer:true,validate:r=>/no (?:registra|puede|se puede)|no.*deduc|no.*acredit|no.*saber|no.*determinar/i.test(text(r?.answer)) || /Dato no deducible/i.test(text(r?.title))});}
   const fakeWord=variant(['Lunar','Boreal','Marciano','Orbital','Fantasma','Imposible'],seed,'smoke-fake-word'),fake=`Autotest ${fakeWord} Inexistente ${2090+(normalizeSeed(seed)%10)} ${String((normalizeSeed(seed)*17)%997).padStart(3,'0')}`;
-  add({id:'ai-nonexistent-event',group:'SEGURIDAD',label:'IA no inventa evento inexistente',prompt:variant(TPL.nonexistent,seed,'smoke-fake-prompt',{fake}),expected:'Debe negar que exista sin fijarlo como evento real',validate:r=>{
-    const answer=text(r?.answer),denied=/(?:no\s+(?:lo\s+)?(?:encuentro|existe|figura|consta)|no\s+se\s+(?:encuentra|localiza)|no\s+est[aá]\s+registrad[oa]|no\s+tengo[^.]{0,100}(?:registro|constancia)|ning[uú]n\s+evento[^.]{0,100}(?:coincid|parec|registr))/i.test(answer);
-    // Puede existir un evento ambiental en resultContext; eso no convierte la negación correcta en KO.
-    // Solo sería inválido si el propio contexto fijase exactamente el evento ficticio como canónico.
-    const fakeWasCanonical=resultContextEvents(r).some(x=>norm(x)===norm(fake));
-    return denied && !fakeWasCanonical;
-  }});
+  add({id:'ai-nonexistent-event',group:'SEGURIDAD',label:'IA no inventa evento inexistente',prompt:variant(TPL.nonexistent,seed,'smoke-fake-prompt',{fake}),expected:'Debe negar que exista sin fijarlo como evento real',validate:r=>{const answer=text(r?.answer),denied=/(?:no\s+(?:lo\s+)?(?:encuentro|existe|figura|consta)|no\s+se\s+(?:encuentra|localiza)|no\s+est[aá]\s+registrad[oa]|no\s+tengo[^.]{0,100}(?:registro|constancia)|ning[uú]n\s+evento[^.]{0,100}(?:coincid|parec|registr))/i.test(answer);const fakeWasCanonical=resultContextEvents(r).some(x=>norm(x)===norm(fake));return denied&&!fakeWasCanonical;}});
   return cases.slice(0,max);
 }
 
-async function buildFullCertScenarios(state,maxTurns=24,seed=1){
+async function buildFullCertScenarios(state,maxTurns=36,seed=1){
   const {events,withPurchases,sibling}=chooseEvents(state,seed),{sample:people}=choosePeople(state,seed); const sc=[];
   if(events.length>=2){const a=events[0],b=events.find(x=>trim(x.id)!==trim(a.id));if(b){const an=eventName(a),bn=eventName(b),ao=await eventOracle(state,an),bo=await eventOracle(state,bn);sc.push({name:'Cambio de evento',turns:[
     {prompt:variant(TPL.event,seed,'full-event-a',{event:an}),event:an,oracle:{kind:'event-summary',event:an,data:ao}},
@@ -438,20 +716,61 @@ async function buildFullCertScenarios(state,maxTurns=24,seed=1){
     {prompt:variant(TPL.person,seed,'full-cross-person',{person:n1}),person:n1,oracle:{kind:'person-summary',person:n1,data:p1o}},
     {prompt:variant(TPL.relationFollow,seed,'full-cross-relation'),event:en,person:n1,oracle:{kind:'person-relation',event:en,person:n1,related,known:!!rel,data:rel}}
   ]});}}
+
+  // Documentos, justificantes y TKxx en una misma conversación para probar continuidad documental.
+  let docPick=null;
+  for(const e of shuffled(events,seed,'full-doc-events').slice(0,Math.min(8,events.length))){const d=await documentationOracle(state,eventName(e));if(!d)continue;const score=d.incomeRecords+d.tickets+d.documents+d.incomeWithReceipt+d.ticketsWithImage+d.documentsWithAttachment;if(!docPick||score>docPick.score)docPick={e,d,score};}
+  if(docPick){const en=eventName(docPick.e),d=docPick.d,turns=[
+    {prompt:variant(TPL.documentation,seed,'full-doc-summary',{event:en}),event:en,oracle:{kind:'documentation',event:en,data:d}},
+    {prompt:variant(TPL.receipts,seed,'full-doc-receipts',{event:en}),event:en,oracle:{kind:'documentation-field',event:en,label:'justificantes de ingreso',value:d.incomeWithReceipt}},
+    {prompt:variant(TPL.ticketsFollow,seed,'full-doc-tickets'),event:en,oracle:{kind:'documentation-field',event:en,label:'TKxx con imagen',value:d.ticketsWithImage}},
+    {prompt:variant(TPL.docsFollow,seed,'full-doc-documents'),event:en,oracle:{kind:'documentation-field',event:en,label:'documentos con adjunto',value:d.documentsWithAttachment}}
+  ];const ticket=trim(pick(d.ticketRows.filter(r=>trim(r?.TKxx)),seed,'full-doc-ticket')?.TKxx);if(ticket)turns.push({prompt:variant(TPL.ticketDetail,seed,'full-doc-ticket-detail',{event:en,ticket}),event:en,oracle:{kind:'ticket-detail',event:en,ticket}});sc.push({name:'Documentos, justificantes y TKxx',turns});}
+
+  const donationEvents=events.filter(e=>donationCountForEvent(state,trim(e.id))>0);
+  if(donationEvents.length){const e=pick(donationEvents,seed,'full-donation-event'),en=eventName(e),d=await donationOracle(state,en);if(d)sc.push({name:'Donaciones del evento',turns:[
+    {prompt:variant(TPL.donations,seed,'full-donations',{event:en}),event:en,oracle:{kind:'donations',event:en,data:d}},
+    {prompt:variant(TPL.donationFollow,seed,'full-donations-follow'),event:en,oracle:{kind:'donations',event:en,data:d}}
+  ]});}
+
+  const mgEvents=events.filter(e=>arr(state?.hitos).some(h=>eventIdOf(h)===trim(e.id))||arr(state?.lgs).some(l=>eventIdOf(l)===trim(e.id)));
+  if(mgEvents.length){const e=pick(mgEvents,seed,'full-management-event'),en=eventName(e),m=await managementOracle(state,en);if(m)sc.push({name:'Hitos y LG',turns:[
+    {prompt:variant(TPL.management,seed,'full-management',{event:en}),event:en,oracle:{kind:'management',event:en,data:m}},
+    {prompt:variant(TPL.managementFollow,seed,'full-management-follow'),event:en,oracle:{kind:'management',event:en,data:m}}
+  ]});}
+
+  if(events[1]){const en=eventName(events[1]),eo=await eventOracle(state,en);if(eo)sc.push({name:'Asistencia',turns:[
+    {prompt:variant(TPL.attendance,seed,'full-attendance',{event:en}),event:en,oracle:{kind:'attendance',event:en,data:attendanceOracle(eo,en)}},
+    {prompt:variant(TPL.attendanceFollow,seed,'full-attendance-follow'),event:en,oracle:{kind:'attendance',event:en,data:attendanceOracle(eo,en)}}
+  ]});}
+
+  let bankPick=null;
+  for(const e of shuffled(events,seed,'full-bank-events').slice(0,Math.min(5,events.length))){const b=await bankOracle(state,eventName(e));if(!b)continue;if(!bankPick)bankPick={e,b};if(b.hasData){bankPick={e,b};break;}}
+  if(bankPick){const en=eventName(bankPick.e);sc.push({name:'Cuadre Banco',turns:[
+    {prompt:variant(TPL.bank,seed,'full-bank',{event:en}),event:en,oracle:{kind:'bank-summary',event:en,data:bankPick.b}},
+    {prompt:variant(TPL.bankFollow,seed,'full-bank-follow'),event:en,oracle:{kind:'bank-summary',event:en,data:bankPick.b}}
+  ]});}
+
+  const catalogLabels={events:'eventos',people:'personas',products:'productos',stores:'tiendas'};
+  const ce=pick(Object.keys(catalogLabels),seed,'full-catalog')||'events',co=catalogOracle(state,ce);sc.push({name:'Tablas generales',turns:[{prompt:variant(TPL.catalog,seed,'full-catalog-prompt',{entity:catalogLabels[ce]}),oracle:{kind:'catalog-count',...co}}]});
+
+  const ov=await eventsOverviewOracle(state);if(ov)sc.push({name:'Panorama global',turns:[{prompt:variant(TPL.overview,seed,'full-overview'),oracle:{kind:'events-overview',count:ov.count}}]});
+  const fullStore=pick(arr(state?.tiendas).filter(s=>trim(s?.nombre)),seed,'full-store');if(fullStore){const so=await storePurchasesOracle(state,trim(fullStore.nombre));if(so)sc.push({name:'Tienda entre eventos',turns:[{prompt:variant(TPL.storePurchases,seed,'full-store-prompt',{store:so.store}),oracle:{kind:'store-purchases',...so}}]});}
+
   const out=[]; for(const s of sc){for(const t of s.turns){if(out.length>=maxTurns)break;const expected=expectedOracleText(t.oracle)||(t.event?`Evento: ${t.event}`:arr(t.events).length?`Eventos: ${t.events.join(' ↔ ')}`:t.person?`Persona: ${t.person}`:'Regla/invariante satisfecha');out.push({...t,expected,scenario:s.name,id:`full-${out.length+1}-${key(s.name)}-${normalizeSeed(seed).toString(36).slice(-4)}`});} if(out.length>=maxTurns)break;}
   return out;
 }
 
 async function batteryBlueprint(state,rawSeed){
   const seed=normalizeSeed(rawSeed);
-  const fast=await buildRealFastCases(state,seed); const smoke=buildAiSmokeCases(state,40,seed); const full=await buildFullCertScenarios(state,30,seed);
-  const counts={events:arr(state?.eventos).length,people:arr(state?.personas).length,products:arr(state?.productos).length,stores:arr(state?.tiendas).length,purchases:arr(state?.compras).length,incomes:arr(state?.colaboradores).length,bankMovements:arr(state?.bankMovements||state?.movimientosBanco||state?.movimientos_banco).length};
+  const fast=await buildRealFastCases(state,seed); const smoke=await buildAiSmokeCases(state,48,seed); const full=await buildFullCertScenarios(state,36,seed);
+  const counts={events:arr(state?.eventos).length,people:arr(state?.personas).length,products:arr(state?.productos).length,stores:arr(state?.tiendas).length,purchases:arr(state?.compras).length,incomes:arr(state?.colaboradores).length,documents:arr(state?.eventDocuments).length,ticketImages:Object.keys(state?.ticketImages||{}).length,donationLines:arr(state?.compras).filter(r=>isDonationTicketLocal(ticketTextLocal(r))).length,hitos:arr(state?.hitos).length,lgs:arr(state?.lgs).length,bankMovements:arr(state?.bankMovements||state?.movimientosBanco||state?.movimientos_banco).length};
   return {seed,counts,fast,smoke,full};
 }
 
 export async function previewZuzuBattery({seed}={}){
   const state=await getState(); const b=await batteryBlueprint(state,seed);
-  return {ok:true,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(24,b.smoke.length),costEurRange:'0,05–0,25 €',hardCapSuggested:0.25},'FULL-CERT':{turns:Math.min(18,b.full.length),costEurRange:'0,10–0,50 €',hardCapSuggested:0.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'FAST usa datos reales y 0 llamadas IA.','AI-SMOKE se ejecuta caso a caso para no agotar la duración máxima de una función serverless.','FULL-CERT puede ejecutarse turno a turno conservando el contexto de conversación en el cliente.','FIX2.10 ORÁCULO FUERTE: FULL-CERT verifica contexto y también verdad canónica (totales, máximos, mínimos, comparaciones, persona/evento y respuestas no vacías).','Ningún modo modifica datos de producción.']};
+  return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(36,b.full.length),costEurRange:'0,12–0,50 €',hardCapSuggested:0.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT recorre conversaciones multiturno con ORÁCULO FUERTE y conserva pregunta + esperado + respuesta.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco se lee desde sus tablas normalizadas separadas; ningún modo modifica datos de producción.']};
 }
 
 function streamWrite(send,type,payload={}){ send({type,at:nowIso(),...payload}); }
@@ -580,6 +899,32 @@ export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationSta
   }
   r.durationMs=Date.now()-started;
   return {ok:true,mode:m,case:r,conversationState:nextConversationState,timeoutMs};
+}
+
+export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},conversationState={},signal}={}){
+  const m=trim(mode||savedCase?.mode).toUpperCase();
+  if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('La repetición histórica solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
+  const c=restoredHistoricalCase(savedCase,m);if(!c.id||!c.prompt){const e=new Error('La batería histórica no contiene una pregunta ejecutable.');e.status=422;throw e;}
+  const state=await getState();if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+  const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
+  let r,nextConversationState=null;
+  if(m==='AI-SMOKE'){
+    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,conversationHistory:[],conversationTurnNumber:1,externalSignal})});
+    if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+    if(timed.timedOut)r=outcome(c,'WARN',`TIEMPO MÁXIMO: el caso histórico superó ${Math.round(timeoutMs/1000)} s.`,{timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});
+    else if(timed.error)r=outcome(c,'KO',timed.error?.message||String(timed.error),{usage:{calls:1,tokens:0,costEur:reserve}});
+    else{const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`
+ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,historicalExact:true});}
+  }else{
+    let cs=safeConversationState(conversationState);if(cs.scenario!==trim(c.scenario))cs={previousInteractionId:'',history:[],scenario:trim(c.scenario)};
+    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,previousInteractionId:cs.previousInteractionId,conversationHistory:cs.history,conversationTurnNumber:cs.history.length+1,externalSignal})});
+    if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+    if(timed.timedOut){r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno histórico superó ${Math.round(timeoutMs/1000)} s.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
+    else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
+    else{const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,420)}${verdict.reasons.length?`
+ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,historicalExact:true});const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});nextConversationState={previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};}
+  }
+  r.durationMs=Date.now()-started;return{ok:true,mode:m,case:r,conversationState:nextConversationState,timeoutMs,historicalExact:true};
 }
 
 export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,caseIds,seed,send,signal}){

@@ -213,6 +213,8 @@
       window.authUser = data.user;
       window.__CONTROL_EVENT_USER__ = data.user;
       if(window.ControlEventApp) window.ControlEventApp.authUser = data.user;
+      try{ window.dispatchEvent(new CustomEvent('controlevent:auth-changed',{detail:{user:data.user}})); }catch(_e){}
+      try{ window.ceRefreshZuzuTestButton?.(); }catch(_e){}
       safe(() => localStorage.setItem(SESSION_KEY, JSON.stringify(data.user || null)), null);
       const claveEl = $('loginClave'); if(claveEl) claveEl.value = '';
       forceAuthenticatedUI(data.user);
