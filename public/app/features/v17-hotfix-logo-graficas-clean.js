@@ -1,4 +1,4 @@
-/* ControlEvent v1.0_exp - logo inicial Peña El Arrastre fijo por CSS, sin ficha/texto ni cambios de tamaño. */
+/* ControlEvent v2.0_exp - logo inicial Peña El Arrastre fijo por CSS, sin ficha/texto ni cambios de tamaño. */
 (function(){
   'use strict';
   const INSTALLED='__ceV17LogoFijoUnaVezFinal';
@@ -38,5 +38,5 @@
   document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='selectedEvent'&&norm(ev.target.value)){setGraficas();hideLogo();}},true);
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:data-loaded','controlevent:event-loaded'].forEach(evt=>window.addEventListener(evt,()=>setTimeout(install,20),true));
   [0,200,900].forEach(ms=>setTimeout(install,ms));
-  window.ControlEventV17LogoFijo={install,hideLogo,showLogoIfNoEvent,version:'v1.0_exp_logo_el_arrastre_una_vez'};
+  window.ControlEventV17LogoFijo={install,hideLogo,showLogoIfNoEvent,version:'v2.0_exp_logo_el_arrastre_una_vez'};
 })();

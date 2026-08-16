@@ -1,4 +1,4 @@
-/* ControlEvent v1.0_exp - asistencia canónica compartida en navegador.
+/* ControlEvent v2.0_exp - asistencia canónica compartida en navegador.
    Una única regla para AVANCE DEL EVENTO y cualquier vista cliente:
    - parejas cuentan por personas;
    - filas técnicas no cuentan;
@@ -80,5 +80,5 @@
     const totalNoSocios=noSociosAsistentes.reduce((a,x)=>a+num(x.size),0);
     return {eventId:id,registrosIngreso:incomes.length,asistentes:sociosAsistentes,noAsisten:sociosNoAsistentes,noSocios:noSociosAsistentes,total:totalSocios,totalAs,totalNo,totalNoSocios,totalAsistentes:totalAs+totalNoSocios,criterio:'Numero>0 confirma; Numero=0 solo con estado explícito. Parejas cuentan por personas y se excluyen filas técnicas.'};
   }
-  root.ControlEventCanonicalAttendance={version:'v1.0_exp',calculate};
+  root.ControlEventCanonicalAttendance={version:'v2.0_exp',calculate};
 })(window);

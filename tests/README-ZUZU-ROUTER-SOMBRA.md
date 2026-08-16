@@ -1,6 +1,6 @@
-# Zuzu Router SOMBRA · v1.0_exp
+# Zuzu Router SOMBRA · v2.0_exp
 
-La fase SOMBRA ya ha cumplido su función de validación. **La producción v1.0_exp usa ya la arquitectura nueva Gemini → herramientas ControlEvent → Gemini → presentación canónica.**
+La fase SOMBRA ya ha cumplido su función de validación. **La producción v2.0_exp usa ya la arquitectura nueva Gemini → herramientas ControlEvent → Gemini → presentación canónica.**
 
 ## Producción
 

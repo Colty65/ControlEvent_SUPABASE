@@ -1,9 +1,9 @@
-/* ControlEvent v1.0_exp - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v2.0_exp - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v1.0_exp';
+  var VERSION='v2.0_exp';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -33,7 +33,7 @@
   }
   function ensureZuzuUserPreface(value){
     var src=stripZuzuCssLeak(value); if(!src) return src;
-    // v1.0_exp: la respuesta empieza directamente. Eliminamos también el saludo
+    // v2.0_exp: la respuesta empieza directamente. Eliminamos también el saludo
     // si llega de una conversación antigua o el modelo lo genera por inercia.
     return src.replace(/^Te\s+comento\s*,\s*[^.:\n]{1,120}[.:]\s*/i,'').trim();
   }
@@ -134,7 +134,7 @@
     data=data||{};
     var subject=questionSubject60(prompt || data.__prompt || 'consulta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v1.0_exp-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v2.0_exp-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -205,7 +205,7 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v1.0_exp</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v2.0_exp</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-mode-strip is-new" id="ceAiConversationMode"></div>'+
         '<div class="ce-ai-prompt">'+
           '<div class="ce-ai-prompt-grid">'+
@@ -365,7 +365,7 @@
     var now=new Date(),win=null;
     try{win=window.open('','_blank');}catch(_){win=null;}
     if(!win){setStatus('El navegador ha bloqueado la ventana de impresión.','err');return;}
-    var title=selected.length===1?responsePdfTitle({__prompt:selected[0].turn.user},selected[0].turn.user):('ControlEvent_v1.0_exp-conversacion_Zuzu-'+dateStamp(now)+'.pdf');
+    var title=selected.length===1?responsePdfTitle({__prompt:selected[0].turn.user},selected[0].turn.user):('ControlEvent_v2.0_exp-conversacion_Zuzu-'+dateStamp(now)+'.pdf');
     var userName=loggedUserDisplayName();
     var body=selected.map(function(item){
       var turn=item.turn||{},n=item.idx+1;
@@ -405,7 +405,7 @@
     window.__ceLastZuzuResult=null;
     window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
     saveZuzuInteractionId('');
-    try{ ['ControlEvent_v1.0_exp','ControlEvent_'+'v30'+'_prod','ControlEvent_v29_prod','ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); sessionStorage.removeItem(v+'_zuzu_usage_total'); }); }catch(_){ }
+    try{ ['ControlEvent_v2.0_exp','ControlEvent_'+'v30'+'_prod','ControlEvent_v29_prod','ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); sessionStorage.removeItem(v+'_zuzu_usage_total'); }); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.removeAttribute('data-ce-resume-only'); r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     updateConversationMode();
     updateConversationTrail();
@@ -475,7 +475,7 @@
   function startZuzuThinking(){ clearZuzuThinkingTimer(); setZuzuButtonHeartbeat(true); }
   function finishZuzuThinkingFast(){ setZuzuButtonHeartbeat(false); return Promise.resolve(); }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); setZuzuButtonHeartbeat(false); window.__ceZuzuThinkingState=null; }
-  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v1.0_exp').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
+  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v2.0_exp').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
   function zuzuMigratedStorageValue(suffix){
     var key=zuzuStorageKey(suffix),raw='';
@@ -617,7 +617,7 @@
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
-    // v1.0_exp: la conversación nativa de Gemini es el hilo principal. El evento de pantalla
+    // v2.0_exp: la conversación nativa de Gemini es el hilo principal. El evento de pantalla
     // sigue siendo contexto ambiental y ControlEvent aporta herramientas/hechos canónicos.
     setStatus('', '');
     var resEl=$('ceAiResult');
@@ -693,7 +693,7 @@
     return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo IA</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' '+(Number(usage.calls||0)===1?'llamada':'llamadas')+' · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
   }
   function traceHtml(data){
-    // v1.0_exp: la traza está SIEMPRE disponible en pantalla, plegada por defecto.
+    // v2.0_exp: la traza está SIEMPRE disponible en pantalla, plegada por defecto.
     // Los totales Gemini forman parte de la traza: no aparecen fuera de ella.
     var trace=(data && (data.debugTrace || (data.meta&&data.meta.debugTrace))) || [];
     if(!Array.isArray(trace)) trace=[];
@@ -850,7 +850,7 @@
     if(!all.length) return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer">Sin valores numéricos para representar.</div></div>';
     var globalMin=Math.min.apply(null,all),globalMax=Math.max.apply(null,all);
     if(globalMin===globalMax){globalMin-=1;globalMax+=1;}else{var gm=(globalMax-globalMin)*0.12;globalMin-=gm;globalMax+=gm;}
-    // v1.0_exp: globos completos y legibles. Se reparte la serie solo cuando hace falta,
+    // v2.0_exp: globos completos y legibles. Se reparte la serie solo cuando hace falta,
     // equilibrando los tramos para no dejar una última gráfica con uno o dos movimientos.
     var maxPerSegment=8,segmentCount=Math.max(1,Math.ceil(labels.length/maxPerSegment)),segmentSize=Math.ceil(labels.length/segmentCount),segments=[];
     for(var start=0;start<labels.length;start+=segmentSize){segments.push({start:start,end:Math.min(labels.length,start+segmentSize)});}

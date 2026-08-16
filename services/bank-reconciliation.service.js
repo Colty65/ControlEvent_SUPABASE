@@ -24,6 +24,10 @@ function normalizeSpace(value){ return text(value).replace(/\s+/g, ' '); }
 function normalizeWords(value){
   return text(value).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,' ').replace(/\s+/g,' ').trim();
 }
+function isPenaElArrastre(value){
+  const normalized=normalizeWords(value);
+  return normalized==='PENA EL ARRASTRE'||normalized.startsWith('PENA EL ARRASTRE ');
+}
 function meaningfulTokens(value){
   const stop=new Set(['ABONO','TRANS','TRANSFERENCIA','INMEDIATA','INGRESO','CUOTA','PAGO','BANCO','BIZUM','SYSA','EVENTO','PEÑA','PENA','DE','DEL','LA','LAS','EL','LOS','Y']);
   return normalizeWords(value).split(' ').filter(token=>token.length>=3&&!stop.has(token));
@@ -530,16 +534,24 @@ function buildIncomeCatalog(event,collaborators,persons,images,snapshots=[]){
     const person=people.get(text(row.persona_id))||{};
     const snapshot=history.get(`${event.id}|${text(row.persona_id)}`)||{};
     const amount=collaboratorIncomeAmount(event,row,person,snapshot);
+    const personName=text(snapshot.nombre_snapshot||snapshot.nombreSnapshot||person.nombre)||text(row.persona_id)||'Ingreso';
     return {
-      id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName:text(snapshot.nombre_snapshot||snapshot.nombreSnapshot||person.nombre)||text(row.persona_id)||'Ingreso',
-      paymentMethod:text(row.situacion),amount,imageUrl:incomeImageUrl(images,event.id,text(row.id)),createdAt:text(row.created_at),updatedAt:text(row.updated_at)
+      id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName,
+      paymentMethod:text(row.situacion),amount,imageUrl:incomeImageUrl(images,event.id,text(row.id)),createdAt:text(row.created_at),updatedAt:text(row.updated_at),
+      // v2.0_exp · La aportación interna de Peña El Arrastre puede no corresponder a un
+      // abono bancario justificable. Se conserva visible, pero NO condiciona el estado
+      // completo/incompleto del Cuadre Banco ni su porcentaje de ingresos conciliados.
+      ignoredForReconciliation:isPenaElArrastre(personName)
     };
   }).filter(row=>row.id&&row.amount>0).sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))||a.personName.localeCompare(b.personName,'es')||a.id.localeCompare(b.id));
 }
 function incomeNameScore(description,income,executedAt=''){
   const descriptionNorm=normalizeWords(description);
   const personNorm=normalizeWords(income.personName);
-  let score=0;
+  // Preferimos siempre ingresos ordinarios frente a la aportación interna de Peña El
+  // Arrastre cuando varios importes coinciden. Si solo existe esa aportación, sigue siendo
+  // una candidata válida para mostrar trazabilidad, aunque no compute en el semáforo.
+  let score=income?.ignoredForReconciliation===true?-1000:0;
   if(personNorm&&descriptionNorm.includes(personNorm)) score+=220;
   for(const token of meaningfulTokens(income.personName)) if(descriptionNorm.includes(token)) score+=35;
   const movementTime=Date.parse(text(executedAt));
@@ -611,19 +623,27 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
   }
   const enriched=arr(rows).map(row=>traced.get(row.id)||row);
   const positive=enriched.filter(row=>num(row.amount)>0&&row.included);
+  const ignoredCatalog=arr(incomeCatalog).filter(item=>item?.ignoredForReconciliation===true);
+  const countableCatalog=arr(incomeCatalog).filter(item=>item?.ignoredForReconciliation!==true);
+  const countableIds=new Set(countableCatalog.map(item=>text(item.id)).filter(Boolean));
   const matchedIds=new Set();
-  for(const row of positive) for(const link of arr(row.incomeLinks)) if(text(link?.id)) matchedIds.add(text(link.id));
-  const total=arr(incomeCatalog).length;
-  const reconciled=[...matchedIds].filter(id=>catalogById.has(id)).length;
-  const movementReconciled=positive.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
+  for(const row of positive) for(const link of arr(row.incomeLinks)) if(text(link?.id)&&countableIds.has(text(link.id))) matchedIds.add(text(link.id));
+  const movementIgnored=row=>isPenaElArrastre(row?.description)||(
+    arr(row?.incomeLinks).length>0&&arr(row.incomeLinks).every(link=>link?.ignoredForReconciliation===true)
+  );
+  const positiveRequired=positive.filter(row=>!movementIgnored(row));
+  const total=countableCatalog.length;
+  const reconciled=[...matchedIds].length;
+  const movementReconciled=positiveRequired.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
   const allCatalogLinked=total===0||reconciled===total;
-  const allMovementsReconciled=positive.length===0||movementReconciled===positive.length;
+  const allMovementsReconciled=positiveRequired.length===0||movementReconciled===positiveRequired.length;
   const allReconciled=allCatalogLinked&&allMovementsReconciled;
   const percentage=total?Math.round(reconciled/total*100):(allMovementsReconciled?100:0);
   const traffic=allReconciled?'GREEN':(percentage>50?'ORANGE':'RED');
   return {movements:enriched,summary:{
     total,reconciled,pending:Math.max(0,total-reconciled),percentage,ratio:total?reconciled/total:(allMovementsReconciled?1:0),traffic,allReconciled,
-    movementTotal:positive.length,movementReconciled,movementPending:Math.max(0,positive.length-movementReconciled),
+    movementTotal:positiveRequired.length,movementReconciled,movementPending:Math.max(0,positiveRequired.length-movementReconciled),
+    ignoredTotal:ignoredCatalog.length,ignoredMovementTotal:Math.max(0,positive.length-positiveRequired.length),ignoredReason:ignoredCatalog.length?'Peña El Arrastre no computa para completar el Cuadre Banco':'',
     allCatalogLinked,allMovementsReconciled
   }};
 }
@@ -677,7 +697,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     }
     const eventLinkedMovements=all.filter(row=>arr(displayLinksByMovement.get(row.id)).some(link=>link.isActiveEvent));
     const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
-    // v1.0_exp FIX10 · Estado REAL del Cuadre Banco.
+    // v2.0_exp FIX10 · Estado REAL del Cuadre Banco.
     // Una fecha/periodo guardado NO significa que el cuadre haya empezado. Para considerar
     // iniciado el mantenimiento tiene que existir al menos un movimiento con una fila/evidencia
     // persistida para ESTE evento: estado En saldo/excluido, vínculo TKxx o vínculo manual de ingreso.
@@ -1204,7 +1224,7 @@ export async function exportBankData({accountId='',eventId=''} = {}){
       }));
       const links=movements.flatMap(row=>arr(row.links));
       return {
-        ok:true,event:reconciliation.event,period:reconciliation.period,reconciliation:reconciliation.reconciliation||null,summary:reconciliation.summary,ticketSummary:reconciliation.ticketSummary,
+        ok:true,event:reconciliation.event,period:reconciliation.period,reconciliation:reconciliation.reconciliation||null,summary:reconciliation.summary,ticketSummary:reconciliation.ticketSummary,incomeSummary:reconciliation.incomeSummary,
         movements,links,batches:[],balanceTimeline:arr(reconciliation.balanceTimeline),
         eventSettings:[{eventId:selectedEvent,dateFrom:reconciliation.period?.dateFrom||'',dateTo:reconciliation.period?.dateTo||''}],
         incomeLinks:movements.flatMap(row=>arr(row.incomeLinks).filter(link=>link.manual&&link.linkId).map(link=>({id:link.linkId,movementId:row.id,eventId:selectedEvent,incomeId:link.id,incomeAmountSnapshot:link.amount}))),

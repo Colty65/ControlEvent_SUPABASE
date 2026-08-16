@@ -1,6 +1,6 @@
 {
-  "name": "controlevent-v1-0-exp",
-  "version": "1.0.0-exp.0",
+  "name": "controlevent-v2-0-exp",
+  "version": "2.0.0-exp.0",
   "private": true,
   "type": "module",
   "scripts": {

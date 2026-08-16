@@ -1,10 +1,10 @@
-/* ControlEvent v1.0_exp - cierre de versión y descarga/Excel sin carga periódica.
+/* ControlEvent v2.0_exp - cierre de versión y descarga/Excel sin carga periódica.
    Alcance: versión, nombres Excel y cierre seguro de visores. Sin setInterval ni re-render. */
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v1.0_exp';
-  const VERSION_FILE = 'ControlEvent_v1.0_exp';
+  const VERSION = 'ControlEvent v2.0_exp';
+  const VERSION_FILE = 'ControlEvent_v2.0_exp';
   const INSTALLED = '__ceV73ProdFinalFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

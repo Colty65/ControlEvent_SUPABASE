@@ -1,4 +1,4 @@
-/* ControlEvent v1.0_exp · VOZ4 MOVIL ESTABLE
+/* ControlEvent v2.0_exp · VOZ4 MOVIL ESTABLE
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -12,7 +12,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu = true;
 
-  var BUILD = 'v1.0_exp';
+  var BUILD = 'v2.0_exp';
   var STYLE_ID = 'ceV22Voz3Style';
   var PANEL_ID = 'ceV22Voz3Panel';
   var STORAGE = {
@@ -638,10 +638,10 @@
   function prepareSpeechText(value){
     var s=String(value==null?'':value);
     s=s.replace(/\u00a0/g,' ').replace(/[•▪◦]/g,'. ').replace(/[|]+/g,', ');
-    // v1.0_exp · Los marcadores Markdown se conservan en pantalla/PDF, pero no deben pronunciarse.
+    // v2.0_exp · Los marcadores Markdown se conservan en pantalla/PDF, pero no deben pronunciarse.
     s=s.replace(/\*+/g,' ').replace(/(^|\s)#{1,6}(?=\s)/g,'$1').replace(/[`_~]+/g,' ');
     s=s.replace(/\bPte\.?\s*Compra\b/gi,'pendiente de compra');
-    // v1.0_exp · Voz: el TTS de algunos navegadores pronuncia mal «línea/líneas».
+    // v2.0_exp · Voz: el TTS de algunos navegadores pronuncia mal «línea/líneas».
     // Solo cambiamos el texto enviado a voz; no alteramos los datos ni lo que se muestra en pantalla.
     s=s.replace(/\bl[ií]neas?\s+de\s+compra\b/gi,function(m){return /^l[ií]nea\b/i.test(m)?'registro de compra':'registros de compra';});
     s=s.replace(/\bl[ií]neas?\s+de\s+gesti[oó]n\b/gi,function(m){return /^l[ií]nea\b/i.test(m)?'tarea de gestión':'tareas de gestión';});

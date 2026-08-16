@@ -1,8 +1,8 @@
-/* ControlEvent v1.0_exp - visor TKxx estable, búsquedas reales, descargas ampliadas, arranque robusto y compartir simplificado. */
+/* ControlEvent v2.0_exp - visor TKxx estable, búsquedas reales, descargas ampliadas, arranque robusto y compartir simplificado. */
 (function(){
   'use strict';
   if(window.__ceV104AppFixes) return; window.__ceV104AppFixes=true;
-  var VERSION='v1.0_exp', VERSION_FULL='ControlEvent v1.0_exp';
+  var VERSION='v2.0_exp', VERSION_FULL='ControlEvent v2.0_exp';
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
   function $(id){ return document.getElementById(id); }
@@ -41,7 +41,7 @@
 
   function applyVersion(){
     try{ document.title=VERSION_FULL; }catch(_){ }
-    try{ document.body.dataset.ceVersion=VERSION_FULL; window.__ceVersion=VERSION_FULL; window.VERSION=VERSION_FULL; window.ControlEventVersion={version:VERSION_FULL, versionFile:'ControlEvent_v1.0_exp'}; }catch(_){ }
+    try{ document.body.dataset.ceVersion=VERSION_FULL; window.__ceVersion=VERSION_FULL; window.VERSION=VERSION_FULL; window.ControlEventVersion={version:VERSION_FULL, versionFile:'ControlEvent_v2.0_exp'}; }catch(_){ }
     var stack=document.querySelector('.appname-stack'); if(stack){
       var first=stack.querySelector(':scope > span,.ce-v96-brand-mini,.ce-v100-brand-mini,.ce-v101-brand-mini,.ce-v104-brand-mini,.ce-v104-brand-mini');
       if(first){ first.className='ce-v104-brand-mini'; first.innerHTML='<img src="./assets/icons/controlevent-welcome-v44.png" alt="CE"><span>'+VERSION+'</span>'; }

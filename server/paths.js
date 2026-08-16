@@ -12,9 +12,9 @@ export const UPLOADS_DIR = path.join(ROOT, 'uploads');
 export const NODE_MODULES_DIR = path.join(ROOT, 'node_modules');
 export const PORT = Number(process.env.PORT || 3030);
 export const BACKEND_NAME = 'supabase-real-tables';
-export const APP_VERSION = 'ControlEvent v1.0_exp';
+export const APP_VERSION = 'ControlEvent v2.0_exp';
 
-export const APP_VERSION_LABEL = 'v1.0_exp';
-export const APP_VERSION_FILE = 'ControlEvent_v1.0_exp';
-export const BUILD_ID = '20260814-V1.0-EXP-PDFTRACE1';
-export const ZIP_NAME = 'ControlEvent_v1.0_exp.zip';
+export const APP_VERSION_LABEL = 'v2.0_exp';
+export const APP_VERSION_FILE = 'ControlEvent_v2.0_exp';
+export const BUILD_ID = '20260816-V2.0-EXP-BANK-FINAL1';
+export const ZIP_NAME = 'ControlEvent_v2.0_exp.zip';

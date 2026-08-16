@@ -1,10 +1,10 @@
-/* ControlEvent v1.0_exp FIX9.3.12 · Cuadre Banco: visor contable junto a cada justificante. */
+/* ControlEvent v2.0_exp FIX9.3.12 · Cuadre Banco: visor contable junto a cada justificante. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v1.0_exp';
+  const VERSION = 'v2.0_exp';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -182,7 +182,7 @@
           </div>
           <div class="ce-bank-command-fields">
             <label><span>Cuenta bancaria</span><select id="ceBankAccount"></select></label>
-            <label><span>Vista de control</span><select id="ceBankFilter"><option value="TODOS">Todos los movimientos</option><option value="INCLUIDOS">Incluidos en saldo</option><option value="EXCLUIDOS">Fuera del saldo</option><option value="PENDIENTES">Pendientes de justificar</option><option value="CUADRADOS">Cuadrados</option><option value="FORZADOS">Cuadrados forzados</option></select></label>
+            <label><span>Vista de control</span><select id="ceBankFilter"><option value="TODOS">Todos los movimientos</option><option value="INCLUIDOS">En saldo</option><option value="EXCLUIDOS">Fuera del saldo</option><option value="PENDIENTES">Pendientes de justificar</option><option value="CUADRADOS">Cuadrados</option><option value="FORZADOS">Cuadrados forzados</option></select></label>
             <label><span>Orden temporal</span><select id="ceBankSort"><option value="DESC">Más joven → más antiguo</option><option value="ASC">Más antiguo → más joven</option></select></label>
             <label class="ce-bank-search"><span>Buscar movimiento</span><div><i>⌕</i><input id="ceBankSearch" autocomplete="off" placeholder="Fecha, concepto, importe, saldo o TKxx"></div></label>
           </div>
@@ -247,8 +247,9 @@
     }
     if(target.id==='ceBankFilter'){
       const next=text(target.value)||'TODOS';
-      // En un evento finalizado solo se muestran los movimientos elegidos En saldo.
-      store.filter=next;
+      // v2.0_exp · Un evento FINALIZADO es una foto definitiva: la vista queda siempre
+      // en «Incluidos en saldo». El selector está además deshabilitado en solo lectura.
+      store.filter=store.readOnly?'INCLUIDOS':next;
       target.value=store.filter; store.page=1; invalidateMovementCache(); scheduleBodyRender(true);
       return;
     }
@@ -446,6 +447,9 @@
       invalidateMovementCache();
       store.accountId=data.selectedAccount||store.accountId;
       store.readOnly=data.readOnly===true;
+      // v2.0_exp · Al consultar un FINALIZADO se muestran siempre las filas «En saldo».
+      // Evita que quede heredado «Todos los movimientos» de una sesión/evento anterior.
+      if(store.readOnly||data?.event?.finalized===true) store.filter='INCLUIDOS';
       store.dateFrom=text(data?.period?.dateFrom); store.dateTo=text(data?.period?.dateTo);
       render();
       requestAnimationFrame(()=>restorePosition(preserveMovementId,preserveScroll));
@@ -469,7 +473,7 @@
     const body=$('ceBankBody'); if(!body) return;
     if(movementId){
       let row=body.querySelector(`[data-movement-id="${cssEscape(movementId)}"]`);
-      if(!row && (store.filter!=='TODOS'||text(store.search))){
+      if(!row && !store.readOnly && (store.filter!=='TODOS'||text(store.search))){
         store.filter='TODOS'; store.search=''; store.page=1; invalidateMovementCache();
         if($('ceBankFilter')) $('ceBankFilter').value='TODOS';
         if($('ceBankSearch')) $('ceBankSearch').value='';
@@ -528,7 +532,8 @@
     const incomeTrafficNode=$('ceBankIncomeTraffic');
     if(incomeTrafficNode){
       incomeTrafficNode.className=`ce-bank-traffic ce-bank-income-traffic ${incomeTraffic.className}`;
-      incomeTrafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(incomes.reconciled)} / ${num(incomes.total)} ingresos</b><small>${esc(incomeTraffic.label)} · ${num(incomes.percentage)}%</small></div>`;
+      const ignoredIncomeNote=num(incomes.ignoredTotal)>0?` · ${num(incomes.ignoredTotal)} Peña El Arrastre excluido${num(incomes.ignoredTotal)===1?'':'s'} del criterio`:'';
+      incomeTrafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(incomes.reconciled)} / ${num(incomes.total)} ingresos</b><small>${esc(incomeTraffic.label)} · ${num(incomes.percentage)}%${esc(ignoredIncomeNote)}</small></div>`;
     }
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
     $('ceBankOverlay')?.classList.toggle('ce-bank-readonly-mode',store.readOnly);
@@ -554,7 +559,7 @@
         <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo antes de la primera fila almacenada</span><strong>${money(s.openingBalance)}</strong><small>Referencia calculada únicamente desde el primer movimiento guardado del Cuadre.</small></article>
         <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo tras la última fila almacenada</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} incluidas · ${num(s.excludedCount)} excluidas · ${storedCount} fila(s) guardada(s)</small></div></article>
         <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal del Cuadre almacenado"><span>Movimientos almacenados incluidos</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Impacto de las filas incluidas ${money(economicVariation)}</small><em class="ce-bank-chart-hint">Ver foto temporal ↗</em></article>
-        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Estado al cerrar el evento</span><strong>${esc(rec.message||'CUADRE BANCARIO')}</strong><small>TKxx asociados: ${num(tickets.linked)}/${num(tickets.total)} · ingresos asociados: ${num(incomes.reconciled)}/${num(incomes.total)}.</small></article>`;
+        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Estado al cerrar el evento</span><strong>${esc(rec.message||'CUADRE BANCARIO')}</strong><small>TKxx asociados: ${num(tickets.linked)}/${num(tickets.total)} · ingresos computables asociados: ${num(incomes.reconciled)}/${num(incomes.total)}${num(incomes.ignoredTotal)>0?` · Peña El Arrastre excluido del criterio: ${num(incomes.ignoredTotal)}`:''}.</small></article>`;
     }else{
       $('ceBankSummary').innerHTML=`
         <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo bancario inicial del periodo</span><strong>${money(s.openingBalance)}</strong><small>Saldo anterior al movimiento más antiguo del periodo de trabajo</small><div class="ce-bank-kpi-formula">Saldo posterior − importe (en un cargo se suma su valor absoluto)</div></article>

@@ -1,4 +1,4 @@
-/* ControlEvent v1.0_exp - HOTFIX mínimo: búsqueda finalizados, recarga puntual COMPRAS/DONACIONES y ayuda compartir pantalla. */
+/* ControlEvent v2.0_exp - HOTFIX mínimo: búsqueda finalizados, recarga puntual COMPRAS/DONACIONES y ayuda compartir pantalla. */
 (function(){
   'use strict';
   if(window.__ceV105HotfixBusquedaRecargaCompartir) return;

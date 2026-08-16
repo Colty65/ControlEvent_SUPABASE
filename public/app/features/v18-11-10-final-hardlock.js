@@ -1,12 +1,12 @@
-/* ControlEvent v1.0_exp - hardlock final de versión, trazabilidad y herramientas laterales. */
+/* ControlEvent v2.0_exp - hardlock final de versión, trazabilidad y herramientas laterales. */
 (function(){
   'use strict';
   if(window.__ceV181110FinalHardlock) return; window.__ceV181110FinalHardlock=true;
-  var VERSION_LABEL='v1.0_exp';
-  var VERSION_TEXT='ControlEvent v1.0_exp';
-  var VERSION_FILE='ControlEvent_v1.0_exp';
-  var BUILD_ID='20260814-V1.0-EXP-PDFTRACE1';
-  var ZIP_NAME='ControlEvent_v1.0_exp.zip';
+  var VERSION_LABEL='v2.0_exp';
+  var VERSION_TEXT='ControlEvent v2.0_exp';
+  var VERSION_FILE='ControlEvent_v2.0_exp';
+  var BUILD_ID='20260816-V2.0-EXP-BANK-FINAL1';
+  var ZIP_NAME='ControlEvent_v2.0_exp.zip';
   var oldRe=/(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   function safe(fn){ try{return fn();}catch(_){ return null; } }
   function setText(el,txt){ if(el && el.textContent!==txt) el.textContent=txt; }
@@ -14,7 +14,7 @@
     return String(value||'')
       .replace(/ControlEvent_v(?:\d+(?:_\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_FILE)
       .replace(/ControlEvent\s+v(?:\d+(?:[._]\d+){0,4}|23)_prod(?:_r1)?/ig,VERSION_TEXT)
-      .replace(/\bv1.0_exp\b/ig,VERSION_LABEL);
+      .replace(/\bv2.0_exp\b/ig,VERSION_LABEL);
   }
   function patchDownloadNames(){
     safe(function(){
