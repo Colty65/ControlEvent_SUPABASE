@@ -215,7 +215,7 @@ async function bankOracle(state,event){
     // vuelve a certificar como «Cuadre» candidatos del histórico que la respuesta no debe usar.
     const r=await execCanonicalTool(state,{id:'itv_oracle_bank',name:'event_bank',event:rr.nombre,scope:'named_event',detail:'full'},state,'');
     const f=r?.facts||{},hasReconciliation=f?.has_bank_reconciliation!==false,movements=hasReconciliation?num(f?.included_movement_count??f?.movement_count):0;
-    return{event:trim(f?.event)||rr.nombre,eventId:rr.id,hasReconciliation,reconciliationStatus:trim(f?.reconciliation_status)||(hasReconciliation?'CONFIGURADO':'NO_CONFIGURADO'),movements,included:movements,income:hasReconciliation?round(f?.included_income_total,2):0,expense:hasReconciliation?round(f?.included_charge_total,2):0,impact:hasReconciliation?round(f?.bank_impact,2):0,opening:hasReconciliation?round(f?.opening_balance,2):0,closing:hasReconciliation?round(f?.closing_balance,2):0,cashIncome:0,eventIncome:hasReconciliation?round(f?.included_income_total,2):0,period:hasReconciliation?(f?.period||{}):{},ticketSummary:hasReconciliation?(f?.ticket_summary||{}):{},periodCandidates:num(f?.period_candidate_movement_count),hasData:hasReconciliation&&f?.bank_data_available!==false&&movements>0};
+    return{event:trim(f?.event)||rr.nombre,eventId:rr.id,eventFinalized:f?.event_finalized===true,hasReconciliation,rowCount:num(f?.reconciliation_row_count),reconciliationStatus:trim(f?.reconciliation_status)||(hasReconciliation?'EN_CURSO_CUADRE_INICIADO':'EN_CURSO_SIN_CUADRE'),lifecycleMessage:trim(f?.lifecycle_message),movements,included:movements,income:hasReconciliation?round(f?.included_income_total,2):0,expense:hasReconciliation?round(f?.included_charge_total,2):0,impact:hasReconciliation?round(f?.bank_impact,2):0,opening:hasReconciliation?round(f?.opening_balance,2):0,closing:hasReconciliation?round(f?.closing_balance,2):0,cashIncome:0,eventIncome:hasReconciliation?round(f?.included_income_total,2):0,period:hasReconciliation?(f?.period||{}):{},ticketSummary:hasReconciliation?(f?.ticket_summary||{}):{},periodCandidates:num(f?.period_candidate_movement_count),hasData:hasReconciliation&&f?.bank_data_available!==false&&movements>0};
   }catch(_){return null;}
 }
 
@@ -248,8 +248,8 @@ async function storePurchasesOracle(state,store){
 async function bankTimelineOracle(state,event){
   try{
     const r=await execCanonicalTool(state,{id:'itv_oracle_bank_timeline',name:'event_bank_timeline',event,scope:'named_event',detail:'full'},state,'');
-    const hasReconciliation=r?.facts?.has_bank_reconciliation!==false;
-    return{event:trim(r?.facts?.event)||event,hasReconciliation,points:hasReconciliation?num(r?.facts?.timeline_movement_count):0,opening:hasReconciliation?round(r?.facts?.opening_balance,2):0,closing:hasReconciliation?round(r?.facts?.closing_balance,2):0,impact:hasReconciliation?round(r?.facts?.bank_impact,2):0,rows:hasReconciliation?arr(toolTable(r,'balance_timeline')?.rows):[]};
+    const f=r?.facts||{},hasReconciliation=f?.has_bank_reconciliation!==false;
+    return{event:trim(f?.event)||event,eventFinalized:f?.event_finalized===true,hasReconciliation,rowCount:num(f?.reconciliation_row_count),reconciliationStatus:trim(f?.reconciliation_status)||(hasReconciliation?'EN_CURSO_CUADRE_INICIADO':'EN_CURSO_SIN_CUADRE'),lifecycleMessage:trim(f?.lifecycle_message),points:hasReconciliation?num(f?.timeline_movement_count):0,opening:hasReconciliation?round(f?.opening_balance,2):0,closing:hasReconciliation?round(f?.closing_balance,2):0,impact:hasReconciliation?round(f?.bank_impact,2):0,rows:hasReconciliation?arr(toolTable(r,'balance_timeline')?.rows):[]};
   }catch(_){return null;}
 }
 async function refreshHistoricalBankOracle(caseDef,state){
@@ -286,7 +286,7 @@ function expectedOracleText(oracle){
   if(oracle.kind==='documentation')return `${oracle.event}: ingresos ${oracle.data?.incomeRecords||0} (${oracle.data?.incomeWithReceipt||0} justificantes) · TKxx ${oracle.data?.tickets||0} (${oracle.data?.ticketsWithImage||0} imágenes) · DOC ${oracle.data?.documents||0} (${oracle.data?.documentsWithAttachment||0} adjuntos) · faltan ${oracle.data?.missing||0}`;
   if(oracle.kind==='ticket-detail')return `${oracle.event}: ${oracle.ticket}`;
   if(oracle.kind==='catalog-count')return `${oracle.entity}: ${oracle.count} registros`;
-  if(oracle.kind==='bank-summary')return oracle.data?.hasReconciliation===false?`${oracle.event}: no consta Cuadre Banco configurado`:`${oracle.event}: ${oracle.data?.movements||0} movimientos${oracle.data?.hasData?` · impacto ${euro(oracle.data?.impact||0)}`:''}`;
+  if(oracle.kind==='bank-summary')return trim(oracle.data?.lifecycleMessage)||(oracle.data?.hasReconciliation===false?`${oracle.event}: no consta Cuadre Banco configurado`:`${oracle.event}: ${oracle.data?.movements||0} movimientos${oracle.data?.hasData?` · impacto ${euro(oracle.data?.impact||0)}`:''}`);
   if(oracle.kind==='attendance')return `${oracle.event}: ${oracle.data?.attendees||0} asistentes`;
   if(oracle.kind==='management')return `${oracle.event}: ${oracle.data?.hitos||0} hitos · ${oracle.data?.lg||0} LG · ${oracle.data?.pending||0} pendientes`;
   if(oracle.kind==='donations')return `${oracle.event}: ${oracle.data?.records||0} donaciones · ${oracle.data?.donors||0} donantes · ${euro(oracle.data?.total||0)}`;
@@ -297,7 +297,7 @@ function expectedOracleText(oracle){
   if(oracle.kind==='canonical-socios')return `Socios canónicos: ${oracle.records} registros · ${oracle.people} personas`;
   if(oracle.kind==='store-purchases')return `${oracle.store}: ${euro(oracle.total)} · ${oracle.records} registros en ${oracle.eventCount} eventos`;
   if(oracle.kind==='participation-events')return `${oracle.person}: ${oracle.eventCount} eventos`;
-  if(oracle.kind==='bank-timeline')return oracle.hasReconciliation===false?`${oracle.event}: no consta Cuadre Banco configurado`:`${oracle.event}: ${oracle.points} puntos · impacto ${euro(oracle.impact)}`;
+  if(oracle.kind==='bank-timeline')return trim(oracle.lifecycleMessage)||(oracle.hasReconciliation===false?`${oracle.event}: no consta Cuadre Banco configurado`:`${oracle.event}: ${oracle.points} puntos · impacto ${euro(oracle.impact)}`);
   return'';
 }
 function oracleFail(reasons=[]){return{ok:false,reasons:arr(reasons).filter(Boolean)};}
@@ -360,14 +360,11 @@ function validateOracle(caseDef,result){
   }else if(oracle.kind==='catalog-count'){
     if(!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`catálogo: no acredita ${oracle.count} registros`);
   }else if(oracle.kind==='bank-summary'){
-    const d=oracle.data;
-    const explicitlyUnavailable=result?.meta?.resultContext?.hasBankReconciliation===false||/no\s+consta[^.]{0,80}cuadre\s+banco|no\s+(?:hay|existe)[^.]{0,80}cuadre\s+banco/i.test(blob);
+    const d=oracle.data,required=trim(d?.lifecycleMessage),normalizedRequired=norm(required);
+    if(required&&!norm(blob).includes(normalizedRequired))reasons.push(`estado de Cuadre Banco no coincide: se exige «${required}»`);
     if(d?.hasReconciliation===false){
-      if(!explicitlyUnavailable)reasons.push('debe indicar que no consta Cuadre Banco configurado y no usar el histórico general');
-    }else if(explicitlyUnavailable){
-      // Batería histórica anterior a esta política: la ausencia canónica actual prevalece
-      // sobre magnitudes antiguas que procedían del histórico general.
-    }else if(d?.hasData&&d.movements>0&&!new RegExp(`\\b${Number(d.movements)}\\b`).test(blob)&&!hasMoney(blob,d.impact)&&!hasMoney(blob,d.closing))reasons.push('no devuelve ninguna magnitud bancaria canónica');
+      if(/\b(?:saldo\s+(?:inicial|final)|\d+\s+movimientos?|impacto\s+bancario|abonos?|cargos?)\b/i.test(blob)&&!norm(blob).includes(norm(required)))reasons.push('Cuadre inexistente: no puede aportar magnitudes del histórico general');
+    }else if(d?.hasData&&d.movements>0&&!new RegExp(`\b${Number(d.movements)}\b`).test(blob)&&!hasMoney(blob,d.impact)&&!hasMoney(blob,d.closing))reasons.push('no devuelve ninguna magnitud bancaria canónica almacenada');
   }else if(oracle.kind==='attendance'){
     const d=oracle.data;if(d&&d.attendees>=0&&!new RegExp(`\\b${Number(d.attendees)}\\b`).test(blob))reasons.push(`asistencia: no acredita ${d.attendees} personas`);
   }else if(oracle.kind==='management'){
@@ -400,14 +397,11 @@ function validateOracle(caseDef,result){
     const namedCount=expectedNames.filter(n=>hasNameInText(blob,n)).length;
     if(oracle.eventCount>0&&!exactCount&&namedCount<Math.min(Number(oracle.eventCount),expectedNames.length||Number(oracle.eventCount)))reasons.push(`participación: no acredita ${oracle.eventCount} eventos`);
   }else if(oracle.kind==='bank-timeline'){
-    const explicitlyUnavailable=result?.meta?.resultContext?.hasBankReconciliation===false||/no\s+consta[^.]{0,80}cuadre\s+banco|no\s+(?:hay|existe)[^.]{0,80}cuadre\s+banco/i.test(blob);
-    // Compatibilidad con baterías históricas creadas antes de la regla de Cuadre explícito:
-    // una ausencia canónica actual prevalece sobre el antiguo histórico general.
+    const required=trim(oracle.lifecycleMessage),normalizedRequired=norm(required);
+    if(required&&!norm(blob).includes(normalizedRequired))reasons.push(`estado de cronología bancaria no coincide: se exige «${required}»`);
     if(oracle.hasReconciliation===false){
-      if(!explicitlyUnavailable)reasons.push('cronología bancaria: debe negar el cuadre no configurado');
-    }else if(explicitlyUnavailable){
-      // Correcto bajo la política nueva: no exigimos puntos derivados del histórico.
-    }else if(oracle.points>0&&!new RegExp(`\\b${Number(oracle.points)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length>=Number(oracle.points)))reasons.push(`cronología bancaria: no acredita ${oracle.points} puntos/movimientos`);
+      if(arr(result?.tables).some(t=>arr(t?.rows).length>0))reasons.push('Cuadre inexistente: no debe materializar una cronología desde el histórico general');
+    }else if(oracle.points>0&&!new RegExp(`\b${Number(oracle.points)}\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length>=Number(oracle.points)))reasons.push(`cronología bancaria: no acredita ${oracle.points} puntos/movimientos almacenados`);
   }
   return reasons.length?oracleFail(reasons):oraclePass();
 }
@@ -434,8 +428,8 @@ async function buildRealFastCases(state,seed){
   cases.push(makeCase({id:'global-events-overview',group:'TABLAS GENERALES',label:'Panorama económico de todos los eventos',expected:`${events.length} eventos`,run:async function(){
     const o=await eventsOverviewOracle(state);return outcome(this,o&&o.count===events.length?'OK':'KO',`eventos=${o?.count??'—'}; esperado=${events.length}`);
   }}));
-  cases.push(makeCase({id:'global-people-activity',group:'TABLAS GENERALES',label:'Implicación global de personas canónicas',expected:'Actividad global de personas disponible',run:async function(){
-    const o=await peopleActivityOracle(state);return outcome(this,o&&o.count>=0?'OK':'KO',`personas canónicas=${o?.count??'—'}; filas=${o?.rows?.length??0}`);
+  cases.push(makeCase({id:'global-people-activity',group:'TABLAS GENERALES',label:'Identidades personales canónicas globales',expected:'Identidades personales canónicas globales disponibles',run:async function(){
+    const o=await peopleActivityOracle(state);return outcome(this,o&&o.count>=0?'OK':'KO',`identidades personales canónicas globales=${o?.count??'—'}; filas=${o?.rows?.length??0}`);
   }}));
   cases.push(makeCase({id:'global-canonical-socios',group:'TABLAS GENERALES',label:'Censo de socios canónicos',expected:'Censo canónico disponible',run:async function(){
     const o=await canonicalSociosOracle(state);return outcome(this,o&&o.records>=0&&o.people>=0?'OK':'KO',`registros=${o?.records??'—'}; personas=${o?.people??'—'}`);
@@ -505,12 +499,11 @@ async function buildRealFastCases(state,seed){
   const fastBankEvents=shuffled(events,seed,'fast-bank-events').slice(0,Math.min(6,events.length));
   for(const ev of fastBankEvents){
     const title=eventName(ev),eid=trim(ev.id);
-    cases.push(makeCase({id:`event-bank-${key(eid)}`,group:'BANCO',label:`Cuadre Banco · ${title}`,expected:'Cuadre explícito o ausencia segura',run:async function(){
+    cases.push(makeCase({id:`event-bank-${key(eid)}`,group:'BANCO',label:`Cuadre Banco · ${title}`,expected:'Estado de Cuadre Banco según ciclo de vida + filas almacenadas',run:async function(){
       try{
         const b=await bankOracle(state,title);
         if(!b)return outcome(this,'WARN','Sin fuente bancaria utilizable para este evento.');
-        if(!b.hasReconciliation)return outcome(this,'OK','Sin Cuadre Banco explícito: el histórico general no se atribuye al evento.');
-        return outcome(this,'OK',`Cuadre explícito · movimientos=${b.movements}; ingresos=${round(b.income,2)}; gastos=${round(b.expense,2)}; saldoFinal=${round(b.closing,2)}; candidatos históricos ignorados=${b.periodCandidates}`);
+        return outcome(this,'OK',`${b.reconciliationStatus} · filas=${b.rowCount} · ${b.lifecycleMessage||'sin mensaje'}${b.hasReconciliation?` · movimientos incluidos=${b.movements} · candidatos históricos ignorados=${b.periodCandidates}`:''}`);
       }catch(error){return outcome(this,'WARN',`Sin fuente bancaria utilizable para este evento: ${trim(error?.message)||'sin datos'}`);}
     }}));
   }
@@ -520,6 +513,24 @@ async function buildRealFastCases(state,seed){
       if(!o)return outcome(this,'WARN','Sin fuente bancaria utilizable');
       if(o.hasReconciliation===false)return outcome(this,'OK','Sin Cuadre Banco explícito: no se construye cronología desde el histórico general.');
       return outcome(this,'OK',`puntos=${o.points}; apertura=${euro(o.opening)}; cierre=${euro(o.closing)}; impacto=${euro(o.impact)}`);
+    }}));
+  }
+
+  // Matriz estricta de ciclo de vida: si existe en los datos, FAST exige cada uno de los
+  // cuatro estados definidos por negocio. Así un evento Finalizado nunca puede heredar el
+  // histórico general y un evento En curso conserva su mantenimiento operativo.
+  const lifecycleSamples=new Map();
+  for(const ev of events){
+    const title=eventName(ev),b=await bankOracle(state,title);if(!b)continue;
+    if(!lifecycleSamples.has(b.reconciliationStatus))lifecycleSamples.set(b.reconciliationStatus,{ev,b});
+    if(lifecycleSamples.size>=4)break;
+  }
+  for(const [status,sample] of lifecycleSamples){
+    const title=eventName(sample.ev),b=sample.b;
+    cases.push(makeCase({id:`bank-lifecycle-${key(status)}`,group:'BANCO',label:`Estado definitivo Cuadre · ${title}`,expected:b.lifecycleMessage||status,run:async function(){
+      const fresh=await bankOracle(state,title);
+      const ok=!!fresh&&fresh.reconciliationStatus===status&&trim(fresh.lifecycleMessage)===trim(b.lifecycleMessage)&&((fresh.rowCount>0)===fresh.hasReconciliation);
+      return outcome(this,ok?'OK':'KO',`${fresh?.reconciliationStatus||'—'} · filas=${fresh?.rowCount??'—'} · ${fresh?.lifecycleMessage||'sin mensaje'}`);
     }}));
   }
 

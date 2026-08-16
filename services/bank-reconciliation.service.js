@@ -394,6 +394,27 @@ function eventFromDb(row = {}){
     finalized:/FINALIZADO/i.test(text(row.situacion || row.estado))
   };
 }
+function bankLifecycle(event,rowCount=0){
+  const hasRows=Number(rowCount)>0;
+  if(event?.finalized){
+    if(!hasRows) return {
+      code:'FINALIZADO_SIN_CUADRE',
+      message:'ESTE EVENTO NO CUENTA CON CUADRE BANCARIO, EN CASO DE QUERER HACERLO, HAY QUE ABRIR EL EVENTO DE NUEVO, REALIZAR EL CUADRE Y VOLVER A CERRARLO'
+    };
+    return {
+      code:'FINALIZADO_CUADRE_INCOMPLETO',
+      message:'EL EVENTO SE CERRÓ CON EL CUADRE BANCARIO SIN FINALIZAR, EN CASO DE QUERER REMATARLO HAY QUE ABRIR EL EVENTO DE NUEVO, REALIZAR EL CUADRE PENDIENTE Y VOLVER A CERRARLO'
+    };
+  }
+  if(hasRows) return {
+    code:'EN_CURSO_CUADRE_INICIADO',
+    message:'EL CUADRE BANCARIO DEL EVENTO ESTÁ EN CURSO'
+  };
+  return {
+    code:'EN_CURSO_SIN_CUADRE',
+    message:'EL CUADRE BANCARIO NO SE HA INICIADO'
+  };
+}
 async function loadEvent(eventId){
   const id=text(eventId);
   if(!id) fail('Selecciona un evento antes de abrir Cuadre Banco.',409,'BANK_EVENT_REQUIRED');
@@ -621,24 +642,34 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     }
     const eventLinkedMovements=all.filter(row=>arr(displayLinksByMovement.get(row.id)).some(link=>link.isActiveEvent));
     const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
-    // v1.0_exp · Cuadre Banco explícito:
-    // ce_bank_event_settings puede existir por INICIALIZACION_AUTOMATICA solo para preparar
-    // la ventana de banco. Esa fila NO demuestra que el evento tenga un cuadre realizado.
-    // Para Zuzu/ITV consideramos que existe conciliación real únicamente cuando hay al menos
-    // una decisión/configuración específica del evento: periodo guardado manualmente,
-    // estado de movimiento, vínculo TKxx o vínculo manual de ingreso.
+    // v1.0_exp FIX10 · Estado REAL del Cuadre Banco.
+    // Una fecha/periodo guardado NO significa que el cuadre haya empezado. Para considerar
+    // iniciado el mantenimiento tiene que existir al menos un movimiento con una fila/evidencia
+    // persistida para ESTE evento: estado En saldo/excluido, vínculo TKxx o vínculo manual de ingreso.
     const periodUpdater=text(period?.updatedBy);
     const periodExplicit=period?.saved===true && periodUpdater.toUpperCase()!=='INICIALIZACION_AUTOMATICA';
+    const stateMovementIds=new Set(arr(stateRows).map(row=>text(row.movement_id)).filter(Boolean));
+    const ticketMovementIds=new Set(arr(activeRawLinkRows).map(row=>text(row.movement_id)).filter(Boolean));
+    const incomeMovementIds=new Set(arr(manualIncomeLinkRows).map(row=>text(row.movement_id)).filter(Boolean));
+    const storedMovementIds=new Set([...stateMovementIds,...ticketMovementIds,...incomeMovementIds]);
+    const reconciliationRowCount=storedMovementIds.size;
+    const lifecycle=bankLifecycle(event,reconciliationRowCount);
     const reconciliationEvidence={
       manualPeriod:periodExplicit,
       movementStates:arr(stateRows).length,
       ticketLinks:activeRawLinkRows.length,
-      incomeLinks:arr(manualIncomeLinkRows).length
+      incomeLinks:arr(manualIncomeLinkRows).length,
+      storedMovements:reconciliationRowCount
     };
-    const hasExplicitReconciliation=periodExplicit||reconciliationEvidence.movementStates>0||reconciliationEvidence.ticketLinks>0||reconciliationEvidence.incomeLinks>0;
+    const hasExplicitReconciliation=reconciliationRowCount>0;
     const stateByMovement=new Map(arr(stateRows).map(row=>[text(row.movement_id),row.included!==false]));
-    const scopedAll=accountMovements
-      .filter(row=>inPeriod(row,period))
+    // EVENTO FINALIZADO = foto cerrada: jamás se reconstruye desde el histórico general ni
+    // por caer dentro del periodo. Solo se cargan las filas realmente persistidas del evento.
+    // EVENTO EN CURSO = se mantienen los candidatos del periodo para poder continuar el cuadre.
+    const sourceMovements=event.finalized
+      ? accountMovements.filter(row=>storedMovementIds.has(text(row.id)))
+      : accountMovements.filter(row=>inPeriod(row,period));
+    const scopedAll=sourceMovements
       .map(row=>{
         const displayLinks=arr(displayLinksByMovement.get(row.id));
         const currentLinks=displayLinks.filter(link=>link.isActiveEvent);
@@ -647,9 +678,18 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         // Un movimiento que ya está conciliado en otro evento no puede entrar por defecto
         // en el saldo del evento actual, aunque el indicador global histórico sea true.
         const eventInclusionExplicit=stateByMovement.has(row.id);
-        let included=eventInclusionExplicit?stateByMovement.get(row.id):row.included;
+        const eventStored=storedMovementIds.has(text(row.id));
+        let included;
+        if(event.finalized){
+          // En un evento cerrado no heredamos nunca ce_bank_movements.included (indicador global).
+          // Si existe estado específico, manda ese estado. Si solo hay vínculo propio persistido,
+          // el movimiento pertenece al cuadre y se considera incluido.
+          included=eventInclusionExplicit?stateByMovement.get(row.id):(currentLinks.length>0||incomeMovementIds.has(text(row.id)));
+        }else{
+          included=eventInclusionExplicit?stateByMovement.get(row.id):row.included;
+        }
         if(linkedToOtherEvent) included=false;
-        const reconciled=reconcileMovement({...row,included,eventInclusionExplicit},currentLinks);
+        const reconciled=reconcileMovement({...row,included,eventInclusionExplicit,eventStored},currentLinks);
         const foreignTarget=row.amount<0?Math.abs(row.amount):0;
         const foreignJustified=cents(foreignLinks.reduce((sum,link)=>sum+num(link.ticketAmount),0));
         const foreignDifference=cents(foreignTarget-foreignJustified);
@@ -672,12 +712,13 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
           justificationStatus:linkedToOtherEvent?'OTRO_EVENTO':reconciled.justificationStatus
         };
       });
-    // Finalizado = fotografía cerrada del evento: únicamente sus movimientos En saldo.
+    // En Finalizado se muestran TODAS las filas persistidas (incluidas y excluidas), porque son
+    // la fotografía definitiva de cómo quedó el mantenimiento al cerrar el evento.
     const incomeCatalog=buildIncomeCatalog(event,collaboratorRows,personRows,incomeImageRows,eventPersonSnapshotRows);
     const incomeTrace=attachIncomeTraceability(scopedAll,incomeCatalog,manualIncomeLinkRows.map(incomeLinkFromDb));
     const tracedById=new Map(incomeTrace.movements.map(row=>[row.id,row]));
     const tracedScoped=scopedAll.map(row=>tracedById.get(row.id)||row);
-    const visibleScoped=event.finalized ? tracedScoped.filter(row=>row.included) : tracedScoped;
+    const visibleScoped=tracedScoped;
     const ledger=buildEventLedger(tracedScoped);
     const movementById=new Map(ledger.movements.map(row=>[row.id,row]));
     const movements=visibleScoped.map(row=>({...row,...(movementById.get(row.id)||{})}));
@@ -692,7 +733,11 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       period:{dateFrom:period.dateFrom,dateTo:period.dateTo,linkedOutsidePeriodCount:linkedOutsidePeriod.length},
       reconciliation:{
         hasExplicitReconciliation,
-        status:hasExplicitReconciliation?'CONFIGURADO':'NO_CONFIGURADO',
+        hasStoredRows:hasExplicitReconciliation,
+        rowCount:reconciliationRowCount,
+        status:lifecycle.code,
+        message:lifecycle.message,
+        eventFinalized:event.finalized,
         evidence:reconciliationEvidence,
         periodSource:periodExplicit?'MANUAL':(period?.saved===true?'INICIALIZACION_AUTOMATICA':'CALCULADO_NO_GUARDADO')
       },

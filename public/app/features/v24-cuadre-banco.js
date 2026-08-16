@@ -248,7 +248,7 @@
     if(target.id==='ceBankFilter'){
       const next=text(target.value)||'TODOS';
       // En un evento finalizado solo se muestran los movimientos elegidos En saldo.
-      store.filter=store.readOnly?'INCLUIDOS':next;
+      store.filter=next;
       target.value=store.filter; store.page=1; invalidateMovementCache(); scheduleBodyRender(true);
       return;
     }
@@ -271,7 +271,7 @@
     if(filter){
       filter.disabled=!!store.readOnly;
       filter.setAttribute('aria-disabled',store.readOnly?'true':'false');
-      filter.value=store.readOnly?'INCLUIDOS':store.filter;
+      filter.value=store.filter;
     }
     if(account){account.onchange=event=>applyCommandValue(event.currentTarget||event.target);}
     if(filter){filter.onchange=event=>applyCommandValue(event.currentTarget||event.target);}
@@ -446,7 +446,6 @@
       invalidateMovementCache();
       store.accountId=data.selectedAccount||store.accountId;
       store.readOnly=data.readOnly===true;
-      if(store.readOnly && store.filter==='TODOS') store.filter='INCLUIDOS';
       store.dateFrom=text(data?.period?.dateFrom); store.dateTo=text(data?.period?.dateTo);
       render();
       requestAnimationFrame(()=>restorePosition(preserveMovementId,preserveScroll));
@@ -502,15 +501,21 @@
     $('ceBankFilter').value=store.filter;
     $('ceBankSort').value=store.sort;
     $('ceBankSearch').value=store.search;
-    $('ceBankDateFrom').value=store.dateFrom;
-    $('ceBankDateTo').value=store.dateTo;
-    const s=data.summary||{}; const event=data.event||{}; const tickets=data.ticketSummary||{}; const incomes=data.incomeSummary||{}; const period=data.period||{}; const traffic=trafficInfo(tickets); const incomeTraffic=incomeTrafficInfo(incomes);
+    const s=data.summary||{}; const event=data.event||{}; const tickets=data.ticketSummary||{}; const incomes=data.incomeSummary||{}; const period=data.period||{}; const rec=data.reconciliation||{}; const traffic=trafficInfo(tickets); const incomeTraffic=incomeTrafficInfo(incomes);
+    const storedRows=arr(data.movements),storedCount=num(rec.rowCount),hasStoredRows=rec.hasStoredRows===true||storedCount>0,finalSnapshot=event.finalized===true;
+    const storedDates=storedRows.map(row=>text(row.executedAt||row.valueDate).slice(0,10)).filter(Boolean).sort();
+    const displayFrom=finalSnapshot?(storedDates[0]||''):store.dateFrom;
+    const displayTo=finalSnapshot?(storedDates.at(-1)||''):store.dateTo;
+    $('ceBankDateFrom').value=displayFrom;
+    $('ceBankDateTo').value=displayTo;
     const finalClass=num(s.calculatedBalance)<0?'negative':'positive';
     const variationClass=num(s.eventVariation)<0?'negative':'positive';
     const headline=$('ceBankEventHeadline');
     headline.className=`ce-bank-event-headline ${event.finalized?'finalized':'in-progress'}`;
     headline.innerHTML=`<strong>${esc(event.title||'Evento')}</strong><span>${esc(event.status||'En curso')}</span>`;
-    $('ceBankEventPeriod').textContent=`Periodo bancario: ${formatDate(store.dateFrom,false)} — ${formatDate(store.dateTo,false)} · fechas inclusivas`;
+    $('ceBankEventPeriod').textContent=finalSnapshot
+      ?(hasStoredRows?`Cuadre al cierre: ${storedCount} fila(s) almacenada(s)${displayFrom&&displayTo?` · ${formatDate(displayFrom,false)} — ${formatDate(displayTo,false)}`:''} · foto definitiva`:'Cuadre Banco no iniciado al cierre · el histórico general queda solo como referencia')
+      :`Periodo bancario: ${formatDate(store.dateFrom,false)} — ${formatDate(store.dateTo,false)} · fechas inclusivas`;
     const trafficNode=$('ceBankTraffic');
     trafficNode.className=`ce-bank-traffic ${traffic.className}`;
     trafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(tickets.linked)} / ${num(tickets.total)} TKxx</b><small>${esc(traffic.label)} · ${num(tickets.percentage)}%</small></div>`;
@@ -521,7 +526,6 @@
     }
     $('ceBankReadOnly').classList.toggle('hidden',!store.readOnly);
     $('ceBankOverlay')?.classList.toggle('ce-bank-readonly-mode',store.readOnly);
-    if(store.readOnly){store.filter='INCLUIDOS';if($('ceBankFilter'))$('ceBankFilter').value='INCLUIDOS';}
     wireCommandControls();
     const importButton=$('ceBankImport'); const importInput=$('ceBankCsvFile'); const importDisabled=(store.readOnly===true)||store.importing; if(importInput) importInput.disabled=importDisabled; if(importButton){importButton.setAttribute('aria-disabled',importDisabled?'true':'false');importButton.classList.toggle('disabled',importDisabled);importButton.classList.toggle('busy',store.importing);importButton.tabIndex=importDisabled?-1:0;}
     ['ceBankDateFrom','ceBankDateTo','ceBankApplyPeriod'].forEach(id=>{const node=$(id);if(node){node.disabled=store.readOnly;node.setAttribute('aria-disabled',store.readOnly?'true':'false');}});
@@ -533,18 +537,32 @@
     const cashIncomePct=Math.round(Math.abs(cashIncome)/flowMax*100);
     const expensePct=Math.round(Math.abs(num(s.expense))/flowMax*100);
     const objective=economicVariation>=0?'El evento deja más recursos que al comenzar':'El evento reduce los recursos de partida';
-    $('ceBankSummary').innerHTML=`
-      <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo bancario inicial del evento</span><strong>${money(s.openingBalance)}</strong><small>Saldo anterior al movimiento más antiguo del periodo</small><div class="ce-bank-kpi-formula">Saldo posterior − importe (en un cargo se suma su valor absoluto)</div></article>
-      <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo final calculado del evento</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} movimientos aplicados · ${num(s.excludedCount)} inactivos</small></div></article>
-      <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal de la evolución del saldo"><span>Entradas y salidas incluidas</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Variación económica ${money(economicVariation)} · ${esc(objective)}</small><em class="ce-bank-chart-hint">Ver evolución temporal ↗</em></article>
-      <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Saldo certificado por el banco</span><strong>${money(s.latestBankBalance)}</strong><small>Último movimiento global ${formatDate(s.latestAt)}</small><div class="ce-bank-actual-period">Saldo real al final del periodo: <b>${money(s.actualClosingBalance)}</b></div></article>`;
-    if(num(period.linkedOutsidePeriodCount)>0){
+    if(finalSnapshot&&!hasStoredRows){
+      $('ceBankSummary').innerHTML=`
+        <article class="ce-bank-kpi ce-bank-kpi-hero"><div class="ce-bank-kpi-copy"><span>Estado definitivo del Cuadre Banco</span><strong>NO INICIADO AL CIERRE</strong><small>${esc(rec.message||'Este evento no cuenta con Cuadre Banco.')}</small></div></article>
+        <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Filas almacenadas del evento</span><strong>0</strong><small>No existe ninguna fila específica de Cuadre Banco para este evento.</small></article>
+        <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver histórico general de la cuenta"><span>Histórico general de la cuenta</span><strong>SOLO REFERENCIA</strong><small>No se atribuye ningún movimiento, saldo ni variación de ese histórico al evento.</small><em class="ce-bank-chart-hint">Ver histórico general ↗</em></article>
+        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Datos bancarios específicos del evento</span><strong>NO EXISTEN</strong><small>Para crear el cuadre hay que reabrir el evento.</small></article>`;
+    }else if(finalSnapshot){
+      $('ceBankSummary').innerHTML=`
+        <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo antes de la primera fila almacenada</span><strong>${money(s.openingBalance)}</strong><small>Referencia calculada únicamente desde el primer movimiento guardado del Cuadre.</small></article>
+        <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo tras la última fila almacenada</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} incluidas · ${num(s.excludedCount)} excluidas · ${storedCount} fila(s) guardada(s)</small></div></article>
+        <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal del Cuadre almacenado"><span>Movimientos almacenados incluidos</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Impacto de las filas incluidas ${money(economicVariation)}</small><em class="ce-bank-chart-hint">Ver foto temporal ↗</em></article>
+        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Estado al cerrar el evento</span><strong>CUADRE SIN FINALIZAR</strong><small>${esc(rec.message||'El evento se cerró con filas de Cuadre Banco almacenadas.')}</small></article>`;
+    }else{
+      $('ceBankSummary').innerHTML=`
+        <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo bancario inicial del periodo</span><strong>${money(s.openingBalance)}</strong><small>Saldo anterior al movimiento más antiguo del periodo de trabajo</small><div class="ce-bank-kpi-formula">Saldo posterior − importe (en un cargo se suma su valor absoluto)</div></article>
+        <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo calculado del periodo de trabajo</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} movimientos aplicados · ${num(s.excludedCount)} inactivos</small></div></article>
+        <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal de la evolución del saldo"><span>Entradas y salidas incluidas</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Variación económica ${money(economicVariation)} · ${esc(objective)}</small><em class="ce-bank-chart-hint">Ver evolución temporal ↗</em></article>
+        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Saldo certificado por el banco</span><strong>${money(s.latestBankBalance)}</strong><small>Último movimiento global ${formatDate(s.latestAt)}</small><div class="ce-bank-actual-period">Saldo real al final del periodo: <b>${money(s.actualClosingBalance)}</b></div></article>`;
+    }
+    if(finalSnapshot){
+      notice(rec.message||'Evento finalizado: el Cuadre Banco se presenta como foto definitiva de las filas almacenadas.','warning',false);
+    }else if(num(period.linkedOutsidePeriodCount)>0){
       notice(`Hay ${num(period.linkedOutsidePeriodCount)} movimiento(s) con TKxx asociados fuera del periodo bancario seleccionado. Amplía las fechas para revisarlos.`,'warning',false);
-    }else if(tickets.allJustified){
-      notice('');
-    }else if(store.readOnly){
-      notice('El evento está Finalizado: se permite consultar, buscar, filtrar y revisar asociaciones, pero no modificarlas.','warning',false);
-    }else if(!store.noticeLocked){ notice(''); }
+    }else if(!store.noticeLocked){
+      notice(rec.message||'');
+    }
     renderBody();
     wireCommandControls();
     if(store.balanceChartOpen) renderBalanceChart();
@@ -851,8 +869,10 @@
     const overlay=$('ceBankBalanceChartOverlay');
     if(!overlay) return;
     const series=buildBalanceSeries();
-    const includedRows=arr(store.data?.movements).filter(row=>Boolean(row.included)&&row.inclusionLocked!==true&&row.linkedToOtherEvent!==true);
+    const eventRows=arr(store.data?.movements);
+    const includedRows=eventRows.filter(row=>Boolean(row.included)&&row.inclusionLocked!==true&&row.linkedToOtherEvent!==true);
     const eventIds=new Set(includedRows.map(row=>String(row.id)));
+    const rec=store.data?.reconciliation||{},event=store.data?.event||{},finalSnapshot=event.finalized===true,storedCount=num(rec.rowCount);
     const accountLabel=chartAccountLabel();
     if(!series.length){
       overlay.innerHTML=`<section class="ce-bank-balance-chart-card" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header><div><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3></div><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-empty"><strong>No hay movimientos bancarios históricos para esta cuenta.</strong><span>Selecciona otra cuenta que tenga movimientos cargados.</span></div></section>`;
@@ -882,9 +902,16 @@
     const shortWideScreen=!phone&&vh<900;
     const zoomHeight=landscapePhone?300:(phone?350:(shortWideScreen?245:310));
     const historyHeight=phone?235:(shortWideScreen?205:285);
-    const zoomPane=chartPane({id:'zoom',title:eventData.title,subtitle:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom completo del evento`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,showEventPoints:true});
-    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)} · La franja amarilla identifica el intervalo En saldo del evento`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,showEventPoints:false});
-    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector hidden-info"></aside><aside id="ceBankBalanceInspectorMedia" class="ce-bank-balance-inspector-media hidden-info" aria-label="Justificantes del movimiento"></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>Movimientos En saldo señalados</span><strong>${includedRows.length}</strong></div></div><div class="ce-bank-balance-stack">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span><span><i class="amber"></i>Intervalo del evento</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span><small>Zoom: solo movimientos En saldo del evento. Histórico: cronología completa de la cuenta.</small></footer></section>`;
+    const emptyZoomMessage=finalSnapshot&&storedCount<=0
+      ?(rec.message||'Este evento se cerró sin Cuadre Banco.')
+      :(finalSnapshot?'Hay filas almacenadas del Cuadre, pero ninguna quedó incluida En saldo.':'Todavía no hay movimientos En saldo para construir el zoom del evento.');
+    const zoomPane=includedRows.length
+      ?chartPane({id:'zoom',title:eventData.title,subtitle:finalSnapshot?`${includedRows.length} movimiento(s) En saldo almacenado(s) al cierre · foto definitiva`:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom del periodo de trabajo`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,showEventPoints:true})
+      :{html:`<section class="ce-bank-balance-pane zoom" data-pane-id="zoom"><div class="ce-bank-balance-pane-head"><div><strong>${esc(eventData.title)}</strong><span>${finalSnapshot?'Foto definitiva del Cuadre Banco al cierre':'Cuadre Banco del evento'}</span></div><span class="ce-bank-balance-pane-status ${esc(eventData.statusClass)}">${esc(eventData.status)}</span></div><div class="ce-bank-balance-chart-empty"><strong>${finalSnapshot&&storedCount<=0?'SIN CUADRE BANCARIO AL CIERRE':'SIN MOVIMIENTOS EN SALDO'}</strong><span>${esc(emptyZoomMessage)}</span></div></section>`,meta:{id:'zoom',width:chartWidth,height:zoomHeight,points:[]}};
+    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'}`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,showEventPoints:false});
+    const eventCountLabel=finalSnapshot?'Filas almacenadas del Cuadre':'Movimientos En saldo señalados';
+    const eventCountValue=finalSnapshot?storedCount:includedRows.length;
+    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector hidden-info"></aside><aside id="ceBankBalanceInspectorMedia" class="ce-bank-balance-inspector-media hidden-info" aria-label="Justificantes del movimiento"></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>${esc(eventCountLabel)}</span><strong>${eventCountValue}</strong></div></div><div class="ce-bank-balance-stack">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span>${includedRows.length?'<span><i class="amber"></i>Intervalo del Cuadre</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span>':''}<small>${finalSnapshot?'Parte inferior: exclusivamente filas almacenadas del Cuadre al cerrar el evento. El histórico superior es solo referencia.':'Zoom: solo movimientos En saldo del evento. Histórico: cronología completa de la cuenta.'}</small></footer></section>`;
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden','false');
     overlay.querySelectorAll('.ce-bank-balance-pane').forEach(pane=>wireBalancePane(pane,pane.dataset.paneId==='zoom'?zoomPane.meta:historyPane.meta));
@@ -950,7 +977,11 @@
     const end=Math.min(rows.length,start+store.pageSize);
     const pageRows=rows.slice(start,end);
     updatePager(rows.length,start,end);
-    if(!pageRows.length){ body.innerHTML='<div class="ce-bank-empty"><strong>No hay movimientos en esta vista.</strong><span>Prueba otro filtro, cambia la búsqueda o amplía las fechas.</span></div>'; return; }
+    if(!pageRows.length){
+      const rec=store.data?.reconciliation||{},event=store.data?.event||{};
+      body.innerHTML=event.finalized&&num(rec.rowCount)<=0
+        ?'<div class="ce-bank-empty"><strong>Este evento se cerró sin ninguna fila de Cuadre Banco.</strong><span>El histórico general de la cuenta no se atribuye al evento. Para hacer el cuadre hay que reabrirlo.</span></div>'
+        :'<div class="ce-bank-empty"><strong>No hay movimientos en esta vista.</strong><span>Prueba otro filtro o cambia la búsqueda.</span></div>'; return; }
     body.innerHTML=pageRows.map((row,index)=>{
       const status=row.amount>=0?incomeStatusInfo(row):statusInfo(row); const amountClass=row.amount<0?'negative':'positive';
       const displayLinks=arr(row.displayLinks||row.links);

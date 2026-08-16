@@ -364,7 +364,7 @@
   async function replayHistoricalRun(){
     if(uiRunning){setPhase('Detén la ejecución antes de repetir una batería histórica.');return;}const d=await selectedHistorical();const run=d?.run;if(!run)return;
     const saved=run.generatedBattery||null;if(!saved?.cases||num(saved?.replayContractVersion)<2){setPhase('Esta batería histórica es anterior al contrato reproducible exacto v2. Puedes REGENERAR su semilla manualmente; las baterías creadas con esta versión sí podrán repetirse literalmente.',true);return;}
-    historicReplayKey=run.runKey;batterySeed=num(run.seed);batteryClock=`repetición exacta · ${run.batteryClock||run.seed}`;preview=saved;currentRunKey=`exact-${batterySeed}-${Date.now()}`;
+    historicReplayKey=run.runKey;batterySeed=num(run.seed);{const baseClock=text(run.batteryClock||run.seed).replace(/^(?:repetición exacta\s*·\s*)+/i,'');batteryClock=`repetición exacta · ${baseClock||run.seed}`;}preview=saved;currentRunKey=`exact-${batterySeed}-${Date.now()}`;
     for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);await saveServerRun();await loadServerHistory();
     setPhase(`Batería histórica ${batterySeed} cargada para REPETICIÓN EXACTA. AI-SMOKE y FULL-CERT usarán literalmente las preguntas y esperados guardados; FAST vuelve a comprobar la estructura actual con la misma semilla.`);
   }
