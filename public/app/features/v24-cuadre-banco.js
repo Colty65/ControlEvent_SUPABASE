@@ -504,8 +504,14 @@
     const s=data.summary||{}; const event=data.event||{}; const tickets=data.ticketSummary||{}; const incomes=data.incomeSummary||{}; const period=data.period||{}; const rec=data.reconciliation||{}; const traffic=trafficInfo(tickets); const incomeTraffic=incomeTrafficInfo(incomes);
     const storedRows=arr(data.movements),storedCount=num(rec.rowCount),hasStoredRows=rec.hasStoredRows===true||storedCount>0,finalSnapshot=event.finalized===true;
     const storedDates=storedRows.map(row=>text(row.executedAt||row.valueDate).slice(0,10)).filter(Boolean).sort();
-    const displayFrom=finalSnapshot?(storedDates[0]||''):store.dateFrom;
-    const displayTo=finalSnapshot?(storedDates.at(-1)||''):store.dateTo;
+    // FIX13 · Un evento FINALIZADO debe conservar y mostrar el periodo bancario realmente
+    // guardado. La fecha de la primera/última fila almacenada NO sustituye al periodo: puede
+    // no haber movimiento justo el primer día seleccionado (p.ej. periodo 14/07–27/07 con
+    // primera fila el 16/07). Solo eventos antiguos sin periodo persistido recurren a las
+    // fechas de sus filas como respaldo visual.
+    const persistedFinalPeriod=finalSnapshot&&text(rec.periodSource)!=='CALCULADO_NO_GUARDADO'&&store.dateFrom&&store.dateTo;
+    const displayFrom=finalSnapshot?(persistedFinalPeriod?store.dateFrom:(storedDates[0]||'')):store.dateFrom;
+    const displayTo=finalSnapshot?(persistedFinalPeriod?store.dateTo:(storedDates.at(-1)||'')):store.dateTo;
     $('ceBankDateFrom').value=displayFrom;
     $('ceBankDateTo').value=displayTo;
     const finalClass=num(s.calculatedBalance)<0?'negative':'positive';
