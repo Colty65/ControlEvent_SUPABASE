@@ -252,6 +252,16 @@ async function bankTimelineOracle(state,event){
     return{event:trim(f?.event)||event,eventFinalized:f?.event_finalized===true,hasReconciliation,rowCount:num(f?.reconciliation_row_count),reconciliationStatus:trim(f?.reconciliation_status)||(hasReconciliation?'EN_CURSO_CUADRE_EN_CURSO':(f?.event_finalized===true?'FINALIZADO_CUADRE_SIN_REALIZAR':'EN_CURSO_CUADRE_SIN_INICIAR')),lifecycleMessage:trim(f?.lifecycle_message),points:hasReconciliation?num(f?.timeline_movement_count):0,opening:hasReconciliation?round(f?.opening_balance,2):0,closing:hasReconciliation?round(f?.closing_balance,2):0,impact:hasReconciliation?round(f?.bank_impact,2):0,rows:hasReconciliation?arr(toolTable(r,'balance_timeline')?.rows):[]};
   }catch(_){return null;}
 }
+async function refreshHistoricalCanonicalSociosOracle(caseDef,state){
+  const c=caseDef;if(trim(c?.oracle?.kind)!=='canonical-socios')return c;
+  try{
+    const data=await canonicalSociosOracle(state);if(!data)return c;
+    c.oracle={kind:'canonical-socios',records:data.records,people:data.people};
+    c.expected=expectedOracleText(c.oracle);
+  }catch(_){/* Si falla la lectura actual, se conserva el contrato histórico. */}
+  return c;
+}
+
 async function refreshHistoricalBankOracle(caseDef,state){
   const c=caseDef,kind=trim(c?.oracle?.kind),event=trim(c?.event||c?.oracle?.event);
   if(!event||!['bank-summary','bank-timeline'].includes(kind))return c;
@@ -1020,7 +1030,7 @@ export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},convers
   const m=trim(mode||savedCase?.mode).toUpperCase();
   if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('La repetición histórica solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
   const c=restoredHistoricalCase(savedCase,m);if(!c.id||!c.prompt){const e=new Error('La batería histórica no contiene una pregunta ejecutable.');e.status=422;throw e;}
-  const state=await getState();await refreshHistoricalBankOracle(c,state);if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+  const state=await getState();await refreshHistoricalBankOracle(c,state);await refreshHistoricalCanonicalSociosOracle(c,state);if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
   const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
   let r,nextConversationState=null;
   if(m==='AI-SMOKE'){

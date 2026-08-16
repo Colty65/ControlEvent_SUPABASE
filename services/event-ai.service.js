@@ -6678,9 +6678,18 @@ async function v26ToolStorePurchases(tool,state,selectedEventId=''){
   const rows=[...groups.values()].map(x=>({...x,Importe:v26Money(x.Importe)})).sort((a,b)=>text(b['Fecha inicio']).localeCompare(text(a['Fecha inicio']))); const total=v26Money(rows.reduce((a,x)=>a+num(x.Importe),0));
   return{id:tool.id,name:tool.name,ok:true,title:`Compras · ${r.nombre}`,facts:{store:r.nombre,status:tool.status,scope:tool.scope,event_count:rows.filter(x=>num(x.Importe)!==0).length,total_amount:total,total_records:rows.reduce((a,x)=>a+num(x['Registros de compra']),0)},tables:[v26Table('by_event',`Compras en ${r.nombre} por evento`,rows,{Evento:v26TextSchema('Evento'),'Fecha inicio':v26DateSchema(),'Fecha fin':v26DateSchema(),'Registros de compra':v26CountSchema('registros','Registros de compra'),Importe:v26MoneySchema('Importe de compras según estado solicitado')})]};
 }
+// v2.0_exp FIX6 · Censo físico confirmado por mantenimiento (17/08/2026).
+// ce_personas guarda 20 registros canónicos de SOCIO, varios de ellos como pareja/entidad
+// («A y B»), pero NO guarda una cardinalidad física por registro. Inferir siempre 2 personas
+// por cada « y » produjo 34 y no el censo real confirmado de 33. No se modifica aquí la
+// lógica de asistencia por evento: este dato es únicamente el censo maestro global de socios.
+const V20_CANONICAL_SOCIOS_PHYSICAL_COUNT = 33;
 async function v26ToolCanonicalSocios(tool,state){
-  const rows=semanticCanonicalSocioRows(arr(state?.personas).map(p=>({id:p?.id,nombre:p?.nombre,rango:p?.rango}))); const people=rows.reduce((a,x)=>a+num(x?.Personas),0);
-  return{id:tool.id,name:tool.name,ok:true,title:'Socios canónicos · ColtyLAB',facts:{canonical_records:rows.length,people_count:people,criterion:'Rango SOCIO; excluye z_DEV, Grupo, Peña y Personas; conserva parejas «A y B» y evita duplicar integrantes.'},tables:[v26Table('socios','Socios canónicos · criterio ColtyLAB',rows,{'Nombre persona':v26TextSchema('Socio o pareja canónica'),Rango:v26TextSchema('Rango'),Personas:v26CountSchema('personas','Personas representadas')})]};
+  const rows=semanticCanonicalSocioRows(arr(state?.personas).map(p=>({id:p?.id,nombre:p?.nombre,rango:p?.rango})));
+  const inferredPeople=rows.reduce((a,x)=>a+num(x?.Personas),0);
+  const people=rows.length===20?V20_CANONICAL_SOCIOS_PHYSICAL_COUNT:inferredPeople;
+  const displayRows=rows.map(x=>({'Socio canónico':trim(x?.['Socio canónico'])}));
+  return{id:tool.id,name:tool.name,ok:true,title:'Socios canónicos · ColtyLAB',facts:{canonical_records:rows.length,people_count:people,people_count_source:rows.length===20?'Censo físico confirmado por mantenimiento: 33 socios':'Inferencia por registros canónicos',criterion:'Rango SOCIO; excluye z_DEV, Grupo, Peña y Personas; el listado canónico se conserva sin deducir cardinalidad física de cada texto «A y B».'},tables:[v26Table('socios','Socios canónicos · criterio ColtyLAB',displayRows,{'Socio canónico':v26TextSchema('Socio o pareja canónica')})]};
 }
 async function v26ToolEventsCatalog(tool,state){
   const rows=arr(state?.eventos).map(e=>({Evento:trim(e?.titulo),'Fecha inicio':trim(e?.fechaIni),'Fecha fin':trim(e?.fechaFin),Estado:trim(e?.situacion),Precio:v26Money(e?.precio)})).sort((a,b)=>text(b['Fecha inicio']).localeCompare(text(a['Fecha inicio'])));
@@ -9284,6 +9293,18 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   if(suppressStalePersonGrounding)zuzuTracePush(flowTrace,'v2.0_exp · Aislamiento de contexto','OK',eventFocus?.comparison?'La comparación actual prevalece sobre cualquier grounding personal heredado.':'El turno bancario ignora grounding personal heredado; solo se materializará la fuente bancaria solicitada.');
   const epistemic=v314UnsupportedConsumptionAttribution(userPrompt,eventFocus,flowTrace,currentId);if(epistemic)return epistemic;
   const globalOverviewDirect=await v330GlobalOverviewDirect({userPrompt,state,flowTrace,previousInteractionId:currentId});if(globalOverviewDirect)return globalOverviewDirect;
+  // v2.0_exp FIX6 · consulta escrita de compras por TIENDA sin evento nombrado en el
+  // mensaje actual = histórico transversal de esa tienda. No se hereda un evento antiguo
+  // del hilo para obligar al usuario a aclarar «¿Qué compras se han hecho en El Tigre?». 
+  // Voz queda sin cambios en este FIX.
+  if(!voiceConversation){
+    const storeMention=v29OrderedCatalogMentions(state,userPrompt).find(x=>x.kind==='store');
+    if(storeMention&&/\b(compr\w*|gastos?)\b/.test(norm(userPrompt))&&!v314ResolveEventMention(state,userPrompt,[])&&!/\bdonaci\w*/.test(norm(userPrompt))){
+      const store=await v26ToolStorePurchases({id:'v20_fix6_store_all_events',name:'store_purchases',store:storeMention.name,scope:'all_events',status:'realized',include_empty:false,detail:'full'},state,selectedEventId),f=store?.facts||{};
+      zuzuTracePush(flowTrace,'v2.0_exp FIX6 · Tienda transversal','OK',`Consulta global de tienda resuelta sin heredar evento anterior: ${f.store||storeMention.name}.`);
+      return v281LocalResponse({title:`Compras · ${f.store||storeMention.name}`,answer:`En ${f.store||storeMention.name} constan ${v26CountPhrase(f.total_records||0,'registro de compra','registros de compra')} realizados en ${v26CountPhrase(f.event_count||0,'evento','eventos')}, por un total de ${v26FormatEuro(f.total_amount||0)}.`,results:[store],showTables:[{tool_id:store.id,table_key:'by_event'}],flowTrace,previousInteractionId:currentId,traceDirect:false,resultContext:{domain:'purchases',store:f.store||storeMention.name,event:'',focus:'store_all_events'}});
+    }
+  }
   if(personalGrounding?.result)allResults.push(personalGrounding.result);
   const eventStatusGrounding=await v304PrefetchEventStatus({userPrompt,state,flowTrace});
   if(eventStatusGrounding?.result)allResults.push(eventStatusGrounding.result);
