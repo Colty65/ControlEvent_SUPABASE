@@ -40,16 +40,25 @@
   }
   function stopControlGuard(){if(controlGuard)clearInterval(controlGuard);controlGuard=null;}
 
+  function storedAuth(){
+    const direct=window.ControlEventLoginUser||window.__CONTROL_EVENT_LOGIN_USER__||window.__CONTROL_EVENT_CE_ACCESO__||null;
+    if(direct)return direct;
+    for(const key of ['ControlEvent_v1.0_exp_login_user','ControlEvent_ce_acceso_usuario','ControlEvent_auth_user_v509']){
+      try{const raw=sessionStorage.getItem(key)||localStorage.getItem(key);if(raw){const u=JSON.parse(raw);if(u)return u;}}catch(_){ }
+    }
+    return null;
+  }
   function auth(){
-    // Fuente principal: la fachada estable de CE, que expone el authUser léxico real.
-    // El usuario recibido por controlevent:auth-changed se conserva además como respaldo inmediato.
+    // La ITV no depende del momento en que termine de construirse la fachada general de CE.
+    // Primero usa el usuario capturado directamente del login y después todas las fuentes de respaldo.
     try{
       const appUser=window.ControlEventApp?.authUser||window.ControlEventRuntime?.app?.authUser||null;
-      if(authEventUser||appUser||window.authUser||window.__CONTROL_EVENT_USER__) return authEventUser||appUser||window.authUser||window.__CONTROL_EVENT_USER__;
+      if(authEventUser||window.__CE_ZUZU_ITV_LOGIN_USER__||appUser||window.authUser||window.__CONTROL_EVENT_USER__||storedAuth())
+        return authEventUser||window.__CE_ZUZU_ITV_LOGIN_USER__||appUser||window.authUser||window.__CONTROL_EVENT_USER__||storedAuth();
       return Function('return (typeof authUser!=="undefined" && authUser) ? authUser : null')();
-    }catch(_){return authEventUser||window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||null;}
+    }catch(_){return authEventUser||window.__CE_ZUZU_ITV_LOGIN_USER__||window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||storedAuth()||null;}
   }
-  function role(){const u=auth()||{};return text(u.nivel||u.Nivel).trim().toUpperCase();}
+  function role(){const u=auth()||{};return text(u.nivel||u.Nivel||u.NIVEL||u.rol||u.Rol).trim().toUpperCase();}
   function isGD(){return role()==='GD';}
   function actorHeader(){const u=auth()||{};return encodeURIComponent(JSON.stringify({nivel:role(),identificacion:text(u.identificacion||u.Identificacion),nombre:text(u.nombre||u.Nombre)}));}
   function apiHeaders(extra={}){return {'Content-Type':'application/json','X-ControlEvent-Feature':'zuzu-test-console-v2','X-ControlEvent-Actor':actorHeader(),...extra};}
@@ -369,5 +378,40 @@
   function printReport(){const mode=lastMode,c=modeCache[mode],s=c.summary||{},date=new Date().toLocaleString('es-ES'),body=c.rows.map(r=>`<tr><td class="${esc(r.status)}">${esc(r.status)}</td><td>${esc(r.group)}</td><td>${esc(r.label)}</td><td>${esc(r.prompt||'')}</td><td>${esc(r.expected||'')}</td><td>${esc(r.actual||'')}</td></tr>`).join('');if(!c.rows.length){alert('Este modo todavía no tiene resultados.');return;}const w=window.open('','_blank');if(!w){setPhase('El navegador ha bloqueado la ventana de impresión. Usa ⬇ INFORME para descargar el JSON.',true);return;}w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>ControlEvent - ITV Zuzu</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;margin:16px;color:#0f172a}h1{color:#075985}table{width:100%;border-collapse:collapse;font-size:8.5px;table-layout:fixed}th,td{border:1px solid #cbd5e1;padding:4px;vertical-align:top;overflow-wrap:anywhere}th:nth-child(1){width:5%}th:nth-child(2){width:8%}th:nth-child(3){width:13%}th:nth-child(4){width:22%}th:nth-child(5){width:20%}th:nth-child(6){width:32%}.OK{color:#15803d;font-weight:bold}.KO{color:#b91c1c;font-weight:bold}.WARN{color:#b45309;font-weight:bold}.summary{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0 12px}.summary b{font-size:16px}</style></head><body><h1>🧪 ITV de Zuzu · ${esc(mode)}</h1><p>${esc(date)} · semilla <b>${esc(batterySeed)}</b> · tablas reales · solo lectura</p><div class="summary"><span>OK <b>${fmtN(s.ok)}</b></span><span>AVISOS <b>${fmtN(s.warn)}</b></span><span>KO <b>${fmtN(s.ko)}</b></span><span>Llamadas IA <b>${fmtN(s.calls)}</b></span><span>Tokens <b>${fmtN(s.tokens)}</b></span><span>Coste <b>${fmtE(s.costEur)}</b></span></div><table><thead><tr><th>Estado</th><th>Grupo</th><th>Prueba</th><th>Pregunta realizada</th><th>Esperado</th><th>Respuesta Zuzu / Obtenido</th></tr></thead><tbody>${body}</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();}
 
 
-  style();window.addEventListener('controlevent:auth-changed',e=>{authEventUser=e?.detail?.user||null;injectButton();});window.addEventListener('controlevent:app-ready',injectButton);document.addEventListener('DOMContentLoaded',injectButton);setInterval(injectButton,500);injectButton();
+  function captureLoginUser(user){
+    if(!user||typeof user!=='object')return;
+    authEventUser=user;window.__CE_ZUZU_ITV_LOGIN_USER__=user;injectButton();
+  }
+  function observeLoginResponse(){
+    if(typeof window.fetch!=='function'||window.fetch.__ceZuzuItvLoginObserver)return;
+    const previous=window.fetch;
+    const wrapped=function(input,init){
+      const url=typeof input==='string'?input:(input&&input.url)||'';
+      const promise=previous.apply(this,arguments);
+      if(/\/api\/login(?:[?#]|$)/i.test(url)){
+        Promise.resolve(promise).then(res=>{
+          try{res.clone().json().then(data=>{if(res.ok&&data?.ok&&data?.user)captureLoginUser(data.user);}).catch(()=>{});}catch(_){ }
+        }).catch(()=>{});
+      }
+      return promise;
+    };
+    wrapped.__ceZuzuItvLoginObserver=true;
+    wrapped.__ceZuzuItvPreviousFetch=previous;
+    window.fetch=wrapped;
+  }
+
+  // Se instala al leer el HTML, antes de los bundles pesados. Así el botón no espera minutos.
+  style();observeLoginResponse();
+  window.addEventListener('controlevent:auth-changed',e=>{captureLoginUser(e?.detail?.user||null);});
+  window.addEventListener('controlevent:app-ready',injectButton);
+  document.addEventListener('DOMContentLoaded',injectButton);
+  document.addEventListener('click',e=>{
+    if(!e.target?.closest?.('#btnLogin'))return;
+    // Respaldo inmediato para variantes de login que sustituyan fetch después de arrancar la ITV.
+    [0,50,150,400,900].forEach(ms=>setTimeout(()=>{
+      const u=window.authUser||window.ControlEventApp?.authUser||window.ControlEventLoginUser||storedAuth();
+      if(u)captureLoginUser(u);else injectButton();
+    },ms));
+  },true);
+  injectButton();
 })();

@@ -144,6 +144,8 @@
         <button type="button" class="tab" id="tabGraficasBtn" title="Gráficas del evento"><span class="tabicon">📊</span></button>
         <button type="button" class="tab ce-zuzu-test-tab hidden" id="ceZuzuTestBtn" style="display:none!important" title="PRUEBAS ZUZU · ITV automática · solo GD" aria-label="PRUEBAS ZUZU" aria-hidden="true"><span class="tabicon">🧪</span></button>
       </div>
+      <!-- ITV Zuzu: carga inmediata junto al botón; no espera a los bundles pesados de ControlEvent. -->
+      <script src="./app/features/zuzu-test-console-gd.js?v=20260816-V1.0-EXP-ZUZU-ITV-BOTON-INMEDIATO-FIX4"></script>
 
       <div id="noEventMessage" class="card hidden">
         <div class="empty">No hay eventos. Crea uno desde mantenimiento.</div>
@@ -583,7 +585,7 @@
 <script src="./app/features/v16-opt2h-graficas-v46-hardlock.js?v=v1.0_exp_20260708170000"></script>
 <script>window.__ceDisableLegacyBarGraficas=true;</script>
 <script id="legacy-bundle-after-modules-v307" src="./app/legacy/legacy-bundle-after-modules-v30.7.js?v=20260814-V1.0-EXP-PDFTRACE1"></script>
-<script src="./app/features/zuzu-test-console-gd.js?v=20260816-V1.0-EXP-ZUZU-ITV-BOTON-ACTIVO"></script>
+
 <script src="./app/features/mapa-productos.js?v=v1.0_exp_20260708170000"></script>
 <script src="./app/features/v19-mapa-recursos-global.js?v=20260814-V1.0-EXP-PDFTRACE1"></script>
 <script src="./app/features/planificacion-inicial.js?v=20260814-V1.0-EXP-VOICE-NOMBRES-ECO-FIX2"></script>
