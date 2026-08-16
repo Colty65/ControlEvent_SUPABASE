@@ -172,7 +172,13 @@ function looksEmptyOrDeferred(result){
   return /control\s*event ha conservado los datos canonicos|se ha omitido una interpretacion|voy a (?:consultar|revisar|buscar)|necesito (?:revisar|consultar) los registros/.test(b);
 }
 function claimsNoProducts(result){ return /no\s+(?:se\s+)?(?:encontraron|hay|hubo|constan|aparecen)[^.]{0,90}(?:productos?|compras?)/i.test(resultBlob(result)); }
-function claimsKnownEventMissing(result,name=''){ const b=resultBlob(result); if(!hasNameInText(b,name))return false; return /(?:no\s+(?:hay|existe|figura|consta|encuentro)|no\s+se\s+(?:encuentra|localiza)|no\s+est[aá]\s+registrad[oa]|no\s+hay\s+un\s+evento|parece\s+que\s+no\s+hay\s+un\s+evento)/i.test(b); }
+function claimsKnownEventMissing(result,name=''){
+  const b=resultBlob(result); if(!hasNameInText(b,name))return false;
+  // Solo es negación de EXISTENCIA del evento si la negación apunta al propio concepto "evento".
+  // No confundir "no hay compras pendientes" ni "Rafita no figura en el evento X" con "el evento X no existe".
+  return /(?:no\s+(?:encuentro|localizo|existe|consta)\s+(?:(?:ning[uú]n|un|el)\s+)?evento\b|no\s+hay\s+(?:(?:ning[uú]n|un)\s+)?evento\b(?:[^.\n]{0,90}(?:llamad|denominad|con\s+el\s+nombre))?|(?:el\s+)?evento\b[^.\n]{0,120}\bno\s+(?:existe|consta|se\s+encuentra|est[aá]\s+registrad[oa]))/i.test(b);
+}
+function resultUsedTool(result,name=''){return arr(result?.meta?.tools).some(t=>trim(t)===trim(name));}
 function hasNameInText(value,name){ const h=norm(value),toks=significant(name); if(yearOf(name)&&!h.includes(yearOf(name)))return false; return toks.length>0&&toks.filter(t=>h.includes(t)).length>=Math.min(2,toks.length); }
 
 function purchaseOracle(state,event){
@@ -335,20 +341,30 @@ function validateOracle(caseDef,result){
   }else if(oracle.kind==='donations'){
     const d=oracle.data;if(d){if(d.records>0&&claimsNoProducts(result))reasons.push('donaciones: afirma ausencia de producto pese a existir registros');if(d.total>0&&!hasMoney(blob,d.total)&&!new RegExp(`\\b${Number(d.records)}\\b`).test(blob))reasons.push(`donaciones: no acredita ${euro(d.total)} ni ${d.records} registros`);}
   }else if(oracle.kind==='documentation-field'){
-    if(!new RegExp(`\\b${Number(oracle.value)}\\b`).test(blob))reasons.push(`documentación: ${oracle.label} esperado ${oracle.value}`);
+    const expected=Number(oracle.value),label=norm(oracle.label);
+    const numeric=new RegExp(`\\b${expected}\\b`).test(blob);
+    const docCodes=[...new Set((blob.match(/\bDOC\s*\d+\b/gi)||[]).map(x=>norm(x).replace(/\s+/g,'')))];
+    const tableEvidence=arr(result?.tables).some(t=>arr(t?.rows).length>=expected);
+    if(!numeric&&!(label.includes('document')&&docCodes.length>=expected)&&!tableEvidence)reasons.push(`documentación: ${oracle.label} esperado ${oracle.value}`);
   }else if(oracle.kind==='event-metric'){
     if(!hasMoney(blob,oracle.value))reasons.push(`${oracle.label}: no devuelve ${euro(oracle.value)}`);
   }else if(oracle.kind==='events-overview'){
     if(!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`panorama global: no acredita ${oracle.count} eventos`);
   }else if(oracle.kind==='people-activity'){
-    if(oracle.count>0&&!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`actividad global: no acredita ${oracle.count} personas canónicas`);
+    const exactCount=new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)||arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count));
+    // Si la herramienta canónica people_activity se ejecutó, no obligamos a Zuzu a recitar
+    // el tamaño total del universo cuando la pregunta pide el ranking/actividad de personas.
+    if(oracle.count>0&&!exactCount&&!resultUsedTool(result,'people_activity'))reasons.push(`actividad global: no acredita ${oracle.count} personas canónicas`);
   }else if(oracle.kind==='canonical-socios'){
     if(oracle.records>0&&!new RegExp(`\\b${Number(oracle.records)}\\b`).test(blob)&&!new RegExp(`\\b${Number(oracle.people)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.records)))reasons.push(`socios canónicos: no acredita ${oracle.records} registros / ${oracle.people} personas`);
   }else if(oracle.kind==='store-purchases'){
     if(!hasNameInText(blob,oracle.store)&&!arr(result?.tables).length)reasons.push(`tienda no acreditada: ${oracle.store}`);
     if(oracle.total>0&&!hasMoney(blob,oracle.total)&&!arr(result?.tables).length)reasons.push(`compras de tienda: no acredita ${euro(oracle.total)}`);
   }else if(oracle.kind==='participation-events'){
-    if(oracle.eventCount>0&&!new RegExp(`\\b${Number(oracle.eventCount)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.eventCount)))reasons.push(`participación: no acredita ${oracle.eventCount} eventos`);
+    const exactCount=new RegExp(`\\b${Number(oracle.eventCount)}\\b`).test(blob)||arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.eventCount));
+    const expectedNames=arr(oracle?.rows).map(r=>trim(r?.Evento)).filter(Boolean);
+    const namedCount=expectedNames.filter(n=>hasNameInText(blob,n)).length;
+    if(oracle.eventCount>0&&!exactCount&&namedCount<Math.min(Number(oracle.eventCount),expectedNames.length||Number(oracle.eventCount)))reasons.push(`participación: no acredita ${oracle.eventCount} eventos`);
   }else if(oracle.kind==='bank-timeline'){
     if(oracle.points>0&&!new RegExp(`\\b${Number(oracle.points)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length>=Number(oracle.points)))reasons.push(`cronología bancaria: no acredita ${oracle.points} puntos/movimientos`);
   }
@@ -569,7 +585,7 @@ const TPL={
   relationFollow:['¿Tuvo alguna relación con ese evento?','¿Aparece relacionado con ese evento?','¿Tuvo algo que ver con ese evento?','¿Figura en ese evento de alguna manera?'],
   relativeNext:['¿Y el del año siguiente?','Ahora el del año posterior.','¿Qué pasa con el del siguiente año?','Vete al de {year}.'],
   catalog:[
-    'Dame la lista general de {entity}.','¿Cuántos {entity} hay registrados?','Enséñame el catálogo de {entity}.','Quiero consultar todos los {entity}.',
+    'Dame la lista general de {entity}.','¿Cuántos {entity} hay registrados?','Enséñame el catálogo de {entity}.','Quiero consultar el catálogo de {entity}.',
     'Repasa la tabla general de {entity}.','¿Qué contiene el maestro de {entity}?'
   ],
   documentation:[

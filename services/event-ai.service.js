@@ -8255,8 +8255,9 @@ function v325ResolveRelativeYearSibling(state,userPrompt='',conversationHistory=
 }
 function v325ComparisonFollowUpCue(userPrompt=''){
   const p=norm(userPrompt);
-  return /\b(?:cual|cuál|cuales|cuáles)\b.*\b(?:mas|más|menos|mejor|peor)\b|\b(?:diferencia|cambio|cambio|respecto\s+al\s+anterior|entre\s+los\s+dos|de\s+los\s+dos)\b/.test(p)
-    || /^\s*[¿?]?\s*y\s+(?:cual|cuál|que|qué)\b/.test(p);
+  return /\b(?:cual|cuál|cuales|cuáles)\b.*\b(?:mas|más|menos|mejor|peor|encima|debajo)\b|\b(?:diferencia|cambio|respecto\s+al\s+anterior|entre\s+(?:los|esos|estos|ambos)\s+dos|de\s+los\s+dos|por\s+encima|por\s+debajo)\b/.test(p)
+    || /^\s*[¿?]?\s*y\s+(?:cual|cuál|que|qué|de\s+(?:ingresos?|compras?|donaciones?|saldo|valoraci[oó]n|asistencia))\b/.test(p)
+    || /\b(?:donde|dónde)\b.*\b(?:mas|más|menos)\b/.test(p);
 }
 function v325PriorComparisonContext(conversationHistory=[]){
   for(const turn of arr(conversationHistory).slice(-6).reverse()){
@@ -8417,8 +8418,12 @@ function v314CompactEvidenceRows(rows=[],limit=40){
 function v314PurchaseEvidence(r){
   if(!r)return null;
   const rows=arr(arr(r?.tables).find(t=>trim(t?.key)==='by_product')?.rows).map(x=>({label:trim(x?.Producto),units:round(x?.Unidades,3),amount:v26Money(x?.Importe)})).filter(x=>x.label);
-  const compact=v314CompactEvidenceRows(rows,40);
-  return{kind:'product_set',source:'event_purchase_lines',filterProduct:trim(r?.facts?.product),totalAmount:Number.isFinite(Number(r?.facts?.total_amount))?v26Money(r?.facts?.total_amount):compact.totalAmount,totalUnits:compact.totalUnits,recordCount:num(r?.facts?.purchase_line_count),productCount:num(r?.facts?.product_count)||compact.distinctCount,distinctCount:compact.distinctCount,rows:compact.rows,complete:compact.complete};
+  const compact=v314CompactEvidenceRows(rows,40),ordered=[...rows].sort((a,b)=>num(a.amount)-num(b.amount)||a.label.localeCompare(b.label,'es'));
+  // Los extremos se calculan ANTES de truncar la evidencia que viaja entre turnos. Así un
+  // seguimiento «el más caro / el más barato» es exacto aunque haya 80 productos y solo se
+  // conserven 40 filas para contexto.
+  const extrema={min:ordered[0]||null,max:ordered[ordered.length-1]||null};
+  return{kind:'product_set',source:'event_purchase_lines',filterProduct:trim(r?.facts?.product),totalAmount:Number.isFinite(Number(r?.facts?.total_amount))?v26Money(r?.facts?.total_amount):compact.totalAmount,totalUnits:compact.totalUnits,recordCount:num(r?.facts?.purchase_line_count),productCount:num(r?.facts?.product_count)||compact.distinctCount,distinctCount:compact.distinctCount,rows:compact.rows,complete:compact.complete,extrema};
 }
 function v314DonationEvidence(r){
   if(!r)return null;
@@ -8428,6 +8433,33 @@ function v314DonationEvidence(r){
   const compact=v314CompactEvidenceRows(rows,40);
   const canonicalTotal=Number(r?.facts?.total_value??r?.facts?.donations_value??r?.facts?.total_amount);
   return{kind:'product_set',source:trim(r?.name)||'donations',totalAmount:Number.isFinite(canonicalTotal)?v26Money(canonicalTotal):compact.totalAmount,totalUnits:compact.totalUnits,recordCount:num(r?.facts?.donation_line_count)||compact.rowCount,productCount:compact.distinctCount,distinctCount:compact.distinctCount,rows:compact.rows,complete:compact.complete};
+}
+
+function v326DocumentationEvidence(r){
+  if(!r)return null;
+  const f=r?.facts||{},tickets=arr(arr(r?.tables).find(t=>trim(t?.key)==='purchase_tickets')?.rows),docs=arr(arr(r?.tables).find(t=>trim(t?.key)==='documents')?.rows),incomes=arr(arr(r?.tables).find(t=>trim(t?.key)==='income_receipts')?.rows);
+  return{kind:'documentation_set',incomeRecords:num(f.income_records),incomeWithReceipt:num(f.income_with_receipt),tickets:num(f.purchase_tickets),ticketsWithImage:num(f.purchase_tickets_with_image),documents:num(f.documents),documentsWithAttachment:num(f.documents_with_attachment),missing:num(f.missing_evidence_count),ticketCodesWithImage:tickets.filter(x=>trim(x?.Ticket)==='Sí').map(x=>trim(x?.TKxx)).filter(Boolean),documentCodes:docs.map(x=>trim(x?.Documento)).filter(Boolean),documentCodesWithAttachment:docs.filter(x=>trim(x?.Adjunto)==='Sí').map(x=>trim(x?.Documento)).filter(Boolean),incomeReceiptIds:incomes.filter(x=>trim(x?.Justificante)==='Sí').map(x=>trim(x?.Registro)||trim(x?.Persona)).filter(Boolean)};
+}
+function v326DocumentationDerivedFollowUp({userPrompt,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  const p=norm(userPrompt);let ctx=null;
+  for(const turn of arr(conversationHistory).slice(-5).reverse()){
+    const c=turn?.resultContext;if(c&&trim(c?.domain)==='documentation'&&c?.evidence?.kind==='documentation_set'){ctx=c;break;}
+    if(c&&['comparison','person','purchases','donations','bank','attendance','management'].includes(trim(c?.domain)))break;
+  }
+  if(!ctx)return null;const e=ctx.evidence||{},event=trim(ctx.event),trace=detail=>zuzuTracePush(flowTrace,'v1.0_exp · Seguimiento documental canónico','OK',detail);
+  if(/\b(?:tickets?|tkxx|fototickets?)\b/.test(p)&&/\b(?:imagen|foto|fototicket|documentad)\w*/.test(p)){
+    const codes=arr(e.ticketCodesWithImage).filter(Boolean);trace(`Se reutiliza la lista completa de ${codes.length} TKxx con imagen del último event_documentation.`);
+    return v281LocalResponse({title:`Fototickets · ${event}`,answer:`Tienen imagen ${codes.length} TKxx${event?` en ${event}`:''}: ${codes.join(', ')||'ninguno'}.`,results:[],flowTrace,previousInteractionId,traceDirect:false,resultContext:{...ctx,derived:{operation:'documentation_tickets_with_image',value:codes.length}}});
+  }
+  if(/\b(?:doc(?:umentos?)?|documentos?)\b/.test(p)){
+    const codes=arr(e.documentCodes).filter(Boolean),attached=arr(e.documentCodesWithAttachment).filter(Boolean);trace(`Se reutilizan ${codes.length} DOC del último event_documentation; adjuntos=${attached.length}.`);
+    return v281LocalResponse({title:`Documentos · ${event}`,answer:`Constan ${codes.length} documentos${event?` en ${event}`:''}: ${codes.join(', ')||'ninguno'}. ${attached.length} tienen adjunto.`,results:[],flowTrace,previousInteractionId,traceDirect:false,resultContext:{...ctx,derived:{operation:'documentation_documents',value:attached.length}}});
+  }
+  if(/\b(?:ingresos?|registros?)\b/.test(p)&&/\bjustificant\w*/.test(p)){
+    trace(`Se reutiliza el recuento documental canónico: ${num(e.incomeWithReceipt)} ingresos con justificante.`);
+    return v281LocalResponse({title:`Justificantes de ingreso · ${event}`,answer:`Hay ${num(e.incomeWithReceipt)} registros de ingreso con justificante${event?` en ${event}`:''}, sobre ${num(e.incomeRecords)} registros de ingreso.`,results:[],flowTrace,previousInteractionId,traceDirect:false,resultContext:{...ctx,derived:{operation:'documentation_income_receipts',value:num(e.incomeWithReceipt)}}});
+  }
+  return null;
 }
 
 function v325ComparisonEvidence(result){
@@ -8475,6 +8507,7 @@ function v310InteractionResultContext(userPrompt='',results=[],eventFocus=null,p
     const base={domain,event:trim(r?.facts?.event)||trim(eventFallback),focus:domain};
     if(domain==='purchases')base.evidence=v314PurchaseEvidence(r);
     if(domain==='donations')base.evidence=v314DonationEvidence(r);
+    if(domain==='documentation')base.evidence=v326DocumentationEvidence(r);
     return base;
   };
   if(compare){const names=arr(compare?.facts?.event_names).map(trim).filter(Boolean),evidence=v325ComparisonEvidence(compare);if(names.length>=2)return{domain:'comparison',eventNames:names,event:'',focus:'events',...(evidence?{evidence}: {})};}
@@ -8577,10 +8610,11 @@ function v311DerivedFollowUp({userPrompt,conversationHistory=[],eventFocus=null,
     trace(`CONTEO reutiliza el último conjunto factual: ${distinct} elementos distintos.`);
     return v281LocalResponse({title:`Conteo${event?` · ${event}`:''}`,answer:`Son ${distinct} productos distintos${scope}.`,results:[],flowTrace,previousInteractionId,traceDirect:false,resultContext:{...baseCtx,derived:{operation:'count',value:distinct}}});
   }
-  if((op==='max'||op==='min')&&rows.length&&evidence.complete!==false){
-    const sorted=[...rows].sort((a,b)=>num(a.amount)-num(b.amount)||a.label.localeCompare(b.label,'es')),row=op==='max'?sorted[sorted.length-1]:sorted[0];
-    trace(`${op==='max'?'MÁXIMO':'MÍNIMO'} se calcula sobre ${rows.length} filas canónicas ya disponibles.`);
-    return v281LocalResponse({title:`${op==='max'?'Mayor':'Menor'} importe${event?` · ${event}`:''}`,answer:`${row.label}: ${v26FormatEuro(row.amount)}${Number.isFinite(Number(row.units))&&num(row.units)!==0?` (${v26FormatPlainNumber(row.units)} unidades)`:''}.`,results:[],flowTrace,previousInteractionId,traceDirect:false,resultContext:{...baseCtx,derived:{operation:op,label:row.label,value:row.amount}}});
+  if(op==='max'||op==='min'){
+    const exact=evidence?.extrema?.[op]||null;
+    const sorted=(!exact&&rows.length&&evidence.complete!==false)?[...rows].sort((a,b)=>num(a.amount)-num(b.amount)||a.label.localeCompare(b.label,'es')):[];
+    const row=exact||(sorted.length?(op==='max'?sorted[sorted.length-1]:sorted[0]):null);
+    if(row){trace(`${op==='max'?'MÁXIMO':'MÍNIMO'} se calcula sobre el conjunto canónico completo${evidence.complete===false?' antes de compactarlo':''}.`);return v281LocalResponse({title:`${op==='max'?'Mayor':'Menor'} importe${event?` · ${event}`:''}`,answer:`${row.label}: ${v26FormatEuro(row.amount)}${Number.isFinite(Number(row.units))&&num(row.units)!==0?` (${v26FormatPlainNumber(row.units)} unidades)`:''}.`,results:[],flowTrace,previousInteractionId,traceDirect:false,resultContext:{...baseCtx,derived:{operation:op,label:row.label,value:row.amount}}});}
   }
   if((op==='sort_asc'||op==='sort_desc'||op==='list')&&rows.length&&evidence.complete!==false){
     const ordered=op==='list'?[...rows]:[...rows].sort((a,b)=>(op==='sort_desc'?-1:1)*(num(a.amount)-num(b.amount))||a.label.localeCompare(b.label,'es'));
@@ -8904,7 +8938,8 @@ function v304BankFilterFollowUp(userPrompt='',conversationHistory=[]){
   const p=norm(userPrompt),recent=arr(conversationHistory).slice(-7).map(t=>norm(`${t?.user||''} ${t?.assistant||''}`)).join(' ');
   const bankRecent=/\b(banco|bancari\w*|movimientos?|cuadre|conciliacion|conciliación|cargos?|abonos?|tickets?\s+vinculad)\b/.test(recent);
   const filter=/\b(solo\s+los?\s+cargos?|ahora\s+los?\s+abonos?|abonos?|cargos?|cu[aá]les\s+tienen\s+ticket|tickets?\s+vinculad|sin\s+justificante|sin\s+justificaci[oó]n|justificados?\s+con\s+tickets?)\b/.test(p);
-  return bankRecent&&filter;
+  const status=/\b(?:estan|están|quedan|son)\b[^.]{0,70}\bjustificad\w*\b|\b(?:todos?|los)\s+movimientos?\b[^.]{0,70}\bjustificad\w*/.test(p);
+  return bankRecent&&(filter||status);
 }
 async function v304PrefetchBankFollowUp({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[]}){
   if(!v304BankFilterFollowUp(userPrompt,conversationHistory))return null;
@@ -8945,6 +8980,13 @@ function v304DeterministicBankFilterAnswer(userPrompt='',grounding=null){
   });
   const total=filtered.reduce((a,r)=>a+Math.abs(num(r?.Importe)),0);
   return `Estos son los ${label} que cumplen el filtro (${filtered.length}; total ${v26FormatEuro(total)}):\n${lines.join('\n')}`;
+}
+
+function v326DeterministicBankStatusAnswer(userPrompt='',grounding=null){
+  const r=grounding?.result,p=norm(userPrompt);if(!r||!/\bjustificad\w*/.test(p)||!/\bmovim\w*/.test(p))return'';
+  const f=r?.facts||{},total=num(f.included_movement_count),justified=num(f.justified_movement_count),unlinked=num(f.unlinked_movement_count),impact=num(f.bank_impact),event=trim(f.event)||'este evento';
+  if(!total)return `No hay movimientos bancarios incluidos en el Cuadre Banco de ${event}.`;
+  return unlinked===0?`Sí. Los ${total} movimientos bancarios incluidos de ${event} constan justificados; impacto del periodo: ${v26FormatEuro(impact)}.`:`No completamente. De ${total} movimientos bancarios incluidos de ${event}, ${justified} constan justificados y ${unlinked} quedan sin vínculo justificativo registrado; impacto del periodo: ${v26FormatEuro(impact)}.`;
 }
 
 function v304EnsurePersonalOpening(answer,context={}){
@@ -9045,6 +9087,8 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   if(bankFollowUpGrounding?.result)allResults.push(bankFollowUpGrounding.result);
   // FIX2.2 se limita al canal escrito mientras congelamos el cerebro: voz queda exactamente igual.
   if(!voiceConversation){
+    const bankStatus=v326DeterministicBankStatusAnswer(userPrompt,bankFollowUpGrounding);if(bankStatus)return v281LocalResponse({title:`Cuadre Banco · ${trim(bankFollowUpGrounding?.result?.facts?.event)||''}`,answer:bankStatus,results:[bankFollowUpGrounding.result],flowTrace,previousInteractionId:currentId,traceDirect:false,resultContext:{domain:'bank',event:trim(bankFollowUpGrounding?.result?.facts?.event),focus:'justification'}});
+    const documentationDerived=v326DocumentationDerivedFollowUp({userPrompt,conversationHistory,flowTrace,previousInteractionId:currentId});if(documentationDerived)return documentationDerived;
     const compareDerived=v325ComparisonDerivedFollowUp({userPrompt,conversationHistory,flowTrace,previousInteractionId:currentId});if(compareDerived)return compareDerived;
     const derived=v311DerivedFollowUp({userPrompt,conversationHistory,eventFocus,flowTrace,previousInteractionId:currentId});if(derived)return derived;
     const personDirect=v325PersonGroundingDirect({userPrompt,grounding:personalGrounding,conversationHistory,flowTrace,previousInteractionId:currentId});if(personDirect)return personDirect;
@@ -9261,6 +9305,13 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     }
   }
   final={...final,answer:v29SanitizeAnswerMarkup(final.answer)};
+  // Última red de seguridad: algunos saneos pueden retirar por completo una respuesta generada.
+  // Si existen resultados canónicos del mismo turno, reconstruimos una salida factual en lugar de
+  // devolver un globo vacío al usuario.
+  if(!trim(final.answer)&&allResults.some(r=>r?.ok)){
+    const closure=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
+    if(closure?.answer){final={...final,...closure,answer:v29SanitizeAnswerMarkup(closure.answer)};resetInteractionId=true;zuzuTracePush(flowTrace,'v1.0_exp · Rescate final de respuesta vacía','WARN','La prosa quedó vacía tras el saneo; se reconstruye desde las herramientas canónicas ya ejecutadas.');}
+  }
   if((dataAccessReq.tableOnly||dataAccessReq.groupSegmentDestination)&&(dataAccessReq.catalogEntity||dataAccessReq.purchaseDetail)&&trim(final.answer).length>700)final={...final,answer:'Aquí tienes la tabla solicitada, ordenada y totalizada según tu petición.'};
   final={...final,showTables:requiredShowTables.concat(existingShowTables.filter(x=>!requiredShowTables.some(r=>trim(r?.tool_id)===trim(x?.tool_id)&&trim(r?.table_key)===trim(x?.table_key)))).slice(0,8)};
   if(voiceConversation){
@@ -10767,6 +10818,19 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
   const earlyComparisonEvents=v285ComparisonEventNames(state,userPrompt,conversationHistory);
   if(v285ComparisonRequest(userPrompt,conversationHistory,earlyComparisonEvents)){
     return v285DirectMultiEventComparison({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId,eventNames:earlyComparisonEvents});
+  }
+
+  // Cuadre Banco explícito: es una consulta estructurada de CE, no una petición para que Gemini
+  // adivine qué módulo usar. Se materializa siempre desde event_bank.
+  if(/\bcuadre\s+(?:de\s+)?banco\b|\bcuadre\s+bancari\w*/.test(p)){
+    return v283DirectBankReport({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
+  }
+
+  // Compras de una tienda sin evento nombrado = histórico transversal de esa tienda.
+  const storeMention=v29OrderedCatalogMentions(state,userPrompt).find(x=>x.kind==='store');
+  if(storeMention&&/\b(compr\w*|gastos?)\b/.test(p)&&!v314ResolveEventMention(state,userPrompt,conversationHistory)&&!/\bdonaci\w*/.test(p)){
+    const store=await v26ToolStorePurchases({id:'v326_direct_store_all_events',name:'store_purchases',store:storeMention.name,scope:'all_events',status:'realized',include_empty:false,detail:'full'},state,selectedEventId),f=store?.facts||{};
+    return v281LocalResponse({title:`Compras · ${f.store||storeMention.name}`,answer:`En ${f.store||storeMention.name} constan ${v26CountPhrase(f.total_records||0,'registro de compra','registros de compra')} realizados en ${v26CountPhrase(f.event_count||0,'evento','eventos')}, por un total de ${v26FormatEuro(f.total_amount||0)}.`,results:[store],showTables:[{tool_id:store.id,table_key:'by_event'}],flowTrace,previousInteractionId,resultContext:{domain:'purchases',store:f.store||storeMention.name,event:'',focus:'store_all_events'}});
   }
 
   // v1.0_exp · el planificador transaccional estricto tiene prioridad sobre rutas
