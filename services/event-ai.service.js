@@ -3517,12 +3517,14 @@ MAPEO_DE_DOMINIO:
 - CONCILIACION_BANCARIA = ce_bank_movements + ce_bank_ticket_links + ce_bank_income_links + ce_bank_event_settings + ce_bank_event_movement_state. Los lotes CSV están en ce_bank_import_batches.
 
 SEMANTICA_CONTROL_EVENT:
-- ce_bank_event_settings define el período bancario inclusivo de cada evento.
+- ce_bank_event_settings define el período bancario inclusivo de cada evento, PERO una fila con updated_by=INICIALIZACION_AUTOMATICA solo prepara la ventana y NO acredita que exista un Cuadre Banco real.
+- CUADRE BANCO REAL: solo existe para Zuzu si ControlEvent confirma configuración/evidencia específica del evento (periodo guardado manualmente, ce_bank_event_movement_state, ce_bank_ticket_links o ce_bank_income_links). Si no existe, responde que no consta Cuadre Banco para ese evento.
+- PROHIBIDO reconstruir un Cuadre Banco desde el histórico general de ce_bank_movements. El primer/último saldo del histórico NO son saldo inicial/final del evento y no deben presentarse como tales si el cuadre no está configurado.
 - ce_bank_event_movement_state.included es la decisión «En saldo» específica del evento y prevalece sobre ce_bank_movements.included.
 - ce_bank_ticket_links enlaza exclusivamente TKxx del evento con movimientos bancarios. forced_square=true significa cuadre aceptado manualmente y cuenta como justificado igual que un cuadre exacto.
 - ce_bank_movements.amount > 0 es un abono/entrada. Se justifica con registros bancarios de ce_colaboradores; la asociación manual corregida se guarda en ce_bank_income_links y prevalece sobre la asociación automática por importe, nombre y fecha.
 - Para saber si todos los TKxx están conciliados, compara los TKxx contables de ce_compras del evento con ce_bank_ticket_links del mismo event_id.
-- El saldo inicial del evento es saldo_banco del movimiento más antiguo menos su importe; el saldo final calculado aplica cronológicamente solo movimientos En saldo.
+- Solo cuando ControlEvent confirme un Cuadre Banco real puede calcularse el saldo inicial del periodo como saldo_banco del primer movimiento incluido menos su importe y el saldo final aplicando cronológicamente los movimientos «En saldo».
 
 - ce_colaboradores.numero = número de personas asociadas al colaborador. En parejas normalmente 2; en exentos puede ser 0.
 - Las fechas fecha_minima/fecha_maxima de ce_hitos son calculadas desde sus LG. Para el detalle operativo usa ce_lg.
@@ -7460,16 +7462,35 @@ function v261EventManagementTool(tool,state,selectedEventId=''){
   })();
 }
 
+function v261BankUnavailableResult(tool,rr,bank={}){
+  const rec=bank?.reconciliation||{};
+  return{
+    id:tool.id,name:tool.name,ok:true,title:`Cuadre bancario · ${rr.nombre}`,
+    facts:{
+      event:rr.nombre,
+      has_bank_reconciliation:false,
+      reconciliation_status:trim(rec?.status)||'NO_CONFIGURADO',
+      bank_data_available:false,
+      note:'No consta un Cuadre Banco explícitamente configurado para este evento. El histórico general de movimientos bancarios no se atribuye al evento y no se usa para deducir saldo inicial, saldo final, movimientos ni impacto.'
+    },
+    tables:[]
+  };
+}
 async function v261EventBankTool(tool,state,selectedEventId=''){
   const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
   const bank=await exportBankData({accountId:'TODOS',eventId:rr.id});
+  if(bank?.reconciliation?.hasExplicitReconciliation!==true)return v261BankUnavailableResult(tool,rr,bank);
   const ev=rr.row||{},period=bank?.period||{},summary=bank?.summary||{};
   const eventStart=v272DateOnly(ev?.fechaIni),eventEnd=v272DateOnly(ev?.fechaFin);
   const periodStart=v272DateOnly(period?.dateFrom),periodEnd=v272DateOnly(period?.dateTo);
   const relation=v272PeriodRelation(ev?.fechaIni,ev?.fechaFin,period?.dateFrom,period?.dateTo);
-  const rawMovements=arr(bank?.movements);
+  // Zuzu no debe convertir todos los movimientos del periodo en movimientos del evento.
+  // El API de Cuadre Banco también devuelve candidatos del histórico para que la UI pueda
+  // revisarlos; aquí conservamos EXCLUSIVAMENTE movimientos con evidencia específica del evento.
+  const periodCandidateMovements=arr(bank?.movements);
+  const rawMovements=periodCandidateMovements.filter(x=>x?.included!==false&&v271BankMovementEvidence(x).length>0);
   const movementJustification=x=>{
-    const amount=v26Money(x?.amount||x?.importe),ticketLinks=arr(x?.links),incomeLinks=arr(x?.incomeLinks),parts=[];
+    const amount=v26Money(x?.amount||x?.importe),ticketLinks=arr(x?.links),incomeLinks=arr(x?.incomeLinks).filter(link=>link?.manual===true||trim(link?.linkId)),parts=[];
     if(amount>0&&incomeLinks.length){
       const items=incomeLinks.map(link=>{
         const who=trim(link?.personName)||'Ingreso';
@@ -7499,13 +7520,15 @@ async function v261EventBankTool(tool,state,selectedEventId=''){
   const includedChargeTotal=v26Money(included.filter(x=>num(x?.amount||x?.importe)<0).reduce((a,x)=>a+Math.abs(num(x?.amount||x?.importe)),0));
   const justifiedMovementCount=included.filter(x=>movementJustification(x)!=='Sin vínculo justificativo registrado').length;
   const ticketLinkedMovementCount=included.filter(x=>arr(x?.links).length>0).length;
-  const incomeLinkedMovementCount=included.filter(x=>arr(x?.incomeLinks).length>0).length;
-  const openingBalance=v26Money(summary?.openingBalance);
+  const incomeLinkedMovementCount=included.filter(x=>arr(x?.incomeLinks).some(link=>link?.manual===true||trim(link?.linkId))).length;
+  const openingBalance=v271ExplicitBankOpeningBalance(included);
   let impact=0;
   const timeline=included.map((x,index)=>{
     const amount=v26Money(x?.amount||x?.importe),type=amount>0?'INGRESO':amount<0?'CARGO':'NEUTRO';impact=v26Money(impact+amount);
     const dt=trim(x?.executedAt||x?.executed_at||x?.fecha),isoDate=v272DateOnly(dt),short=isoDate?`${isoDate.slice(8,10)}/${isoDate.slice(5,7)}/${isoDate.slice(0,4)}${dt.length>10?' '+dt.slice(11,16):''}`:dt;
-    const ledgerBalance=Number.isFinite(Number(x?.eventBalanceAfter))?v26Money(x.eventBalanceAfter):v26Money(openingBalance+impact);
+    // eventBalanceAfter del servicio puede incorporar candidatos históricos no atribuibles
+    // al evento. La serie de Zuzu se recalcula solo con el conjunto explícito del Cuadre.
+    const ledgerBalance=v26Money(openingBalance+impact);
     const justification=movementJustification(x);
     const detail=[short||dt,trim(x?.description||x?.concept||x?.concepto),justification,`Saldo ${v26FormatEuro(ledgerBalance)}`].filter(Boolean).join(' · ');
     return {Orden:index+1,Momento:short||dt,Fecha:dt,Tipo:type,Movimiento:amount,'Impacto bancario acumulado':impact,'Saldo bancario del periodo':ledgerBalance,Concepto:trim(x?.description||x?.concept||x?.concepto),Justificación:justification,Detalle:detail,Evidencia:justification};
@@ -7520,7 +7543,7 @@ async function v261EventBankTool(tool,state,selectedEventId=''){
   const eventWindowIncomeTotal=v26Money(eventWindowTimeline.filter(r=>num(r?.Movimiento)>0).reduce((a,r)=>a+num(r.Movimiento),0));
   const eventWindowChargeTotal=v26Money(eventWindowTimeline.filter(r=>num(r?.Movimiento)<0).reduce((a,r)=>a+Math.abs(num(r.Movimiento)),0));
   const timelineSchema={Orden:v26CountSchema('movimientos'),Momento:v26TextSchema('Fecha/hora abreviada para eje X'),Fecha:v26DateSchema('Fecha/hora bancaria'),Tipo:v26StatusSchema('INGRESO, CARGO o NEUTRO'),Movimiento:v26MoneySchema('Movimiento bancario firmado'),'Impacto bancario acumulado':v26MoneySchema('Variación acumulada de movimientos incluidos'),'Saldo bancario del periodo':v26MoneySchema('Saldo bancario tras cada movimiento incluido'),Concepto:v26TextSchema('Concepto bancario'),Justificación:v26TextSchema('Ingreso o TKxx que justifica el movimiento'),Detalle:v26TextSchema('Fecha, concepto, justificación y saldo para presentación'),Evidencia:v26TextSchema('Alias compatible de la justificación')};
-  return{id:tool.id,name:tool.name,ok:true,title:`Cuadre bancario · ${rr.nombre}`,facts:{event:rr.nombre,event_start:eventStart,event_end:eventEnd,period:bank?.period||null,period_start:periodStart,period_end:periodEnd,period_relation_to_event:relation.status,period_relation_reason:relation.reason,summary:bank?.summary||null,ticket_summary:bank?.ticketSummary||null,movement_count:movements.length,included_movement_count:included.length,excluded_movement_count:Math.max(0,rawMovements.length-included.length),link_count:links.length,opening_balance:openingBalance,closing_balance:v26Money(closingBalance),bank_impact:v26Money(timeline.length?timeline[timeline.length-1]['Impacto bancario acumulado']:0),included_income_total:includedIncomeTotal,included_charge_total:includedChargeTotal,justified_movement_count:justifiedMovementCount,unlinked_movement_count:Math.max(0,included.length-justifiedMovementCount),ticket_linked_movement_count:ticketLinkedMovementCount,income_linked_movement_count:incomeLinkedMovementCount,event_window_movement_count:eventWindowTimeline.length,event_window_opening_balance:eventWindowOpening,event_window_closing_balance:eventWindowClosing,event_window_impact:v26Money(eventWindowImpact),event_window_income_total:eventWindowIncomeTotal,event_window_charge_total:eventWindowChargeTotal,event_window_has_movements:eventWindowTimeline.length>0,note:'El Cuadre Banco es la fuente primaria para la conciliación del evento. event_window_timeline contiene exclusivamente movimientos cuya fecha cae entre el inicio y el fin del evento; si está vacío, no debe sustituirse por el histórico.'},facts_schema:{opening_balance:v26MoneySchema('Saldo bancario al inicio del periodo conciliado'),closing_balance:v26MoneySchema('Saldo bancario calculado al final de los movimientos incluidos'),bank_impact:v26MoneySchema('Variación algebraica de los movimientos incluidos; no es saldo operativo'),event_window_opening_balance:v26MoneySchema('Saldo bancario inmediatamente anterior al primer movimiento dentro de las fechas del evento'),event_window_closing_balance:v26MoneySchema('Saldo bancario tras el último movimiento dentro de las fechas del evento'),event_window_impact:v26MoneySchema('Variación algebraica exclusivamente dentro de las fechas del evento')},tables:[
+  return{id:tool.id,name:tool.name,ok:true,title:`Cuadre bancario · ${rr.nombre}`,facts:{event:rr.nombre,has_bank_reconciliation:true,reconciliation_status:included.length?'CONFIGURADO':'CONFIGURADO_SIN_MOVIMIENTOS_EXPLICITOS',bank_data_available:included.length>0,event_start:eventStart,event_end:eventEnd,period:bank?.period||null,period_start:periodStart,period_end:periodEnd,period_relation_to_event:relation.status,period_relation_reason:relation.reason,summary:{openingBalance,calculatedBalance:v26Money(closingBalance),eventVariation:v26Money(timeline.length?timeline[timeline.length-1]['Impacto bancario acumulado']:0),movementCount:included.length,includedCount:included.length,excludedCount:0,income:includedIncomeTotal,expense:includedChargeTotal},ticket_summary:bank?.ticketSummary||null,period_candidate_movement_count:periodCandidateMovements.length,movement_count:movements.length,included_movement_count:included.length,excluded_movement_count:0,link_count:links.length,opening_balance:openingBalance,closing_balance:v26Money(closingBalance),bank_impact:v26Money(timeline.length?timeline[timeline.length-1]['Impacto bancario acumulado']:0),included_income_total:includedIncomeTotal,included_charge_total:includedChargeTotal,justified_movement_count:justifiedMovementCount,unlinked_movement_count:Math.max(0,included.length-justifiedMovementCount),ticket_linked_movement_count:ticketLinkedMovementCount,income_linked_movement_count:incomeLinkedMovementCount,event_window_movement_count:eventWindowTimeline.length,event_window_opening_balance:eventWindowOpening,event_window_closing_balance:eventWindowClosing,event_window_impact:v26Money(eventWindowImpact),event_window_income_total:eventWindowIncomeTotal,event_window_charge_total:eventWindowChargeTotal,event_window_has_movements:eventWindowTimeline.length>0,note:'Zuzu usa únicamente movimientos con evidencia explícita del evento (selección por evento, TKxx vinculado o ingreso vinculado manualmente). Los demás movimientos del periodo son candidatos de revisión de la UI y nunca se cuentan ni se usan para deducir saldos del Cuadre.'},facts_schema:{opening_balance:v26MoneySchema('Saldo de referencia inmediatamente anterior al primer movimiento explícito del Cuadre'),closing_balance:v26MoneySchema('Saldo calculado aplicando solo los movimientos explícitos del Cuadre'),bank_impact:v26MoneySchema('Variación algebraica de los movimientos explícitos; no es saldo operativo'),event_window_opening_balance:v26MoneySchema('Saldo de referencia antes del primer movimiento explícito dentro de las fechas del evento'),event_window_closing_balance:v26MoneySchema('Saldo calculado tras el último movimiento explícito dentro de las fechas del evento'),event_window_impact:v26MoneySchema('Variación algebraica exclusivamente de movimientos explícitos dentro de las fechas del evento')},tables:[
     v26Table('event_window_timeline',`Movimientos bancarios entre fechas del evento · ${rr.nombre}`,eventWindowTimeline,timelineSchema),
     v26Table('reconciliation_timeline',`Conciliación bancaria · ${rr.nombre}`,timeline,timelineSchema),
     {...v26Table('reconciliation_justified_movements',`Movimientos y justificación de la conciliación · ${rr.nombre}`,timeline,timelineSchema),chartable:false},
@@ -7553,35 +7576,41 @@ function v271BankMovementEvidence(row){
   if((row?.incomeAssociationMode==='MANUAL'||num(row?.manualIncomeLinkCount)>0)&&arr(row?.incomeLinks).length)bits.push('ingreso vinculado manualmente al evento');
   return bits;
 }
+function v271ExplicitBankOpeningBalance(rows=[]){
+  const sorted=arr(rows).slice().sort((a,b)=>trim(a?.executedAt||a?.executed_at||a?.fecha).localeCompare(trim(b?.executedAt||b?.executed_at||b?.fecha))||trim(a?.id).localeCompare(trim(b?.id)));
+  const firstByAccount=new Map();
+  for(const row of sorted){const key=trim(row?.accountId||row?.account_id)||'SIN_CUENTA';if(!firstByAccount.has(key))firstByAccount.set(key,row);}
+  return v26Money([...firstByAccount.values()].reduce((sum,row)=>{const bal=Number(row?.bankBalance??row?.bank_balance),amt=Number(row?.amount??row?.importe);return sum+(Number.isFinite(bal)&&Number.isFinite(amt)?bal-amt:0);},0));
+}
 async function v271EventBankTimelineTool(tool,state,selectedEventId=''){
   const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
   const bank=await exportBankData({accountId:'TODOS',eventId:rr.id});
+  if(bank?.reconciliation?.hasExplicitReconciliation!==true)return v261BankUnavailableResult(tool,rr,bank);
   const ev=rr.row||{},period=bank?.period||{},summary=bank?.summary||{};
   const eventStart=v272DateOnly(ev?.fechaIni),eventEnd=v272DateOnly(ev?.fechaFin);
   const periodStart=v272DateOnly(period?.dateFrom),periodEnd=v272DateOnly(period?.dateTo);
   const relation=v272PeriodRelation(ev?.fechaIni,ev?.fechaFin,period?.dateFrom,period?.dateTo);
   const all=arr(bank?.movements).filter(x=>x?.included!==false).slice().sort((a,b)=>trim(a?.executedAt).localeCompare(trim(b?.executedAt))||trim(a?.id).localeCompare(trim(b?.id)));
   const evidence=all.filter(row=>v271BankMovementEvidence(row).length>0);
-  // Política genérica de calidad: si sabemos que los periodos NO se solapan, evitamos mezclar
-  // movimientos sin evidencia del evento. Si el solape es correcto usamos el ledger «En saldo».
-  // Si las fechas no pueden validarse, conservamos la evidencia específica cuando existe y dejamos
-  // la incertidumbre explícita en facts, sin convertir un fallo de parseo en «no solapa».
-  const chosen=relation.status==='overlap'?all:(relation.status==='disjoint'?evidence:(evidence.length?evidence:all));
-  const openingBalance=v26Money(summary?.openingBalance);
+  // La cronología de Zuzu nunca usa todos los movimientos del periodo por el mero hecho de
+  // coincidir en fechas. Solo entran movimientos con evidencia específica del evento.
+  const chosen=evidence;
+  const openingBalance=v271ExplicitBankOpeningBalance(chosen);
   let impact=0;
   const rows=chosen.map((x,index)=>{
     const amount=v26Money(x?.amount),type=amount>0?'INGRESO':amount<0?'CARGO':'NEUTRO';impact=v26Money(impact+amount);
     const dt=trim(x?.executedAt),isoDate=v272DateOnly(dt),short=isoDate?`${isoDate.slice(8,10)}/${isoDate.slice(5,7)}/${isoDate.slice(0,4)}${dt.length>10?' '+dt.slice(11,16):''}`:dt;
-    const ledgerBalance=Number.isFinite(Number(x?.eventBalanceAfter))?v26Money(x.eventBalanceAfter):v26Money(openingBalance+impact);
+    const ledgerBalance=v26Money(openingBalance+impact);
     return {Orden:index+1,Momento:short||dt,Fecha:dt,Tipo:type,Movimiento:amount,'Impacto bancario acumulado':impact,'Saldo bancario del periodo':ledgerBalance,Concepto:trim(x?.description||x?.concept||x?.concepto),Evidencia:v271BankMovementEvidence(x).join(' + ')||(relation.status==='overlap'?'En saldo dentro del periodo configurado':'Sin evidencia específica')};
   });
   const incomes=v26Money(rows.filter(r=>r.Tipo==='INGRESO').reduce((a,r)=>a+num(r.Movimiento),0));
   const charges=v26Money(rows.filter(r=>r.Tipo==='CARGO').reduce((a,r)=>a+Math.abs(num(r.Movimiento)),0));
   let qualityIssue='';
-  if(relation.status==='disjoint') qualityIssue=`El periodo bancario configurado (${periodStart||'?'} a ${periodEnd||'?'}) no solapa las fechas del evento (${eventStart||'?'} a ${eventEnd||'?'}). La cronología prioriza movimientos con evidencia específica del evento.`;
-  else if(relation.status==='unknown') qualityIssue='No se ha podido validar de forma determinista el solape entre fechas del evento y periodo bancario. ControlEvent no interpreta esta incertidumbre como «no solapa» y conserva la evidencia disponible.';
+  if(!rows.length) qualityIssue='Existe configuración del Cuadre Banco, pero no hay movimientos explícitamente asociados al evento. No se usa el histórico general como sustituto.';
+  else if(relation.status==='disjoint') qualityIssue=`El periodo bancario configurado (${periodStart||'?'} a ${periodEnd||'?'}) no solapa las fechas del evento (${eventStart||'?'} a ${eventEnd||'?'}). Solo se muestran movimientos con evidencia específica del evento.`;
+  else if(relation.status==='unknown') qualityIssue='No se ha podido validar de forma determinista el solape entre fechas del evento y periodo bancario; la cronología conserva únicamente movimientos con evidencia específica.';
   const closingBalance=rows.length?num(rows[rows.length-1]['Saldo bancario del periodo']):openingBalance;
-  return{id:tool.id,name:tool.name,ok:true,title:`Cronología bancaria · ${rr.nombre}`,facts:{event:rr.nombre,event_start:eventStart,event_end:eventEnd,bank_period_start:periodStart,bank_period_end:periodEnd,bank_period_relation:relation.status,bank_period_relation_reason:relation.reason,bank_period_plausible:relation.status!=='disjoint',raw_included_movement_count:all.length,event_evidence_movement_count:evidence.length,timeline_movement_count:rows.length,opening_balance:openingBalance,closing_balance:v26Money(closingBalance),income_total_bank:incomes,charge_total_bank:charges,bank_impact:v26Money(rows.length?rows[rows.length-1]['Impacto bancario acumulado']:0),data_quality_note:qualityIssue||'Las fechas del evento y el periodo bancario se solapan. La cronología usa los movimientos «En saldo» configurados para el evento.',rendering_complete:true,chart_instruction:'Para SALDO BANCARIO usa la tabla balance_timeline con Momento como etiqueta y Saldo bancario del periodo como valor. Para IMPACTO/VARIACIÓN atribuida a los movimientos usa Impacto bancario acumulado, que parte de 0. Nunca presentes este impacto base 0 como saldo de la cuenta ni como saldo operativo del evento. Tipo sirve como marker_field.'},facts_schema:{timeline_movement_count:v26CountSchema('movimientos','Movimientos usados en la cronología'),opening_balance:v26MoneySchema('Saldo bancario al inicio del periodo del evento'),closing_balance:v26MoneySchema('Saldo bancario calculado al final de la cronología'),income_total_bank:v26MoneySchema('Abonos bancarios incluidos'),charge_total_bank:v26MoneySchema('Valor absoluto de cargos bancarios incluidos'),bank_impact:v26MoneySchema('Suma algebraica de los movimientos mostrados; variación, no saldo')},provenance:'ControlEvent · Cuadre Banco · cronología canónica',tables:[v26Table('balance_timeline',`Cronología bancaria · ${rr.nombre}`,rows,{Orden:v26CountSchema('movimientos'),Momento:v26TextSchema('Fecha/hora abreviada para eje X'),Fecha:v26DateSchema('Fecha/hora bancaria'),Tipo:v26StatusSchema('INGRESO, CARGO o NEUTRO'),Movimiento:v26MoneySchema('Movimiento bancario firmado'),'Impacto bancario acumulado':v26MoneySchema('Variación acumulada desde 0 de los movimientos mostrados; NO es saldo de cuenta'),'Saldo bancario del periodo':v26MoneySchema('Saldo del ledger bancario del evento, partiendo del saldo inicial del periodo'),Concepto:v26TextSchema('Concepto bancario'),Evidencia:v26TextSchema('Por qué el movimiento se considera del evento')})].filter(t=>t.rows.length)};
+  return{id:tool.id,name:tool.name,ok:true,title:`Cronología bancaria · ${rr.nombre}`,facts:{event:rr.nombre,has_bank_reconciliation:true,reconciliation_status:rows.length?'CONFIGURADO':'CONFIGURADO_SIN_MOVIMIENTOS_EXPLICITOS',bank_data_available:rows.length>0,event_start:eventStart,event_end:eventEnd,bank_period_start:periodStart,bank_period_end:periodEnd,bank_period_relation:relation.status,bank_period_relation_reason:relation.reason,bank_period_plausible:relation.status!=='disjoint',period_candidate_movement_count:all.length,raw_included_movement_count:all.length,event_evidence_movement_count:evidence.length,timeline_movement_count:rows.length,opening_balance:openingBalance,closing_balance:v26Money(closingBalance),income_total_bank:incomes,charge_total_bank:charges,bank_impact:v26Money(rows.length?rows[rows.length-1]['Impacto bancario acumulado']:0),data_quality_note:qualityIssue||'La cronología usa exclusivamente movimientos con evidencia explícita del evento; los candidatos del histórico general quedan fuera.',rendering_complete:true,chart_instruction:'Para SALDO BANCARIO usa la tabla balance_timeline con Momento como etiqueta y Saldo bancario del Cuadre como valor. Para IMPACTO/VARIACIÓN atribuida a los movimientos usa Impacto bancario acumulado, que parte de 0. Nunca presentes movimientos del histórico general sin evidencia del evento. Tipo sirve como marker_field.'},facts_schema:{timeline_movement_count:v26CountSchema('movimientos','Movimientos explícitos usados en la cronología'),opening_balance:v26MoneySchema('Saldo de referencia anterior al primer movimiento explícito'),closing_balance:v26MoneySchema('Saldo calculado aplicando solo movimientos explícitos'),income_total_bank:v26MoneySchema('Abonos explícitos incluidos'),charge_total_bank:v26MoneySchema('Valor absoluto de cargos explícitos incluidos'),bank_impact:v26MoneySchema('Suma algebraica de los movimientos explícitos; variación, no saldo')},provenance:'ControlEvent · Cuadre Banco · cronología explícita por evento',tables:[v26Table('balance_timeline',`Cronología bancaria · ${rr.nombre}`,rows,{Orden:v26CountSchema('movimientos'),Momento:v26TextSchema('Fecha/hora abreviada para eje X'),Fecha:v26DateSchema('Fecha/hora bancaria'),Tipo:v26StatusSchema('INGRESO, CARGO o NEUTRO'),Movimiento:v26MoneySchema('Movimiento bancario firmado'),'Impacto bancario acumulado':v26MoneySchema('Variación acumulada desde 0 de los movimientos explícitos; NO es saldo operativo'),'Saldo bancario del periodo':v26MoneySchema('Saldo calculado desde el primer movimiento explícito del Cuadre'),Concepto:v26TextSchema('Concepto bancario'),Evidencia:v26TextSchema('Por qué el movimiento pertenece al evento')})].filter(t=>t.rows.length)};
 }
 
 async function v261EventWeatherTool(tool,state,selectedEventId='',flowTrace=[]){
@@ -8566,7 +8595,7 @@ function v311DerivedAggregateRequest(userPrompt=''){
   if(/\b(cu[aá]ntas?\s+unidades|unidades\s+en\s+total|total\s+de\s+unidades)\b/.test(p))return'sum_units';
   if(/\b(cu[aá]ntos?\s+(?:productos?|art[ií]culos?|tipos?)\s+(?:distintos?|diferentes?)?|n[uú]mero\s+de\s+(?:productos?|art[ií]culos?))\b/.test(p))return'count';
   if(/\b(m[aá]s\s+car[oa]|mayor\s+(?:importe|valor|coste|precio)|m[aá]s\s+cost[oó]|producto\s+de\s+mayor\s+valor)\b/.test(p))return'max';
-  if(/\b(menos\s+car[oa]|menor\s+(?:importe|valor|coste|precio)|menos\s+cost[oó]|producto\s+de\s+menor\s+valor)\b/.test(p))return'min';
+  if(/\b(menos\s+car[oa]|menor\s+(?:importe|valor|coste|precio)|menos\s+cost[oó]|producto\s+de\s+menor\s+valor|(?:producto|art[ií]culo).{0,28}(?:cost[oó]|costaba)\s+menos|(?:cost[oó]|costaba)\s+menos)\b/.test(p))return'min';
   if(/\b(cu[aá]nto\s+suman|cu[aá]nto\s+suma|suman\s+(?:todas?|todos?|estas?|estos?|esas?|esos?)|cu[aá]l\s+es\s+el\s+total|total(?:izan)?\s+(?:todas?|todos?|estas?|estos?|esas?|esos?))\b/.test(p))return'sum';
   if(/\b(?:lista|listado|enumera|mu[eé]strame)\b.*\b(?:productos?|art[ií]culos?)\b/.test(p))return'list';
   if(/^\s*(?:qu[eé]|cu[aá]les)\b.*\b(?:fueron|son|eran)\b/.test(p)&&!/(donantes?|personas?|socios?|asistentes?|tiendas?|eventos?)/.test(p))return'list';
@@ -8767,6 +8796,17 @@ function v261ObjectiveIssues(final,results,conversationHistory=[]){
   if(!hasBenchmark&&/\b(supera(?:ndo)?\s+(?:las\s+)?expectativas|por\s+encima\s+de\s+lo\s+esperado|rentabilidad\s+(?:excelente|sobresaliente))\b/.test(normalizedAnswer))issues.push('No hay benchmark/objetivo canónico que permita afirmar que el resultado supera expectativas o tiene rentabilidad excelente. Mantén el tono ejecutivo sin inventar una referencia comparativa.');
   return issues;
 }
+function v307BankAvailabilityRepair(final,results,userPrompt='',flowTrace=[]){
+  const missing=arr(results).slice().reverse().find(r=>r?.ok&&['event_bank','event_bank_timeline'].includes(trim(r?.name))&&r?.facts?.has_bank_reconciliation===false);
+  if(!missing)return final;
+  const p=norm(userPrompt);
+  const bankSpecific=/\b(cuadre|concili|banco|bancari|movimientos?\s+banc|saldo\s+banc|tesorer[ií]a|movimientos?|cargos?|abonos?|justificad\w*)\b/.test(p);
+  const otherDomain=/\b(compras?|donaciones?|ingresos?\s+(?!banc)|asistencia|documentos?|hitos?|\blg\b|personas?|tiendas?|productos?)\b/.test(p);
+  if(!bankSpecific||otherDomain)return final;
+  const event=trim(missing?.facts?.event)||'este evento';
+  zuzuTracePush(flowTrace,'v1.0_exp · Regla Cuadre Banco explícito','OK',`${event}: no existe conciliación explícita; se bloquea cualquier saldo/movimiento inferido del histórico general.`);
+  return{...final,answer:`No consta un Cuadre Banco configurado para ${event}. No doy saldos, movimientos ni impacto bancario del evento a partir del histórico general de la cuenta.`,showTables:[],chartSpecs:[],charts:[]};
+}
 function v283DeterministicSafetyRepair(final,results,conversationHistory=[]){
   let answer=trim(final?.answer);
   const unsupported=v261UnsupportedMoneyWithConversation(answer,results,conversationHistory);
@@ -8828,7 +8868,24 @@ function v30ConversationEventForPerson(state,userPrompt,conversationHistory=[],s
   for(const turn of arr(conversationHistory).slice(-6).reverse()){
     const u=trim(turn?.user);if(!u)continue;
     const people=v26PersonHintsFromPrompt(u,state).map(canonicalNameKey);
-    if(sk&&people.includes(sk))return v281EventNameInText(state,u)||'';
+    if(sk&&people.includes(sk)){
+      const sameTurnEvent=v281EventNameInText(state,u);
+      if(sameTurnEvent)return sameTurnEvent;
+      break;
+    }
+  }
+  // Follow-up pronominal real observado en FULL-CERT:
+  // evento -> persona -> «¿Figura en ese evento de alguna manera?».
+  // La persona sigue siendo el sujeto y «ese evento» debe recuperar el último evento
+  // canónico del hilo, no el evento visible en pantalla ni una suposición de Gemini.
+  if(/\b(ese|este|aquel)\s+evento\b|\ben\s+(?:ese|este|aquel)\b|\ball[ií]\b/.test(promptN)){
+    for(const turn of arr(conversationHistory).slice(-8).reverse()){
+      const ctx=turn?.resultContext&&typeof turn.resultContext==='object'?turn.resultContext:null;
+      const candidate=trim(ctx?.event);
+      if(candidate&&semanticResolveEntity(state,'event',candidate)?.ok)return candidate;
+      const fromUser=v281EventNameInText(state,trim(turn?.user));
+      if(fromUser)return fromUser;
+    }
   }
   return'';
 }
@@ -8884,6 +8941,7 @@ function v325PersonGroundingDirect({userPrompt,grounding,conversationHistory=[],
   else if(/\bdonaci\w*|donante|donado|don[oó]\b/.test(p))focus='donations';
   else if(/\bingres\w*|cuotas?\b/.test(p))focus='incomes';
   else if(/\b(hitos?|tareas?|\blg\b|gesti[oó]n)\b/.test(p))focus='management';
+  else if(grounding.scope==='named_event'&&/\b(figura|aparece|relaci[oó]n|relacionad|vinculad|tiene\s+algo\s+que\s+ver|de\s+alguna\s+manera)\b/.test(p))focus='relation';
   else if(broadSimple)focus='summary';
   else return null;
   const table=(key)=>arr(r?.tables).find(t=>trim(t?.key)===key),show=(key)=>table(key)&&arr(table(key)?.rows).length?[{tool_id:trim(r.id),table_key:key}]:[];
@@ -8892,6 +8950,13 @@ function v325PersonGroundingDirect({userPrompt,grounding,conversationHistory=[],
     const prior=['purchases','donations','incomes','management'].includes(focus)?focus:'events';
     key=prior==='purchases'?'purchase_by_event':prior==='donations'?'donations_by_event':prior==='incomes'?'income_by_event':prior==='management'?'management_by_event':'summary_by_event';
     const events=arr(table(key)?.rows).map(x=>trim(x?.Evento)).filter(Boolean);answer=events.length?`${subject} aparece en ${events.length} evento${events.length===1?'':'s'}${prior!=='events'?` para ${prior}`:''}: ${events.join(', ')}.`:`No hay eventos registrados para esa dimensión de ${subject}.`;focus=prior;
+  }else if(focus==='relation'){
+    key='summary_by_event';
+    const event=trim(f.scope_event||grounding.event);
+    const related=num(f.event_count)>0||Math.abs(num(f.income_linked_total))>0.00001||num(f.purchase_responsibility_records)>0||num(f.donation_records||f.donation_lines)>0||num(f.hitos_count)>0||num(f.lg_count)>0;
+    answer=related
+      ?`Sí. ${subject} tiene relación registrada con ${event}: ${num(f.event_count)>0?'figura en los datos del evento; ':''}${v26FormatEuro(num(f.income_linked_total))} en ingresos vinculados, ${num(f.purchase_responsibility_records)} registros de compra bajo responsabilidad, ${num(f.donation_records||f.donation_lines)} registros de donación, ${num(f.hitos_count)} hitos y ${num(f.lg_count)} tareas LG.`
+      :`No. ControlEvent no registra relación de ${subject} con ${event}: no constan participación/ingresos, compras bajo responsabilidad, donaciones, Hitos ni tareas LG para ese evento.`;
   }else if(focus==='purchases'){
     key='purchase_by_event';answer=num(f.purchase_responsibility_records)>0?`${subject} tiene ${v26FormatEuro(num(f.purchase_responsibility_total))} en compras bajo su responsabilidad directa, distribuidas en ${num(f.purchase_responsibility_records)} registros y ${num(f.purchase_responsibility_ticket_count)} tickets distintos.`:`${subject} no tiene compras bajo su responsabilidad directa registradas.`;
   }else if(focus==='donations'){
@@ -8948,7 +9013,8 @@ async function v304PrefetchBankFollowUp({userPrompt,state,selectedEventId,conver
     const tool={id:'v304_bank_followup_grounding',name:'event_bank',detail:'brief',...(directEvent?{scope:'named_event',event:directEvent}:{scope:'active_event'})};
     const result=await v261EventBankTool(tool,state,selectedEventId);
     const compact=v261CompactToolResult(result,'standard');
-    zuzuTracePush(flowTrace,'v30.4 · Banco conversacional fresco','OK',`${trim(result?.facts?.event)||directEvent||'evento'}: ${num(result?.facts?.included_movement_count)} movimientos incluidos · abonos ${v26FormatEuro(num(result?.facts?.included_income_total))} · cargos ${v26FormatEuro(num(result?.facts?.included_charge_total))}.`);
+    if(result?.facts?.has_bank_reconciliation===false)zuzuTracePush(flowTrace,'v30.4 · Banco conversacional fresco','OK',`${trim(result?.facts?.event)||directEvent||'evento'}: no consta Cuadre Banco explícito; no se usa el histórico general como sustituto.`);
+    else zuzuTracePush(flowTrace,'v30.4 · Banco conversacional fresco','OK',`${trim(result?.facts?.event)||directEvent||'evento'}: ${num(result?.facts?.included_movement_count)} movimientos incluidos · abonos ${v26FormatEuro(num(result?.facts?.included_income_total))} · cargos ${v26FormatEuro(num(result?.facts?.included_charge_total))}.`);
     return{result,compact,event:trim(result?.facts?.event)||directEvent};
   }catch(error){
     zuzuTracePush(flowTrace,'v30.4 · Banco conversacional fresco','WARN',`No se pudo refrescar el cuadre bancario: ${cleanGeminiError(error)}.`);
@@ -8957,10 +9023,13 @@ async function v304PrefetchBankFollowUp({userPrompt,state,selectedEventId,conver
 }
 function v304BankGroundingInput(userPrompt,grounding){
   if(!grounding?.compact)return userPrompt;
+  const unavailable=grounding?.result?.facts?.has_bank_reconciliation===false;
+  if(unavailable)return `${userPrompt}\n\nCANONICAL_BANK_GROUNDING (ControlEvent, este mismo turno):\n${JSON.stringify(grounding.compact)}\nREGLA OBLIGATORIA: no consta Cuadre Banco configurado para este evento. No atribuyas el histórico general al evento y no des saldo inicial/final, movimientos, impacto, cargos, abonos ni estado de justificación como si existiera un cuadre.`;
   return `${userPrompt}\n\nCANONICAL_BANK_GROUNDING (Cuadre Banco fresco, este mismo turno):\n${JSON.stringify(grounding.compact)}\nREGLA: responde el filtro pedido directamente. «Ahora los abonos» = enumera los abonos; «solo cargos» = enumera cargos; «qué cargos tienen ticket» = enumera esos cargos/tickets; «sin justificante» = usa únicamente los movimientos sin vínculo. No respondas solo con una cifra ni pidas permiso para listar si los datos ya están aquí.`;
 }
 function v304DeterministicBankFilterAnswer(userPrompt='',grounding=null){
   const result=grounding?.result;if(!result)return'';
+  if(result?.facts?.has_bank_reconciliation===false)return `No consta un Cuadre Banco configurado para ${trim(result?.facts?.event)||'este evento'}. No uso el histórico general para inventar cargos, abonos o movimientos del evento.`;
   const p=norm(userPrompt),table=arr(result?.tables).find(t=>trim(t?.key)==='movements'),rows=arr(table?.rows).filter(r=>trim(r?.Incluido)!=='No');
   if(!rows.length)return'';
   let filtered=[],label='movimientos bancarios';
@@ -8984,8 +9053,10 @@ function v304DeterministicBankFilterAnswer(userPrompt='',grounding=null){
 
 function v326DeterministicBankStatusAnswer(userPrompt='',grounding=null){
   const r=grounding?.result,p=norm(userPrompt);if(!r||!/\bjustificad\w*/.test(p)||!/\bmovim\w*/.test(p))return'';
-  const f=r?.facts||{},total=num(f.included_movement_count),justified=num(f.justified_movement_count),unlinked=num(f.unlinked_movement_count),impact=num(f.bank_impact),event=trim(f.event)||'este evento';
-  if(!total)return `No hay movimientos bancarios incluidos en el Cuadre Banco de ${event}.`;
+  const f=r?.facts||{},event=trim(f.event)||'este evento';
+  if(f.has_bank_reconciliation===false)return `No consta un Cuadre Banco configurado para ${event}. No puedo afirmar que sus movimientos estén justificados porque no existe ese cuadre explícito en ControlEvent.`;
+  const total=num(f.included_movement_count),justified=num(f.justified_movement_count),unlinked=num(f.unlinked_movement_count),impact=num(f.bank_impact);
+  if(!total)return `El Cuadre Banco de ${event} está configurado, pero no tiene movimientos incluidos.`;
   return unlinked===0?`Sí. Los ${total} movimientos bancarios incluidos de ${event} constan justificados; impacto del periodo: ${v26FormatEuro(impact)}.`:`No completamente. De ${total} movimientos bancarios incluidos de ${event}, ${justified} constan justificados y ${unlinked} quedan sin vínculo justificativo registrado; impacto del periodo: ${v26FormatEuro(impact)}.`;
 }
 
@@ -9218,6 +9289,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
       zuzuTracePush(flowTrace,'v1.0_exp · Garantía gráfica bancaria','OK',`Cronología bancaria materializable: ${arr(deliveredBankTimeline?.rows).length} movimientos${asksJustification?' con justificantes':''}.`);
     }
   }
+  final=v307BankAvailabilityRepair(final,allResults,userPrompt,flowTrace);
   final=v311PurchaseAmountConsistencyRepair(final,allResults,userPrompt,flowTrace);
   final=v314CompoundCoverageRepair(final,allResults,userPrompt,state,flowTrace);
   const issues=v261ObjectiveIssues(final,allResults,conversationHistory);
@@ -10712,6 +10784,9 @@ async function v29ExecuteMetricTask(task,{userPrompt,state,selectedEventId,conve
 }
 async function v29ExecuteBankTask(task,{userPrompt,state,selectedEventId,conversationHistory}){
   const ea=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true),src=await v261EventBankTool({id:'v29_plan_bank_source',name:'event_bank',...ea,detail:'full'},state,selectedEventId),f=src?.facts||{},tables=[],charts=[];
+  if(f.has_bank_reconciliation===false){
+    return{results:[src],showTables:[],chartSpecs:[],answer:`No consta un Cuadre Banco configurado para ${f.event||'este evento'}. No doy saldos, movimientos ni impacto bancario del evento a partir del histórico general de la cuenta.`,resultContext:{domain:'bank',event:f.event,mode:'unavailable',hasBankReconciliation:false}};
+  }
   if(task.mode==='links'){
     const t=arr(src?.tables).find(x=>x?.key==='reconciliation_timeline')||arr(src?.tables).find(x=>x?.key==='event_window_timeline');
     const pp=norm(userPrompt),onlyCharges=/\b(cargos?|tkxx|tickets?)\b/.test(pp)&&!/\babonos?|ingresos?\s+vinculad/.test(pp),onlyIncome=/\babonos?\b/.test(pp)&&!/\bcargos?|tkxx|tickets?\b/.test(pp);

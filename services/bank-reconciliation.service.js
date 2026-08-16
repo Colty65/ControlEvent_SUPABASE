@@ -621,6 +621,21 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     }
     const eventLinkedMovements=all.filter(row=>arr(displayLinksByMovement.get(row.id)).some(link=>link.isActiveEvent));
     const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
+    // v1.0_exp · Cuadre Banco explícito:
+    // ce_bank_event_settings puede existir por INICIALIZACION_AUTOMATICA solo para preparar
+    // la ventana de banco. Esa fila NO demuestra que el evento tenga un cuadre realizado.
+    // Para Zuzu/ITV consideramos que existe conciliación real únicamente cuando hay al menos
+    // una decisión/configuración específica del evento: periodo guardado manualmente,
+    // estado de movimiento, vínculo TKxx o vínculo manual de ingreso.
+    const periodUpdater=text(period?.updatedBy);
+    const periodExplicit=period?.saved===true && periodUpdater.toUpperCase()!=='INICIALIZACION_AUTOMATICA';
+    const reconciliationEvidence={
+      manualPeriod:periodExplicit,
+      movementStates:arr(stateRows).length,
+      ticketLinks:activeRawLinkRows.length,
+      incomeLinks:arr(manualIncomeLinkRows).length
+    };
+    const hasExplicitReconciliation=periodExplicit||reconciliationEvidence.movementStates>0||reconciliationEvidence.ticketLinks>0||reconciliationEvidence.incomeLinks>0;
     const stateByMovement=new Map(arr(stateRows).map(row=>[text(row.movement_id),row.included!==false]));
     const scopedAll=accountMovements
       .filter(row=>inPeriod(row,period))
@@ -675,6 +690,12 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       ok:true,
       event:{...event,reconciliationStart:period.dateFrom,reconciliationEnd:period.dateTo},
       period:{dateFrom:period.dateFrom,dateTo:period.dateTo,linkedOutsidePeriodCount:linkedOutsidePeriod.length},
+      reconciliation:{
+        hasExplicitReconciliation,
+        status:hasExplicitReconciliation?'CONFIGURADO':'NO_CONFIGURADO',
+        evidence:reconciliationEvidence,
+        periodSource:periodExplicit?'MANUAL':(period?.saved===true?'INICIALIZACION_AUTOMATICA':'CALCULADO_NO_GUARDADO')
+      },
       readOnly:event.finalized,
       ticketSummary,
       incomeSummary:incomeTrace.summary,
@@ -1021,7 +1042,7 @@ export async function exportBankData({accountId='',eventId=''} = {}){
       }));
       const links=movements.flatMap(row=>arr(row.links));
       return {
-        ok:true,event:reconciliation.event,period:reconciliation.period,summary:reconciliation.summary,ticketSummary:reconciliation.ticketSummary,
+        ok:true,event:reconciliation.event,period:reconciliation.period,reconciliation:reconciliation.reconciliation||null,summary:reconciliation.summary,ticketSummary:reconciliation.ticketSummary,
         movements,links,batches:[],balanceTimeline:arr(reconciliation.balanceTimeline),
         eventSettings:[{eventId:selectedEvent,dateFrom:reconciliation.period?.dateFrom||'',dateTo:reconciliation.period?.dateTo||''}],
         incomeLinks:movements.flatMap(row=>arr(row.incomeLinks).filter(link=>link.manual&&link.linkId).map(link=>({id:link.linkId,movementId:row.id,eventId:selectedEvent,incomeId:link.id,incomeAmountSnapshot:link.amount}))),

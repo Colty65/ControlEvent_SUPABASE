@@ -4,7 +4,6 @@
 import { getState } from './state.service.js';
 import { listUsers } from './auth.service.js';
 import { analyzeEventPrompt, __zuzuStructuralTesting as Z } from './event-ai.service.js';
-import { listBankReconciliation } from './bank-reconciliation.service.js';
 
 const arr = v => Array.isArray(v) ? v : [];
 const text = v => v == null ? '' : String(v);
@@ -203,7 +202,7 @@ async function comparisonOracle(state,events=[]){
   try{const r=await execCanonicalTool(state,{id:'itv_oracle_compare',name:'compare_events',events:arr(events),detail:'standard'},state,'');const rows=arr(toolTable(r,'comparison')?.rows).map(x=>({event:trim(x?.Evento),income:round(x?.Ingresos,2),purchases:round(x?.['Compras realizadas'],2),pending:round(x?.['Compras pendientes'],2),donations:round(x?.['Donaciones valoradas'],2),balance:round(x?.['Saldo operativo'],2),valuation:round(x?.['Valoración del evento'],2),attendees:round(x?.['Asistentes canónicos'],3)}));return rows.length>=2?{events:rows.map(x=>x.event),rows}:null;}catch(_){return null;}
 }
 async function personOracle(state,person,event=''){
-  try{const args={id:'itv_oracle_person',name:'person_dossier',person,scope:event?'named_event':'all_events',detail:'brief'};if(event)args.event=event;const r=await execCanonicalTool(state,args,state,'');const f=r?.facts||{};return{person:trim(f.person)||person,event:trim(f.scope_event),eventCount:num(f.event_count),income:round(f.income_linked_total,2),purchases:round(f.purchase_responsibility_total,2),donations:round(f.donations_value,2),purchaseRecords:num(f.purchase_responsibility_records),donationRecords:num(f.donation_records),summaryRows:arr(toolTable(r,'summary_by_event')?.rows),incomeRows:arr(toolTable(r,'income_by_event')?.rows)};}catch(_){return null;}
+  try{const args={id:'itv_oracle_person',name:'person_dossier',person,scope:event?'named_event':'all_events',detail:'brief'};if(event)args.event=event;const r=await execCanonicalTool(state,args,state,'');const f=r?.facts||{};return{person:trim(f.person)||person,event:trim(f.scope_event),eventCount:num(f.event_count),income:round(f.income_linked_total,2),purchases:round(f.purchase_responsibility_total,2),donations:round(f.donations_value,2),purchaseRecords:num(f.purchase_responsibility_records),donationRecords:num(f.donation_records),hitos:num(f.hitos_count),lg:num(f.lg_count),summaryRows:arr(toolTable(r,'summary_by_event')?.rows),incomeRows:arr(toolTable(r,'income_by_event')?.rows)};}catch(_){return null;}
 }
 
 async function documentationOracle(state,event){
@@ -211,8 +210,15 @@ async function documentationOracle(state,event){
 }
 async function bankOracle(state,event){
   const rr=Z.semanticResolveEntity(state,'event',event);if(!rr?.ok)return null;
-  try{const r=await listBankReconciliation({eventId:rr.id});const s=r?.summary||{};return{event:rr.nombre,eventId:rr.id,movements:arr(r?.movements).length,included:num(s.movementCount||s.includedMovementCount||arr(r?.movements).filter(x=>x?.included!==false).length),income:round(s.income,2),expense:round(s.expense,2),impact:round(s.impact??s.netMovement??(num(s.income)-num(s.expense)),2),opening:round(s.openingBalance,2),closing:round(s.closingBalance,2),cashIncome:round(s.cashIncome,2),eventIncome:round(s.eventIncome,2),period:r?.period||{},ticketSummary:r?.ticketSummary||{},hasData:arr(r?.movements).length>0};}catch(_){return null;}
+  try{
+    // Usa exactamente la misma fuente canónica y la misma política que Zuzu. Así la ITV no
+    // vuelve a certificar como «Cuadre» candidatos del histórico que la respuesta no debe usar.
+    const r=await execCanonicalTool(state,{id:'itv_oracle_bank',name:'event_bank',event:rr.nombre,scope:'named_event',detail:'full'},state,'');
+    const f=r?.facts||{},hasReconciliation=f?.has_bank_reconciliation!==false,movements=hasReconciliation?num(f?.included_movement_count??f?.movement_count):0;
+    return{event:trim(f?.event)||rr.nombre,eventId:rr.id,hasReconciliation,reconciliationStatus:trim(f?.reconciliation_status)||(hasReconciliation?'CONFIGURADO':'NO_CONFIGURADO'),movements,included:movements,income:hasReconciliation?round(f?.included_income_total,2):0,expense:hasReconciliation?round(f?.included_charge_total,2):0,impact:hasReconciliation?round(f?.bank_impact,2):0,opening:hasReconciliation?round(f?.opening_balance,2):0,closing:hasReconciliation?round(f?.closing_balance,2):0,cashIncome:0,eventIncome:hasReconciliation?round(f?.included_income_total,2):0,period:hasReconciliation?(f?.period||{}):{},ticketSummary:hasReconciliation?(f?.ticket_summary||{}):{},periodCandidates:num(f?.period_candidate_movement_count),hasData:hasReconciliation&&f?.bank_data_available!==false&&movements>0};
+  }catch(_){return null;}
 }
+
 async function managementOracle(state,event){
   try{const r=await execCanonicalTool(state,{id:'itv_oracle_management',name:'event_management',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,hitos:num(f.hitos_count),lg:num(f.lg_count),completed:num(f.lg_completed),pending:num(f.lg_pending)};}catch(_){return null;}
 }
@@ -240,8 +246,29 @@ async function storePurchasesOracle(state,store){
   try{const r=await execCanonicalTool(state,{id:'itv_oracle_store',name:'store_purchases',store,scope:'all_events',status:'realized',include_empty:false,detail:'full'},state,'');return{store:trim(r?.facts?.store)||store,eventCount:num(r?.facts?.event_count),records:num(r?.facts?.total_records),total:round(r?.facts?.total_amount,2),rows:arr(toolTable(r,'by_event')?.rows)};}catch(_){return null;}
 }
 async function bankTimelineOracle(state,event){
-  try{const r=await execCanonicalTool(state,{id:'itv_oracle_bank_timeline',name:'event_bank_timeline',event,scope:'named_event',detail:'full'},state,'');return{event:trim(r?.facts?.event)||event,points:num(r?.facts?.timeline_movement_count),opening:round(r?.facts?.opening_balance,2),closing:round(r?.facts?.closing_balance,2),impact:round(r?.facts?.bank_impact,2),rows:arr(toolTable(r,'balance_timeline')?.rows)};}catch(_){return null;}
+  try{
+    const r=await execCanonicalTool(state,{id:'itv_oracle_bank_timeline',name:'event_bank_timeline',event,scope:'named_event',detail:'full'},state,'');
+    const hasReconciliation=r?.facts?.has_bank_reconciliation!==false;
+    return{event:trim(r?.facts?.event)||event,hasReconciliation,points:hasReconciliation?num(r?.facts?.timeline_movement_count):0,opening:hasReconciliation?round(r?.facts?.opening_balance,2):0,closing:hasReconciliation?round(r?.facts?.closing_balance,2):0,impact:hasReconciliation?round(r?.facts?.bank_impact,2):0,rows:hasReconciliation?arr(toolTable(r,'balance_timeline')?.rows):[]};
+  }catch(_){return null;}
 }
+async function refreshHistoricalBankOracle(caseDef,state){
+  const c=caseDef,kind=trim(c?.oracle?.kind),event=trim(c?.event||c?.oracle?.event);
+  if(!event||!['bank-summary','bank-timeline'].includes(kind))return c;
+  try{
+    if(kind==='bank-summary'){
+      const data=await bankOracle(state,event);if(!data)return c;
+      c.oracle={kind:'bank-summary',event:data.event||event,data};
+      c.expected=expectedOracleText(c.oracle);
+      return c;
+    }
+    const data=await bankTimelineOracle(state,event);if(!data)return c;
+    c.oracle={kind:'bank-timeline',event:data.event||event,...data};
+    c.expected=expectedOracleText(c.oracle);
+  }catch(_){/* Si no podemos refrescar la verdad bancaria, conservamos el contrato histórico. */}
+  return c;
+}
+
 function donationCountForEvent(state,eventId){return arr(state?.compras).filter(r=>eventIdOf(r)===trim(eventId)&&isDonationTicketLocal(ticketTextLocal(r))).length;}
 
 function metricWinner(compare,metric){
@@ -259,18 +286,18 @@ function expectedOracleText(oracle){
   if(oracle.kind==='documentation')return `${oracle.event}: ingresos ${oracle.data?.incomeRecords||0} (${oracle.data?.incomeWithReceipt||0} justificantes) · TKxx ${oracle.data?.tickets||0} (${oracle.data?.ticketsWithImage||0} imágenes) · DOC ${oracle.data?.documents||0} (${oracle.data?.documentsWithAttachment||0} adjuntos) · faltan ${oracle.data?.missing||0}`;
   if(oracle.kind==='ticket-detail')return `${oracle.event}: ${oracle.ticket}`;
   if(oracle.kind==='catalog-count')return `${oracle.entity}: ${oracle.count} registros`;
-  if(oracle.kind==='bank-summary')return `${oracle.event}: ${oracle.data?.movements||0} movimientos${oracle.data?.hasData?` · impacto ${euro(oracle.data?.impact||0)}`:''}`;
+  if(oracle.kind==='bank-summary')return oracle.data?.hasReconciliation===false?`${oracle.event}: no consta Cuadre Banco configurado`:`${oracle.event}: ${oracle.data?.movements||0} movimientos${oracle.data?.hasData?` · impacto ${euro(oracle.data?.impact||0)}`:''}`;
   if(oracle.kind==='attendance')return `${oracle.event}: ${oracle.data?.attendees||0} asistentes`;
   if(oracle.kind==='management')return `${oracle.event}: ${oracle.data?.hitos||0} hitos · ${oracle.data?.lg||0} LG · ${oracle.data?.pending||0} pendientes`;
   if(oracle.kind==='donations')return `${oracle.event}: ${oracle.data?.records||0} donaciones · ${oracle.data?.donors||0} donantes · ${euro(oracle.data?.total||0)}`;
   if(oracle.kind==='documentation-field')return `${oracle.event}: ${oracle.label} = ${oracle.value}`;
   if(oracle.kind==='event-metric')return `${oracle.event}: ${oracle.label} = ${euro(oracle.value)}`;
   if(oracle.kind==='events-overview')return `Panorama: ${oracle.count} eventos`;
-  if(oracle.kind==='people-activity')return `Actividad global: ${oracle.count} personas canónicas`;
+  if(oracle.kind==='people-activity')return `Identidades personales canónicas globales: ${oracle.count}`;
   if(oracle.kind==='canonical-socios')return `Socios canónicos: ${oracle.records} registros · ${oracle.people} personas`;
   if(oracle.kind==='store-purchases')return `${oracle.store}: ${euro(oracle.total)} · ${oracle.records} registros en ${oracle.eventCount} eventos`;
   if(oracle.kind==='participation-events')return `${oracle.person}: ${oracle.eventCount} eventos`;
-  if(oracle.kind==='bank-timeline')return `${oracle.event}: ${oracle.points} puntos · impacto ${euro(oracle.impact)}`;
+  if(oracle.kind==='bank-timeline')return oracle.hasReconciliation===false?`${oracle.event}: no consta Cuadre Banco configurado`:`${oracle.event}: ${oracle.points} puntos · impacto ${euro(oracle.impact)}`;
   return'';
 }
 function oracleFail(reasons=[]){return{ok:false,reasons:arr(reasons).filter(Boolean)};}
@@ -333,7 +360,14 @@ function validateOracle(caseDef,result){
   }else if(oracle.kind==='catalog-count'){
     if(!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`catálogo: no acredita ${oracle.count} registros`);
   }else if(oracle.kind==='bank-summary'){
-    const d=oracle.data;if(d?.hasData&&d.movements>0&&!new RegExp(`\\b${Number(d.movements)}\\b`).test(blob)&&!hasMoney(blob,d.impact)&&!hasMoney(blob,d.closing))reasons.push('no devuelve ninguna magnitud bancaria canónica');
+    const d=oracle.data;
+    const explicitlyUnavailable=result?.meta?.resultContext?.hasBankReconciliation===false||/no\s+consta[^.]{0,80}cuadre\s+banco|no\s+(?:hay|existe)[^.]{0,80}cuadre\s+banco/i.test(blob);
+    if(d?.hasReconciliation===false){
+      if(!explicitlyUnavailable)reasons.push('debe indicar que no consta Cuadre Banco configurado y no usar el histórico general');
+    }else if(explicitlyUnavailable){
+      // Batería histórica anterior a esta política: la ausencia canónica actual prevalece
+      // sobre magnitudes antiguas que procedían del histórico general.
+    }else if(d?.hasData&&d.movements>0&&!new RegExp(`\\b${Number(d.movements)}\\b`).test(blob)&&!hasMoney(blob,d.impact)&&!hasMoney(blob,d.closing))reasons.push('no devuelve ninguna magnitud bancaria canónica');
   }else if(oracle.kind==='attendance'){
     const d=oracle.data;if(d&&d.attendees>=0&&!new RegExp(`\\b${Number(d.attendees)}\\b`).test(blob))reasons.push(`asistencia: no acredita ${d.attendees} personas`);
   }else if(oracle.kind==='management'){
@@ -366,7 +400,14 @@ function validateOracle(caseDef,result){
     const namedCount=expectedNames.filter(n=>hasNameInText(blob,n)).length;
     if(oracle.eventCount>0&&!exactCount&&namedCount<Math.min(Number(oracle.eventCount),expectedNames.length||Number(oracle.eventCount)))reasons.push(`participación: no acredita ${oracle.eventCount} eventos`);
   }else if(oracle.kind==='bank-timeline'){
-    if(oracle.points>0&&!new RegExp(`\\b${Number(oracle.points)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length>=Number(oracle.points)))reasons.push(`cronología bancaria: no acredita ${oracle.points} puntos/movimientos`);
+    const explicitlyUnavailable=result?.meta?.resultContext?.hasBankReconciliation===false||/no\s+consta[^.]{0,80}cuadre\s+banco|no\s+(?:hay|existe)[^.]{0,80}cuadre\s+banco/i.test(blob);
+    // Compatibilidad con baterías históricas creadas antes de la regla de Cuadre explícito:
+    // una ausencia canónica actual prevalece sobre el antiguo histórico general.
+    if(oracle.hasReconciliation===false){
+      if(!explicitlyUnavailable)reasons.push('cronología bancaria: debe negar el cuadre no configurado');
+    }else if(explicitlyUnavailable){
+      // Correcto bajo la política nueva: no exigimos puntos derivados del histórico.
+    }else if(oracle.points>0&&!new RegExp(`\\b${Number(oracle.points)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length>=Number(oracle.points)))reasons.push(`cronología bancaria: no acredita ${oracle.points} puntos/movimientos`);
   }
   return reasons.length?oracleFail(reasons):oraclePass();
 }
@@ -459,18 +500,26 @@ async function buildRealFastCases(state,seed){
     }}));
   }
 
-  // Cuadre Banco vive en tablas normalizadas separadas del estado general. Se prueba por una
-  // muestra reproducible de eventos para cubrir la fuente sin multiplicar el coste/tiempo de FAST.
+  // Banco: FAST comprueba primero si el evento tiene un Cuadre Banco EXPLÍCITO.
+  // Un histórico de cuenta dentro de las fechas del evento no se convierte nunca en cuadre.
   const fastBankEvents=shuffled(events,seed,'fast-bank-events').slice(0,Math.min(6,events.length));
   for(const ev of fastBankEvents){
     const title=eventName(ev),eid=trim(ev.id);
-    cases.push(makeCase({id:`event-bank-${key(eid)}`,group:'BANCO',label:`Cuadre Banco · ${title}`,expected:'Lectura bancaria segura y coherente',run:async function(){
-      try{const b=await listBankReconciliation({eventId:eid}),s=b?.summary||{},m=arr(b?.movements);const ok=b?.ok!==false&&m.every(x=>Number.isFinite(Number(x?.amount)));return outcome(this,ok?'OK':'KO',`movimientos=${m.length}; ingresos=${round(s.income,2)}; gastos=${round(s.expense,2)}; saldoFinal=${round(s.closingBalance,2)}`);}catch(error){return outcome(this,'WARN',`Sin fuente bancaria utilizable para este evento: ${trim(error?.message)||'sin datos'}`);}
+    cases.push(makeCase({id:`event-bank-${key(eid)}`,group:'BANCO',label:`Cuadre Banco · ${title}`,expected:'Cuadre explícito o ausencia segura',run:async function(){
+      try{
+        const b=await bankOracle(state,title);
+        if(!b)return outcome(this,'WARN','Sin fuente bancaria utilizable para este evento.');
+        if(!b.hasReconciliation)return outcome(this,'OK','Sin Cuadre Banco explícito: el histórico general no se atribuye al evento.');
+        return outcome(this,'OK',`Cuadre explícito · movimientos=${b.movements}; ingresos=${round(b.income,2)}; gastos=${round(b.expense,2)}; saldoFinal=${round(b.closing,2)}; candidatos históricos ignorados=${b.periodCandidates}`);
+      }catch(error){return outcome(this,'WARN',`Sin fuente bancaria utilizable para este evento: ${trim(error?.message)||'sin datos'}`);}
     }}));
   }
   for(const ev of fastBankEvents.slice(0,Math.min(2,fastBankEvents.length))){
-    const title=eventName(ev);cases.push(makeCase({id:`event-bank-timeline-${key(ev.id)}`,group:'BANCO',label:`Cronología bancaria · ${title}`,expected:'Cronología bancaria segura',run:async function(){
-      const o=await bankTimelineOracle(state,title);return outcome(this,o?'OK':'WARN',o?`puntos=${o.points}; apertura=${euro(o.opening)}; cierre=${euro(o.closing)}; impacto=${euro(o.impact)}`:'Sin cronología bancaria utilizable');
+    const title=eventName(ev);cases.push(makeCase({id:`event-bank-timeline-${key(ev.id)}`,group:'BANCO',label:`Cronología bancaria · ${title}`,expected:'Cronología solo si hay Cuadre Banco explícito',run:async function(){
+      const o=await bankTimelineOracle(state,title);
+      if(!o)return outcome(this,'WARN','Sin fuente bancaria utilizable');
+      if(o.hasReconciliation===false)return outcome(this,'OK','Sin Cuadre Banco explícito: no se construye cronología desde el histórico general.');
+      return outcome(this,'OK',`puntos=${o.points}; apertura=${euro(o.opening)}; cierre=${euro(o.closing)}; impacto=${euro(o.impact)}`);
     }}));
   }
 
@@ -683,11 +732,12 @@ async function buildAiSmokeCases(state,max=40,seed=1){
   const managementEvents=events.filter(e=>arr(state?.hitos).some(h=>eventIdOf(h)===trim(e.id))||arr(state?.lgs).some(l=>eventIdOf(l)===trim(e.id)));
   if(managementEvents.length){const e=pick(managementEvents,seed,'smoke-management-event'),en=eventName(e),m=await managementOracle(state,en);if(m)add({id:`ai-management-${key(e.id)}`,group:'HITOS/LG',label:`IA consulta gestión · ${en}`,prompt:variant(TPL.management,seed,'smoke-management',{event:en}),event:en,oracle:{kind:'management',event:en,data:m}});}
 
-  // Banco vive en tablas separadas. Probamos una pequeña muestra reproducible hasta encontrar datos; si no, se mantiene una consulta de ausencia segura.
+  // Banco vive en tablas separadas. Priorizamos un evento con Cuadre Banco explícito.
+  // Si la muestra no tiene ninguno, probamos una ausencia segura sin reconstruir el histórico.
   let bankPick=null;
-  for(const e of shuffled(events,seed,'smoke-bank-events').slice(0,Math.min(4,events.length))){const b=await bankOracle(state,eventName(e));if(!b)continue;if(!bankPick)bankPick={e,b};if(b.hasData){bankPick={e,b};break;}}
+  for(const e of shuffled(events,seed,'smoke-bank-events').slice(0,Math.min(6,events.length))){const b=await bankOracle(state,eventName(e));if(!b)continue;if(!bankPick)bankPick={e,b};if(b.hasReconciliation){bankPick={e,b};break;}}
   if(bankPick){const en=eventName(bankPick.e);add({id:`ai-bank-${key(bankPick.e.id)}`,group:'BANCO',label:`IA consulta Cuadre Banco · ${en}`,prompt:variant(TPL.bank,seed,'smoke-bank',{event:en}),event:en,oracle:{kind:'bank-summary',event:en,data:bankPick.b}});}
-  if(bankPick?.b?.hasData){const en=eventName(bankPick.e),bt=await bankTimelineOracle(state,en);if(bt)add({id:`ai-bank-timeline-${key(bankPick.e.id)}`,group:'BANCO',label:`IA consulta cronología bancaria · ${en}`,prompt:variant(TPL.bankTimeline,seed,'smoke-bank-timeline',{event:en}),event:en,oracle:{kind:'bank-timeline',...bt},validate:r=>arr(r?.meta?.tools).some(t=>/event_bank(?:_timeline)?/.test(t))||arr(r?.tables).length>0});}
+  if(bankPick?.b?.hasReconciliation&&bankPick?.b?.hasData){const en=eventName(bankPick.e),bt=await bankTimelineOracle(state,en);if(bt)add({id:`ai-bank-timeline-${key(bankPick.e.id)}`,group:'BANCO',label:`IA consulta cronología bancaria · ${en}`,prompt:variant(TPL.bankTimeline,seed,'smoke-bank-timeline',{event:en}),event:en,oracle:{kind:'bank-timeline',...bt},validate:r=>arr(r?.meta?.tools).some(t=>/event_bank(?:_timeline)?/.test(t))||arr(r?.tables).length>0});}
 
   if(sibling.length>=2){const a=sibling[0],b=sibling[1],an=eventName(a),bn=eventName(b);add({id:`ai-compare-${key(a.id)}-${key(b.id)}`,group:'COMPARACIONES',label:'IA conserva dos eventos parecidos',prompt:variant(TPL.compare,seed,'smoke-compare-family',{a:an,b:bn}),expectedEvents:[an,bn],events:[an,bn],validate:r=>[an,bn].every(n=>resultHasEvent(r,n)) || /compare_events/.test(arr(r?.meta?.tools).join(' '))});}
   if(events.length>=2){const a=events[0],b=events.find(x=>trim(x.id)!==trim(a.id));if(b){const an=eventName(a),bn=eventName(b);add({id:`ai-compare-mixed-${key(a.id)}-${key(b.id)}`,group:'COMPARACIONES',label:'IA compara dos eventos distintos',prompt:variant(TPL.compare,seed,'smoke-compare-mixed',{a:an,b:bn}),expectedEvents:[an,bn],events:[an,bn],validate:r=>[an,bn].every(n=>resultHasEvent(r,n)) || /compare_events/.test(arr(r?.meta?.tools).join(' '))});}}
@@ -727,7 +777,7 @@ async function buildFullCertScenarios(state,maxTurns=36,seed=1){
     {prompt:variant(TPL.switchPerson,seed,'full-person-switch',{person:n2}),person:n2,oracle:{kind:'person-summary',person:n2,data:p2o}},
     {prompt:variant(TPL.incomePersonFollow,seed,'full-person-income'),person:n2,oracle:{kind:'person-income',person:n2,total:p2o?.income||0,known:!!p2o}}
   ]});
-  if(events[0]){const en=eventName(events[0]),rel=await personOracle(state,n1,en),related=!!(rel&&(rel.eventCount>0||Math.abs(rel.income)>0||Math.abs(rel.purchases)>0||Math.abs(rel.donations)>0));sc.push({name:'Cruce persona y evento',turns:[
+  if(events[0]){const en=eventName(events[0]),rel=await personOracle(state,n1,en),related=!!(rel&&(rel.eventCount>0||Math.abs(rel.income)>0||Math.abs(rel.purchases)>0||Math.abs(rel.donations)>0||rel.purchaseRecords>0||rel.donationRecords>0||rel.hitos>0||rel.lg>0));sc.push({name:'Cruce persona y evento',turns:[
     {prompt:variant(TPL.event,seed,'full-cross-event',{event:en}),event:en,oracle:{kind:'event-summary',event:en,data:await eventOracle(state,en)}},
     {prompt:variant(TPL.person,seed,'full-cross-person',{person:n1}),person:n1,oracle:{kind:'person-summary',person:n1,data:p1o}},
     {prompt:variant(TPL.relationFollow,seed,'full-cross-relation'),event:en,person:n1,oracle:{kind:'person-relation',event:en,person:n1,related,known:!!rel,data:rel}}
@@ -761,7 +811,7 @@ async function buildFullCertScenarios(state,maxTurns=36,seed=1){
   ]});}
 
   let bankPick=null;
-  for(const e of shuffled(events,seed,'full-bank-events').slice(0,Math.min(5,events.length))){const b=await bankOracle(state,eventName(e));if(!b)continue;if(!bankPick)bankPick={e,b};if(b.hasData){bankPick={e,b};break;}}
+  for(const e of shuffled(events,seed,'full-bank-events').slice(0,Math.min(7,events.length))){const b=await bankOracle(state,eventName(e));if(!b)continue;if(!bankPick)bankPick={e,b};if(b.hasReconciliation){bankPick={e,b};break;}}
   if(bankPick){const en=eventName(bankPick.e);sc.push({name:'Cuadre Banco',turns:[
     {prompt:variant(TPL.bank,seed,'full-bank',{event:en}),event:en,oracle:{kind:'bank-summary',event:en,data:bankPick.b}},
     {prompt:variant(TPL.bankFollow,seed,'full-bank-follow'),event:en,oracle:{kind:'bank-summary',event:en,data:bankPick.b}}
@@ -786,7 +836,7 @@ async function batteryBlueprint(state,rawSeed){
 
 export async function previewZuzuBattery({seed}={}){
   const state=await getState(); const b=await batteryBlueprint(state,seed);
-  return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(36,b.full.length),costEurRange:'0,12–0,50 €',hardCapSuggested:0.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT recorre conversaciones multiturno con ORÁCULO FUERTE y conserva pregunta + esperado + respuesta.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco se lee desde sus tablas normalizadas separadas; ningún modo modifica datos de producción.']};
+  return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(36,b.full.length),costEurRange:'0,12–0,50 €',hardCapSuggested:0.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT recorre conversaciones multiturno con ORÁCULO FUERTE y conserva pregunta + esperado + respuesta.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco solo se informa como Cuadre Banco cuando existe configuración/evidencia explícita del evento; el histórico general nunca se reconstruye como cuadre. Ningún modo modifica datos de producción.']};
 }
 
 function streamWrite(send,type,payload={}){ send({type,at:nowIso(),...payload}); }
@@ -921,7 +971,7 @@ export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},convers
   const m=trim(mode||savedCase?.mode).toUpperCase();
   if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('La repetición histórica solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
   const c=restoredHistoricalCase(savedCase,m);if(!c.id||!c.prompt){const e=new Error('La batería histórica no contiene una pregunta ejecutable.');e.status=422;throw e;}
-  const state=await getState();if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+  const state=await getState();await refreshHistoricalBankOracle(c,state);if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
   const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
   let r,nextConversationState=null;
   if(m==='AI-SMOKE'){
