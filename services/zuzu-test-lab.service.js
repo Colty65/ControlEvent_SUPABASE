@@ -93,6 +93,146 @@ function publicBatteryCase(c,mode=''){
 function makeCase({id,group,label,prompt='',expected='',meta={},run}){ return {id,group,label,prompt,expected,meta,run}; }
 function outcome(c,status,actual,extra={}){ return {id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:trim(actual),status,...extra}; }
 
+// FIX2.10 · ORÁCULO FUERTE -----------------------------------------------------
+// La ITV no debe aprobar una respuesta solo porque conserve la entidad correcta.
+// Estos helpers calculan la verdad esperada desde las tablas reales de CE, sin IA,
+// y validan CONTEXTO + CONTENIDO factual + calidad mínima de respuesta.
+function firstNonEmpty(...values){ for(const v of values){const x=trim(v);if(x)return x;} return ''; }
+function ticketTextLocal(row){ return firstNonEmpty(row?.ticketDonacion,row?.ticket_donacion,row?.ticket,row?.ticketOtrosGastos,row?.ticket_otros_gastos); }
+function isDonationTicketLocal(v){ return /^DONADO\s+(TIENDA|SOCIO|OTROS)$/i.test(trim(v)); }
+function isPendingTicketLocal(v){ const raw=trim(v); return !raw || /PTE\.?\s*COMPRA|PENDIENTE/i.test(raw); }
+function lineAmountLocal(row){ return round(num(row?.unidades)*num(row?.precio),2); }
+function mapById(rows=[]){ const m=new Map(); for(const r of arr(rows)){const id=trim(r?.id);if(id)m.set(id,r);} return m; }
+function euro(v){ try{return Z.v26FormatEuro(num(v));}catch(_){return `${round(v,2).toFixed(2).replace('.',',')} €`;} }
+function parseLocalizedDisplayNumber(raw=''){
+  let s=trim(raw).replace(/\s/g,'').replace(/€/g,''); if(!s)return NaN;
+  const comma=s.lastIndexOf(','),dot=s.lastIndexOf('.');
+  if(comma>=0&&dot>=0){ if(comma>dot)s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/,/g,''); }
+  else if(comma>=0)s=s.replace(/\./g,'').replace(',','.');
+  else if((s.match(/\./g)||[]).length>1)s=s.replace(/\./g,'');
+  const n=Number(s); return Number.isFinite(n)?n:NaN;
+}
+function euroValues(value=''){
+  const out=[],re=/-?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,4})?|\d+(?:[.,]\d{1,4})?)\s*(?:€|euros?)/gi;let m;
+  while((m=re.exec(text(value)))){const n=parseLocalizedDisplayNumber(m[0]);if(Number.isFinite(n))out.push(round(n,2));}
+  return out;
+}
+function hasMoney(value,amount){ return euroValues(value).some(v=>moneyEq(v,amount)); }
+function resultBlob(result){ return `${trim(result?.title)}\n${trim(result?.answer)}`.trim(); }
+function resultCtx(result){ const c=result?.meta?.resultContext; return c&&typeof c==='object'?c:{}; }
+function resultEvidence(result){ const e=resultCtx(result)?.evidence; return e&&typeof e==='object'?e:null; }
+function resultDerived(result){ const d=resultCtx(result)?.derived; return d&&typeof d==='object'?d:null; }
+function tableRowsByKeys(result,keys=[]){
+  const wanted=new Set(arr(keys).map(trim)); let rows=[];
+  for(const t of arr(result?.tables)){ if(wanted.has(trim(t?.key))) rows=rows.concat(arr(t?.rows)); }
+  return rows;
+}
+function looksEmptyOrDeferred(result){
+  const a=trim(result?.answer),b=norm(`${result?.title||''} ${a}`);
+  if(!a)return true;
+  return /control\s*event ha conservado los datos canonicos|se ha omitido una interpretacion|voy a (?:consultar|revisar|buscar)|necesito (?:revisar|consultar) los registros/.test(b);
+}
+function claimsNoProducts(result){ return /no\s+(?:se\s+)?(?:encontraron|hay|hubo|constan|aparecen)[^.]{0,90}(?:productos?|compras?)/i.test(resultBlob(result)); }
+function hasNameInText(value,name){ const h=norm(value),toks=significant(name); if(yearOf(name)&&!h.includes(yearOf(name)))return false; return toks.length>0&&toks.filter(t=>h.includes(t)).length>=Math.min(2,toks.length); }
+
+function purchaseOracle(state,event){
+  const rr=Z.semanticResolveEntity(state,'event',event); if(!rr?.ok)return null;
+  const products=mapById(state?.productos),groups=new Map(); let total=0,records=0,totalUnits=0;
+  for(const row of arr(state?.compras)){
+    if(eventIdOf(row)!==trim(rr.id))continue; const tt=ticketTextLocal(row);
+    if(isDonationTicketLocal(tt)||isPendingTicketLocal(tt))continue;
+    const pid=trim(row?.productoId||row?.producto_id),prod=products.get(pid)||{},label=trim(prod?.nombre)||pid||'Sin producto',amount=lineAmountLocal(row),units=round(row?.unidades,3);
+    total+=amount; totalUnits+=units; records++;
+    const k=norm(label),g=groups.get(k)||{label,amount:0,units:0,records:0};g.amount+=amount;g.units+=units;g.records++;groups.set(k,g);
+  }
+  const rows=[...groups.values()].map(x=>({...x,amount:round(x.amount,2),units:round(x.units,3)}));
+  const byAmountDesc=rows.slice().sort((a,b)=>num(b.amount)-num(a.amount)||a.label.localeCompare(b.label,'es',{sensitivity:'base'}));
+  const byAmountAsc=rows.slice().sort((a,b)=>num(a.amount)-num(b.amount)||a.label.localeCompare(b.label,'es',{sensitivity:'base'}));
+  return{event:rr.nombre,eventId:rr.id,total:round(total,2),totalUnits:round(totalUnits,3),records,productCount:rows.length,rows,max:byAmountDesc[0]||null,min:byAmountAsc[0]||null};
+}
+async function eventOracle(state,event){
+  try{const r=await Z.v26ExecuteTool({id:'itv_oracle_event',name:'event_dossier',event,scope:'named_event',detail:'brief'},state,'');return{event:trim(r?.facts?.event)||event,income:round(r?.facts?.income_total,2),purchases:round(r?.facts?.purchases_realized,2),pending:round(r?.facts?.purchases_pending,2),donations:round(r?.facts?.donations_value,2),balance:round(r?.facts?.operating_balance,2),valuation:round(r?.facts?.event_valuation,2),attendees:round(r?.facts?.attendees_canonical,3),status:trim(r?.facts?.status)};}catch(_){return null;}
+}
+async function comparisonOracle(state,events=[]){
+  try{const r=await Z.v26ExecuteTool({id:'itv_oracle_compare',name:'compare_events',events:arr(events),detail:'standard'},state,'');const rows=arr(toolTable(r,'comparison')?.rows).map(x=>({event:trim(x?.Evento),income:round(x?.Ingresos,2),purchases:round(x?.['Compras realizadas'],2),pending:round(x?.['Compras pendientes'],2),donations:round(x?.['Donaciones valoradas'],2),balance:round(x?.['Saldo operativo'],2),valuation:round(x?.['Valoración del evento'],2),attendees:round(x?.['Asistentes canónicos'],3)}));return rows.length>=2?{events:rows.map(x=>x.event),rows}:null;}catch(_){return null;}
+}
+async function personOracle(state,person,event=''){
+  try{const args={id:'itv_oracle_person',name:'person_dossier',person,scope:event?'named_event':'all_events',detail:'brief'};if(event)args.event=event;const r=await Z.v26ExecuteTool(args,state,'');const f=r?.facts||{};return{person:trim(f.person)||person,event:trim(f.scope_event),eventCount:num(f.event_count),income:round(f.income_linked_total,2),purchases:round(f.purchase_responsibility_total,2),donations:round(f.donations_value,2),purchaseRecords:num(f.purchase_responsibility_records),donationRecords:num(f.donation_records),summaryRows:arr(toolTable(r,'summary_by_event')?.rows),incomeRows:arr(toolTable(r,'income_by_event')?.rows)};}catch(_){return null;}
+}
+function metricWinner(compare,metric){
+  const rows=arr(compare?.rows); if(rows.length<2)return null; const sorted=rows.slice().sort((a,b)=>num(b?.[metric])-num(a?.[metric])||trim(a.event).localeCompare(trim(b.event),'es'));const winner=sorted[0],runner=sorted[1];return{winner,runner,diff:round(num(winner?.[metric])-num(runner?.[metric]),metric==='attendees'?3:2)};
+}
+function expectedOracleText(oracle){
+  if(!oracle)return'';
+  if(oracle.kind==='purchase-set')return `${oracle.event}: ${oracle.productCount} productos · ${euro(oracle.total)}`;
+  if(oracle.kind==='purchase-max'||oracle.kind==='purchase-min')return `${oracle.row?.label||'—'} · ${euro(oracle.row?.amount||0)}`;
+  if(oracle.kind==='purchase-sum')return `${oracle.event}: ${euro(oracle.total)}`;
+  if(oracle.kind==='compare-metric'){const w=metricWinner(oracle.compare,oracle.metric);return w?`${w.winner.event} · ${euro(w.winner[oracle.metric])} · diferencia ${euro(w.diff)}`:'';}
+  if(oracle.kind==='person-income'&&oracle.known!==false)return `${oracle.person}: ${euro(oracle.total)}`;
+  if(oracle.kind==='person-relation'&&oracle.known!==false)return `${oracle.person} ${oracle.related?'SÍ':'NO'} tiene relación con ${oracle.event}`;
+  if(oracle.kind==='event-economy')return `${oracle.event}: ingresos ${euro(oracle.data?.income)} · compras ${euro(oracle.data?.purchases)} · saldo ${euro(oracle.data?.balance)}`;
+  return'';
+}
+function oracleFail(reasons=[]){return{ok:false,reasons:arr(reasons).filter(Boolean)};}
+function oraclePass(){return{ok:true,reasons:[]};}
+function validateOracle(caseDef,result){
+  const reasons=[],oracle=caseDef?.oracle||null,blob=resultBlob(result),ctx=resultCtx(result),ev=resultEvidence(result),derived=resultDerived(result);
+  if(!result?.ok)reasons.push('result.ok=false');
+  if(caseDef?.requireAnswer!==false&&looksEmptyOrDeferred(result))reasons.push(!trim(result?.answer)?'respuesta vacía':'respuesta aplazada/genérica sin resolver el dato');
+  if(caseDef?.event&&!resultHasEvent(result,caseDef.event))reasons.push(`foco de evento distinto de ${caseDef.event}`);
+  if(arr(caseDef?.events).length&&!arr(caseDef.events).every(n=>resultHasEvent(result,n)))reasons.push('la comparación no conserva todos los eventos');
+  if(caseDef?.person&&!resultHasPerson(result,caseDef.person))reasons.push(`sujeto distinto de ${caseDef.person}`);
+  if(!oracle)return reasons.length?oracleFail(reasons):oraclePass();
+
+  if(oracle.kind==='purchase-set'){
+    if(oracle.productCount>0&&claimsNoProducts(result))reasons.push(`afirma que no hay productos, pero CE tiene ${oracle.productCount}`);
+    if(ev?.kind==='product_set'){
+      if(trim(ev.filterProduct))reasons.push(`aplicó un filtro de producto no pedido: ${ev.filterProduct}`);
+      if(num(ev.productCount||ev.distinctCount)!==num(oracle.productCount))reasons.push(`conteo de productos ${num(ev.productCount||ev.distinctCount)} != ${oracle.productCount}`);
+      if(!moneyEq(ev.totalAmount,oracle.total))reasons.push(`total del result-set ${euro(ev.totalAmount)} != ${euro(oracle.total)}`);
+    }else{
+      const rows=arr(result?.tables).flatMap(t=>arr(t?.rows)).filter(r=>trim(r?.Producto||r?.label));
+      const labels=new Set(rows.map(r=>norm(r?.Producto||r?.label)).filter(Boolean));
+      if(oracle.productCount>0&&labels.size===0)reasons.push('no entrega un result-set de productos verificable');
+    }
+  }else if(oracle.kind==='purchase-max'||oracle.kind==='purchase-min'){
+    const op=oracle.kind==='purchase-max'?'max':'min',row=oracle.row;
+    if(!row)reasons.push('el oráculo no tiene producto esperado');
+    else if(derived?.operation===op){if(norm(derived.label)!==norm(row.label))reasons.push(`${op} producto ${derived.label||'—'} != ${row.label}`);if(!moneyEq(derived.value,row.amount))reasons.push(`${op} importe ${euro(derived.value)} != ${euro(row.amount)}`);}
+    else{if(!hasNameInText(blob,row.label))reasons.push(`no identifica el producto esperado: ${row.label}`);if(!hasMoney(blob,row.amount))reasons.push(`no devuelve el importe esperado: ${euro(row.amount)}`);}
+  }else if(oracle.kind==='purchase-sum'){
+    if(derived?.operation==='sum'){if(!moneyEq(derived.value,oracle.total))reasons.push(`suma ${euro(derived.value)} != ${euro(oracle.total)}`);}
+    else if(!hasMoney(blob,oracle.total))reasons.push(`no devuelve la suma canónica ${euro(oracle.total)}`);
+  }else if(oracle.kind==='comparison'){
+    if(!oracle.compare?.rows?.length)reasons.push('sin comparación canónica de referencia');
+    const ce=ev?.kind==='event_comparison'?arr(ev.rows):[];
+    if(ce.length>=2){for(const expected of oracle.compare.rows){const got=ce.find(r=>norm(r.event)===norm(expected.event));if(!got){reasons.push(`falta ${expected.event} en evidencia comparativa`);continue;}for(const k of ['income','purchases','donations','balance'])if(!moneyEq(got[k],expected[k]))reasons.push(`${expected.event} ${k} no coincide`);}}
+  }else if(oracle.kind==='compare-metric'){
+    const w=metricWinner(oracle.compare,oracle.metric);if(!w)reasons.push('sin ganador canónico');else if(derived?.operation==='comparison_max'){
+      if(norm(derived.winner)!==norm(w.winner.event))reasons.push(`ganador ${derived.winner||'—'} != ${w.winner.event}`);
+      if(!moneyEq(derived.difference,w.diff))reasons.push(`diferencia ${euro(derived.difference)} != ${euro(w.diff)}`);
+    }else{if(!hasNameInText(blob,w.winner.event))reasons.push(`no identifica ganador ${w.winner.event}`);if(!hasMoney(blob,w.winner[oracle.metric]))reasons.push(`no contiene valor ganador ${euro(w.winner[oracle.metric])}`);}
+  }else if(oracle.kind==='event-economy'){
+    const d=oracle.data;if(d){const values=[d.balance,d.income,d.purchases].filter(v=>Number.isFinite(Number(v)));if(values.length&&!values.some(v=>hasMoney(blob,v)))reasons.push('no contiene ninguna magnitud económica canónica esperada');}
+  }else if(oracle.kind==='person-summary'){
+    if(!trim(result?.answer))reasons.push('resumen personal vacío');
+    if(oracle.data&&oracle.data.eventCount>0&&!hasNameInText(blob,oracle.person)&&!resultHasPerson(result,oracle.person))reasons.push('no mantiene la identidad personal');
+  }else if(oracle.kind==='person-events'){
+    const names=arr(oracle.data?.summaryRows).map(r=>trim(r?.Evento)).filter(Boolean);if(names.length&&!names.some(n=>hasNameInText(blob,n))&&arr(result?.tables).length===0)reasons.push('no muestra ningún evento real de la persona');
+  }else if(oracle.kind==='person-income'){
+    if(oracle.known!==false&&!hasMoney(blob,oracle.total))reasons.push(`ingreso vinculado no coincide con ${euro(oracle.total)}`);
+  }else if(oracle.kind==='person-relation'){
+    if(oracle.known!==false){const neg=/\bno\s+(?:figura|aparece|tiene|consta|se\s+encuentra)|ninguna\s+relaci[oó]n|no\s+se\s+encontr/i.test(blob),pos=/\bsi\b|\bsí\b|figura|aparece|tiene\s+relaci[oó]n|vinculad/i.test(blob);
+    if(oracle.related&&neg&&!pos)reasons.push('niega una relación que sí existe');
+    if(!oracle.related&&!neg)reasons.push('no niega una relación que CE no registra');}
+  }
+  return reasons.length?oracleFail(reasons):oraclePass();
+}
+function validatePaidCase(caseDef,result){
+  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result);
+  return{ok:base&&oracle.ok,reasons:[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons]};
+}
+
 async function buildRealFastCases(state,seed){
   const events=arr(state?.eventos).filter(e=>trim(e?.id)&&eventName(e));
   const people=arr(state?.personas).filter(p=>trim(p?.id)&&personName(p) && !/^z[_ -]?dev/i.test(personName(p)));
@@ -245,7 +385,7 @@ const TPL={
 
 function buildAiSmokeCases(state,max=40,seed=1){
   const {events,withPurchases,sibling}=chooseEvents(state,seed),{sample:people}=choosePeople(state,seed),cases=[];
-  const add=c=>{if(cases.length<max)cases.push(c);};
+  const add=c=>{if(!trim(c?.expected))c.expected=trim(c?.expectedEvent)?`Evento: ${trim(c.expectedEvent)}`:arr(c?.expectedEvents).length?`Eventos: ${arr(c.expectedEvents).join(' ↔ ')}`:trim(c?.expectedPerson)?`Persona: ${trim(c.expectedPerson)}`:'Regla/invariante satisfecha';if(cases.length<max)cases.push(c);};
   const eventSample=events.slice(0,Math.min(6,events.length));
   eventSample.forEach((e,i)=>{const name=eventName(e),prompt=variant(TPL.event,seed,`smoke-event-${i}`,{event:name});add({id:`ai-event-${i}-${key(e.id)}`,group:'EVENTOS',label:`IA identifica evento · ${name}`,prompt,expectedEvent:name,validate:r=>resultHasEvent(r,name)});});
   withPurchases.slice(0,Math.min(5,withPurchases.length)).forEach((e,i)=>{const name=eventName(e),prompt=variant(TPL.purchases,seed,`smoke-purchase-${i}`,{event:name});add({id:`ai-purchases-${i}-${key(e.id)}`,group:'COMPRAS',label:`IA selecciona compras · ${name}`,prompt,expectedEvent:name,validate:r=>resultHasEvent(r,name) && arr(r?.meta?.tools).some(t=>/event_(?:breakdowns|purchase_lines|dossier)/.test(t))});});
@@ -264,54 +404,54 @@ function buildAiSmokeCases(state,max=40,seed=1){
   return cases.slice(0,max);
 }
 
-function buildFullCertScenarios(state,maxTurns=24,seed=1){
+async function buildFullCertScenarios(state,maxTurns=24,seed=1){
   const {events,withPurchases,sibling}=chooseEvents(state,seed),{sample:people}=choosePeople(state,seed); const sc=[];
-  if(events.length>=2){const a=events[0],b=events.find(x=>trim(x.id)!==trim(a.id));if(b){const an=eventName(a),bn=eventName(b);sc.push({name:'Cambio de evento',turns:[
-    {prompt:variant(TPL.event,seed,'full-event-a',{event:an}),event:an},
-    {prompt:variant(TPL.economyFollow,seed,'full-economy-a'),event:an},
-    {prompt:variant(TPL.switchEvent,seed,'full-switch-b',{event:bn}),event:bn},
-    {prompt:variant(TPL.highlightFollow,seed,'full-highlight-b'),event:bn}
+  if(events.length>=2){const a=events[0],b=events.find(x=>trim(x.id)!==trim(a.id));if(b){const an=eventName(a),bn=eventName(b),ao=await eventOracle(state,an),bo=await eventOracle(state,bn);sc.push({name:'Cambio de evento',turns:[
+    {prompt:variant(TPL.event,seed,'full-event-a',{event:an}),event:an,oracle:{kind:'event-summary',event:an,data:ao}},
+    {prompt:variant(TPL.economyFollow,seed,'full-economy-a'),event:an,oracle:{kind:'event-economy',event:an,data:ao}},
+    {prompt:variant(TPL.switchEvent,seed,'full-switch-b',{event:bn}),event:bn,oracle:{kind:'event-summary',event:bn,data:bo}},
+    {prompt:variant(TPL.highlightFollow,seed,'full-highlight-b'),event:bn,oracle:{kind:'event-summary',event:bn,data:bo}}
   ]});}}
-  if(sibling.length>=2){const a=sibling[0],b=sibling[1],an=eventName(a),bn=eventName(b);sc.push({name:'Comparación persistente',turns:[
-    {prompt:variant(TPL.compare,seed,'full-compare',{a:an,b:bn}),events:[an,bn]},
-    {prompt:variant(TPL.compareIncomeFollow,seed,'full-compare-income'),events:[an,bn]},
-    {prompt:variant(TPL.comparePurchasesFollow,seed,'full-compare-purchases'),events:[an,bn]}
+  if(sibling.length>=2){const a=sibling[0],b=sibling[1],an=eventName(a),bn=eventName(b),cmp=await comparisonOracle(state,[an,bn]);sc.push({name:'Comparación persistente',turns:[
+    {prompt:variant(TPL.compare,seed,'full-compare',{a:an,b:bn}),events:[an,bn],oracle:{kind:'comparison',compare:cmp}},
+    {prompt:variant(TPL.compareIncomeFollow,seed,'full-compare-income'),events:[an,bn],oracle:{kind:'compare-metric',compare:cmp,metric:'income'}},
+    {prompt:variant(TPL.comparePurchasesFollow,seed,'full-compare-purchases'),events:[an,bn],oracle:{kind:'compare-metric',compare:cmp,metric:'purchases'}}
   ]});
   const byYear=[a,b].slice().sort((x,y)=>Number(yearOf(eventName(x)))-Number(yearOf(eventName(y))));const first=byYear[0],second=byYear[1],y=yearOf(eventName(second));sc.push({name:'Referencia temporal relativa',turns:[
-    {prompt:variant(TPL.event,seed,'full-relative-start',{event:eventName(first)}),event:eventName(first)},
-    {prompt:variant(TPL.relativeNext,seed,'full-relative-next',{year:y}),event:eventName(second)}
+    {prompt:variant(TPL.event,seed,'full-relative-start',{event:eventName(first)}),event:eventName(first),oracle:{kind:'event-summary',event:eventName(first),data:await eventOracle(state,eventName(first))}},
+    {prompt:variant(TPL.relativeNext,seed,'full-relative-next',{year:y}),event:eventName(second),oracle:{kind:'event-summary',event:eventName(second),data:await eventOracle(state,eventName(second))}}
   ]});}
-  if(withPurchases[0]){const e=withPurchases[0],en=eventName(e);sc.push({name:'Result-set de compras',turns:[
-    {prompt:variant(TPL.listProducts,seed,'full-products',{event:en}),event:en},
-    {prompt:variant(TPL.maxFollow,seed,'full-max'),event:en},
-    {prompt:variant(TPL.minFollow,seed,'full-min'),event:en},
-    {prompt:variant(TPL.sumFollow,seed,'full-sum'),event:en}
+  if(withPurchases[0]){const e=withPurchases[0],en=eventName(e),po=purchaseOracle(state,en);sc.push({name:'Result-set de compras',turns:[
+    {prompt:variant(TPL.listProducts,seed,'full-products',{event:en}),event:en,oracle:{kind:'purchase-set',...(po||{event:en,total:0,productCount:0})}},
+    {prompt:variant(TPL.maxFollow,seed,'full-max'),event:en,oracle:{kind:'purchase-max',event:en,row:po?.max||null}},
+    {prompt:variant(TPL.minFollow,seed,'full-min'),event:en,oracle:{kind:'purchase-min',event:en,row:po?.min||null}},
+    {prompt:variant(TPL.sumFollow,seed,'full-sum'),event:en,oracle:{kind:'purchase-sum',event:en,total:po?.total||0}}
   ]});}
-  if(people.length>=2){const p1=people[0],p2=people[1],n1=personName(p1),n2=personName(p2);sc.push({name:'Cambio de persona',turns:[
-    {prompt:variant(TPL.person,seed,'full-person-1',{person:n1}),person:n1},
-    {prompt:variant(TPL.eventsPersonFollow,seed,'full-person-events'),person:n1},
-    {prompt:variant(TPL.switchPerson,seed,'full-person-switch',{person:n2}),person:n2},
-    {prompt:variant(TPL.incomePersonFollow,seed,'full-person-income'),person:n2}
+  if(people.length>=2){const p1=people[0],p2=people[1],n1=personName(p1),n2=personName(p2),p1o=await personOracle(state,n1),p2o=await personOracle(state,n2);sc.push({name:'Cambio de persona',turns:[
+    {prompt:variant(TPL.person,seed,'full-person-1',{person:n1}),person:n1,oracle:{kind:'person-summary',person:n1,data:p1o}},
+    {prompt:variant(TPL.eventsPersonFollow,seed,'full-person-events'),person:n1,oracle:{kind:'person-events',person:n1,data:p1o}},
+    {prompt:variant(TPL.switchPerson,seed,'full-person-switch',{person:n2}),person:n2,oracle:{kind:'person-summary',person:n2,data:p2o}},
+    {prompt:variant(TPL.incomePersonFollow,seed,'full-person-income'),person:n2,oracle:{kind:'person-income',person:n2,total:p2o?.income||0,known:!!p2o}}
   ]});
-  if(events[0]){const en=eventName(events[0]);sc.push({name:'Cruce persona y evento',turns:[
-    {prompt:variant(TPL.event,seed,'full-cross-event',{event:en}),event:en},
-    {prompt:variant(TPL.person,seed,'full-cross-person',{person:n1}),person:n1},
-    {prompt:variant(TPL.relationFollow,seed,'full-cross-relation'),event:en,person:n1}
+  if(events[0]){const en=eventName(events[0]),rel=await personOracle(state,n1,en),related=!!(rel&&(rel.eventCount>0||Math.abs(rel.income)>0||Math.abs(rel.purchases)>0||Math.abs(rel.donations)>0));sc.push({name:'Cruce persona y evento',turns:[
+    {prompt:variant(TPL.event,seed,'full-cross-event',{event:en}),event:en,oracle:{kind:'event-summary',event:en,data:await eventOracle(state,en)}},
+    {prompt:variant(TPL.person,seed,'full-cross-person',{person:n1}),person:n1,oracle:{kind:'person-summary',person:n1,data:p1o}},
+    {prompt:variant(TPL.relationFollow,seed,'full-cross-relation'),event:en,person:n1,oracle:{kind:'person-relation',event:en,person:n1,related,known:!!rel,data:rel}}
   ]});}}
-  const out=[]; for(const s of sc){for(const t of s.turns){if(out.length>=maxTurns)break;out.push({...t,scenario:s.name,id:`full-${out.length+1}-${key(s.name)}-${normalizeSeed(seed).toString(36).slice(-4)}`});} if(out.length>=maxTurns)break;}
+  const out=[]; for(const s of sc){for(const t of s.turns){if(out.length>=maxTurns)break;const expected=expectedOracleText(t.oracle)||(t.event?`Evento: ${t.event}`:arr(t.events).length?`Eventos: ${t.events.join(' ↔ ')}`:t.person?`Persona: ${t.person}`:'Regla/invariante satisfecha');out.push({...t,expected,scenario:s.name,id:`full-${out.length+1}-${key(s.name)}-${normalizeSeed(seed).toString(36).slice(-4)}`});} if(out.length>=maxTurns)break;}
   return out;
 }
 
 async function batteryBlueprint(state,rawSeed){
   const seed=normalizeSeed(rawSeed);
-  const fast=await buildRealFastCases(state,seed); const smoke=buildAiSmokeCases(state,40,seed); const full=buildFullCertScenarios(state,30,seed);
+  const fast=await buildRealFastCases(state,seed); const smoke=buildAiSmokeCases(state,40,seed); const full=await buildFullCertScenarios(state,30,seed);
   const counts={events:arr(state?.eventos).length,people:arr(state?.personas).length,products:arr(state?.productos).length,stores:arr(state?.tiendas).length,purchases:arr(state?.compras).length,incomes:arr(state?.colaboradores).length,bankMovements:arr(state?.bankMovements||state?.movimientosBanco||state?.movimientos_banco).length};
   return {seed,counts,fast,smoke,full};
 }
 
 export async function previewZuzuBattery({seed}={}){
   const state=await getState(); const b=await batteryBlueprint(state,seed);
-  return {ok:true,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(24,b.smoke.length),costEurRange:'0,05–0,25 €',hardCapSuggested:0.25},'FULL-CERT':{turns:Math.min(18,b.full.length),costEurRange:'0,10–0,50 €',hardCapSuggested:0.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'FAST usa datos reales y 0 llamadas IA.','AI-SMOKE se ejecuta caso a caso para no agotar la duración máxima de una función serverless.','FULL-CERT puede ejecutarse turno a turno conservando el contexto de conversación en el cliente.','Ningún modo modifica datos de producción.']};
+  return {ok:true,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(24,b.smoke.length),costEurRange:'0,05–0,25 €',hardCapSuggested:0.25},'FULL-CERT':{turns:Math.min(18,b.full.length),costEurRange:'0,10–0,50 €',hardCapSuggested:0.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'FAST usa datos reales y 0 llamadas IA.','AI-SMOKE se ejecuta caso a caso para no agotar la duración máxima de una función serverless.','FULL-CERT puede ejecutarse turno a turno conservando el contexto de conversación en el cliente.','FIX2.10 ORÁCULO FUERTE: FULL-CERT verifica contexto y también verdad canónica (totales, máximos, mínimos, comparaciones, persona/evento y respuestas no vacías).','Ningún modo modifica datos de producción.']};
 }
 
 function streamWrite(send,type,payload={}){ send({type,at:nowIso(),...payload}); }
@@ -367,8 +507,8 @@ async function runSmoke({state,cases,send,signal,maxCostEur=0.25,maxCases=24}){
     }else if(timed.error){
       r=outcome(c,'KO',timed.error?.message||String(timed.error));
     }else{
-      const result=timed.value,u=usageOf(result);costEur=round(costEur+u.costEur,6);calls+=u.calls;tokens+=u.tokens;const valid=c.validate?!!c.validate(result):!!result?.ok;
-      r=outcome(c,valid?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,260)}`,{usage:u,tools:arr(result?.meta?.tools)});
+      const result=timed.value,u=usageOf(result);costEur=round(costEur+u.costEur,6);calls+=u.calls;tokens+=u.tokens;const verdict=validatePaidCase(c,result);
+      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,260)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons});
     }
     r.durationMs=Date.now()-t0;done++;if(r.status==='OK')ok++;else if(r.status==='WARN')warn++;else{ko++;failures.push(r);}streamWrite(send,'case',{case:r,progress:{done,total,ok,warn,ko,percent:total?Math.round(done*100/total):100,costEur,calls,tokens}});
     if(costEur>=maxCostEur){streamWrite(send,'budget',{message:'Se ha alcanzado el presupuesto máximo configurado.',costEur});break;}
@@ -394,8 +534,8 @@ async function runFull({state,turns,send,signal,maxCostEur=0.50,maxCases=18}){
     }else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario});previousInteractionId='';}
     else{
       const result=timed.value,u=usageOf(result);costEur=round(costEur+u.costEur,6);calls+=u.calls;tokens+=u.tokens;
-      let valid=!!result?.ok;if(c.event)valid=valid&&resultHasEvent(result,c.event);if(c.events)valid=valid&&c.events.every(n=>resultHasEvent(result,n));if(c.person)valid=valid&&resultHasPerson(result,c.person);
-      r=outcome(c,valid?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,300)}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario});
+      const verdict=validatePaidCase(c,result);
+      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,300)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons});
       previousInteractionId=trim(result?.interactionId||result?.meta?.interactionId||'');
       history.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});
     }
@@ -423,7 +563,7 @@ export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationSta
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
     if(timed.timedOut) r=outcome(c,'WARN',`TIEMPO MÁXIMO: el caso superó ${Math.round(timeoutMs/1000)} s. Se cancela este caso y el cliente puede continuar con el siguiente.`,{timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});
     else if(timed.error) r=outcome(c,'KO',timed.error?.message||String(timed.error),{usage:{calls:1,tokens:0,costEur:reserve}});
-    else {const result=timed.value,u=usageOf(result),valid=c.validate?!!c.validate(result):!!result?.ok;r=outcome(c,valid?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,320)}`,{usage:u,tools:arr(result?.meta?.tools)});}
+    else {const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,320)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons});}
   } else {
     let cs=safeConversationState(conversationState);
     if(cs.scenario!==trim(c.scenario)) cs={previousInteractionId:'',history:[],scenario:trim(c.scenario)};
@@ -432,8 +572,8 @@ export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationSta
     if(timed.timedOut){r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno superó ${Math.round(timeoutMs/1000)} s. El siguiente turno reiniciará la cadena del escenario.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
     else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
     else {
-      const result=timed.value,u=usageOf(result);let valid=!!result?.ok;if(c.event)valid=valid&&resultHasEvent(result,c.event);if(c.events)valid=valid&&c.events.every(n=>resultHasEvent(result,n));if(c.person)valid=valid&&resultHasPerson(result,c.person);
-      r=outcome(c,valid?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario});
+      const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);
+      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons});
       const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});
       nextConversationState={previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};
     }
@@ -447,6 +587,6 @@ export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,ca
   const all=m==='AI-SMOKE'?b.smoke:m==='FULL-CERT'?b.full:b.fast; const selected=filterCases(all,caseIds);
   streamWrite(send,'start',{mode:m,seed:b.seed,dataCounts:b.counts,total:selected.length,source:'tablas reales de ControlEvent',maxCostEur:m==='FAST'?0:round(maxCostEur,2)});
   const result=m==='AI-SMOKE'?await runSmoke({state,cases:selected,send,signal,maxCostEur:Math.max(0.02,num(maxCostEur)||0.25),maxCases:maxCases||24}):m==='FULL-CERT'?await runFull({state,turns:selected,send,signal,maxCostEur:Math.max(0.02,num(maxCostEur)||0.50),maxCases:maxCases||18}):await runFast({state,cases:selected,send,signal});
-  streamWrite(send,'summary',{mode:m,...result,finishedAt:nowIso(),certified:result.ko===0&&!result.aborted&&result.done>0});
+  streamWrite(send,'summary',{mode:m,...result,finishedAt:nowIso(),certified:result.ko===0&&!result.aborted&&result.done===selected.length&&result.done>0});
   return result;
 }
