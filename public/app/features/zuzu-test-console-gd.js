@@ -39,7 +39,14 @@
   }
   function stopControlGuard(){if(controlGuard)clearInterval(controlGuard);controlGuard=null;}
 
-  function auth(){try{return window.authUser||window.__CONTROL_EVENT_USER__||window.ControlEventApp?.authUser||null;}catch(_){return null;}}
+  function auth(){
+    // CE conserva todavía una referencia léxica `authUser` en el bundle legacy.
+    // Leer solo window.authUser puede dejar el botón visible por CSS pero sin permiso funcional.
+    try{
+      const lexical=Function('return (typeof authUser!=="undefined" && authUser) ? authUser : null')();
+      return lexical||window.authUser||window.__CONTROL_EVENT_USER__||window.ControlEventApp?.authUser||window.ControlEventRuntime?.app?.authUser||null;
+    }catch(_){return window.authUser||window.__CONTROL_EVENT_USER__||window.ControlEventApp?.authUser||window.ControlEventRuntime?.app?.authUser||null;}
+  }
   function role(){const u=auth()||{};return text(u.nivel||u.Nivel).trim().toUpperCase();}
   function isGD(){return role()==='GD';}
   function actorHeader(){const u=auth()||{};return encodeURIComponent(JSON.stringify({nivel:role(),identificacion:text(u.identificacion||u.Identificacion),nombre:text(u.nombre||u.Nombre)}));}
@@ -73,10 +80,29 @@
 
   function injectButton(){
     const b=$('ceZuzuTestBtn');if(!b)return;
-    const visible=isGD();b.classList.toggle('hidden',!visible);b.style.display=visible?'':'none';
-    if(visible&&!b.__ztBound){b.__ztBound=true;b.onclick=e=>{e.preventDefault();e.stopPropagation();open();return false;};}
+    const visible=isGD();
+    b.classList.toggle('hidden',!visible);
+    // IMPORTANTE: varios estilos legacy de CE fuerzan #mainTabs .tab {display:flex!important}.
+    // La visibilidad GD debe ganar con un inline !important; de lo contrario el icono puede verse
+    // aunque el rol aún no esté resuelto y al pulsarlo open() se niega correctamente a abrir.
+    b.style.setProperty('display',visible?'flex':'none','important');
+    b.style.setProperty('pointer-events',visible?'auto':'none','important');
+    b.setAttribute('aria-hidden',visible?'false':'true');
+    if(visible){
+      b.disabled=false;
+      if(!b.__ztBound){b.__ztBound=true;b.onclick=e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();open();return false;};}
+    }
   }
   window.ceRefreshZuzuTestButton=injectButton;
+  window.ceOpenZuzuTest=()=>{injectButton();if(!isGD())return false;open();return false;};
+
+  // Delegación en captura: aunque algún render legacy reemplace/neutralice onclick de las pestañas,
+  // PRUEBAS ZUZU sigue abriendo. Se intercepta antes que la navegación genérica de #mainTabs.
+  document.addEventListener('click',e=>{
+    const b=e.target?.closest?.('#ceZuzuTestBtn');if(!b)return;
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();
+    injectButton();if(isGD())open();
+  },true);
 
 
   function modal(){return `<dialog id="ceZuzuTestOverlay"><div class="zt-modal">
@@ -339,5 +365,5 @@
   function printReport(){const mode=lastMode,c=modeCache[mode],s=c.summary||{},date=new Date().toLocaleString('es-ES'),body=c.rows.map(r=>`<tr><td class="${esc(r.status)}">${esc(r.status)}</td><td>${esc(r.group)}</td><td>${esc(r.label)}</td><td>${esc(r.prompt||'')}</td><td>${esc(r.expected||'')}</td><td>${esc(r.actual||'')}</td></tr>`).join('');if(!c.rows.length){alert('Este modo todavía no tiene resultados.');return;}const w=window.open('','_blank');if(!w){setPhase('El navegador ha bloqueado la ventana de impresión. Usa ⬇ INFORME para descargar el JSON.',true);return;}w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>ControlEvent - ITV Zuzu</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;margin:16px;color:#0f172a}h1{color:#075985}table{width:100%;border-collapse:collapse;font-size:8.5px;table-layout:fixed}th,td{border:1px solid #cbd5e1;padding:4px;vertical-align:top;overflow-wrap:anywhere}th:nth-child(1){width:5%}th:nth-child(2){width:8%}th:nth-child(3){width:13%}th:nth-child(4){width:22%}th:nth-child(5){width:20%}th:nth-child(6){width:32%}.OK{color:#15803d;font-weight:bold}.KO{color:#b91c1c;font-weight:bold}.WARN{color:#b45309;font-weight:bold}.summary{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0 12px}.summary b{font-size:16px}</style></head><body><h1>🧪 ITV de Zuzu · ${esc(mode)}</h1><p>${esc(date)} · semilla <b>${esc(batterySeed)}</b> · tablas reales · solo lectura</p><div class="summary"><span>OK <b>${fmtN(s.ok)}</b></span><span>AVISOS <b>${fmtN(s.warn)}</b></span><span>KO <b>${fmtN(s.ko)}</b></span><span>Llamadas IA <b>${fmtN(s.calls)}</b></span><span>Tokens <b>${fmtN(s.tokens)}</b></span><span>Coste <b>${fmtE(s.costEur)}</b></span></div><table><thead><tr><th>Estado</th><th>Grupo</th><th>Prueba</th><th>Pregunta realizada</th><th>Esperado</th><th>Respuesta Zuzu / Obtenido</th></tr></thead><tbody>${body}</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();}
 
 
-  style();window.addEventListener('controlevent:auth-changed',injectButton);document.addEventListener('DOMContentLoaded',injectButton);setInterval(injectButton,5000);injectButton();
+  style();window.addEventListener('controlevent:auth-changed',injectButton);document.addEventListener('DOMContentLoaded',injectButton);setInterval(injectButton,500);injectButton();
 })();
