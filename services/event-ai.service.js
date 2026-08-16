@@ -6133,7 +6133,11 @@ function v26ApplyPlannerGuardrails(plan,userPrompt,state,selectedEventId){
 
   // Preguntas humanas sobre una persona deben recibir un dossier completo sin obligar al usuario
   // a saber que puede aparecer en pareja/alias ni a pedir ingresos, compras o tareas por separado.
-  const hintedPerson=tools.find(t=>trim(t?.person))?.person||v26PersonHintFromPrompt(userPrompt,state);
+  // v2.0_exp FIX3 · la persona escrita literalmente por el usuario tiene prioridad
+  // sobre cualquier simplificación propuesta por el planificador. Esto es esencial
+  // para entidades registradas compuestas como «Julian y Pilar»: si el usuario nombra
+  // la pareja completa, no puede degradarse a «Pilar» o «Julian».
+  const hintedPerson=v26PersonHintFromPrompt(userPrompt,state)||tools.find(t=>trim(t?.person))?.person;
   const shortNaturalPerson=hintedPerson && intent.conversational && text(userPrompt).split(/\s+/).filter(Boolean).length<=14;
   if(intent.broadPerson||shortNaturalPerson){
     if(hintedPerson){
@@ -10079,7 +10083,7 @@ function v29RecentPersonSubject(state,userPrompt,conversationHistory=[]){
     const ctx=(turn?.resultContext&&typeof turn.resultContext==='object')?turn.resultContext:null;
     const ctxSubject=trim(ctx?.subject||ctx?.person||ctx?.persona);
     if(ctxSubject&&['person','donations','purchases','management','incomes','attendance'].includes(trim(ctx?.domain||'person'))){
-      const resolved=semanticResolveEntity(state,'person',ctxSubject);if(resolved?.ok)return resolved.nombre;
+      const resolved=v26ResolvePersonFamily(state,ctxSubject);if(resolved?.ok)return resolved.nombre;
     }
     const u=trim(turn?.user);if(!u)continue;
     const people=v26PersonHintsFromPrompt(u,state);if(people.length)return people[0];
@@ -10088,6 +10092,25 @@ function v29RecentPersonSubject(state,userPrompt,conversationHistory=[]){
   }
   return'';
 }
+function v29PersonEventsFollowupRequest(userPrompt){
+  const p=norm(userPrompt);
+  return /\b(?:en\s+que\s+eventos?|donde\s+aparece(?:\s+registrad[oa])?|eventos?\s+tiene\s+actividad|por\s+que\s+eventos?\s+se\s+mueve|en\s+que\s+eventos?\s+(?:aparece|figura|consta|participa))\b/.test(p);
+}
+async function v29DirectPersonEventsFollowup({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  if(!v29PersonEventsFollowupRequest(userPrompt))return null;
+  const person=v29RecentPersonSubject(state,userPrompt,conversationHistory);if(!person)return null;
+  const participation=await v26ToolParticipation({id:'v2_person_events_followup',name:'participation_events',person,detail:'full'},state);
+  if(!participation?.ok)return null;
+  const rows=arr(participation?.tables).find(t=>t?.key==='events')?.rows||[];
+  const events=semanticUnique(rows.map(r=>trim(r?.Evento)).filter(Boolean));
+  const resolved=trim(participation?.facts?.person)||person;
+  const answer=events.length
+    ? `${resolved} aparece registrado en ${v26CountPhrase(events.length,'evento','eventos')}: ${events.join(', ')}.`
+    : `${resolved} no aparece registrado en ningún evento.`;
+  zuzuTracePush(flowTrace,'v2.0_exp · Seguimiento personal por eventos','OK',`${resolved}: ${events.length} evento(s) materializados directamente desde participation_events.`);
+  return v281LocalResponse({title:`Eventos · ${resolved}`,answer,results:[participation],showTables:[],flowTrace,previousInteractionId,traceDirect:true,resultContext:{domain:'person',subject:resolved,focus:'participation'}});
+}
+
 function v29PersonPresentationIntent(userPrompt,conversationHistory=[]){
   const p=norm(userPrompt),prior=norm(arr(conversationHistory).slice(-4).map(t=>trim(t?.user)).join(' '));
   const wantsTable=/\b(tabla|tablas|tabular|formato\s+bonito)\b/.test(p);
@@ -10947,6 +10970,12 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
     const store=await v26ToolStorePurchases({id:'v326_direct_store_all_events',name:'store_purchases',store:storeMention.name,scope:'all_events',status:'realized',include_empty:false,detail:'full'},state,selectedEventId),f=store?.facts||{};
     return v281LocalResponse({title:`Compras · ${f.store||storeMention.name}`,answer:`En ${f.store||storeMention.name} constan ${v26CountPhrase(f.total_records||0,'registro de compra','registros de compra')} realizados en ${v26CountPhrase(f.event_count||0,'evento','eventos')}, por un total de ${v26FormatEuro(f.total_amount||0)}.`,results:[store],showTables:[{tool_id:store.id,table_key:'by_event'}],flowTrace,previousInteractionId,resultContext:{domain:'purchases',store:f.store||storeMention.name,event:'',focus:'store_all_events'}});
   }
+
+  // v2.0_exp FIX3 · seguimiento personal inequívoco «¿Dónde aparece registrado?»
+  // se responde desde participation_events y enumera eventos REALES. No se deja a
+  // Gemini contestar con una referencia genérica a una tabla que luego no materializa.
+  const personEventsFollowup=await v29DirectPersonEventsFollowup({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId});
+  if(personEventsFollowup)return personEventsFollowup;
 
   // v2.0_exp · el planificador transaccional estricto tiene prioridad sobre rutas
   // históricas de primera coincidencia. Una pregunta compuesta debe completar TODAS
