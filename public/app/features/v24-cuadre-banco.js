@@ -1252,9 +1252,9 @@
     if(dateFrom>dateTo){notice('La fecha de inicio bancaria no puede ser posterior a la fecha final.','warning',true);return;}
     const button=$('ceBankApplyPeriod'); if(button) button.disabled=true;
     try{
-      await api('/api/bank-reconciliation/event-period',{method:'PATCH',body:JSON.stringify({eventId:store.eventId,dateFrom,dateTo})});
+      await api('/api/bank-reconciliation/event-period',{method:'PATCH',body:JSON.stringify({eventId:store.eventId,dateFrom,dateTo,accountId:store.accountId})});
       store.dateFrom=dateFrom; store.dateTo=dateTo;
-      notice(`Periodo bancario aplicado: ${formatDate(dateFrom,false)} — ${formatDate(dateTo,false)}.`,'ok',true);
+      notice(`Periodo bancario aplicado y conciliación automática guardada: ${formatDate(dateFrom,false)} — ${formatDate(dateTo,false)}.`,'ok',true);
       await load({force:true,preserveNotice:true});
     }catch(error){notice(error.message,'error',true);}
     finally{if(button) button.disabled=store.readOnly;}

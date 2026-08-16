@@ -73,7 +73,7 @@ router.patch('/bank-reconciliation/event-period', asyncHandler(async (req,res) =
   const actor = requireBankRole(req);
   const eventId = eventIdFrom(req);
   await assertBankEventWritable(eventId);
-  res.json(await setBankEventPeriod(eventId,req.body?.dateFrom,req.body?.dateTo,actor));
+  res.json(await setBankEventPeriod(eventId,req.body?.dateFrom,req.body?.dateTo,actor,req.body?.accountId));
 }));
 router.post('/bank-reconciliation/import', asyncHandler(async (req,res) => {
   const actor = requireBankRole(req);

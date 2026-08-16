@@ -248,7 +248,8 @@ function incomeLinkFromDb(row){
     incomeId:text(row.income_id),
     incomeAmountSnapshot:cents(row.income_amount_snapshot),
     createdBy:text(row.created_by),
-    createdAt:text(row.created_at)
+    createdAt:text(row.created_at),
+    automatic:/^AUTO_INGRESO(?::|$)/i.test(text(row.created_by))
   };
 }
 function batchFromDb(row){
@@ -589,12 +590,12 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
     let matches=[];
     let associationMode='AUTO';
     if(explicit.length){
-      associationMode='MANUAL';
+      associationMode=explicit.every(link=>link.automatic===true)?'AUTO_GUARDADA':'MANUAL';
       matches=explicit.map(link=>{
         const current=catalogById.get(link.incomeId);
         return current
-          ? {...current,manual:true,linkId:link.id}
-          : {id:link.incomeId,eventId:link.eventId,personId:'',personName:'Ingreso '+link.incomeId,paymentMethod:'',amount:cents(link.incomeAmountSnapshot),imageUrl:'',createdAt:link.createdAt,updatedAt:'',manual:true,linkId:link.id,missing:true};
+          ? {...current,manual:link.automatic!==true,persistedAuto:link.automatic===true,linkId:link.id}
+          : {id:link.incomeId,eventId:link.eventId,personId:'',personName:'Ingreso '+link.incomeId,paymentMethod:'',amount:cents(link.incomeAmountSnapshot),imageUrl:'',createdAt:link.createdAt,updatedAt:'',manual:link.automatic!==true,persistedAuto:link.automatic===true,linkId:link.id,missing:true};
       });
     }else if(row.included&&!row.linkedToOtherEvent){
       const available=incomeCatalog.filter(item=>!used.has(item.id));
@@ -806,7 +807,82 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
   }catch(error){ throw friendlyDbError(error); }
 }
 
-export async function setBankEventPeriod(eventId,dateFrom,dateTo,actor={}){
+async function persistAutomaticIncomeReconciliation(eventId,accountId='',actor={}){
+  const selectedEvent=text(eventId);
+  if(!selectedEvent) return {removedLinks:0,removedStates:0,createdLinks:0,createdStates:0};
+  const actorName=text(actor.identificacion||actor.nombre)||'SISTEMA';
+  const autoTag=`AUTO_INGRESO:${actorName}`;
+
+  // Las asociaciones automáticas pertenecen al periodo actualmente aplicado. Al cambiar
+  // fechas se regeneran desde cero, pero SOLO se eliminan filas creadas por el motor AUTO.
+  // Cualquier asociación o estado corregido manualmente por el usuario se conserva.
+  const [existingIncomeRows,existingStateRows]=await Promise.all([
+    selectPaged(INCOME_LINKS_TABLE,{columns:'id,movement_id,event_id,income_id,income_amount_snapshot,created_by,created_at',order:'created_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)}),
+    selectPaged(EVENT_MOVEMENT_STATE_TABLE,{columns:'event_id,movement_id,included,updated_by,updated_at',order:'updated_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)})
+  ]);
+  const autoIncomeRows=arr(existingIncomeRows).filter(row=>/^AUTO_INGRESO(?::|$)/i.test(text(row.created_by)));
+  const autoStateRows=arr(existingStateRows).filter(row=>/^AUTO_INGRESO(?::|$)/i.test(text(row.updated_by)));
+  if(autoIncomeRows.length){
+    const ids=autoIncomeRows.map(row=>text(row.id)).filter(Boolean);
+    for(let i=0;i<ids.length;i+=200){
+      const {error}=await db().from(INCOME_LINKS_TABLE).delete().in('id',ids.slice(i,i+200));
+      if(error) throw error;
+    }
+  }
+  if(autoStateRows.length){
+    const movementIds=[...new Set(autoStateRows.map(row=>text(row.movement_id)).filter(Boolean))];
+    for(let i=0;i<movementIds.length;i+=200){
+      const {error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).delete().eq('event_id',selectedEvent).in('movement_id',movementIds.slice(i,i+200));
+      if(error) throw error;
+    }
+  }
+
+  // Se usa exactamente el mismo oráculo de asociación que ve la ventana. Solo se persisten
+  // abonos incluidos que quedan CUADRADOS al céntimo; una sugerencia PENDIENTE/EXCESO nunca
+  // se convierte en dato definitivo automáticamente.
+  const snapshot=await listBankReconciliation({eventId:selectedEvent,accountId:text(accountId)});
+  const candidates=arr(snapshot.movements).filter(row=>
+    num(row.amount)>0 &&
+    row.included===true &&
+    row.linkedToOtherEvent!==true &&
+    text(row.incomeAssociationMode).toUpperCase()==='AUTO' &&
+    text(row.incomeJustificationStatus).toUpperCase()==='CUADRADO' &&
+    arr(row.incomeLinks).length>0
+  );
+  const linkRows=[];
+  const stateRows=[];
+  for(const movement of candidates){
+    for(const income of arr(movement.incomeLinks)){
+      const incomeId=text(income?.id);
+      if(!incomeId) continue;
+      linkRows.push({
+        movement_id:text(movement.id),
+        event_id:selectedEvent,
+        income_id:incomeId,
+        income_amount_snapshot:cents(income.amount),
+        created_by:autoTag
+      });
+    }
+    stateRows.push({event_id:selectedEvent,movement_id:text(movement.id),included:true,updated_by:autoTag});
+  }
+  for(let i=0;i<linkRows.length;i+=200){
+    const {error}=await db().from(INCOME_LINKS_TABLE).insert(linkRows.slice(i,i+200));
+    if(error) throw error;
+  }
+  for(let i=0;i<stateRows.length;i+=200){
+    const {error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).upsert(stateRows.slice(i,i+200),{onConflict:'event_id,movement_id'});
+    if(error) throw error;
+  }
+  return {
+    removedLinks:autoIncomeRows.length,
+    removedStates:autoStateRows.length,
+    createdLinks:linkRows.length,
+    createdStates:stateRows.length,
+    movementIds:stateRows.map(row=>row.movement_id)
+  };
+}
+
+export async function setBankEventPeriod(eventId,dateFrom,dateTo,actor={},accountId=''){
   const selectedEvent=text(eventId);
   if(!selectedEvent) fail('Falta el evento activo.',409,'BANK_EVENT_REQUIRED');
   const period=normalizePeriod(dateFrom,dateTo);
@@ -814,7 +890,8 @@ export async function setBankEventPeriod(eventId,dateFrom,dateTo,actor={}){
     const row={event_id:selectedEvent,date_from:period.dateFrom,date_to:period.dateTo,updated_by:text(actor.identificacion||actor.nombre)};
     const {data,error}=await db().from(EVENT_SETTINGS_TABLE).upsert(row,{onConflict:'event_id'}).select('*').single();
     if(error) throw error;
-    return {ok:true,period:eventSettingFromDb(data)};
+    const automaticIncomePersistence=await persistAutomaticIncomeReconciliation(selectedEvent,accountId,actor);
+    return {ok:true,period:eventSettingFromDb(data),automaticIncomePersistence};
   }catch(error){ throw friendlyDbError(error); }
 }
 
