@@ -394,25 +394,40 @@ function eventFromDb(row = {}){
     finalized:/FINALIZADO/i.test(text(row.situacion || row.estado))
   };
 }
-function bankLifecycle(event,rowCount=0){
+function bankLifecycle(event,rowCount=0,{ticketsComplete=false,incomesComplete=false}={}){
   const hasRows=Number(rowCount)>0;
+  const complete=hasRows&&ticketsComplete===true&&incomesComplete===true;
   if(event?.finalized){
     if(!hasRows) return {
-      code:'FINALIZADO_SIN_CUADRE',
-      message:'ESTE EVENTO NO CUENTA CON CUADRE BANCARIO, EN CASO DE QUERER HACERLO, HAY QUE ABRIR EL EVENTO DE NUEVO, REALIZAR EL CUADRE Y VOLVER A CERRARLO'
+      code:'FINALIZADO_CUADRE_SIN_REALIZAR',
+      message:'CUADRE BANCARIO SIN REALIZAR',
+      complete:false
+    };
+    if(complete) return {
+      code:'FINALIZADO_CUADRE_REALIZADO',
+      message:'CUADRE BANCARIO REALIZADO',
+      complete:true
     };
     return {
-      code:'FINALIZADO_CUADRE_INCOMPLETO',
-      message:'EL EVENTO SE CERRÓ CON EL CUADRE BANCARIO SIN FINALIZAR, EN CASO DE QUERER REMATARLO HAY QUE ABRIR EL EVENTO DE NUEVO, REALIZAR EL CUADRE PENDIENTE Y VOLVER A CERRARLO'
+      code:'FINALIZADO_CUADRE_NO_TOTAL',
+      message:'CUADRE BANCARIO NO TOTALMENTE REALIZADO',
+      complete:false
     };
   }
-  if(hasRows) return {
-    code:'EN_CURSO_CUADRE_INICIADO',
-    message:'EL CUADRE BANCARIO DEL EVENTO ESTÁ EN CURSO'
+  if(!hasRows) return {
+    code:'EN_CURSO_CUADRE_SIN_INICIAR',
+    message:'CUADRE BANCARIO SIN INICIAR',
+    complete:false
+  };
+  if(complete) return {
+    code:'EN_CURSO_CUADRE_COMPLETO',
+    message:'CUADRE BANCARIO COMPLETO PERO EVENTO TODAVIA EN CURSO',
+    complete:true
   };
   return {
-    code:'EN_CURSO_SIN_CUADRE',
-    message:'EL CUADRE BANCARIO NO SE HA INICIADO'
+    code:'EN_CURSO_CUADRE_EN_CURSO',
+    message:'CUADRE BANCARIO EN CURSO',
+    complete:false
   };
 }
 async function loadEvent(eventId){
@@ -454,13 +469,22 @@ function reconcileMovement(row,links){
         : (Math.abs(difference) <= 0.01 ? 'CUADRADO' : (difference > 0 ? 'PENDIENTE' : 'EXCESO'))));
   return {...row,links,targetAmount:cents(target),justifiedAmount:justified,difference,forcedSquare,justificationStatus};
 }
-function eventTicketSummary(catalog,eventId){
+function eventTicketSummary(catalog,eventId,movements=[]){
   const tickets=catalog.filter(item=>item.eventId===eventId);
   const linked=tickets.filter(item=>item.linked).length;
   const total=tickets.length;
-  const ratio=total ? linked / total : 0;
-  const traffic=total && linked===total ? 'GREEN' : (ratio >= .5 ? 'ORANGE' : 'RED');
-  return {total,linked,pending:Math.max(0,total-linked),ratio,percentage:Math.round(ratio*100),allJustified:total>0&&linked===total,traffic};
+  const negativeIncluded=arr(movements).filter(row=>num(row.amount)<0&&row.included);
+  const movementJustified=negativeIncluded.filter(row=>['CUADRADO','CUADRADO_FORZADO'].includes(text(row.justificationStatus))).length;
+  const allCatalogLinked=total===0||linked===total;
+  const allMovementsJustified=negativeIncluded.length===0||movementJustified===negativeIncluded.length;
+  const allJustified=allCatalogLinked&&allMovementsJustified;
+  const ratio=total ? linked / total : (allMovementsJustified?1:0);
+  const traffic=allJustified?'GREEN':(ratio>=.5?'ORANGE':'RED');
+  return {
+    total,linked,pending:Math.max(0,total-linked),ratio,percentage:Math.round(ratio*100),allJustified,traffic,
+    movementTotal:negativeIncluded.length,movementJustified,movementPending:Math.max(0,negativeIncluded.length-movementJustified),
+    allCatalogLinked,allMovementsJustified
+  };
 }
 function confirmedBankIncome(value){
   const state=normalizeWords(value);
@@ -586,11 +610,21 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
   }
   const enriched=arr(rows).map(row=>traced.get(row.id)||row);
   const positive=enriched.filter(row=>num(row.amount)>0&&row.included);
-  const reconciled=positive.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
-  const total=positive.length;
-  const percentage=total?Math.round(reconciled/total*100):0;
-  const traffic=percentage>80?'GREEN':(percentage>50?'ORANGE':'RED');
-  return {movements:enriched,summary:{total,reconciled,pending:Math.max(0,total-reconciled),percentage,ratio:total?reconciled/total:0,traffic,allReconciled:total>0&&reconciled===total}};
+  const matchedIds=new Set();
+  for(const row of positive) for(const link of arr(row.incomeLinks)) if(trim(link?.id)) matchedIds.add(trim(link.id));
+  const total=arr(incomeCatalog).length;
+  const reconciled=[...matchedIds].filter(id=>catalogById.has(id)).length;
+  const movementReconciled=positive.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
+  const allCatalogLinked=total===0||reconciled===total;
+  const allMovementsReconciled=positive.length===0||movementReconciled===positive.length;
+  const allReconciled=allCatalogLinked&&allMovementsReconciled;
+  const percentage=total?Math.round(reconciled/total*100):(allMovementsReconciled?100:0);
+  const traffic=allReconciled?'GREEN':(percentage>50?'ORANGE':'RED');
+  return {movements:enriched,summary:{
+    total,reconciled,pending:Math.max(0,total-reconciled),percentage,ratio:total?reconciled/total:(allMovementsReconciled?1:0),traffic,allReconciled,
+    movementTotal:positive.length,movementReconciled,movementPending:Math.max(0,positive.length-movementReconciled),
+    allCatalogLinked,allMovementsReconciled
+  }};
 }
 
 export async function listBankReconciliation({accountId='',eventId=''} = {}){
@@ -653,7 +687,6 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const incomeMovementIds=new Set(arr(manualIncomeLinkRows).map(row=>text(row.movement_id)).filter(Boolean));
     const storedMovementIds=new Set([...stateMovementIds,...ticketMovementIds,...incomeMovementIds]);
     const reconciliationRowCount=storedMovementIds.size;
-    const lifecycle=bankLifecycle(event,reconciliationRowCount);
     const reconciliationEvidence={
       manualPeriod:periodExplicit,
       movementStates:arr(stateRows).length,
@@ -723,7 +756,11 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const movementById=new Map(ledger.movements.map(row=>[row.id,row]));
     const movements=visibleScoped.map(row=>({...row,...(movementById.get(row.id)||{})}));
     const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
-    const ticketSummary=eventTicketSummary(catalog,event.id);
+    const ticketSummary=eventTicketSummary(catalog,event.id,tracedScoped);
+    const lifecycle=bankLifecycle(event,reconciliationRowCount,{
+      ticketsComplete:ticketSummary.allJustified===true,
+      incomesComplete:incomeTrace.summary.allReconciled===true
+    });
     const cashIncome=cashIncomeTotal(event,collaboratorRows,personRows,eventPersonSnapshotRows);
     const eventIncome=cents(ledger.summary.income+cashIncome);
     const economicVariation=cents(eventIncome-ledger.summary.expense);
@@ -738,6 +775,9 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         status:lifecycle.code,
         message:lifecycle.message,
         eventFinalized:event.finalized,
+        complete:lifecycle.complete===true,
+        ticketsComplete:ticketSummary.allJustified===true,
+        incomesComplete:incomeTrace.summary.allReconciled===true,
         evidence:reconciliationEvidence,
         periodSource:periodExplicit?'MANUAL':(period?.saved===true?'INICIALIZACION_AUTOMATICA':'CALCULADO_NO_GUARDADO')
       },

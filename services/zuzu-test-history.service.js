@@ -85,3 +85,19 @@ export async function getZuzuTestRun(runKey=''){
     return {ok:true,storage:'ce_meta-fallback',run:publicRow(hit)};
   }
 }
+
+
+export async function deleteZuzuTestRun(runKey=''){
+  const key=trim(runKey);if(!key){const e=new Error('Falta runKey.');e.status=400;throw e;}
+  try{
+    const {error}=await db().from(TABLE).delete().eq('run_key',key);
+    if(error)throw error;
+    return {ok:true,storage:'ce_zuzu_test_runs',runKey:key};
+  }catch(error){
+    if(!isMissingTable(error))throw error;
+    const rows=await metaLoad();
+    const next=rows.filter(r=>trim(r?.run_key)!==key);
+    await metaSave(next);
+    return {ok:true,storage:'ce_meta-fallback',runKey:key};
+  }
+}

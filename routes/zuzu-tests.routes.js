@@ -1,7 +1,7 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
 import { assertGdActor, previewZuzuBattery, runZuzuTestCase, runSavedZuzuTestCase, runZuzuTestStream } from '../services/zuzu-test-lab.service.js';
-import { saveZuzuTestRun, listZuzuTestRuns, getZuzuTestRun } from '../services/zuzu-test-history.service.js';
+import { saveZuzuTestRun, listZuzuTestRuns, getZuzuTestRun, deleteZuzuTestRun } from '../services/zuzu-test-history.service.js';
 
 const router = express.Router();
 function actorFromRequest(req){
@@ -24,6 +24,11 @@ router.get('/zuzu-tests/history/:runKey', asyncHandler(async (req,res)=>{
 router.post('/zuzu-tests/history', asyncHandler(async (req,res)=>{
   const actor=await assertGdActor(actorFromRequest(req));
   res.json(await saveZuzuTestRun(req.body||{},actor));
+}));
+
+router.delete('/zuzu-tests/history/:runKey', asyncHandler(async (req,res)=>{
+  await assertGdActor(actorFromRequest(req));
+  res.json(await deleteZuzuTestRun(req.params.runKey));
 }));
 
 router.post('/zuzu-tests/history/:runKey/run-case', async (req,res,next)=>{

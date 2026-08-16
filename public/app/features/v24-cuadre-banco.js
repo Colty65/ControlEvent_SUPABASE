@@ -514,8 +514,8 @@
     headline.className=`ce-bank-event-headline ${event.finalized?'finalized':'in-progress'}`;
     headline.innerHTML=`<strong>${esc(event.title||'Evento')}</strong><span>${esc(event.status||'En curso')}</span>`;
     $('ceBankEventPeriod').textContent=finalSnapshot
-      ?(hasStoredRows?`Cuadre al cierre: ${storedCount} fila(s) almacenada(s)${displayFrom&&displayTo?` · ${formatDate(displayFrom,false)} — ${formatDate(displayTo,false)}`:''} · foto definitiva`:'Cuadre Banco no iniciado al cierre · el histórico general queda solo como referencia')
-      :`Periodo bancario: ${formatDate(store.dateFrom,false)} — ${formatDate(store.dateTo,false)} · fechas inclusivas`;
+      ?(hasStoredRows?`${rec.message||'CUADRE BANCARIO'} · ${storedCount} fila(s) almacenada(s)${displayFrom&&displayTo?` · ${formatDate(displayFrom,false)} — ${formatDate(displayTo,false)}`:''} · foto definitiva`:`${rec.message||'CUADRE BANCARIO SIN REALIZAR'} · el histórico general queda solo como referencia`)
+      :`${rec.message||'CUADRE BANCARIO'} · periodo ${formatDate(store.dateFrom,false)} — ${formatDate(store.dateTo,false)} · fechas inclusivas`;
     const trafficNode=$('ceBankTraffic');
     trafficNode.className=`ce-bank-traffic ${traffic.className}`;
     trafficNode.innerHTML=`<span class="ce-bank-traffic-light"><i></i><i></i><i></i></span><div><b>${num(tickets.linked)} / ${num(tickets.total)} TKxx</b><small>${esc(traffic.label)} · ${num(tickets.percentage)}%</small></div>`;
@@ -539,7 +539,7 @@
     const objective=economicVariation>=0?'El evento deja más recursos que al comenzar':'El evento reduce los recursos de partida';
     if(finalSnapshot&&!hasStoredRows){
       $('ceBankSummary').innerHTML=`
-        <article class="ce-bank-kpi ce-bank-kpi-hero"><div class="ce-bank-kpi-copy"><span>Estado definitivo del Cuadre Banco</span><strong>NO INICIADO AL CIERRE</strong><small>${esc(rec.message||'Este evento no cuenta con Cuadre Banco.')}</small></div></article>
+        <article class="ce-bank-kpi ce-bank-kpi-hero"><div class="ce-bank-kpi-copy"><span>Estado definitivo del Cuadre Banco</span><strong>${esc(rec.message||'CUADRE BANCARIO SIN REALIZAR')}</strong><small>El evento está cerrado y no conserva ninguna fila específica de Cuadre Banco.</small></div></article>
         <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Filas almacenadas del evento</span><strong>0</strong><small>No existe ninguna fila específica de Cuadre Banco para este evento.</small></article>
         <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver histórico general de la cuenta"><span>Histórico general de la cuenta</span><strong>SOLO REFERENCIA</strong><small>No se atribuye ningún movimiento, saldo ni variación de ese histórico al evento.</small><em class="ce-bank-chart-hint">Ver histórico general ↗</em></article>
         <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Datos bancarios específicos del evento</span><strong>NO EXISTEN</strong><small>Para crear el cuadre hay que reabrir el evento.</small></article>`;
@@ -548,7 +548,7 @@
         <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo antes de la primera fila almacenada</span><strong>${money(s.openingBalance)}</strong><small>Referencia calculada únicamente desde el primer movimiento guardado del Cuadre.</small></article>
         <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo tras la última fila almacenada</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} incluidas · ${num(s.excludedCount)} excluidas · ${storedCount} fila(s) guardada(s)</small></div></article>
         <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal del Cuadre almacenado"><span>Movimientos almacenados incluidos</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Impacto de las filas incluidas ${money(economicVariation)}</small><em class="ce-bank-chart-hint">Ver foto temporal ↗</em></article>
-        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Estado al cerrar el evento</span><strong>CUADRE SIN FINALIZAR</strong><small>${esc(rec.message||'El evento se cerró con filas de Cuadre Banco almacenadas.')}</small></article>`;
+        <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Estado al cerrar el evento</span><strong>${esc(rec.message||'CUADRE BANCARIO')}</strong><small>TKxx asociados: ${num(tickets.linked)}/${num(tickets.total)} · ingresos asociados: ${num(incomes.reconciled)}/${num(incomes.total)}.</small></article>`;
     }else{
       $('ceBankSummary').innerHTML=`
         <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo bancario inicial del periodo</span><strong>${money(s.openingBalance)}</strong><small>Saldo anterior al movimiento más antiguo del periodo de trabajo</small><div class="ce-bank-kpi-formula">Saldo posterior − importe (en un cargo se suma su valor absoluto)</div></article>
