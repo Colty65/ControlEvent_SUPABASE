@@ -8068,6 +8068,24 @@ function v305CanonicalClosureFromResults(userPrompt,results=[],history=[]){
     }
   }
 
+  if(/\b(matriz\s+econ[oó]mica|panorama\s+(?:global|general)|visi[oó]n\s+global|todos?\s+los?\s+eventos?|eventos?\s+registrados?)\b/.test(p)){
+    const r=latest('events_overview');
+    if(r){
+      const count=num(r?.facts?.event_count),answer=`Panorama global: ${count} evento${count===1?'':'s'} registrados en ControlEvent, con la matriz económica y de asistencia disponible para comparación.`;
+      return{title:'Panorama de eventos',answer,warnings:[],showTables:show(r,'events_overview'),chartSpecs:[]};
+    }
+  }
+
+  if(/\bcat[aá]logo\b/.test(p)){
+    const r=latest('master_catalog');
+    if(r){
+      const f=r.facts||{},count=num(f.record_count),entity=trim(f.entity)||'registros';
+      const labels={products:'productos',stores:'tiendas',people:'personas',events:'eventos'};
+      const label=labels[entity]||entity;
+      return{title:trim(r.title)||`Catálogo de ${label}`,answer:`El catálogo contiene ${count} registro${count===1?'':'s'} de ${label}.`,warnings:[],showTables:show(r,'catalog'),chartSpecs:[]};
+    }
+  }
+
   // Respaldo genérico de persona: si la IA ya pidió el dossier personal del turno actual,
   // nunca se retrocede al evento anterior por un 5xx o una respuesta final vacía.
   {
@@ -8080,7 +8098,7 @@ function v305CanonicalClosureFromResults(userPrompt,results=[],history=[]){
   }
   // Cambio explícito de evento: si Gemini ya pidió el dossier correcto pero intenta abrir
   // otra ronda, el dossier basta para confirmar el foco y evitar un 502 con fallback al evento previo.
-  if(/\b(vuelve|volvamos|regresa|regresemos|ahora\s+h[aá]blame|h[aá]blame|informaci[oó]n|resumen|evento)\b/.test(p)){
+  if(/\b(vuelve|volvamos|regresa|regresemos|ahora\s+h[aá]blame|h[aá]blame|informaci[oó]n|resumen|evento|sit[uú]ame|esencial|radiograf[ií]a|cu[eé]ntame|qu[eé]\s+me\s+puedes\s+decir|lo\s+m[aá]s\s+importante)\b/.test(p)){
     const r=latest('event_dossier');
     if(r){const f=r.facts||{},event=trim(f.event)||'este evento';return{title:`Resumen · ${event}`,answer:`${event} está ${trim(f.status)||'registrado'} del ${trim(f.start)||'—'} al ${trim(f.end)||'—'}. Ingresos ${v26FormatEuro(num(f.income_total))}, compras ${v26FormatEuro(num(f.purchases_realized))}, donaciones ${v26FormatEuro(num(f.donations_value))}, saldo operativo ${v26FormatEuro(num(f.operating_balance))} y valoración ${v26FormatEuro(num(f.event_valuation))}.`,warnings:[],showTables:[],chartSpecs:[]};}
   }
@@ -8610,8 +8628,8 @@ function v311DerivedAggregateRequest(userPrompt=''){
   if(/\b(cu[aá]ntas?\s+unidades|unidades\s+en\s+total|total\s+de\s+unidades)\b/.test(p))return'sum_units';
   if(/\b(cu[aá]ntos?\s+(?:productos?|art[ií]culos?|tipos?)\s+(?:distintos?|diferentes?)?|n[uú]mero\s+de\s+(?:productos?|art[ií]culos?))\b/.test(p))return'count';
   if(/\b(m[aá]s\s+car[oa]|mayor\s+(?:importe|valor|coste|precio)|m[aá]s\s+cost[oó]|producto\s+de\s+mayor\s+valor)\b/.test(p))return'max';
-  if(/\b(menos\s+car[oa]|menor\s+(?:importe|valor|coste|precio)|menos\s+cost[oó]|producto\s+de\s+menor\s+valor|(?:producto|art[ií]culo).{0,28}(?:cost[oó]|costaba)\s+menos|(?:cost[oó]|costaba)\s+menos)\b/.test(p))return'min';
-  if(/\b(cu[aá]nto\s+suman|cu[aá]nto\s+suma|suman\s+(?:todas?|todos?|estas?|estos?|esas?|esos?)|cu[aá]l\s+es\s+el\s+total|total(?:izan)?\s+(?:todas?|todos?|estas?|estos?|esas?|esos?))\b/.test(p))return'sum';
+  if(/\b(menos\s+car[oa]|m[aá]s\s+barat[oa]|menor\s+(?:importe|valor|coste|precio)|menos\s+cost[oó]|producto\s+de\s+menor\s+valor|(?:producto|art[ií]culo).{0,28}(?:cost[oó]|costaba)\s+menos|(?:cost[oó]|costaba)\s+menos)\b/.test(p))return'min';
+  if(/\b(cu[aá]nto\s+suman|cu[aá]nto\s+suma|suman\s+(?:todas?|todos?|estas?|estos?|esas?|esos?)|cu[aá]l\s+es\s+el\s+total|total(?:izan)?\s+(?:todas?|todos?|estas?|estos?|esas?|esos?)|(?:dame|dime|mu[eé]strame)\s+el\s+total\s+de\s+(?:esos?|estos?|esas?|estas?)\s+(?:productos?|art[ií]culos?))\b/.test(p))return'sum';
   if(/\b(?:lista|listado|enumera|mu[eé]strame)\b.*\b(?:productos?|art[ií]culos?)\b/.test(p))return'list';
   if(/^\s*(?:qu[eé]|cu[aá]les)\b.*\b(?:fueron|son|eran)\b/.test(p)&&!/(donantes?|personas?|socios?|asistentes?|tiendas?|eventos?)/.test(p))return'list';
   return'';
@@ -8768,7 +8786,7 @@ function v314CompoundCoverageRepair(final,results=[],userPrompt='',state=null,fl
 function v314UnsupportedConsumptionAttribution(userPrompt='',eventFocus=null,flowTrace=[],previousInteractionId=''){
   const p=norm(userPrompt).replace(/[^a-z0-9ñ\s]/g,' ');
   const asksWho=/\b(?:quien|que\s+persona|cual\s+persona)\b/.test(p);
-  const unsupported=/\b(?:bebio|comio|consumio|tomo|uso)\b/.test(p)||/\b(?:gasto|pago|desembolso)\s+(?:mas\s+)?(?:dinero\s+)?personalmente\b|\bpago\s+(?:mas\s+)?(?:dinero\s+)?de\s+su\s+bolsillo\b/.test(p);
+  const unsupported=/\b(?:bebio|comio|consumio|tomo|uso)\b/.test(p)||/\b(?:gasto|pago|desembolso)\b.{0,55}\bpersonalmente\b|\bpago\s+(?:mas\s+)?(?:dinero\s+)?de\s+su\s+bolsillo\b/.test(p);
   // «responsable de compras» sí es una relación registrada y no entra en esta guardia.
   if(!asksWho||!unsupported||/\bresponsable\b/.test(p))return null;
   const event=trim(eventFocus?.event);
@@ -8876,7 +8894,7 @@ function v30LikelyPersonalFollowUp(userPrompt=''){
   // FIX2.3: los seguimientos personales sobre «qué productos/artículos donó» deben conservar
   // la identidad canónica aunque el pronombre/nombre ya no aparezca en el turno actual.
   // No se decide el dominio aquí: solo se mantiene disponible el person_dossier reciente.
-  return /\b(mi|mis|su|sus|responsabilidad|responsable|compras?|productos?|articulos?|tickets?|tkxx|hitos?|tareas?|\blg\b|donaciones?|donante|donado|donada|dono|donaron|ingresos?|participacion|participación|eventos?|tablas?|listados?|datos?|detalle|formato|grafic\w*|gráfic\w*|dime\s+mas|dime\s+m[aá]s|mas\s+cosas|m[aá]s\s+cosas|solo|solamente|unicamente|únicamente|busca|revisa|comprueba|verifica|hablame|háblame)\b/.test(p);
+  return /\b(mi|mis|su|sus|responsabilidad|responsable|compras?|productos?|articulos?|tickets?|tkxx|hitos?|tareas?|\blg\b|donaciones?|donante|donado|donada|dono|donaron|ingresos?|participacion|participación|eventos?|tablas?|listados?|datos?|detalle|formato|grafic\w*|gráfic\w*|dime\s+mas|dime\s+m[aá]s|mas\s+cosas|m[aá]s\s+cosas|solo|solamente|unicamente|únicamente|busca|revisa|comprueba|verifica|hablame|háblame|figura|aparece|relaci[oó]n|relacionad\w*|vinculad\w*|tuvo\s+algo\s+que\s+ver|tiene\s+algo\s+que\s+ver)\b/.test(p);
 }
 function v30ConversationEventForPerson(state,userPrompt,conversationHistory=[],subject='',explicitSubject=false,selectedEventId=''){
   const direct=v281EventNameInText(state,userPrompt);if(direct)return direct;
@@ -9028,7 +9046,8 @@ function v304BankFilterFollowUp(userPrompt='',conversationHistory=[]){
   const directBank=/\b(?:cuadre(?:\s+banco|\s+bancari\w*)?|conciliaci[oó]n\s+bancari\w*|impacto\s+bancari\w*|movimientos?\s+bancari\w*|saldo\s+bancari\w*|cronolog[ií]a\s+bancari\w*|l[ií]nea\s+temporal\s+bancari\w*)\b/.test(p);
   const filter=/\b(solo\s+los?\s+cargos?|ahora\s+los?\s+abonos?|abonos?|cargos?|cu[aá]les\s+tienen\s+ticket|tickets?\s+vinculad|sin\s+justificante|sin\s+justificaci[oó]n|justificados?\s+con\s+tickets?)\b/.test(p);
   const status=/\b(?:estan|están|quedan|son)\b[^.]{0,70}\bjustificad\w*\b|\b(?:todos?|los)\s+movimientos?\b[^.]{0,70}\bjustificad\w*/.test(p);
-  return directBank||(bankRecent&&(filter||status));
+  const metric=/\b(?:impacto(?:\s+neto)?|variaci[oó]n|saldo\s+final|c[oó]mo\s+qued[oó]\s+el\s+saldo|cu[aá]ntos?\s+movimientos?|cronolog[ií]a|l[ií]nea\s+temporal|evoluci[oó]n\s+temporal)\b/.test(p);
+  return directBank||(bankRecent&&(filter||status||metric));
 }
 async function v304PrefetchBankFollowUp({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[]}){
   if(!v304BankFilterFollowUp(userPrompt,conversationHistory))return null;
@@ -9083,11 +9102,9 @@ function v326DeterministicBankStatusAnswer(userPrompt='',grounding=null){
   // El estado de negocio del Cuadre es contractual: nunca se parafrasea. Si no hay filas,
   // ese estado es toda la respuesta y queda prohibido reconstruir magnitudes del histórico.
   if(f.has_bank_reconciliation===false||num(f.reconciliation_row_count)<=0)return lifecycle||(f.event_finalized===true?'CUADRE BANCARIO SIN REALIZAR':'CUADRE BANCARIO SIN INICIAR');
-  // Una cronología real necesita la herramienta específica event_bank_timeline. Conservamos el
-  // estado contractual para los demás usos, pero dejamos esta petición continuar a la herramienta.
   const timelineQuestion=/\bcronolog[ií]a\b|\bl[ií]nea\s+temporal\b|\bevoluci[oó]n\s+temporal\b/.test(p);
-  if(timelineQuestion)return'';
   const total=num(f.included_movement_count),justified=num(f.justified_movement_count),unlinked=num(f.unlinked_movement_count),impact=num(f.bank_impact),closing=num(f.closing_balance);
+  if(timelineQuestion)return [lifecycle,`${event}: ${total} movimientos bancarios almacenados en el Cuadre · impacto ${v26FormatEuro(impact)}. La cronología se muestra con los movimientos persistidos del evento.`].filter(Boolean).join('\n\n');
   const tk=f.ticket_summary||{},inc=f.income_summary||{};
   if(/\bjustificad\w*/.test(p)&&/\bmovim\w*/.test(p)){
     if(!total)return [lifecycle,`El Cuadre Banco de ${event} no tiene movimientos incluidos.`].filter(Boolean).join('\n\n');
@@ -9148,6 +9165,41 @@ function v30PersonDeterministicChartSpecs(userPrompt='',dossier=null){
   return specs.slice(0,v30WantsSingleChart(userPrompt)?1:4);
 }
 
+
+function v330GlobalOverviewDirectQuestion(userPrompt=''){
+  const p=norm(userPrompt);
+  return /\b(?:matriz\s+econ[oó]mica\s+(?:general\s+)?de\s+eventos?|visi[oó]n\s+global\s+de\s+los?\s+eventos?\s+registrados?|panorama\s+(?:global|general)\s+de\s+(?:los?\s+)?eventos?)\b/.test(p);
+}
+async function v330GlobalOverviewDirect({userPrompt,state,flowTrace=[],previousInteractionId=''}){
+  if(!v330GlobalOverviewDirectQuestion(userPrompt))return null;
+  try{
+    const result=await v26ToolEventsOverview({id:'v330_events_overview',name:'events_overview',detail:'standard'},state);
+    const count=num(result?.facts?.event_count);
+    zuzuTracePush(flowTrace,'v2.0_exp · Panorama global canónico','OK',`Consulta estructurada global: ${count} eventos materializados desde events_overview sin una segunda interpretación IA.`);
+    return v281LocalResponse({
+      title:'Panorama de eventos',
+      answer:`Panorama global: ${count} evento${count===1?'':'s'} registrados en ControlEvent. Te muestro la matriz económica y de asistencia canónica para compararlos.`,
+      results:[result],
+      showTables:[{tool_id:trim(result.id),table_key:'events_overview'}],
+      flowTrace,previousInteractionId,traceDirect:false,
+      resultContext:{domain:'events_overview',focus:'matrix',count}
+    });
+  }catch(error){
+    zuzuTracePush(flowTrace,'v2.0_exp · Panorama global canónico','WARN',`No se pudo materializar el panorama global directamente: ${cleanGeminiError(error)}.`);
+    return null;
+  }
+}
+
+function v330ShouldEarlyCanonicalClose(userPrompt='',results=[]){
+  const p=norm(userPrompt);
+  if(!arr(results).some(r=>r?.ok!==false))return false;
+  if(/\b(opini[oó]n|qu[eé]\s+te\s+parece|c[oó]mo\s+lo\s+ves|analiza|an[aá]lisis|por\s+qu[eé]|recomienda|recomendaci[oó]n|riesgo|anomal|mejorar[ií]as|curios|interpreta)\b/.test(p))return false;
+  if(/\b(gr[aá]fic|evoluci[oó]n\s+visual|representa)\w*/.test(p))return false;
+  // Cierres rápidos solo para preguntas factuales/estructuradas o resúmenes de una entidad ya
+  // resuelta por la propia herramienta elegida por Gemini. Se conserva Gemini para razonamiento abierto.
+  return /\b(cat[aá]logo|matriz|panorama|resumen|radiograf[ií]a|esencial|sit[uú]ame|qu[eé]\s+me\s+puedes\s+decir|cu[eé]ntame|compras?|productos?|donaciones?|asistentes?|hitos?|tareas?|\blg\b|persona|actividad|eventos?|importe|total|cu[aá]nto|cu[aá]ntos?|mayor|menor|barat|car[oa])\b/.test(p);
+}
+
 async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
   // Compatibilidad de regresión v1.4: V27.1.4 · Garantía de cobertura; la lógica vigente es V27.1.5.
   const requestedChartIntent=v273ConversationRequestsCharts(userPrompt,conversationHistory);
@@ -9195,6 +9247,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   else if(eventFocus?.event&&v310EventFocusApplicable(userPrompt,personalGrounding,eventFocus))zuzuTracePush(flowTrace,'v2.0_exp · Foco canónico de evento','OK',`Evento vigente «${eventFocus.event}» (${eventFocus.source}). Se conserva en seguimientos que no nombren otro evento.`);
   if(suppressStalePersonGrounding)zuzuTracePush(flowTrace,'v2.0_exp · Aislamiento de contexto','OK',eventFocus?.comparison?'La comparación actual prevalece sobre cualquier grounding personal heredado.':'El turno bancario ignora grounding personal heredado; solo se materializará la fuente bancaria solicitada.');
   const epistemic=v314UnsupportedConsumptionAttribution(userPrompt,eventFocus,flowTrace,currentId);if(epistemic)return epistemic;
+  const globalOverviewDirect=await v330GlobalOverviewDirect({userPrompt,state,flowTrace,previousInteractionId:currentId});if(globalOverviewDirect)return globalOverviewDirect;
   if(personalGrounding?.result)allResults.push(personalGrounding.result);
   const eventStatusGrounding=await v304PrefetchEventStatus({userPrompt,state,flowTrace});
   if(eventStatusGrounding?.result)allResults.push(eventStatusGrounding.result);
@@ -9202,7 +9255,12 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   if(bankFollowUpGrounding?.result)allResults.push(bankFollowUpGrounding.result);
   // FIX2.2 se limita al canal escrito mientras congelamos el cerebro: voz queda exactamente igual.
   if(!voiceConversation){
-    const bankStatus=v326DeterministicBankStatusAnswer(userPrompt,bankFollowUpGrounding);if(bankStatus)return v281LocalResponse({title:`Cuadre Banco · ${trim(bankFollowUpGrounding?.result?.facts?.event)||''}`,answer:bankStatus,results:[bankFollowUpGrounding.result],flowTrace,previousInteractionId:currentId,traceDirect:false,resultContext:{domain:'bank',event:trim(bankFollowUpGrounding?.result?.facts?.event),focus:'justification'}});
+    const bankStatus=v326DeterministicBankStatusAnswer(userPrompt,bankFollowUpGrounding);
+    if(bankStatus){
+      const timeline=/\bcronolog[ií]a\b|\bl[ií]nea\s+temporal\b|\bevoluci[oó]n\s+temporal\b/.test(norm(userPrompt));
+      const bankResult=bankFollowUpGrounding.result,hasTimeline=arr(bankResult?.tables).some(t=>trim(t?.key)==='reconciliation_timeline'&&arr(t?.rows).length);
+      return v281LocalResponse({title:`Cuadre Banco · ${trim(bankResult?.facts?.event)||''}`,answer:bankStatus,results:[bankResult],showTables:timeline&&hasTimeline?[{tool_id:trim(bankResult.id),table_key:'reconciliation_timeline'}]:[],flowTrace,previousInteractionId:currentId,traceDirect:false,resultContext:{domain:'bank',event:trim(bankResult?.facts?.event),focus:timeline?'timeline':'justification'}});
+    }
     const documentationDerived=v326DocumentationDerivedFollowUp({userPrompt,conversationHistory,flowTrace,previousInteractionId:currentId});if(documentationDerived)return documentationDerived;
     const compareDerived=v325ComparisonDerivedFollowUp({userPrompt,conversationHistory,flowTrace,previousInteractionId:currentId});if(compareDerived)return compareDerived;
     const derived=v311DerivedFollowUp({userPrompt,conversationHistory,eventFocus,flowTrace,previousInteractionId:currentId});if(derived)return derived;
@@ -9232,6 +9290,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   // v2.0_exp: no hay enrutado semántico de CE antes de las herramientas.
   // Si Gemini necesita hechos de ControlEvent, los solicita él mismo en esta Interaction.
   const maxToolCycles=(chartIntent&&bankContext)?2:1;
+  let canonicalClosure=null;
   for(let cycle=1;cycle<=maxToolCycles;cycle++){
     let calls=v261FunctionCalls(payload);
     // v2.0_exp: Gemini decide si necesita herramientas y cuáles. CE no fuerza una fuente por palabras clave.
@@ -9255,13 +9314,20 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
         return{type:'function_result',name:trim(call.name),call_id:trim(call.id),is_error:true,result:{ok:false,error:msg}};
       }
     }));
+    if(v330ShouldEarlyCanonicalClose(userPrompt,allResults)){
+      const early=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
+      if(early){
+        canonicalClosure=early;resetInteractionId=true;
+        zuzuTracePush(flowTrace,'v2.0_exp · Cierre factual rápido','OK',`Gemini eligió y ejecutó la fuente canónica; ControlEvent cierra la respuesta factual sin una segunda llamada IA (${calls.map(c=>trim(c.name)).join(', ')}).`);
+        break;
+      }
+    }
     try{
       payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:`V27.1.5 · Gemini tras herramientas ${cycle}`,externalSignal});
     }catch(error){error.canonicalResults=[...allResults];error.canonicalEventFocus=eventFocus;throw error;}
     currentId=trim(payload?.id)||currentId;
   }
-  let canonicalClosure=null;
-  if(v261FunctionCalls(payload).length){
+  if(!canonicalClosure&&v261FunctionCalls(payload).length){
     canonicalClosure=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
     if(canonicalClosure){
       resetInteractionId=true;

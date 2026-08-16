@@ -313,7 +313,8 @@
 
   function handle(msg){
     lastStreamAt=Date.now();
-    if(msg.type==='start'){setPhase(`${msg.mode}: ${fmtN(msg.total)} pruebas desde datos reales. ${msg.mode==='FAST'?'Coste IA = 0 €':'Presupuesto máximo '+fmtE(msg.maxCostEur)}`);return;}
+    if(msg.type==='preparing'){setPhase(msg.message||`${msg.mode||'ITV'}: preparando ejecución…`);setLive('Preparando casos y oráculos de este chequeo…');return;}
+    if(msg.type==='start'){setPhase(`${msg.mode}: ${fmtN(msg.total)} pruebas desde datos reales. ${msg.mode==='FAST'?'Coste IA = 0 €':'Presupuesto máximo '+fmtE(msg.maxCostEur)}`);setLive('');return;}
     if(msg.type==='case_start'){currentCase=msg.case;setLive(`Procesando ${msg.index}/${msg.total} · ${msg.case?.group||''} · ${msg.case?.label||msg.case?.prompt||''}`);return;}
     if(msg.type==='heartbeat'){const sec=Math.max(0,Math.round(num(msg.elapsedMs)/1000));setLive(`Procesando ${msg.index}/${msg.total} · ${currentCase?.group||''} · ${currentCase?.label||currentCase?.prompt||''} · ${sec} s`);return;}
     if(msg.type==='case'){rows.push(msg.case);appendRow(msg.case);updateProgress(msg.progress||{});renderFilters();cacheCurrent();currentCase=null;setLive('');return;}

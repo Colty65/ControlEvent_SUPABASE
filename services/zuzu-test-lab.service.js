@@ -377,8 +377,10 @@ function validateOracle(caseDef,result){
     const expected=Number(oracle.value),label=norm(oracle.label);
     const numeric=new RegExp(`\\b${expected}\\b`).test(blob);
     const docCodes=[...new Set((blob.match(/\bDOC\s*\d+\b/gi)||[]).map(x=>norm(x).replace(/\s+/g,'')))];
+    const tkCodes=[...new Set((blob.match(/\bTK\s*\d+\b/gi)||[]).map(x=>norm(x).replace(/\s+/g,'')))];
     const tableEvidence=arr(result?.tables).some(t=>arr(t?.rows).length>=expected);
-    if(!numeric&&!(label.includes('document')&&docCodes.length>=expected)&&!tableEvidence)reasons.push(`documentación: ${oracle.label} esperado ${oracle.value}`);
+    const codeEvidence=(label.includes('document')&&docCodes.length>=expected)||((label.includes('tkxx')||label.includes('ticket'))&&tkCodes.length>=expected);
+    if(!numeric&&!codeEvidence&&!tableEvidence)reasons.push(`documentación: ${oracle.label} esperado ${oracle.value}`);
   }else if(oracle.kind==='event-metric'){
     const zeroSemantic=Math.abs(num(oracle.value))<0.005&&/compras?\s+pendientes?/.test(norm(oracle.label))&&/\b(?:no\s+(?:queda|quedan|hay)\s+(?:nada\s+)?pendiente|sin\s+compras?\s+pendientes?|nada\s+pendiente)\b/.test(norm(blob));
     if(!hasMoney(blob,oracle.value)&&!zeroSemantic)reasons.push(`${oracle.label}: no devuelve ${euro(oracle.value)}`);
@@ -523,8 +525,9 @@ async function buildRealFastCases(state,seed){
   // seis estados definidos por negocio (estado del evento + filas + cobertura de TKxx/ingresos).
   // Así la ITV no da por completo un cuadre que tenga una sola asociación pendiente.
   const lifecycleSamples=new Map();
-  for(const ev of events){
-    const title=eventName(ev),b=await bankOracle(state,title);if(!b)continue;
+  const lifecycleChecks=await Promise.all(events.map(async ev=>({ev,b:await bankOracle(state,eventName(ev))})));
+  for(const sample of lifecycleChecks){
+    const {ev,b}=sample;if(!b)continue;
     if(!lifecycleSamples.has(b.reconciliationStatus))lifecycleSamples.set(b.reconciliationStatus,{ev,b});
     if(lifecycleSamples.size>=6)break;
   }
@@ -844,15 +847,42 @@ async function buildFullCertScenarios(state,maxTurns=36,seed=1){
   return out;
 }
 
+
+const BATTERY_RUNTIME_CACHE=new Map();
+const BATTERY_RUNTIME_TTL_MS=20*60*1000;
+function batteryRuntimeGet(rawSeed){
+  const seed=normalizeSeed(rawSeed),hit=BATTERY_RUNTIME_CACHE.get(seed);
+  if(!hit)return null;
+  if(Date.now()-hit.at>BATTERY_RUNTIME_TTL_MS){BATTERY_RUNTIME_CACHE.delete(seed);return null;}
+  return hit.blueprint;
+}
+function batteryRuntimeSet(blueprint){
+  if(!blueprint?.seed)return;
+  BATTERY_RUNTIME_CACHE.set(normalizeSeed(blueprint.seed),{at:Date.now(),blueprint});
+  if(BATTERY_RUNTIME_CACHE.size>8){
+    const oldest=[...BATTERY_RUNTIME_CACHE.entries()].sort((a,b)=>a[1].at-b[1].at).slice(0,BATTERY_RUNTIME_CACHE.size-8);
+    for(const [key] of oldest)BATTERY_RUNTIME_CACHE.delete(key);
+  }
+}
+
+function batteryDataCounts(state){
+  return{events:arr(state?.eventos).length,people:arr(state?.personas).length,products:arr(state?.productos).length,stores:arr(state?.tiendas).length,purchases:arr(state?.compras).length,incomes:arr(state?.colaboradores).length,documents:arr(state?.eventDocuments).length,ticketImages:Object.keys(state?.ticketImages||{}).length,donationLines:arr(state?.compras).filter(r=>isDonationTicketLocal(ticketTextLocal(r))).length,hitos:arr(state?.hitos).length,lgs:arr(state?.lgs).length,bankMovements:arr(state?.bankMovements||state?.movimientosBanco||state?.movimientos_banco).length};
+}
+async function buildCasesForMode(state,mode,rawSeed){
+  const seed=normalizeSeed(rawSeed),m=trim(mode).toUpperCase();
+  if(m==='FAST')return{seed,cases:await buildRealFastCases(state,seed)};
+  if(m==='AI-SMOKE')return{seed,cases:await buildAiSmokeCases(state,48,seed)};
+  if(m==='FULL-CERT')return{seed,cases:await buildFullCertScenarios(state,36,seed)};
+  throw new Error(`Modo ITV no soportado: ${mode}`);
+}
 async function batteryBlueprint(state,rawSeed){
   const seed=normalizeSeed(rawSeed);
   const fast=await buildRealFastCases(state,seed); const smoke=await buildAiSmokeCases(state,48,seed); const full=await buildFullCertScenarios(state,36,seed);
-  const counts={events:arr(state?.eventos).length,people:arr(state?.personas).length,products:arr(state?.productos).length,stores:arr(state?.tiendas).length,purchases:arr(state?.compras).length,incomes:arr(state?.colaboradores).length,documents:arr(state?.eventDocuments).length,ticketImages:Object.keys(state?.ticketImages||{}).length,donationLines:arr(state?.compras).filter(r=>isDonationTicketLocal(ticketTextLocal(r))).length,hitos:arr(state?.hitos).length,lgs:arr(state?.lgs).length,bankMovements:arr(state?.bankMovements||state?.movimientosBanco||state?.movimientos_banco).length};
-  return {seed,counts,fast,smoke,full};
+  return {seed,counts:batteryDataCounts(state),fast,smoke,full};
 }
 
 export async function previewZuzuBattery({seed}={}){
-  const state=await getState(); const b=await batteryBlueprint(state,seed);
+  const state=await getState(); const b=await batteryBlueprint(state,seed);batteryRuntimeSet(b);
   return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(36,b.full.length),costEurRange:'0,12–0,50 €',hardCapSuggested:0.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT recorre conversaciones multiturno con ORÁCULO FUERTE y conserva pregunta + esperado + respuesta.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco solo se informa como Cuadre Banco cuando existe configuración/evidencia explícita del evento; el histórico general nunca se reconstruye como cuadre. Ningún modo modifica datos de producción.']};
 }
 
@@ -955,7 +985,9 @@ function safeConversationState(raw={}){
 export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationState={},seed,signal}={}){
   const m=trim(mode).toUpperCase();
   if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('run-case solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
-  const state=await getState(),b=await batteryBlueprint(state,seed),all=m==='AI-SMOKE'?b.smoke:b.full,c=all.find(x=>trim(x.id)===trim(caseId));
+  const state=await getState(),cached=batteryRuntimeGet(seed);
+  const all=cached?(m==='AI-SMOKE'?cached.smoke:cached.full):(await buildCasesForMode(state,m,seed)).cases;
+  const c=all.find(x=>trim(x.id)===trim(caseId));
   if(!c){const e=new Error('Caso de ITV no encontrado en la batería actual. Actualiza datos y batería.');e.status=404;throw e;}
   if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
   const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
@@ -1011,9 +1043,14 @@ ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.
 }
 
 export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,caseIds,seed,send,signal}){
-  const state=await getState(); const b=await batteryBlueprint(state,seed); const m=trim(mode).toUpperCase();
-  const all=m==='AI-SMOKE'?b.smoke:m==='FULL-CERT'?b.full:b.fast; const selected=filterCases(all,caseIds);
-  streamWrite(send,'start',{mode:m,seed:b.seed,dataCounts:b.counts,total:selected.length,source:'tablas reales de ControlEvent',maxCostEur:m==='FAST'?0:round(maxCostEur,2)});
+  const m=trim(mode).toUpperCase(),normalizedSeed=normalizeSeed(seed);
+  // La primera línea sale ANTES de reconstruir casos/oráculos: el usuario ve respuesta inmediata
+  // al pulsar INICIAR y el watchdog no confunde preparación con bloqueo.
+  streamWrite(send,'preparing',{mode:m,seed:normalizedSeed,message:`${m}: preparando casos de este modo…`});
+  const state=await getState(),cached=batteryRuntimeGet(normalizedSeed);
+  const built=cached?{seed:cached.seed,cases:m==='AI-SMOKE'?cached.smoke:m==='FULL-CERT'?cached.full:cached.fast}:await buildCasesForMode(state,m,normalizedSeed);
+  const selected=filterCases(built.cases,caseIds);
+  streamWrite(send,'start',{mode:m,seed:built.seed,dataCounts:cached?.counts||batteryDataCounts(state),total:selected.length,source:cached?'batería preparada · tablas reales de ControlEvent':'tablas reales de ControlEvent',maxCostEur:m==='FAST'?0:round(maxCostEur,2)});
   const result=m==='AI-SMOKE'?await runSmoke({state,cases:selected,send,signal,maxCostEur:Math.max(0.02,num(maxCostEur)||0.25),maxCases:maxCases||24}):m==='FULL-CERT'?await runFull({state,turns:selected,send,signal,maxCostEur:Math.max(0.02,num(maxCostEur)||0.50),maxCases:maxCases||18}):await runFast({state,cases:selected,send,signal});
   streamWrite(send,'summary',{mode:m,...result,finishedAt:nowIso(),certified:result.ko===0&&!result.aborted&&result.done===selected.length&&result.done>0});
   return result;
