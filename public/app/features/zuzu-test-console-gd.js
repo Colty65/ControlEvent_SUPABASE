@@ -19,6 +19,7 @@
   let currentAbort=null,currentFetchAbort=null,currentCaseCancel=null,currentReader=null,preview=null,rows=[],lastSummary=null,activeFilter='TODOS',lastMode='FAST';
   let streamWatchdog=null,lastStreamAt=0,currentCase=null,stopRequested=false,uiRunning=false,controlGuard=null;
   let batterySeed=0,batteryClock='',currentRunKey='',historyRuns=[],historyStorage='',historicReplayKey='';
+  let authEventUser=null;
 
   function renewBatterySeed(){
     const d=new Date(),sec=d.getSeconds(),slot=d.getHours()*3600+d.getMinutes()*60+sec;
@@ -40,12 +41,13 @@
   function stopControlGuard(){if(controlGuard)clearInterval(controlGuard);controlGuard=null;}
 
   function auth(){
-    // CE conserva todavía una referencia léxica `authUser` en el bundle legacy.
-    // Leer solo window.authUser puede dejar el botón visible por CSS pero sin permiso funcional.
+    // Fuente principal: la fachada estable de CE, que expone el authUser léxico real.
+    // El usuario recibido por controlevent:auth-changed se conserva además como respaldo inmediato.
     try{
-      const lexical=Function('return (typeof authUser!=="undefined" && authUser) ? authUser : null')();
-      return lexical||window.authUser||window.__CONTROL_EVENT_USER__||window.ControlEventApp?.authUser||window.ControlEventRuntime?.app?.authUser||null;
-    }catch(_){return window.authUser||window.__CONTROL_EVENT_USER__||window.ControlEventApp?.authUser||window.ControlEventRuntime?.app?.authUser||null;}
+      const appUser=window.ControlEventApp?.authUser||window.ControlEventRuntime?.app?.authUser||null;
+      if(authEventUser||appUser||window.authUser||window.__CONTROL_EVENT_USER__) return authEventUser||appUser||window.authUser||window.__CONTROL_EVENT_USER__;
+      return Function('return (typeof authUser!=="undefined" && authUser) ? authUser : null')();
+    }catch(_){return authEventUser||window.ControlEventApp?.authUser||window.authUser||window.__CONTROL_EVENT_USER__||null;}
   }
   function role(){const u=auth()||{};return text(u.nivel||u.Nivel).trim().toUpperCase();}
   function isGD(){return role()==='GD';}
@@ -89,8 +91,10 @@
     b.style.setProperty('pointer-events',visible?'auto':'none','important');
     b.setAttribute('aria-hidden',visible?'false':'true');
     if(visible){
-      b.disabled=false;
+      b.disabled=false;b.removeAttribute('disabled');b.setAttribute('aria-disabled','false');b.tabIndex=0;
       if(!b.__ztBound){b.__ztBound=true;b.onclick=e=>{e.preventDefault();e.stopPropagation();e.stopImmediatePropagation?.();open();return false;};}
+    }else{
+      b.setAttribute('aria-disabled','true');b.tabIndex=-1;
     }
   }
   window.ceRefreshZuzuTestButton=injectButton;
@@ -365,5 +369,5 @@
   function printReport(){const mode=lastMode,c=modeCache[mode],s=c.summary||{},date=new Date().toLocaleString('es-ES'),body=c.rows.map(r=>`<tr><td class="${esc(r.status)}">${esc(r.status)}</td><td>${esc(r.group)}</td><td>${esc(r.label)}</td><td>${esc(r.prompt||'')}</td><td>${esc(r.expected||'')}</td><td>${esc(r.actual||'')}</td></tr>`).join('');if(!c.rows.length){alert('Este modo todavía no tiene resultados.');return;}const w=window.open('','_blank');if(!w){setPhase('El navegador ha bloqueado la ventana de impresión. Usa ⬇ INFORME para descargar el JSON.',true);return;}w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>ControlEvent - ITV Zuzu</title><style>@page{size:A4 landscape;margin:10mm}body{font-family:Arial,sans-serif;margin:16px;color:#0f172a}h1{color:#075985}table{width:100%;border-collapse:collapse;font-size:8.5px;table-layout:fixed}th,td{border:1px solid #cbd5e1;padding:4px;vertical-align:top;overflow-wrap:anywhere}th:nth-child(1){width:5%}th:nth-child(2){width:8%}th:nth-child(3){width:13%}th:nth-child(4){width:22%}th:nth-child(5){width:20%}th:nth-child(6){width:32%}.OK{color:#15803d;font-weight:bold}.KO{color:#b91c1c;font-weight:bold}.WARN{color:#b45309;font-weight:bold}.summary{display:flex;gap:18px;flex-wrap:wrap;margin:8px 0 12px}.summary b{font-size:16px}</style></head><body><h1>🧪 ITV de Zuzu · ${esc(mode)}</h1><p>${esc(date)} · semilla <b>${esc(batterySeed)}</b> · tablas reales · solo lectura</p><div class="summary"><span>OK <b>${fmtN(s.ok)}</b></span><span>AVISOS <b>${fmtN(s.warn)}</b></span><span>KO <b>${fmtN(s.ko)}</b></span><span>Llamadas IA <b>${fmtN(s.calls)}</b></span><span>Tokens <b>${fmtN(s.tokens)}</b></span><span>Coste <b>${fmtE(s.costEur)}</b></span></div><table><thead><tr><th>Estado</th><th>Grupo</th><th>Prueba</th><th>Pregunta realizada</th><th>Esperado</th><th>Respuesta Zuzu / Obtenido</th></tr></thead><tbody>${body}</tbody></table><script>window.onload=()=>setTimeout(()=>window.print(),250)<\/script></body></html>`);w.document.close();}
 
 
-  style();window.addEventListener('controlevent:auth-changed',injectButton);document.addEventListener('DOMContentLoaded',injectButton);setInterval(injectButton,500);injectButton();
+  style();window.addEventListener('controlevent:auth-changed',e=>{authEventUser=e?.detail?.user||null;injectButton();});window.addEventListener('controlevent:app-ready',injectButton);document.addEventListener('DOMContentLoaded',injectButton);setInterval(injectButton,500);injectButton();
 })();
