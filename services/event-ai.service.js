@@ -5870,14 +5870,26 @@ function v26PersonHintFromPrompt(prompt,state){
 }
 
 function v26PersonHintsFromPrompt(prompt,state){
-  const p=` ${canonicalNameKey(prompt)} `,out=[],seen=new Set();
+  const p=` ${canonicalNameKey(prompt)} `,out=[],seen=new Set(),compoundParts=new Set(),fullCompounds=new Set();
   const people=semanticCatalogRows(state,'person').slice().sort((a,b)=>canonicalNameKey(b.nombre).length-canonicalNameKey(a.nombre).length);
   const add=name=>{const n=trim(name),k=canonicalNameKey(n);if(n&&k&&!seen.has(k)){seen.add(k);out.push(n);}};
+  // v2.0_exp FIX5 · una entidad canónica compuesta nombrada completa manda sobre sus
+  // componentes individuales. «Julian y Pilar» no puede convertirse además en Julian/Pilar.
+  // Sí se conservan otras personas distintas nombradas en el mismo mensaje (comparativas).
+  for(const row of people){
+    const name=trim(row.nombre),k=canonicalNameKey(name);if(!k||k.length<3||!isCanonicalPairName(name))continue;
+    if(p.includes(` ${k} `)){
+      fullCompounds.add(k);add(name);
+      for(const part of v26PairParts(name)){const pk=canonicalNameKey(part);if(pk)compoundParts.add(pk);}
+    }
+  }
   for(const row of people){
     const name=trim(row.nombre),k=canonicalNameKey(name);if(!k||k.length<3)continue;
+    if(fullCompounds.has(k))continue;
+    if(!isCanonicalPairName(name)&&compoundParts.has(k))continue;
     if(p.includes(` ${k} `)){add(name);continue;}
     if(isCanonicalPairName(name)){
-      for(const part of v26PairParts(name)){const pk=canonicalNameKey(part);if(pk.length>=3&&p.includes(` ${pk} `))add(part);}
+      for(const part of v26PairParts(name)){const pk=canonicalNameKey(part);if(pk.length>=3&&p.includes(` ${pk} `)&&!compoundParts.has(pk))add(part);}
     }
   }
   return out.slice(0,8);
@@ -8299,7 +8311,7 @@ function v325ResolveRelativeYearSibling(state,userPrompt='',conversationHistory=
   const p=norm(userPrompt);
   // Solo aplica cuando el turno expresa continuidad temporal/elipsis; un año aislado dentro de
   // otro título explícito se resuelve por la vía normal de catálogo.
-  const relativeCue=/\b(?:ano|año)\s+(?:anterior|siguiente|posterior)\b|\b(?:el|la|los|las)\s+de\s+(?:19|20)\d{2}\b|^\s*(?:19|20)\d{2}\s*$/.test(p);
+  const relativeCue=/\b(?:ano|año)\s+(?:anterior|siguiente|posterior)\b|\b(?:el|la|los|las)\s+de\s+(?:19|20)\d{2}\b|\bal\s+de\s+(?:19|20)\d{2}\b|\bdel\s+(?:19|20)\d{2}\b|^\s*(?:19|20)\d{2}\s*$/.test(p);
   if(!relativeCue)return'';
   const priorCore=v314EventCoreTokens(prior);if(!priorCore.length)return'';
   const candidates=[];
@@ -8974,7 +8986,7 @@ function v325PersonGroundingDirect({userPrompt,grounding,conversationHistory=[],
   const r=grounding?.result;if(!r?.ok||r?.name!=='person_dossier')return null;
   const p=norm(userPrompt),f=r.facts||{},subject=trim(f.person||f.query||grounding.subject);if(!subject)return null;
   const words=text(userPrompt).trim().split(/\s+/).filter(Boolean).length;
-  const broadSimple=grounding.explicitSubject&&words<=9&&/\b(?:hablame|háblame|informacion|información|datos|quien\s+es|quién\s+es)\b/.test(p)&&!/(compr|donaci|ingres|eventos?|hitos?|tareas?|lg|responsab)/.test(p);
+  const broadSimple=grounding.explicitSubject&&words<=10&&/\b(?:hablame|háblame|informacion|información|datos|quien\s+es|quién\s+es|repasa|actividad)\b/.test(p)&&!/(compr|donaci|ingres|eventos?|hitos?|tareas?|lg|responsab)/.test(p);
   const asksEvents=/\b(en\s+qu[eé]\s+eventos?|qu[eé]\s+eventos?|d[oó]nde|eventos?\s+aparece)\b/.test(p);
   let focus='';
   if(asksEvents)focus=v325PriorPersonFocus(conversationHistory,subject)||'events';
@@ -8982,7 +8994,7 @@ function v325PersonGroundingDirect({userPrompt,grounding,conversationHistory=[],
   else if(/\bdonaci\w*|donante|donado|don[oó]\b/.test(p))focus='donations';
   else if(/\bingres\w*|cuotas?\b/.test(p))focus='incomes';
   else if(/\b(hitos?|tareas?|\blg\b|gesti[oó]n)\b/.test(p))focus='management';
-  else if(grounding.scope==='named_event'&&/\b(figura|aparece|relaci[oó]n|relacionad|vinculad|tiene\s+algo\s+que\s+ver|de\s+alguna\s+manera)\b/.test(p))focus='relation';
+  else if(grounding.scope==='named_event'&&/\b(figura|aparece|relaci[oó]n|relacionad|vinculad|(?:tiene|tuvo)\s+algo\s+que\s+ver|de\s+alguna\s+manera)\b/.test(p))focus='relation';
   else if(broadSimple)focus='summary';
   else return null;
   const table=(key)=>arr(r?.tables).find(t=>trim(t?.key)===key),show=(key)=>table(key)&&arr(table(key)?.rows).length?[{tool_id:trim(r.id),table_key:key}]:[];
@@ -9097,7 +9109,8 @@ function v304DeterministicBankFilterAnswer(userPrompt='',grounding=null){
 function v326DeterministicBankStatusAnswer(userPrompt='',grounding=null){
   const r=grounding?.result,p=norm(userPrompt);if(!r)return'';
   const f=r?.facts||{},event=trim(f.event)||'este evento',lifecycle=trim(f.lifecycle_message);
-  const bankQuestion=/\b(cuadre|concili\w*|banco|banc\w*|movimientos?\s+banc\w*|saldo\s+banc\w*|impacto\s+banc\w*|cronolog[ií]a|l[ií]nea\s+temporal|justificad\w*)\b/.test(p);
+  const bankQuestion=/\b(cuadre|concili\w*|banco|banc\w*|movimientos?\s+banc\w*|saldo\s+banc\w*|impacto\s+banc\w*|cronolog[ií]a|l[ií]nea\s+temporal|justificad\w*)\b/.test(p)
+    ||/\b(?:impacto(?:\s+neto)?|variaci[oó]n|saldo\s+final|cu[aá]ntos?\s+movimientos?)\b/.test(p);
   if(!bankQuestion)return'';
   // El estado de negocio del Cuadre es contractual: nunca se parafrasea. Si no hay filas,
   // ese estado es toda la respuesta y queda prohibido reconstruir magnitudes del histórico.
@@ -9119,6 +9132,25 @@ function v326DeterministicBankStatusAnswer(userPrompt='',grounding=null){
   const incomeDetail=num(inc.total)===0?'sin ingresos que conciliar':`ingresos ${num(inc.reconciled)}/${num(inc.total)}`;
   const detail=`${event}: ${total} movimientos incluidos · impacto ${v26FormatEuro(impact)} · TKxx ${num(tk.linked)}/${num(tk.total)} · ${incomeDetail}${ignoredIncome>0?` · Peña El Arrastre excluido del criterio: ${ignoredIncome}`:''}.`;
   return [lifecycle,detail].filter(Boolean).join('\n\n');
+}
+
+
+function v331PendingPurchaseMetricQuestion(userPrompt=''){
+  const p=norm(userPrompt);
+  const pending=/\b(?:compras?\s+pendientes?|pendiente(?:s)?\s+de\s+compra|pte\.?\s*compra)\b/.test(p);
+  const amount=/\b(?:cuanto|cuánto|importe|total|queda|quedan)\b/.test(p);
+  const openAnalysis=/\b(?:lista|listado|detalle|detallad|producto|productos|ticket|tickets|por\s+que|por\s+qué|analiza|an[aá]lisis|opini[oó]n|informe)\b/.test(p);
+  return pending&&amount&&!openAnalysis&&!/\b(?:banco|bancari|concili|cuadre)\b/.test(p);
+}
+async function v331DirectPendingPurchaseMetric({userPrompt,state,selectedEventId,eventFocus=null,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  if(!v331PendingPurchaseMetricQuestion(userPrompt))return null;
+  const event=v314ResolveEventMention(state,userPrompt,conversationHistory)||trim(eventFocus?.event)||trim(v26EventById(state,selectedEventId)?.titulo);
+  const tool={id:'v331_pending_purchase_metric',name:'event_dossier',scope:event?'named_event':'active_event',detail:'brief',...(event?{event}:{})};
+  const dossier=await v26ToolEventDossier(tool,state,selectedEventId),f=dossier?.facts||{};
+  if(!trim(f.event))return null;
+  const value=v26Money(f.purchases_pending||0);
+  zuzuTracePush(flowTrace,'v2.0_exp · Pte.Compra canónico','OK',`${trim(f.event)}: Pte.Compra ${v26FormatEuro(value)} respondido directamente desde event_dossier; 0 llamadas IA.`);
+  return v281LocalResponse({title:`Compras pendientes · ${trim(f.event)}`,answer:`${trim(f.event)}: compras pendientes ${v26FormatEuro(value)}.`,results:[dossier],flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'purchases',event:trim(f.event),focus:'pending',metrics:['Compras pendientes']}});
 }
 
 function v304EnsurePersonalOpening(answer,context={}){
@@ -9240,6 +9272,10 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   // Solo se conserva grounding personal en banco si el mensaje ACTUAL nombra explícitamente a una persona.
   const explicitPersonThisTurn=arr(v26PersonHintsFromPrompt(userPrompt,state)).length>0;
   const eventFocus=v310RecentEventFocus(state,userPrompt,conversationHistory);
+  if(!voiceConversation){
+    const pendingPurchaseMetric=await v331DirectPendingPurchaseMetric({userPrompt,state,selectedEventId,eventFocus,conversationHistory,flowTrace,previousInteractionId:currentId});
+    if(pendingPurchaseMetric)return pendingPurchaseMetric;
+  }
   // Comparación vigente y banco aíslan cualquier persona antigua. Una persona nombrada AHORA sí se conserva.
   const suppressStalePersonGrounding=(bankContext||eventFocus?.comparison)&&!explicitPersonThisTurn;
   const personalGrounding=suppressStalePersonGrounding?null:await v30PrefetchPersonGrounding({userPrompt,state,selectedEventId,conversationHistory,flowTrace});

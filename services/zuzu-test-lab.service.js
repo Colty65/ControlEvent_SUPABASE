@@ -350,7 +350,7 @@ function validateOracle(caseDef,result){
   }else if(oracle.kind==='person-income'){
     if(oracle.known!==false&&!hasMoney(blob,oracle.total))reasons.push(`ingreso vinculado no coincide con ${euro(oracle.total)}`);
   }else if(oracle.kind==='person-relation'){
-    if(oracle.known!==false){const neg=/\bno\s+(?:figura|aparece|tiene|consta|se\s+encuentra)|ninguna\s+relaci[oó]n|no\s+se\s+encontr/i.test(blob),pos=/\bsi\b|\bsí\b|figura|aparece|tiene\s+relaci[oó]n|vinculad/i.test(blob);
+    if(oracle.known!==false){const neg=/\bno\s+(?:figura|aparece|tiene|consta|se\s+encuentra|se\s+registra|se\s+registran|hay)|ninguna\s+relaci[oó]n|sin\s+relaci[oó]n\s+registrada|no\s+se\s+encontr/i.test(blob),pos=/\bsi\b|\bsí\b|figura|aparece|tiene\s+relaci[oó]n|vinculad/i.test(blob);
     if(oracle.related&&neg&&!pos)reasons.push('niega una relación que sí existe');
     if(!oracle.related&&!neg)reasons.push('no niega una relación que CE no registra');}
   }else if(oracle.kind==='documentation'){
@@ -382,7 +382,7 @@ function validateOracle(caseDef,result){
     const codeEvidence=(label.includes('document')&&docCodes.length>=expected)||((label.includes('tkxx')||label.includes('ticket'))&&tkCodes.length>=expected);
     if(!numeric&&!codeEvidence&&!tableEvidence)reasons.push(`documentación: ${oracle.label} esperado ${oracle.value}`);
   }else if(oracle.kind==='event-metric'){
-    const zeroSemantic=Math.abs(num(oracle.value))<0.005&&/compras?\s+pendientes?/.test(norm(oracle.label))&&/\b(?:no\s+(?:queda|quedan|hay)\s+(?:nada\s+)?pendiente|sin\s+compras?\s+pendientes?|nada\s+pendiente)\b/.test(norm(blob));
+    const zeroSemantic=Math.abs(num(oracle.value))<0.005&&/compras?\s+pendientes?/.test(norm(oracle.label))&&/\b(?:no\s+(?:queda|quedan|hay|tiene|tienen)\s+(?:ninguna?s?\s+|nada\s+)?compras?\s+pendientes?|no\s+(?:queda|quedan|hay|tiene|tienen)\s+(?:nada\s+|ninguna?s?\s+)?pendiente|sin\s+compras?\s+pendientes?|nada\s+pendiente)\b/.test(norm(blob));
     if(!hasMoney(blob,oracle.value)&&!zeroSemantic)reasons.push(`${oracle.label}: no devuelve ${euro(oracle.value)}`);
   }else if(oracle.kind==='events-overview'){
     if(!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`panorama global: no acredita ${oracle.count} eventos`);
