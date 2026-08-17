@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp · VOZ7 CONVERSACIÓN HUMANA 1.2
+/* ControlEvent v2.0_exp · VOZ7 CONVERSACIÓN HUMANA 1.3
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -22,7 +22,8 @@
     femaleVoice: 'ce_zuzu_voz3_female_voice',
     maleVoice: 'ce_zuzu_voz3_male_voice',
     ambientWake: 'ce_zuzu_voz4_ambient_wake',
-    ambientWakeHuman1: 'ce_zuzu_human1_ambient_wake'
+    ambientWakeHuman1: 'ce_zuzu_human1_ambient_wake',
+    ambientWakeHuman2: 'ce_zuzu_human2_ambient_wake'
   };
   var state = {
     recognition: null,
@@ -82,7 +83,10 @@
     recognitionHoldUntil: 0,
     lastSpeechEndedAt: 0,
     voiceLexiconSignature: '',
-    voiceLexiconTokens: []
+    voiceLexiconTokens: [],
+    preAuthPriming: false,
+    preAuthPrimeUntil: 0,
+    lastRecognitionError: ''
   };
 
   function $(id){ return document.getElementById(id); }
@@ -403,12 +407,15 @@
     state.ambientEnabled=!!enabled;
     safeSet(STORAGE.ambientWake,state.ambientEnabled?'1':'0');
     safeSet(STORAGE.ambientWakeHuman1,state.ambientEnabled?'1':'0');
+    safeSet(STORAGE.ambientWakeHuman2,state.ambientEnabled?'1':'0');
   }
   function loadAmbientPreference(){
-    var human=safeGet(STORAGE.ambientWakeHuman1,'');
-    if(human==='0'||human==='1')return human!=='0';
-    // Reactivación única de la conversación humana: no heredamos un «off» antiguo
-    // de versiones en las que la escucha global quedó deshabilitada.
+    var human2=safeGet(STORAGE.ambientWakeHuman2,'');
+    if(human2==='0'||human2==='1')return human2!=='0';
+    // FIX22: nueva reactivación única. FIX20/21 podían heredar un OFF guardado mientras
+    // estábamos depurando el arranque. Esta generación vuelve a activar una sola vez y,
+    // desde ese momento, respeta lo que el usuario decida con el indicador global.
+    safeSet(STORAGE.ambientWakeHuman2,'1');
     safeSet(STORAGE.ambientWakeHuman1,'1');
     safeSet(STORAGE.ambientWake,'1');
     return true;
@@ -773,7 +780,7 @@
     var rec = new Ctor();
     rec.lang = 'es-ES';rec.continuous = true;rec.interimResults = true;rec.maxAlternatives = 5;installRecognitionGrammar(rec);
     rec.onstart = function(){
-      state.recognitionStarting=false;state.recognitionActive=true;state.autoArmTried=false;state.permissionBlocked=false;setMicUi(true);updateWakeBadge();
+      state.recognitionStarting=false;state.recognitionActive=true;state.autoArmTried=false;state.permissionBlocked=false;state.lastRecognitionError='';setMicUi(true);updateWakeBadge();
       setVoiceStatus(state.conversationMode?'Te escucho. Habla con naturalidad; enviaré al detectar dos segundos de silencio.':state.recognitionMode==='manual'?'Escuchando dictado.':'Escucha ambiental activa: di «Hola Zuzu».','ok');
     };
     rec.onresult = function(ev){
@@ -791,7 +798,7 @@
       }
     };
     rec.onerror = function(ev){
-      state.recognitionStarting=false;state.recognitionActive=false;var code=String(ev&&ev.error||'desconocido');
+      state.recognitionStarting=false;state.recognitionActive=false;var code=String(ev&&ev.error||'desconocido');state.lastRecognitionError=code;
       if(code==='aborted'&&!state.wantListening){updateWakeBadge();return;}
       var fatal=/not-allowed|service-not-allowed|audio-capture|language-not-supported/.test(code);
       if(fatal){state.wantListening=false;if(/not-allowed|service-not-allowed/.test(code))state.permissionBlocked=true;}
@@ -816,9 +823,12 @@
     catch(err){
       state.recognitionStarting=false;state.recognitionActive=false;
       var msg=String(err&&err.message||''),name=String(err&&err.name||'');
-      var already=name==='InvalidStateError'&&/already|started|start/i.test(msg)||/already\s+(?:been\s+)?started|already\s+started|has\s+already\s+started/i.test(msg);
+      // Solo tratamos como «ya arrancado» un InvalidStateError que lo diga de forma inequívoca.
+      // FIX20/21 todavía aceptaban cualquier mensaje que contuviera «start», pudiendo mostrar
+      // escucha activa cuando start() había fallado realmente.
+      var already=name==='InvalidStateError'&&/(?:already\s+(?:been\s+)?started|already\s+started|has\s+already\s+started|recognition\s+has\s+already\s+started)/i.test(msg);
       if(already){state.recognitionActive=true;setMicUi(true);updateWakeBadge();return;}
-      state.wantListening=false;if(!fromGesture)state.autoArmTried=true;setMicUi(false);updateWakeBadge();setVoiceStatus('El micrófono no llegó a arrancar. Pulsa «Activar Zuzu» para reintentarlo.','err');
+      state.lastRecognitionError=name+': '+msg;state.wantListening=false;if(!fromGesture)state.autoArmTried=true;setMicUi(false);updateWakeBadge();setVoiceStatus('El micrófono no llegó a arrancar. Pulsa «Activar Zuzu» para reintentarlo.','err');
     }
   }
   function startAmbientListening(fromGesture){
@@ -1409,17 +1419,43 @@
     }
     function syncAmbientWithSession(fromGesture){
       var auth=isAuthenticated();updateWakeBadge();
-      if(!auth){if(state.wantListening||state.recognitionActive)stopAmbientListening(true);return;}
+      if(!auth){
+        // Durante el login podemos haber arrancado SpeechRecognition desde el gesto real del
+        // usuario. No lo desmontamos mientras la petición de acceso está resolviéndose.
+        if(state.preAuthPriming&&Date.now()<Number(state.preAuthPrimeUntil||0))return;
+        state.preAuthPriming=false;state.preAuthPrimeUntil=0;
+        if(state.wantListening||state.recognitionActive)stopAmbientListening(true);return;
+      }
+      if(state.preAuthPriming){state.preAuthPriming=false;state.preAuthPrimeUntil=0;setAmbientPreference(true);}
       if(state.ambientEnabled&&!state.recognitionActive&&!state.recognitionStarting&&!state.wantListening){
         if(fromGesture||!state.autoArmTried)startAmbientListening(!!fromGesture);
       }
     }
     setTimeout(function(){syncAmbientWithSession(false);},650);
-    // Los navegadores móviles pueden exigir un gesto para conceder el micrófono. El primer
-    // gesto ya autenticado rearma la escucha, sin obligar a abrir Zuzu ni pulsar su micro.
-    function ambientGestureArm(){if(state.ambientEnabled&&!state.recognitionActive&&!state.recognitionStarting&&isAuthenticated())syncAmbientWithSession(true);}
-    document.addEventListener('click',ambientGestureArm,true);
-    document.addEventListener('touchend',ambientGestureArm,{capture:true,passive:true});
+
+    // FIX22: el login de ControlEvent intercepta el click en document/capture y llama a
+    // stopImmediatePropagation(). Por eso el antiguo listener de document nunca veía el gesto
+    // que debía armar el micro. Escuchamos en WINDOW/capture (una fase anterior) y arrancamos
+    // SpeechRecognition bajo el mismo gesto, aunque la autenticación todavía esté resolviéndose.
+    function isLoginGesture(ev){
+      var t=ev&&ev.target;if(!t)return false;
+      if(ev.type==='keydown')return ev.key==='Enter'&&(t.id==='loginIdentificacion'||t.id==='loginClave');
+      return t.id==='btnLogin'||!!(t.closest&&t.closest('#btnLogin'));
+    }
+    function primeAmbientOnLoginGesture(ev){
+      if(!state.ambientEnabled||!supportsRecognition()||!isLoginGesture(ev))return;
+      state.preAuthPriming=true;state.preAuthPrimeUntil=Date.now()+12000;state.permissionBlocked=false;state.autoArmTried=false;
+      state.recognitionMode='ambient';state.wantListening=true;startRecognitionEngine(true);
+    }
+    function globalPointerArm(ev){
+      if(isLoginGesture(ev)){primeAmbientOnLoginGesture(ev);return;}
+      if(state.ambientEnabled&&!state.recognitionActive&&!state.recognitionStarting&&isAuthenticated())syncAmbientWithSession(true);
+    }
+    // WINDOW/capture ocurre antes que los interceptores document/capture de ControlEvent.
+    // Pointerdown cubre ratón/táctil/lápiz; touchstart queda como respaldo de Safari antiguo.
+    window.addEventListener('pointerdown',globalPointerArm,true);
+    window.addEventListener('touchstart',globalPointerArm,{capture:true,passive:true});
+    window.addEventListener('keydown',primeAmbientOnLoginGesture,true);
     if(window.MutationObserver){
       state.modalObserver=new MutationObserver(function(){if($('ceGeminiLibreOverlay'))injectPanel();else cleanupWhenClosed();});
       state.modalObserver.observe(document.documentElement,{childList:true,subtree:true});
@@ -1456,7 +1492,7 @@
     wakePhrase:wakeMatch,
     interruptPhrase:interruptCommand,
     normalizeTranscript:voiceAliasNormalize,
-    conversationState:function(){return{ambientEnabled:!!state.ambientEnabled,listening:!!state.recognitionActive,wantListening:!!state.wantListening,starting:!!state.recognitionStarting,conversation:!!state.conversationMode,speaking:!!state.speaking,thinking:!!state.requestInFlight};}
+    conversationState:function(){return{ambientEnabled:!!state.ambientEnabled,listening:!!state.recognitionActive,wantListening:!!state.wantListening,starting:!!state.recognitionStarting,conversation:!!state.conversationMode,speaking:!!state.speaking,thinking:!!state.requestInFlight,preAuthPriming:!!state.preAuthPriming,lastRecognitionError:state.lastRecognitionError||''};}
   };
   window.ControlEventV22Voz3=window.ControlEventV22Voz4;
 })();
