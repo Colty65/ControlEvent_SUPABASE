@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v2.0_exp-FIX27-VOICE-FIX14-CORE';
+  var BUILD='v2.0_exp-FIX28-VOICE-LOCAL-FALLBACK';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -20,6 +20,7 @@
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
     recognition:null, recognitionGeneration:0, recognitionStarting:false, recognitionLive:false, needsGesture:false,
+    localSpeechReady:false, localSpeechPreparing:false, localSpeechAttempted:false, localSpeechUnavailable:false, lastRecognitionError:'', pendingRecognitionKind:'ambient',
     wakeCapture:false, wakeText:'', wakeSession:'', wakeTimer:null, wakeLastAt:0,
     turnPrefix:'', turnSession:'', turnTimer:null, turnLastAt:0,
     requestInFlight:false, awaitingResponse:false, requestPrompt:'', requestTitle:'',
@@ -93,13 +94,29 @@
   function injectBadge(){if($('ceZuzuWakeBadge')||!document.body)return;var b=document.createElement('button');b.id='ceZuzuWakeBadge';b.type='button';b.addEventListener('click',function(){state.ambientEnabled=!state.ambientEnabled;safeSet(STORAGE.ambient,state.ambientEnabled?'1':'0');if(state.ambientEnabled){state.needsGesture=false;startAmbient(true);}else stopRecognition();updateBadge();});document.body.appendChild(b);updateBadge();}
 
   function recognitionCtor(){return window.SpeechRecognition||window.webkitSpeechRecognition;}
+  function localSpeechApi(){var C=recognitionCtor();return C&&typeof C.available==='function'&&typeof C.install==='function'?C:null;}
   function stopRecognition(){state.recognitionGeneration++;state.recognitionStarting=false;state.recognitionLive=false;var r=state.recognition;state.recognition=null;try{r&&r.abort();}catch(_){try{r&&r.stop();}catch(__){}}setMic(false);}
+  function restartRecognitionKind(kind){setTimeout(function(){if(kind==='user'&&state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();else if(kind==='ambient'&&state.ambientEnabled&&!state.conversationMode)startAmbient(false);},120);}
+  function prepareLocalSpeech(kind){
+    var C=localSpeechApi();state.pendingRecognitionKind=kind||state.pendingRecognitionKind||'ambient';
+    if(!C){state.localSpeechUnavailable=true;setStatus('Reconocimiento de voz: la red falló y este navegador no ofrece modo local.','err');updateBadge();return Promise.resolve(false);}
+    if(state.localSpeechReady){restartRecognitionKind(state.pendingRecognitionKind);return Promise.resolve(true);}
+    if(state.localSpeechPreparing)return Promise.resolve(false);
+    state.localSpeechPreparing=true;state.localSpeechAttempted=true;setStatus('La voz en red falló. Activando reconocimiento local…','ok');updateBadge();
+    var opts={langs:['es-ES'],processLocally:true};
+    return Promise.resolve().then(function(){return C.available(opts);}).then(function(result){
+      result=clean(result).toLowerCase();
+      if(result==='available'){state.localSpeechReady=true;state.localSpeechUnavailable=false;setStatus('Voz local activa. Di «Hola Zuzu».','ok');return true;}
+      if(result==='downloadable'||result==='downloading'){setStatus('Preparando voz local en español…','ok');return C.install(opts).then(function(ok){state.localSpeechReady=!!ok;state.localSpeechUnavailable=!ok;setStatus(ok?'Voz local instalada. Di «Hola Zuzu».':'No se pudo instalar la voz local en español.',ok?'ok':'err');return !!ok;});}
+      state.localSpeechUnavailable=true;setStatus('La red de voz falló y el paquete local español no está disponible.','err');return false;
+    }).catch(function(err){state.localSpeechUnavailable=true;setStatus('No se pudo activar la voz local: '+clean(err&&err.name||err&&err.message||'error')+'.','err');return false;}).then(function(ok){state.localSpeechPreparing=false;updateBadge();if(ok)restartRecognitionKind(state.pendingRecognitionKind);return ok;});
+  }
   function sessionText(ev){var parts=[];for(var i=0;i<ev.results.length;i++){var t=clean(ev.results[i]&&ev.results[i][0]&&ev.results[i][0].transcript);if(t)parts.push(t);}return clean(parts.join(' '));}
   function newRecognition(kind){
-    var C=recognitionCtor();if(!C)return null;var r=new C(),gen=++state.recognitionGeneration;r.lang='es-ES';r.continuous=true;r.interimResults=true;r.maxAlternatives=3;r.__gen=gen;r.__kind=kind;
-    r.onstart=function(){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=true;state.needsGesture=false;setMic(kind==='user');if(kind==='ambient')setStatus(state.wakeCapture?'Sigue hablando…':'Escucha activa. Di «Hola Zuzu».','ok');if(kind==='user')setStatus('Te escucho…','ok');updateBadge();};
-    r.onerror=function(ev){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=false;var code=clean(ev&&ev.error);if(code==='not-allowed'||code==='service-not-allowed'){state.needsGesture=true;setStatus('La escucha se rearmará con tu siguiente pulsación normal.','err');}else if(code&&code!=='no-speech'&&code!=='aborted')setStatus('Micrófono: '+code,'err');updateBadge();};
-    r.onend=function(){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=false;state.recognition=null;setMic(false);if(state.needsGesture){updateBadge();return;}if(kind==='ambient'&&state.ambientEnabled&&!state.conversationMode)setTimeout(function(){startAmbient(false);},90);else if(kind==='user'&&state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)setTimeout(startUser,90);};
+    var C=recognitionCtor();if(!C)return null;var r=new C(),gen=++state.recognitionGeneration;r.lang='es-ES';r.continuous=true;r.interimResults=true;r.maxAlternatives=3;if(state.localSpeechReady&&'processLocally' in r)r.processLocally=true;r.__gen=gen;r.__kind=kind;
+    r.onstart=function(){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=true;state.needsGesture=false;state.lastRecognitionError='';setMic(kind==='user');if(kind==='ambient')setStatus(state.wakeCapture?'Sigue hablando…':state.localSpeechReady?'Voz local activa. Di «Hola Zuzu».':'Escucha activa. Di «Hola Zuzu».','ok');if(kind==='user')setStatus(state.localSpeechReady?'Te escucho (voz local)…':'Te escucho…','ok');updateBadge();};
+    r.onerror=function(ev){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=false;var code=clean(ev&&ev.error),message=clean(ev&&ev.message);state.lastRecognitionError=code+(message?' · '+message:'');if(code==='network'&&!state.localSpeechReady){state.localSpeechPreparing=true;state.pendingRecognitionKind=kind;setStatus('La voz en red ha fallado. Paso a reconocimiento local…','ok');setTimeout(function(){state.localSpeechPreparing=false;prepareLocalSpeech(kind);},0);}else if(code==='language-not-supported'&&state.localSpeechReady){state.localSpeechReady=false;state.localSpeechUnavailable=false;state.pendingRecognitionKind=kind;setTimeout(function(){prepareLocalSpeech(kind);},0);}else if(code==='not-allowed'||code==='service-not-allowed'){state.needsGesture=true;setStatus('La escucha se rearmará con tu siguiente pulsación normal.','err');}else if(code&&code!=='no-speech'&&code!=='aborted')setStatus('Micrófono: '+code+(message?' · '+message:''),'err');updateBadge();};
+    r.onend=function(){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=false;state.recognition=null;setMic(false);if(state.needsGesture||state.localSpeechPreparing){updateBadge();return;}if(state.lastRecognitionError==='network'&&!state.localSpeechReady){updateBadge();return;}if(kind==='ambient'&&state.ambientEnabled&&!state.conversationMode)setTimeout(function(){startAmbient(false);},90);else if(kind==='user'&&state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)setTimeout(startUser,90);};
     r.onresult=function(ev){if(gen!==state.recognitionGeneration)return;var t=sessionText(ev);if(kind==='ambient')handleAmbientText(t);else handleUserText(t);};
     return r;
   }
@@ -204,6 +221,10 @@
     // (por ejemplo Entrar) y arrancamos el reconocimiento dentro de ese mismo evento.
     safeSet(STORAGE.ambient,'1');state.ambientEnabled=true;
     if(supportsSpeech()){loadVoices();try{window.speechSynthesis.onvoiceschanged=loadVoices;}catch(_){} }
+    // FIX28: no dependemos ciegamente del servicio remoto de Web Speech. Si Chrome ya tiene
+    // español local instalado lo usamos desde el primer ciclo; si no, probamos red y ante
+    // error `network` descargamos/activamos automáticamente el reconocimiento local.
+    try{var LC=localSpeechApi();if(LC)LC.available({langs:['es-ES'],processLocally:true}).then(function(r){if(clean(r).toLowerCase()==='available')state.localSpeechReady=true;}).catch(function(){});}catch(_){}
     if(state.ambientEnabled)setTimeout(function(){startAmbient(false);},350);
     document.addEventListener('pointerdown',primeAmbientFromGesture,true);
     document.addEventListener('touchstart',primeAmbientFromGesture,{capture:true,passive:true});
@@ -219,7 +240,7 @@
     startAmbientListening:function(){state.ambientEnabled=true;state.needsGesture=false;safeSet(STORAGE.ambient,'1');startAmbient(true);},
     endVoiceConversation:endConversation,downloadConversationRecording:toggleRecording,
     speakResponse:speakResponse,stopSpeaking:stopSpeaking,supportsRecognition:supportsRecognition,supportsDeviceSpeech:supportsSpeech,
-    debugState:function(){return{build:BUILD,ambientEnabled:state.ambientEnabled,conversationMode:state.conversationMode,recognitionStarting:state.recognitionStarting,recognitionLive:state.recognitionLive,needsGesture:state.needsGesture,mode:state.mode};}
+    debugState:function(){return{build:BUILD,ambientEnabled:state.ambientEnabled,conversationMode:state.conversationMode,recognitionStarting:state.recognitionStarting,recognitionLive:state.recognitionLive,needsGesture:state.needsGesture,mode:state.mode,localSpeechReady:state.localSpeechReady,localSpeechPreparing:state.localSpeechPreparing,localSpeechUnavailable:state.localSpeechUnavailable,lastRecognitionError:state.lastRecognitionError};}
   };
   window.ControlEventVoiceV2=window.ControlEventVoiceTurns;
   window.ControlEventV22Voz4=window.ControlEventVoiceTurns;
