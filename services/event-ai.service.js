@@ -7456,8 +7456,35 @@ async function runZuzuV26Tools({userPrompt,state,selectedEventId,flowTrace=[],co
 // verificar hechos objetivos y presentar. No hay rutas conversacionales hard-code.
 // ============================================================================
 
-function v261InteractionModel(){
-  return trim(process.env.CONTROLEVENT_ZUZU_INTERACTIONS_MODEL || process.env.CONTROLEVENT_ZUZU_NARRATIVE_MODEL || process.env.CONTROLEVENT_EVENT_AI_MODEL || 'gemini-2.5-flash').replace(/^models\//,'') || 'gemini-2.5-flash';
+function v332FlashQualityPrompt(userPrompt=''){
+  const p=norm(userPrompt);
+  // Lite es el cerebro habitual. Flash queda reservado para peticiones en las que la calidad
+  // de razonamiento/redacción compensa claramente el mayor coste: informes, opinión, auditoría,
+  // recomendaciones o análisis deliberadamente profundos. Las consultas factuales, búsquedas,
+  // seguimientos y comparaciones normales permanecen en Lite.
+  return /\b(?:informe(?:s)?(?:\s+ejecutiv\w*)?|opini[oó]n|qu[eé]\s+te\s+parece|c[oó]mo\s+lo\s+ves|analiza(?:r|me|lo|la)?|an[aá]lisis|auditor[ií]a|audita|recomienda|recomendaci[oó]n|riesgos?|conclusiones?\s+estrat[eé]gicas?|exhaustiv\w*|diagn[oó]stico\s+profundo|valoraci[oó]n\s+cr[ií]tica)\b/.test(p);
+}
+function v332InteractionPolicy(userPrompt=''){
+  const tier=trim(process.env.CONTROLEVENT_ZUZU_INTERACTIONS_TIER||'lite-first').toLowerCase();
+  const liteModel=trim(process.env.CONTROLEVENT_ZUZU_LITE_MODEL||'gemini-2.5-flash-lite').replace(/^models\//,'')||'gemini-2.5-flash-lite';
+  // Los antiguos overrides de Interaction/Narrativa se conservan como candidato Flash, no como
+  // modelo principal. Así un despliegue que antes fijaba Flash no anula silenciosamente el paso
+  // solicitado a Lite-first.
+  const flashModel=trim(process.env.CONTROLEVENT_ZUZU_FLASH_MODEL||process.env.CONTROLEVENT_ZUZU_INTERACTIONS_MODEL||process.env.CONTROLEVENT_ZUZU_NARRATIVE_MODEL||process.env.CONTROLEVENT_EVENT_AI_MODEL||'gemini-2.5-flash').replace(/^models\//,'')||'gemini-2.5-flash';
+  if(/^(flash|calidad|premium|alta)$/.test(tier))return{tier:'flash',model:flashModel,liteModel,flashModel,persistNativeThread:false,reason:'forzado por CONTROLEVENT_ZUZU_INTERACTIONS_TIER'};
+  if(/^(lite|ahorro|econ[oó]mico|barato|low)$/.test(tier))return{tier:'lite',model:liteModel,liteModel,flashModel,persistNativeThread:true,reason:'Lite forzado por CONTROLEVENT_ZUZU_INTERACTIONS_TIER'};
+  if(v332FlashQualityPrompt(userPrompt))return{tier:'flash',model:flashModel,liteModel,flashModel,persistNativeThread:false,reason:'petición de análisis/informe/opinión'};
+  return{tier:'lite',model:liteModel,liteModel,flashModel,persistNativeThread:true,reason:'conversación normal Lite-first'};
+}
+function v261InteractionModel(userPrompt=''){
+  return v332InteractionPolicy(userPrompt).model;
+}
+function v332CanEscalateLiteFailure(error){
+  if(!error)return true;
+  if(error?.name==='AbortError'||Number(error?.status)===499)return false;
+  if([401,403].includes(Number(error?.status)))return false;
+  if(trim(error?.code)==='ZUZU_COST_CAP')return false;
+  return true;
 }
 
 function v261EventManagementTool(tool,state,selectedEventId=''){
@@ -9254,12 +9281,20 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   const bankContext=v273ConversationBankContext(userPrompt,conversationHistory)||broadGraphEvent;
   const staticPointLabels=v273PromptRequestsStaticPointLabels(userPrompt,conversationHistory);
   const dataAccessReq=v274DataAccessRequirement(userPrompt,conversationHistory);
-  const model=v261InteractionModel(),tools=v261AgentTools(),systemInstruction=v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,userPrompt,conversationHistory,voiceConversation});
+  const modelPolicy=v332InteractionPolicy(userPrompt);
+  let model=modelPolicy.model,escalatedToFlash=false;
+  const tools=v261AgentTools(),systemInstruction=v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,userPrompt,conversationHistory,voiceConversation});
   // v2.0_exp: Gemini conserva el hilo nativo en servidor mediante previous_interaction_id.
   // CE no decide la respuesta; sí puede preconsultar un dossier personal compacto para conservar
   // la identidad y asegurar una fuente fresca cuando el usuario revisa/corrige un dato personal.
   let currentId=trim(previousInteractionId),payload,resetInteractionId=false;
   const cache=new Map(),allResults=[];
+  if(modelPolicy.tier==='flash'&&currentId){
+    // No mezclamos un hilo nativo Lite con una excursión puntual a Flash. El contexto humano se
+    // reconstruye con la cápsula local y, al terminar, el siguiente turno normal vuelve limpio a Lite.
+    currentId='';resetInteractionId=true;
+  }
+  zuzuTracePush(flowTrace,'v2.0_exp · Motor Zuzu',modelPolicy.tier==='lite'?'OK':'INFO',modelPolicy.tier==='lite'?`Lite-first activo · ${model}. Flash queda como respaldo ante fallo real del modelo.`:`Escalado de calidad a Flash · ${model} (${modelPolicy.reason}). La conversación se conserva mediante la cápsula local y el siguiente turno normal vuelve a Lite.`);
   const turnNo=Math.max(0,Number(conversationTurnNumber)||0);
   // v2.0_exp · economía de contexto: cada seis turnos largos se abre una Interaction nueva,
   // pero se inyecta una memoria compacta de todo el hilo para no perder referencias ni resúmenes.
@@ -9346,6 +9381,14 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
       zuzuTracePush(flowTrace,'v30 · Recuperación de Interaction','WARN','El previous_interaction_id anterior ya no es válido. Se reconstruye el hilo con los últimos turnos locales y se crea una nueva cadena sin interrumpir al usuario.');
       currentId='';
       payload=await v261CallInteraction({input:v261EmergencyConversationInput(groundedUserInput,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'v30 · Gemini reconstruye conversación',toolChoice:'auto',externalSignal});
+    }else if(modelPolicy.tier==='lite'&&modelPolicy.flashModel&&modelPolicy.flashModel!==model&&v332CanEscalateLiteFailure(error)){
+      // Fallo REAL de Lite antes de disponer de una respuesta: una sola recuperación con Flash.
+      // Se abandona el previous_interaction_id técnico y se reconstruye el hilo desde la memoria
+      // local para no depender de que Google permita cambiar de modelo dentro de la misma cadena.
+      resetInteractionId=true;currentId='';escalatedToFlash=true;model=modelPolicy.flashModel;
+      zuzuTracePush(flowTrace,'v2.0_exp · Escalado Lite → Flash','WARN',`Lite no completó el turno (${cleanGeminiError(error)}). Se reintenta una sola vez con ${model}, reconstruyendo el contexto local.`);
+      const flashInput=v284ConversationCapsuleInput(groundedUserInput,userPrompt,conversationHistory,conversationDigest);
+      payload=await v261CallInteraction({input:flashInput,previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'v2.0_exp · Flash de respaldo',toolChoice:'auto',externalSignal});
     }else throw error;
   }
   currentId=trim(payload?.id)||currentId;
@@ -9386,7 +9429,17 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     }
     try{
       payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:`V27.1.5 · Gemini tras herramientas ${cycle}`,externalSignal});
-    }catch(error){error.canonicalResults=[...allResults];error.canonicalEventFocus=eventFocus;throw error;}
+    }catch(error){
+      if(modelPolicy.tier==='lite'&&!escalatedToFlash&&modelPolicy.flashModel&&modelPolicy.flashModel!==model&&v332CanEscalateLiteFailure(error)){
+        // Aquí no podemos reconstruir desde cero: los function_result pertenecen a la Interaction
+        // Lite que acaba de pedirlos. Interactions permite continuar la cadena con otro modelo, así
+        // que Flash recibe exactamente esos resultados canónicos y completa la redacción del turno.
+        escalatedToFlash=true;model=modelPolicy.flashModel;resetInteractionId=true;
+        zuzuTracePush(flowTrace,'v2.0_exp · Escalado Lite → Flash','WARN',`Lite falló al cerrar la ronda de herramientas (${cleanGeminiError(error)}). Flash completa el mismo turno con los resultados canónicos ya obtenidos.`);
+        try{payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:`v2.0_exp · Flash tras herramientas ${cycle}`,externalSignal});}
+        catch(flashError){flashError.canonicalResults=[...allResults];flashError.canonicalEventFocus=eventFocus;throw flashError;}
+      }else{error.canonicalResults=[...allResults];error.canonicalEventFocus=eventFocus;throw error;}
+    }
     currentId=trim(payload?.id)||currentId;
   }
   if(!canonicalClosure&&v261FunctionCalls(payload).length){
@@ -9591,10 +9644,13 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   const turnUsage=summarizeGeminiUsageFromTrace(flowTrace),turnCost=num(turnUsage?.costEurApprox);
   zuzuTracePush(flowTrace,'v30 · Control de coste',turnCost>0.030?'WARN':turnCost>0.015?'WARN':'OK',`Turno: ${num(turnUsage?.calls)} llamada(s), ${num(turnUsage?.totalTokens)} tokens, coste estimado ${turnCost.toFixed(6)} €. La continuidad y la finalización de herramientas tienen prioridad; normalmente máximo 2 llamadas exitosas por turno (hasta 3 solo cuando una gráfica bancaria exige una segunda ronda de herramienta).`);
   const finalStatus=trim(payload?.status)||'completed';
-  const completedInteractionId=finalStatus==='completed'?currentId:'';
-  if(completedInteractionId)zuzuTracePush(flowTrace,'v30 · Memoria de conversación','OK',`Interaction completada y guardable para el siguiente turno: ${completedInteractionId.slice(0,40)}…`);
+  const persistNativeThread=modelPolicy.tier==='lite'&&!escalatedToFlash;
+  if(!persistNativeThread)resetInteractionId=true;
+  const completedInteractionId=finalStatus==='completed'&&persistNativeThread?currentId:'';
+  if(completedInteractionId)zuzuTracePush(flowTrace,'v30 · Memoria de conversación','OK',`Interaction Lite completada y guardable para el siguiente turno: ${completedInteractionId.slice(0,40)}…`);
+  else if(finalStatus==='completed'&&!persistNativeThread)zuzuTracePush(flowTrace,'v30 · Memoria de conversación','OK','El turno Flash no se encadena técnicamente: el siguiente turno vuelve a Lite y recupera este contexto desde la memoria local de la conversación.');
   const resultContext=v310InteractionResultContext(userPrompt,allResults,eventFocus,personalGrounding,conversationHistory);
-  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-interactions-v2-0-exp',model,interactionId:completedInteractionId,meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'Gemini mantiene el hilo nativo y decide la respuesta/herramientas; ControlEvent aporta grounding canónico compacto cuando hace falta preservar identidad o verificar una corrección, ejecuta cálculos, verifica y presenta',interactionId:completedInteractionId,resetInteractionId,pendingAction,resultContext,tools:[...new Set(allResults.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-interactions-v2-0-exp',model,interactionId:completedInteractionId,meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'Lite-first: Gemini Flash-Lite mantiene la conversación normal y decide herramientas; Flash se reserva para análisis/informes/opinión o respaldo ante fallo real de Lite; ControlEvent ejecuta, verifica y presenta hechos canónicos',modelTier:escalatedToFlash?'flash-fallback':modelPolicy.tier,interactionId:completedInteractionId,resetInteractionId,pendingAction,resultContext,tools:[...new Set(allResults.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuSemanticAgent({userPrompt,state,selectedEventId,flowTrace=[]}){
@@ -9858,7 +9914,7 @@ function v2853PlainAnalystInput(userPrompt,prefetch,conversationHistory=[]){
 }
 async function v2853CallPlainAnalyst({userPrompt,prefetch,conversationHistory=[],flowTrace=[]}){
   const apiKey=geminiKey();if(!apiKey)throw Object.assign(new Error('Falta GEMINI_API_KEY para Zuzu.'),{status:503});
-  const model=v261InteractionModel();
+  const model=v261InteractionModel(userPrompt);
   const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const sys=v2853PlainAnalystSystemInstruction(prefetch?.kind||'analysis');
   const input=v2853PlainAnalystInput(userPrompt,prefetch,conversationHistory);
