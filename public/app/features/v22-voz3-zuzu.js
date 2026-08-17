@@ -204,14 +204,20 @@
   function interruptCommandDuringSpeech(value){
     var raw=clean(value),n=wakeNorm(raw);if(!n)return{matched:false,rest:''};
     // Durante la locución buscamos una orden FUERTE incluso si antes se ha colado eco de la propia Zuzu.
-    // Evitamos el «para» genérico (aparece mucho en frases normales); solo aceptamos «para un momento».
-    var re=/(^|\s)(perdona|perdon|escucha|callate|cállate|espera|esperate|para\s+un\s+momento|zuzu|susu|suzu)(?:\s+|$)/gi;
+    // «Para» aislado también es una orden válida: se protege más abajo para no autocortarnos
+    // cuando esa palabra forma parte de la propia frase que Zuzu está pronunciando.
+    var re=/(^|\s)(perdona|perdon|oye|ey|escucha|callate|cállate|espera|esperate|para(?:\s+un\s+momento)?|zuzu|susu|suzu)(?:\s+|$)/gi;
     var m,last=null;
     while((m=re.exec(raw))){last={index:m.index+(m[1]?m[1].length:0),end:re.lastIndex,cue:clean(m[2])};}
     if(!last)return{matched:false,rest:''};
     var before=raw.slice(0,last.index),after=clean(raw.slice(last.end));
     var ratio=raw.length?last.index/raw.length:0;
     var cueNorm=wakeNorm(last.cue);
+    var rawWords=wakeNorm(raw).split(' ').filter(Boolean);
+    // «Para» aparece con frecuencia en frases normales de Zuzu. Lo aceptamos si el resultado
+    // reconocido es muy corto (lo normal cuando el usuario la corta con un «Para») o si el cue
+    // llega claramente al final de un transcript contaminado por eco.
+    if(cueNorm==='para' && !(rawWords.length<=4 || ratio>=0.62))return{matched:false,rest:''};
     // «Zuzu» puede aparecer en la propia voz ("soy Zuzu"): solo vale si está prácticamente al final
     // o si la frase es muy corta. El resto de órdenes fuertes pueden aparecer tras eco acumulado.
     if((cueNorm==='zuzu'||cueNorm==='susu'||cueNorm==='suzu') && !(ratio>=0.68 || wakeNorm(raw).split(' ').length<=3))return{matched:false,rest:''};
@@ -221,8 +227,14 @@
     return{matched:true,cue:last.cue,rest:after,prefix:clean(before)};
   }
   function resetRecognitionAfterInterrupt(){
-    state.ignoreRecognitionUntil=Date.now()+420;
-    try{if(state.recognition)state.recognition.abort();}catch(_){}
+    // Tras un barge-in NO reiniciamos SpeechRecognition: abortarlo hacía perder a veces las
+    // primeras palabras que el usuario decía justo después de «Perdona / Para / Escucha».
+    // El recognizer permanece vivo y los filtros de eco ya descartan la cola de la voz cancelada.
+    var now=Date.now();
+    state.lastSpeechEndedAt=now;
+    state.speechEchoUntil=Math.max(Number(state.speechEchoUntil||0),now+1200);
+    state.ignoreRecognitionUntil=0;
+    state.recognitionHoldUntil=0;
   }
   function isWakeOnlyPhrase(value){
     var m=wakeMatch(value);return !!(m.matched&&!clean(m.rest));
@@ -257,7 +269,14 @@
     var out=clean(value);if(!out)return out;
     out=out
       .replace(/\b(?:santiago\s+y\s+santa\s+ana|santiago\s+santa\s+ana|sisa|s\s+y\s+s\s+a|ese\s+y\s+ese\s+a)\b/gi,'SySA')
-      .replace(/\bversus\b/gi,'vs');
+      .replace(/\bversus\b/gi,'vs')
+      // Variantes habituales que devuelve Web Speech al intentar interrumpir una locución.
+      // Se normalizan ANTES de decidir si la frase es una pregunta para que una mala
+      // transcripción no convierta «cállate / perdona / escucha / para» en un turno de Gemini.
+      .replace(/\b(?:callete|cayate|callese|cállese|calla\s+ya|cállate\s+ya)\b/gi,'cállate')
+      .replace(/\b(?:perdone|perd[oó]name|perd[oó]neme)\b/gi,'perdona')
+      .replace(/\b(?:escuchame|escúchame|oye\s+zuzu)\b/gi,'escucha')
+      .replace(/\b(?:parate|párate|detente)\b/gi,'para');
     if(/\b(jornada|visita|evento|edici[oó]n|funci[oó]n)\b/i.test(out)){
       var ord=[['d[eé]cima','X'],['novena','IX'],['octava','VIII'],['s[eé]ptima','VII'],['sexta','VI'],['quinta','V'],['cuarta','IV'],['tercera','III'],['segunda','II'],['primera','I']];
       ord.forEach(function(pair){out=out.replace(new RegExp('\\b'+pair[0]+'\\b','gi'),pair[1]);});
@@ -627,6 +646,21 @@
     });
     return Math.min(1,best);
   }
+  function bestInterruptAlternative(result){
+    if(!result||!result.length)return null;
+    var best=null;
+    for(var i=0;i<Math.min(result.length,5);i++){
+      var raw=clean(result[i]&&result[i].transcript);if(!raw)continue;
+      var normalized=voiceAliasNormalize(raw),hit=interruptCommandDuringSpeech(normalized);
+      if(!hit.matched)continue;
+      var conf=Number(result[i]&&result[i].confidence)||0;
+      // La existencia de un cue fuerte manda sobre el ranking de entidades. Entre varias
+      // alternativas de interrupción preferimos la de mayor confianza y la más corta.
+      var score=10+conf-(wakeNorm(normalized).split(' ').length*0.002);
+      if(!best||score>best.score)best={text:normalized,confidence:conf,score:score,interrupt:true};
+    }
+    return best;
+  }
   function bestRecognitionAlternative(result){
     if(!result||!result.length)return{text:'',confidence:0};
     var best={text:clean(result[0]&&result[0].transcript),confidence:Number(result[0]&&result[0].confidence)||0,score:-1};
@@ -671,7 +705,11 @@
     };
     rec.onresult = function(ev){
       for(var i=ev.resultIndex;i<ev.results.length;i++){
-        var picked=bestRecognitionAlternative(ev.results[i]),text=clean(picked.text);if(!text)continue;
+        // Mientras Zuzu habla inspeccionamos TODAS las alternativas del reconocedor buscando
+        // primero una orden de interrupción. Antes elegíamos una sola alternativa por similitud
+        // con nombres de ControlEvent y podíamos descartar justo la alternativa que contenía
+        // «Perdona / Cállate / Para / Escucha».
+        var picked=(state.conversationMode&&state.speaking?bestInterruptAlternative(ev.results[i]):null)||bestRecognitionAlternative(ev.results[i]),text=clean(picked.text);if(!text)continue;
         var isFinal=!!ev.results[i].isFinal;
         if(state.conversationMode)processConversationSpeech(text,isFinal,picked.confidence);
         else if(state.recognitionMode==='manual'){
