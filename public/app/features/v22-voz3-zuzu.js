@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp · Zuzu Voice · FIX31 PC mic-array multicanal sobre motor estable
+/* ControlEvent v2.0_exp · Zuzu Voice · FIX32 conversación humana + repertorio completo
    Objetivo: recuperar la escucha ambiental que sí funcionó y mantener conversación oral humana.
    Flujo deliberadamente simple:
    AMBIENTE -> "Hola Zuzu" -> USUARIO -> ESPERA IA -> ZUZU HABLA -> USUARIO.
@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v2.0_exp-FIX31-VOICE-PC-MULTICHANNEL';
+  var BUILD='v2.0_exp-FIX32-HUMAN-CONVERSATION-20-PHRASES';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -30,7 +30,7 @@
     bargeRecognition:null, bargeGeneration:0,
     voices:[],
     recorderStream:null, recorder:null, recorderChunks:[], recordingActive:false, lastRecordingBlob:null, lastRecordingMime:'',
-    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, lastEntertainmentIndex:-1
+    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, lastEntertainmentIndex:-1, entertainmentUsed:[], entertainmentCycle:0
   };
 
   var ENTERTAINMENT_PHRASES=[
@@ -90,7 +90,6 @@
     out=out.replace(new RegExp('^'+who+'\\s*[,.:;\\-–—]+\\s*','i'),'');
     return clean(out);
   }
-  function voiceBridge(prompt,title){var formal=isFormalVoiceTurn(prompt,title),name=voiceAddressName(formal);return (formal?'Le comento, ':'Te comento, ')+name+'.';}
 
   function injectStyle(){
     if($(STYLE_ID))return;var st=document.createElement('style');st.id=STYLE_ID;
@@ -216,7 +215,22 @@
   function speakResponse(){var a=q('#ceAiResult .ce-ai-answer');if(a)speakChunks(clean(a.textContent));}
   function previewVoice(){if(!supportsSpeech())return;try{window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance('Esta es la voz de Zuzu. Estoy lista para conversar contigo.');u.lang='es-ES';u.rate=speechRate();u.volume=0.9;var v=chooseVoice();if(v)u.voice=v;window.speechSynthesis.speak(u);}catch(_){} }
 
-  function entertainmentIndex(second,count){var seed=((Number(second)||0)+1)*1103515245+((Number(count)||0)+1)*12345;seed=(seed>>>0);seed=(Math.imul(seed^0x9e3779b9,2654435761)>>>0);var idx=seed%ENTERTAINMENT_PHRASES.length;if(idx===state.lastEntertainmentIndex)idx=(idx+1)%ENTERTAINMENT_PHRASES.length;state.lastEntertainmentIndex=idx;return idx;}
+  function entertainmentIndex(second,count){
+    // La semilla nace SIEMPRE del segundo dentro de la hora actual, como pidió el usuario.
+    // Para que el repertorio real sean 20 frases y no 2-3 repetidas, cada frase usada sale
+    // del pool hasta agotarlo; solo entonces se abre un ciclo nuevo con las 20 disponibles.
+    if(!Array.isArray(state.entertainmentUsed))state.entertainmentUsed=[];
+    if(state.entertainmentUsed.length>=ENTERTAINMENT_PHRASES.length){state.entertainmentUsed=[];state.entertainmentCycle++;}
+    var used=new Set(state.entertainmentUsed),available=[];
+    for(var i=0;i<ENTERTAINMENT_PHRASES.length;i++)if(!used.has(i))available.push(i);
+    var sec=Math.max(0,Math.min(3599,Number(second)||0));
+    var seed=((sec+1)*1103515245)>>>0;
+    seed=(seed+Math.imul((state.entertainmentCycle+1),2654435761)+Math.imul((Number(count)||0)+1,2246822519))>>>0;
+    seed=(Math.imul((seed^(seed>>>16))>>>0,3266489917)>>>0);
+    var idx=available[seed%available.length];
+    state.entertainmentUsed.push(idx);state.lastEntertainmentIndex=idx;
+    return idx;
+  }
   function stopEntertainment(cancelSpeech){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;var was=state.entertainmentSpeaking;state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(cancelSpeech&&was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){} }}
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Number(delay)||2000);}
   function speakEntertainmentPhrase(){if(!state.conversationMode||!state.requestInFlight||!supportsSpeech())return;stopEntertainment(false);var now=new Date(),secondOfHour=now.getMinutes()*60+now.getSeconds(),idx=entertainmentIndex(secondOfHour,state.entertainmentCount++),phrase=ENTERTAINMENT_PHRASES[idx];try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=Math.min(1,speechRate()+0.03);u.volume=0.94;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;u.onend=function(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);};u.onerror=function(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);};window.speechSynthesis.speak(u);}catch(_){state.entertainmentSpeaking=false;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);}}
@@ -245,7 +259,7 @@
 
   document.addEventListener('ce:zuzu-request-started',function(ev){if(!state.conversationMode)return;pauseCloudListening();state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=clean(ev&&ev.detail&&ev.detail.prompt||state.requestPrompt);stopRecognition();clearTurnTimer();setStatus('Consultando ControlEvent…','ok');startEntertainment();});
   document.addEventListener('ce:zuzu-request-error',function(){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(true);setStatus('No se pudo completar. Te escucho.','err');setTimeout(startUser,180);});
-  document.addEventListener('ce:zuzu-response-rendered',function(ev){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(true);var answer=stripVoiceAnswerLead(clean(ev&&ev.detail&&ev.detail.answer)),title=clean(ev&&ev.detail&&ev.detail.title);if(!answer){setTimeout(startUser,120);return;}var auto=$('ceVoz3AutoRead');if(!auto||auto.checked!==false)speakChunks(voiceBridge(state.requestPrompt,title)+' '+answer);else startUser();});
+  document.addEventListener('ce:zuzu-response-rendered',function(ev){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(true);var answer=stripVoiceAnswerLead(clean(ev&&ev.detail&&ev.detail.answer));if(!answer){setTimeout(startUser,120);return;}var auto=$('ceVoz3AutoRead');if(!auto||auto.checked!==false)speakChunks(answer);else startUser();});
   window.addEventListener('controlevent:zuzu-opened',function(){setTimeout(injectPanel,30);});
   window.addEventListener('controlevent:zuzu-closed',function(){parkConversation();});
   document.addEventListener('click',function(ev){var t=ev.target;if(t&&t.closest&&t.closest('#ceAiDownloadResult')&&state.conversationMode)endConversation();},true);
