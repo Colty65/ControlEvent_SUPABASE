@@ -8144,13 +8144,32 @@ function v305CanonicalClosureFromResults(userPrompt,results=[],history=[]){
     }
   }
 
-  if(/\bcat[aá]logo\b/.test(p)){
+  // FIX13 · Lite puede haber ejecutado correctamente una herramienta canónica y fallar
+  // únicamente al cerrar/redactar la Interaction. En ese caso CE no debe degradar una
+  // respuesta global fiable a un mensaje genérico: cierra directamente con los hechos
+  // YA obtenidos en este mismo turno. No añade consultas ni cambia el ámbito.
+  {
+    const r=latest('people_activity');
+    if(r&&/\b(actividad|actividades|implicad|participativ|m[aá]s\s+activ|m[aá]s\s+implicad|m[aá]s\s+presente)\b/.test(p)){
+      const count=num(r?.facts?.entities);
+      return{title:'Implicación de personas canónicas',answer:`Actividad global: ${count} personas canónicas. La tabla conserva el cruce completo de participación, compras bajo responsabilidad, donaciones y gestión para comparar la implicación.`,warnings:[],showTables:show(r,'people_activity'),chartSpecs:[]};
+    }
+  }
+  {
+    const r=latest('canonical_socios');
+    if(r&&/\b(socios?\s+can[oó]nic\w*|criterio\s+coltylab|censo\s+(?:de\s+)?socios?)\b/.test(p)){
+      const records=num(r?.facts?.canonical_records),people=num(r?.facts?.people_count);
+      return{title:'Socios canónicos · ColtyLAB',answer:`Socios canónicos: ${records} registros · ${people} personas.`,warnings:[],showTables:show(r,'socios'),chartSpecs:[]};
+    }
+  }
+
+  if(/\b(cat[aá]logo|maestro|tabla\s+maestra|maestro\s+de)\b/.test(p)){
     const r=latest('master_catalog');
     if(r){
       const f=r.facts||{},count=num(f.record_count),entity=trim(f.entity)||'registros';
       const labels={products:'productos',stores:'tiendas',people:'personas',events:'eventos'};
       const label=labels[entity]||entity;
-      return{title:trim(r.title)||`Catálogo de ${label}`,answer:`El catálogo contiene ${count} registro${count===1?'':'s'} de ${label}.`,warnings:[],showTables:show(r,'catalog'),chartSpecs:[]};
+      return{title:trim(r.title)||`Catálogo de ${label}`,answer:`El maestro de ${label} contiene ${count} registro${count===1?'':'s'} de ${label}.`,warnings:[],showTables:show(r,'catalog'),chartSpecs:[]};
     }
   }
 
