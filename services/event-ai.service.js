@@ -5121,6 +5121,10 @@ function v273PromptRequestsStaticPointLabels(userPrompt,conversationHistory=[]){
 function v273RoutingInstruction(userPrompt,conversationHistory=[]){
   const chart=v273ConversationRequestsCharts(userPrompt,conversationHistory),bank=v273ConversationBankContext(userPrompt,conversationHistory),labels=v273PromptRequestsStaticPointLabels(userPrompt,conversationHistory);
   const lines=[];
+  const p=norm(userPrompt),globalScope=/\b(?:todos\s+los\s+eventos|todos\s+los\s+eventos\s+registrados|cualquiera\s+de\s+los\s+eventos|cualquier\s+evento|en\s+todos\s+los\s+eventos|globalmente)\b/.test(p);
+  const personCompare=/\b(?:compara|comparativa|comparar|frente\s+a|versus|\bvs\b)\b/.test(p);
+  if(globalScope)lines.push('Ámbito global confirmado por el usuario: trabaja con scope=all_events y NO pidas que elija un evento. Si hay una ambigüedad de identidad (por ejemplo una persona que solo aparece dentro de una pareja), aclara únicamente esa identidad; el ámbito global ya está resuelto.');
+  if(globalScope&&personCompare)lines.push('Comparación personal transversal: conserva las personas nombradas y usa person_dossier con scope=all_events para cada identidad resuelta; no sustituyas la comparación por el evento visible en pantalla.');
   if(bank)lines.push('Contexto bancario de un evento: usa event_bank como fuente primaria del Cuadre/conciliación y de sus movimientos vinculados. No sustituyas el cuadre del evento por el histórico general de la cuenta. Usa event_bank_timeline solo cuando la petición requiera explícitamente una cronología histórica distinta o cuando event_bank no aporte una serie temporal suficiente.');
   if(chart)lines.push('La intención de este turno exige una visualización REAL. Solicita en este mismo turno la herramienta de datos necesaria y devuelve una referencia válida en charts; no describas una gráfica futura ni delegues su renderizado al usuario o a otra capa.');
   if(chart&&bank)lines.push(v280BankEventWindowRequest(userPrompt)
@@ -8504,6 +8508,101 @@ function v334GlobalEventContextReset(userPrompt=''){
   const global=/\b(?:todos\s+los\s+eventos|todos\s+los\s+eventos\s+registrados|cualquiera\s+de\s+los\s+eventos|cualquier\s+evento|en\s+general|globalmente)\b/.test(p);
   return forget&&global;
 }
+
+// FIX21 · Higiene de contexto: diferencia una continuación real de una nueva transacción.
+// La conversación visible puede seguir abierta para PDF/grabación, pero la Interaction nativa
+// y la cápsula local NO arrastran sujetos/dominios incompatibles cuando el mensaje actual ya es autosuficiente.
+function v337RecentResultContext(conversationHistory=[]){
+  for(const turn of arr(conversationHistory).slice(-6).reverse()){
+    const ctx=turn?.resultContext&&typeof turn.resultContext==='object'?turn.resultContext:null;
+    if(ctx)return ctx;
+  }
+  return null;
+}
+function v337FullResetRequest(userPrompt=''){
+  const p=norm(userPrompt);
+  if(/^(?:la\s+)?escobita$/.test(p))return true;
+  return /\b(?:pasa|pase|pases|pasar|pulsa|pulse|usa|utiliza)\b[^.]{0,80}\bescobita\b/.test(p)
+    || /\b(?:nueva\s+conversacion|nueva\s+conversación|reinicia\s+(?:la\s+)?conversacion|reinicia\s+(?:la\s+)?conversación|empieza\s+de\s+cero|empecemos\s+de\s+cero|borra\s+(?:la\s+)?memoria|vacia\s+(?:la\s+)?memoria|vacía\s+(?:la\s+)?memoria|limpia\s+(?:el\s+)?contexto)\b/.test(p);
+}
+function v337ForgetPersonRequest(userPrompt=''){
+  const p=norm(userPrompt);
+  return /^(?:olvidame|olvídame|olvida\s+de\s+mi|olvídate\s+de\s+mi)$/.test(p)
+    || /\b(?:no\s+(?:a|de)\s+la\s+persona|no\s+(?:a|de)\s+colty|olvida|olvidate|olvídate)\b[^.]{0,60}\b(?:persona|colty|sujeto)\b/.test(p);
+}
+function v337MetaHelpRequest(userPrompt=''){
+  const p=norm(userPrompt);
+  return /\b(?:qu[eé]\s+es\s+lo\s+que\s+puedo\s+hacer\s+aqu[ií]|qu[eé]\s+puedo\s+hacer\s+aqu[ií]|qu[eé]\s+(?:cosas\s+)?(?:te\s+)?puedo\s+preguntar|qu[eé]\s+puedes\s+hacer|capacidades|ayuda\s+de\s+zuzu|di(?:me|em)\s+\d+\s+preguntas?\s+que\s+te\s+pueda\s+hacer)\b/.test(p);
+}
+function v337PersonalCue(userPrompt=''){
+  const p=norm(userPrompt);
+  return /\b(?:mi|mis|su|sus|de\s+[ée]l|de\s+ella|esa\s+persona|ese\s+socio|esa\s+pareja|responsabilidad|responsable|fue\s+responsable|compr[oó]|don[oó]|aport[oó]|particip[oó]|figura|aparece|tuvo\s+algo\s+que\s+ver|tiene\s+algo\s+que\s+ver)\b/.test(p);
+}
+function v337PersonMentionNegated(userPrompt='',person=''){
+  const p=norm(userPrompt),k=norm(person);if(!p||!k)return false;
+  const ek=escapeRegexText(k);
+  return new RegExp(`\\bno\\b[^.]{0,55}\\b${ek}\\b`,'i').test(p)
+    || new RegExp(`\\b(?:olvida|olvidate|olvídate|descarta|excluye)\\b[^.]{0,55}\\b${ek}\\b`,'i').test(p);
+}
+function v337EventDomainNoun(userPrompt=''){
+  const p=norm(userPrompt);
+  if(/\b(?:donaci[oó]n|donaciones|donantes?)\b/.test(p))return'donations';
+  if(/\b(?:compra|compras|gasto|gastos|tienda|tiendas)\b/.test(p))return'purchases';
+  if(/\b(?:asistencia|asistentes|colaboradores?)\b/.test(p))return'attendance';
+  if(/\b(?:documentaci[oó]n|documentos?|justificantes?|facturas?|tickets?)\b/.test(p))return'documentation';
+  if(/\b(?:hitos?|tareas?|\blg\b|gesti[oó]n)\b/.test(p))return'management';
+  if(/\b(?:ingresos?|cuotas?|cobrar|ingresar)\b/.test(p))return'incomes';
+  if(/\b(?:banco|bancari|conciliaci[oó]n|cuadre|saldo\s+bancario|movimientos?\s+bancarios?)\b/.test(p))return'bank';
+  return'';
+}
+function v337ContextIsolationPolicy(state,userPrompt='',conversationHistory=[],eventFocus=null){
+  const prior=v337RecentResultContext(conversationHistory),explicitPeople=v26PersonHintsFromPrompt(userPrompt,state).filter(name=>!v337PersonMentionNegated(userPrompt,name)),explicitEvent=trim(v314ResolveEventMention(state,userPrompt,[]));
+  const domain=v337EventDomainNoun(userPrompt),global=/\b(?:todos\s+los\s+eventos(?:\s+registrados)?|cualquiera\s+de\s+los\s+eventos|cualquier\s+evento|entre\s+los\s+eventos|globalmente|hist[oó]rico\s+global)\b/.test(norm(userPrompt));
+  const resetAll=v337FullResetRequest(userPrompt),forgetPerson=v337ForgetPersonRequest(userPrompt),metaHelp=v337MetaHelpRequest(userPrompt);
+  const p=norm(userPrompt),personalCue=v337PersonalCue(userPrompt);
+  const shortContinuation=/^(?:y|pero|ademas|además|tambien|también|solo|solamente|unicamente|únicamente|ahora\s+dime|dime\s+m[aá]s|qu[eé]\s+m[aá]s|si|sí|hazlo|adelante)\b/.test(p)&&text(userPrompt).trim().split(/\s+/).length<=16;
+  let isolate=false,suppressPerson=false,reason='';
+  if(resetAll)return{resetAll:true,isolate:true,suppressPerson:true,reason:'escobita/reset explícito',prior,domain};
+  if(forgetPerson)return{forgetPerson:true,isolate:true,suppressPerson:true,reason:'olvido explícito de persona',prior,domain};
+  if(metaHelp){isolate=true;suppressPerson=true;reason='pregunta meta/capacidades autosuficiente';}
+  else if(explicitPeople.length===1&&!explicitEvent&&!shortContinuation){isolate=true;reason='persona explícita nueva';}
+  else if(explicitEvent&&!explicitPeople.length&&!shortContinuation){isolate=true;suppressPerson=true;reason='evento explícito autosuficiente';}
+  else if(global&&!explicitPeople.length){isolate=true;suppressPerson=true;reason='ámbito global autosuficiente';}
+  else if(domain&&eventFocus?.event&&!explicitPeople.length&&!personalCue){
+    suppressPerson=true;
+    const priorSubject=trim(prior?.subject||prior?.person||prior?.persona),priorDomain=trim(prior?.domain||prior?.topic);
+    if(priorSubject||priorDomain==='person'||arr(conversationHistory).slice(-6).some(t=>trim(t?.resultContext?.subject||t?.resultContext?.person||t?.resultContext?.persona))){isolate=true;reason='consulta del evento incompatible con persona heredada';}
+  }
+  return{resetAll:false,forgetPerson:false,isolate,suppressPerson,reason,prior,domain};
+}
+function v337DonationContinuationRequest(userPrompt='',conversationHistory=[]){
+  const prior=v337RecentResultContext(conversationHistory),p=norm(userPrompt);
+  if(trim(prior?.domain)!=='donations'||!trim(prior?.event))return null;
+  if(/\b(?:compra|compras|gasto|gastos)\b/.test(p)&&!/\bdonaci/.test(p))return null;
+  const detail=/\b(?:detalle|detalla|productos?|uno\s+por\s+uno|unidades?|precios?|importe|sumatori|ordenad[oa]|destino|estas\s+donaciones|esas\s+donaciones)\b/.test(p);
+  return detail?{event:trim(prior.event),domain:'donations'}:null;
+}
+async function v337DirectDonationContinuation({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  const follow=v337DonationContinuationRequest(userPrompt,conversationHistory);if(!follow)return null;
+  const res=await v29ToolEventDonationLines({id:'v337_donation_followup',name:'event_donation_lines',scope:'named_event',event:follow.event,detail:'full'},state,selectedEventId),f=res?.facts||{};
+  const show=[{tool_id:res.id,table_key:'donor_products'},{tool_id:res.id,table_key:'donation_lines'}];
+  const answer=`Detalle de las donaciones de ${f.event||follow.event}: ${v26CountPhrase(f.donation_record_count||0,'registro de donación','registros de donación')}, ${v26CountPhrase(f.product_count||0,'producto distinto','productos distintos')} y valor total ${v26FormatEuro(f.total_value||0)}. Se muestran producto por producto, con donante, segmento, destino, unidades y valor.`;
+  zuzuTracePush(flowTrace,'v2.0_exp · Continuidad de dominio','OK','El turno anterior estaba centrado en DONACIONES: «productos/detalle/unidades/precios/importes» conserva ese dominio y no se desvía a COMPRAS.');
+  return v281LocalResponse({title:`Donaciones · ${f.event||follow.event}`,answer,results:[res],showTables:show,flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'donations',event:trim(f.event||follow.event),focus:'products'}});
+}
+
+function v337LocalConversationResetResponse(flowTrace=[]){
+  zuzuTracePush(flowTrace,'v2.0_exp · Escobita','OK','Reset real solicitado: se invalida la Interaction, la memoria local y el contexto de entidades.');
+  return{ok:true,rejected:false,title:'Conversación nueva',answer:'Hecho. Empezamos de cero. Dime.',warnings:[],charts:[],tables:[],files:[],provider:'control-event-context-reset',model:'calculo-local-oficial',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',interactionId:'',resetInteractionId:true,resetConversation:true,doNotArchiveTurn:true,resultContext:{domain:'context_reset',reset:'all'},geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+}
+
+function v337LocalForgetPersonResponse(eventFocus=null,flowTrace=[],previousInteractionId=''){
+  const event=trim(eventFocus?.event),answer=event?`Hecho. Dejo de usar la persona anterior como sujeto y mantengo ${event} como foco.`:'Hecho. Dejo de usar la persona anterior como sujeto.';
+  zuzuTracePush(flowTrace,'v2.0_exp · Olvido de persona','OK',event?`Se elimina el sujeto personal heredado y se conserva «${event}».`:'Se elimina el sujeto personal heredado.');
+  const r=v281LocalResponse({title:'Contexto actualizado',answer,results:[],flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'context_reset',reset:'person',event}});
+  r.meta={...(r.meta||{}),resultContext:{domain:'context_reset',reset:'person',event}};
+  return r;
+}
 function v314ResolveEventMention(state,userPrompt='',conversationHistory=[]){
   // Una orden global de olvido de foco no convierte el evento citado en un nuevo foco.
   if(v334GlobalEventContextReset(userPrompt))return'';
@@ -8550,7 +8649,7 @@ function v310RecentEventFocus(state,userPrompt='',conversationHistory=[]){
     const fromUser=v281EventNameInText(state,trim(turn?.user));
     if(fromUser)return{event:fromUser,explicit:false,source:'mensaje anterior'};
     // Un cambio explícito a persona/ámbito global corta la herencia del evento anterior.
-    if(['person','global_events','people_activity','event_comparison','comparison','multi'].includes(trim(ctx?.domain||ctx?.topic)))return null;
+    if(['person','global_events','people_activity','event_comparison','comparison','multi','meta','context_reset'].includes(trim(ctx?.domain||ctx?.topic)))return null;
     if(v26PersonHintsFromPrompt(trim(turn?.user),state).length)return null;
     const priorIntent=v26ImplicitIntent(trim(turn?.user));if(priorIntent.globalAcrossEvents||priorIntent.comparison)return null;
   }
@@ -8694,7 +8793,7 @@ function v325ComparisonDerivedFollowUp({userPrompt,conversationHistory=[],flowTr
 
 function v310InteractionResultContext(userPrompt='',results=[],eventFocus=null,personalGrounding=null,conversationHistory=[]){
   const list=arr(results).filter(r=>r?.ok!==false),latest=name=>list.slice().reverse().find(r=>trim(r?.name)===name);
-  const person=latest('person_dossier'),compare=latest('compare_events')||latest('compare_events_extended');
+  const personResults=list.filter(r=>trim(r?.name)==='person_dossier'),person=personResults.slice(-1)[0],compare=latest('compare_events')||latest('compare_events_extended');
   const map=[['event_purchase_lines','purchases'],['event_donation_lines','donations'],['event_bank','bank'],['event_bank_timeline','bank'],['event_people','attendance'],['event_documentation','documentation'],['event_management','management'],['event_breakdowns','breakdowns'],['event_dossier','event']];
   const ctxFor=(r,domain,eventFallback='')=>{
     const base={domain,event:trim(r?.facts?.event)||trim(eventFallback),focus:domain};
@@ -8704,6 +8803,26 @@ function v310InteractionResultContext(userPrompt='',results=[],eventFocus=null,p
     return base;
   };
   if(compare){const names=arr(compare?.facts?.event_names).map(trim).filter(Boolean),evidence=v325ComparisonEvidence(compare);if(names.length>=2)return{domain:'comparison',eventNames:names,event:'',focus:'events',...(evidence?{evidence}: {})};}
+  const comparedSubjects=semanticUnique(personResults.map(r=>trim(r?.facts?.person||r?.facts?.query)).filter(Boolean));
+  if(comparedSubjects.length>=2)return{domain:'person_comparison',subjects:comparedSubjects.slice(0,4),event:'',focus:v314PersonFocusFromPrompt(userPrompt)||'comparison',scope:'all_events'};
+  // Una comparación personal puede resolverse en varios turnos: «compara Pocholo y Gema» →
+  // «de todos los eventos» → «sí, Pablo y Gema». En ese último turno Gemini puede pedir solo
+  // el dossier de la identidad recién aclarada. Conservamos también la otra identidad del hilo
+  // para que un «dame información ahora» no pierda el referente comparativo.
+  if(personResults.length){
+    const recentTurns=arr(conversationHistory).slice(-4),recentText=recentTurns.map(t=>trim(t?.user)).join(' ');
+    const comparisonRequested=/\b(?:compara|comparativa|comparar|frente\s+a|versus|\bvs\b)\b/.test(norm(recentText));
+    if(comparisonRequested){
+      const priorSubjects=[];
+      for(const turn of recentTurns){
+        const ctx=turn?.resultContext&&typeof turn.resultContext==='object'?turn.resultContext:null;if(!ctx)continue;
+        if(trim(ctx.domain)==='person'&&trim(ctx.subject))priorSubjects.push(trim(ctx.subject));
+        if(trim(ctx.domain)==='person_comparison')priorSubjects.push(...arr(ctx.subjects).map(trim).filter(Boolean));
+      }
+      const combined=semanticUnique(priorSubjects.concat(comparedSubjects).filter(Boolean));
+      if(combined.length>=2)return{domain:'person_comparison',subjects:combined.slice(-4),event:'',focus:v314PersonFocusFromPrompt(userPrompt)||'comparison',scope:'all_events'};
+    }
+  }
   // Si el usuario acaba de nombrar un evento, ese resultado manda aunque exista un dossier personal heredado.
   if(eventFocus?.explicit&&eventFocus?.event){for(const [name,domain] of map){const r=latest(name);if(r)return ctxFor(r,domain,eventFocus?.event);}}
   if(person)return{domain:'person',subject:trim(person?.facts?.person||person?.facts?.query||personalGrounding?.subject),event:trim(person?.facts?.scope_event),focus:v314PersonFocusFromPrompt(userPrompt)};
@@ -9035,10 +9154,11 @@ function v30PersonalRecheckRequested(userPrompt=''){
 }
 function v30LikelyPersonalFollowUp(userPrompt=''){
   const p=norm(userPrompt);
-  // FIX2.3: los seguimientos personales sobre «qué productos/artículos donó» deben conservar
-  // la identidad canónica aunque el pronombre/nombre ya no aparezca en el turno actual.
-  // No se decide el dominio aquí: solo se mantiene disponible el person_dossier reciente.
-  return /\b(mi|mis|su|sus|responsabilidad|responsable|compras?|productos?|articulos?|tickets?|tkxx|hitos?|tareas?|\blg\b|donaciones?|donante|donado|donada|dono|donaron|ingresos?|participacion|participación|eventos?|tablas?|listados?|datos?|detalle|formato|grafic\w*|gráfic\w*|dime\s+mas|dime\s+m[aá]s|mas\s+cosas|m[aá]s\s+cosas|solo|solamente|unicamente|únicamente|busca|revisa|comprueba|verifica|hablame|háblame|figura|aparece|relaci[oó]n|relacionad\w*|vinculad\w*|tuvo\s+algo\s+que\s+ver|tiene\s+algo\s+que\s+ver)\b/.test(p);
+  // FIX21 · Heredar una persona es una excepción, no la regla. Los sustantivos de dominio
+  // («compras», «productos», «donaciones», «ingresos», «eventos») por sí solos NO prueban que
+  // el usuario siga hablando de la persona anterior: pueden referirse al evento completo.
+  // Solo mantenemos sujeto personal cuando existe una marca gramatical/personal inequívoca.
+  return /\b(?:mi|mis|su|sus|de\s+[ée]l|de\s+ella|esa\s+persona|ese\s+socio|esa\s+pareja|responsabilidad|responsable|fue\s+responsable|ha\s+sido\s+responsable|compr[oó]|compraron|don[oó]|donaron|aport[oó]|aportaron|particip[oó]|figura|aparece|relaci[oó]n|relacionad\w*|vinculad\w*|tuvo\s+algo\s+que\s+ver|tiene\s+algo\s+que\s+ver|qu[eé]\s+hizo|qu[eé]\s+aport[oó]|qu[eé]\s+compr[oó]|qu[eé]\s+don[oó]|dime\s+m[aá]s|m[aá]s\s+cosas)\b/.test(p);
 }
 function v30ConversationEventForPerson(state,userPrompt,conversationHistory=[],subject='',explicitSubject=false,selectedEventId=''){
   if(v334GlobalEventContextReset(userPrompt))return'';
@@ -9268,6 +9388,111 @@ function v326DeterministicBankStatusAnswer(userPrompt='',grounding=null){
 }
 
 
+
+
+function v336NormalizeStructuredPromptRefs(userPrompt=''){
+  let out=trim(userPrompt);if(!out)return out;
+  out=out.replace(/\bTK\s*0*(\d{1,3})\b/gi,(_,n)=>`TK${String(Number(n)).padStart(2,'0')}`);
+  out=out.replace(/\b(?:DOCU|DOC|DOCUMENTO)\s*0*(\d{1,3})\b/gi,(_,n)=>`DOC${Number(n)}`);
+  out=out.replace(/\bLG\s*0*(\d{1,3})\b/gi,(_,n)=>`LG${Number(n)}`);
+  out=out.replace(/\bHITO\s*0*(\d{1,3})\b/gi,(_,n)=>`HITO${Number(n)}`);
+  return out;
+}
+
+function v335RecognizedBusinessCue(userPrompt='',state=null){
+  const p=norm(userPrompt);if(!p)return false;
+  if(/\b(?:ingres\w*|compr\w*|donaci\w*|banco|saldo|cuadre|ticket|tk\s*\d+|docu?\s*\d+|document\w*|hitos?|\blg\b|tareas?|evento|eventos|persona|personas|socio|socios|tienda|tiendas|producto|productos|asist\w*|responsab\w*|pendient\w*|importe|total|graf\w*|compar\w*|particip\w*)\b/.test(p))return true;
+  if(v26PersonHintsFromPrompt(userPrompt,state).length)return true;
+  if(v314ResolveEventMention(state,userPrompt,[]))return true;
+  const ordered=v29OrderedCatalogMentions(state,userPrompt);if(arr(ordered).length)return true;
+  return false;
+}
+function v335OpaqueShortPrompt(userPrompt='',state=null){
+  const raw=trim(userPrompt),p=norm(raw).replace(/[¿?¡!.,;:]+/g,' ').replace(/\s+/g,' ').trim(),words=p.split(/\s+/).filter(Boolean);if(!raw||words.length>5)return false;
+  if(v335RecognizedBusinessCue(raw,state))return false;
+  if(/\b(?:hola|buenas|gracias|adios|adiós|quien\s+eres|quién\s+eres|como\s+estas|cómo\s+estás|que\s+tal|qué\s+tal)\b/.test(p))return false;
+  // Continuaciones cortas legítimas conservan el hilo: «dime más», «dame información ahora», «y eso», etc.
+  if(/^(?:y|pero|entonces|ahora|vale|ok|pues|bueno|si|sí)?\s*(?:dame|dime|cuentame|cuéntame|sigue|continua|continúa|amplia|amplía)?\s*(?:mas|más|informacion|información|datos|detalle|detalles|eso|esa|ese|lo\s+anterior)?\s*(?:ahora)?\s*$/.test(p))return false;
+  return true;
+}
+function v335OpaquePromptResponse({userPrompt,state,flowTrace=[],previousInteractionId=''}){
+  if(!v335OpaqueShortPrompt(userPrompt,state))return null;
+  const literal=trim(userPrompt).replace(/[\r\n]+/g,' ').slice(0,120);
+  zuzuTracePush(flowTrace,'v2.0_exp · Ambigüedad conversacional','OK',`La frase corta «${literal}» no contiene una entidad ni intención reconocible; no se hereda automáticamente el evento anterior.`);
+  return v281LocalResponse({title:'Necesito concretar una cosa',answer:`No identifico qué quieres decir con «${literal}». Dímelo de otra forma o nómbrame la persona, evento, tienda, producto, TK o DOC al que te refieres.`,results:[],flowTrace,previousInteractionId,traceDirect:false,resultContext:null});
+}
+function v335PriorPersonComparisonContext(conversationHistory=[]){
+  for(const turn of arr(conversationHistory).slice(-6).reverse()){
+    const ctx=turn?.resultContext&&typeof turn.resultContext==='object'?turn.resultContext:null;if(!ctx)continue;
+    if(trim(ctx.domain)==='person_comparison'&&arr(ctx.subjects).length>=2)return ctx;
+  }
+  return null;
+}
+function v335GenericMoreInfoPrompt(userPrompt=''){
+  const p=norm(userPrompt).replace(/[¿?¡!.,;:]+/g,' ').replace(/\s+/g,' ').trim();
+  return /^(?:ahora\s+)?(?:dame|dime|cuentame|cuéntame|amplia|amplía|sigue|continua|continúa)(?:\s+mas|\s+más)?(?:\s+(?:informacion|información|datos|detalle|detalles|algo))?(?:\s+ahora)?$/.test(p)
+    || /^(?:mas|más)\s+(?:informacion|información|datos|detalle|detalles)$/.test(p);
+}
+async function v335PersonComparisonContinuation({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  if(!v335GenericMoreInfoPrompt(userPrompt))return null;
+  const ctx=v335PriorPersonComparisonContext(conversationHistory);if(!ctx)return null;
+  const subjects=arr(ctx.subjects).map(trim).filter(Boolean).slice(0,2);if(subjects.length<2)return null;
+  const dossiers=[];
+  for(let i=0;i<subjects.length;i++)dossiers.push(await v26ToolPersonDossier({id:`v335_compare_follow_${i+1}`,name:'person_dossier',person:subjects[i],scope:'all_events',status:'all',detail:'brief'},state,selectedEventId));
+  const bits=dossiers.map(r=>{const f=r?.facts||{},name=trim(f.person)||trim(f.query);return `${name}: ${num(f.event_count)} eventos, ${v26FormatEuro(num(f.income_linked_total))} en ingresos vinculados, ${v26FormatEuro(num(f.purchase_responsibility_total))} en compras bajo responsabilidad, ${v26FormatEuro(num(f.donations_value))} en donaciones, ${num(f.hitos_count)} hitos y ${num(f.lg_count)} tareas LG${num(f.income_pending_total)>0?`, además ${v26FormatEuro(num(f.income_pending_total))} pendientes de ingreso`:''}.`;});
+  zuzuTracePush(flowTrace,'v2.0_exp · Continuidad de comparación personal','OK',`«${trim(userPrompt)}» conserva ${subjects.join(' / ')} y el ámbito global; no se pide otra vez persona ni evento.`);
+  return v281LocalResponse({title:`Más información · ${subjects.join(' / ')}`,answer:`Sigo con la comparación: ${subjects[0]} frente a ${subjects[1]}. ${bits.join(' ')}`,results:dossiers,flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'person_comparison',subjects,focus:'summary',scope:'all_events'}});
+}
+
+function v336RecentComparisonIdentityPair(userPrompt='',state=null,conversationHistory=[]){
+  const current=v26PersonHintsFromPrompt(userPrompt,state).map(trim).filter(Boolean);
+  if(!current.length)return[];
+  const recent=arr(conversationHistory).slice(-4);
+  const comparisonTurn=[...recent].reverse().find(t=>/\b(?:compara|comparativa|comparar|frente\s+a|versus|\bvs\b)\b/.test(norm(t?.user)));
+  if(!comparisonTurn)return[];
+  const prior=[];
+  // Los resultContext ya resueltos son más fiables que volver a interpretar la prosa.
+  for(const turn of recent){
+    const ctx=turn?.resultContext&&typeof turn.resultContext==='object'?turn.resultContext:null;if(!ctx)continue;
+    if(trim(ctx.domain)==='person'&&trim(ctx.subject))prior.push(trim(ctx.subject));
+    if(trim(ctx.domain)==='person_comparison')prior.push(...arr(ctx.subjects).map(trim).filter(Boolean));
+  }
+  // Si el hilo todavía no guardó un sujeto canónico, recuperamos las menciones del turno comparativo.
+  if(!prior.length)prior.push(...v26PersonHintsFromPrompt(comparisonTurn?.user||'',state));
+  const currentKeys=new Set(current.map(canonicalNameKey));
+  const other=semanticUnique(prior).filter(x=>!currentKeys.has(canonicalNameKey(x)));
+  if(!other.length)return[];
+  return[other[0],current[0]];
+}
+async function v336ResolvedComparisonAfterIdentityClarification({userPrompt,state,selectedEventId,conversationHistory=[],flowTrace=[],previousInteractionId=''}){
+  const pair=v336RecentComparisonIdentityPair(userPrompt,state,conversationHistory);if(pair.length<2)return null;
+  // Solo entra si el turno actual parece realmente la respuesta a una aclaración de identidad,
+  // no porque dos personas hayan aparecido casualmente en mensajes recientes.
+  const recentAssistant=trim(arr(conversationHistory).slice(-1)[0]?.assistant);
+  const clarification=/\b(?:te\s+refieres|quieres\s+decir|nombre\s+completo|otra\s+persona|pablo\s+y\s+gema)\b/.test(norm(recentAssistant));
+  const confirmation=/^(?:si|sí|correcto|exacto|eso|esa|ese|me\s+refiero|si\s+me\s+refiero|sí\s+me\s+refiero)\b/.test(norm(userPrompt))||v26PersonHintsFromPrompt(userPrompt,state).length===1;
+  if(!clarification||!confirmation)return null;
+  const dossiers=[];
+  for(let i=0;i<pair.length;i++)dossiers.push(await v26ToolPersonDossier({id:`v336_compare_identity_${i+1}`,name:'person_dossier',person:pair[i],scope:'all_events',status:'all',detail:'brief'},state,selectedEventId));
+  const facts=dossiers.map(r=>r?.facts||{});
+  const line=f=>{
+    const name=trim(f.person)||trim(f.query)||'Persona';
+    const pieces=[
+      `${num(f.event_count)} eventos`,
+      `${v26FormatEuro(num(f.income_linked_total))} en ingresos`,
+      `${v26FormatEuro(num(f.purchase_responsibility_total))} en compras bajo responsabilidad`,
+      `${v26FormatEuro(num(f.donations_value))} en donaciones`,
+      `${num(f.hitos_count)} Hitos`,
+      `${num(f.lg_count)} LG`
+    ];
+    if(num(f.income_pending_total)>0)pieces.push(`${v26FormatEuro(num(f.income_pending_total))} pendientes de ingreso`);
+    return `${name}: ${pieces.join(', ')}.`;
+  };
+  const names=facts.map(f=>trim(f.person)||trim(f.query)).filter(Boolean);
+  zuzuTracePush(flowTrace,'v2.0_exp · Comparación personal tras aclaración','OK',`Identidad aclarada: se comparan ${names.join(' / ')} en todos los eventos; no se vuelve a pedir evento ni se reutilizan importes narrativos antiguos.`);
+  return v281LocalResponse({title:`Comparativa · ${names.join(' / ')}`,answer:`Comparación global: ${names[0]} frente a ${names[1]}. ${facts.map(line).join(' ')}`,results:dossiers,flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'person_comparison',subjects:names,focus:'comparison',scope:'all_events'}});
+}
+
 function v334PendingIncomeMetricQuestion(userPrompt=''){
   const p=norm(userPrompt);
   if(/\b(?:pte\.?\s*compra|pendiente(?:s)?\s+de\s+compra|compras?\s+pendientes?)\b/.test(p))return false;
@@ -9443,16 +9668,26 @@ function v330ShouldEarlyCanonicalClose(userPrompt='',results=[]){
 }
 
 async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
+  // Las referencias estructuradas tienen una forma canónica única tanto si vienen de voz como
+  // de teclado/copia-pega: TK1/TK 1 -> TK01; DOCU1/DOC 01 -> DOC1; LG/HITO equivalentes.
+  userPrompt=v336NormalizeStructuredPromptRefs(userPrompt);
+  const eventFocus=v310RecentEventFocus(state,userPrompt,conversationHistory);
+  // FIX21 · primero decidimos si el mensaje actual necesita realmente la memoria anterior.
+  // El foco canónico puede heredarse (p. ej. «los gastos del evento» -> SySA 2026) sin arrastrar
+  // toda la Interaction ni una persona antigua. Esto separa TRANSACCIÓN de CONVERSACIÓN.
+  const contextPolicy=v337ContextIsolationPolicy(state,userPrompt,conversationHistory,eventFocus);
+  if(contextPolicy.forgetPerson)return v337LocalForgetPersonResponse(eventFocus,flowTrace,previousInteractionId);
+  const contextHistory=contextPolicy.isolate?[]:conversationHistory;
   // Compatibilidad de regresión v1.4: V27.1.4 · Garantía de cobertura; la lógica vigente es V27.1.5.
-  const requestedChartIntent=v273ConversationRequestsCharts(userPrompt,conversationHistory);
+  const requestedChartIntent=v273ConversationRequestsCharts(userPrompt,contextHistory);
   const chartIntent=voiceConversation?false:requestedChartIntent;
   const broadGraphEvent=v280BroadGraphicalEventRequest(userPrompt);
-  const bankContext=v273ConversationBankContext(userPrompt,conversationHistory)||broadGraphEvent;
-  const staticPointLabels=v273PromptRequestsStaticPointLabels(userPrompt,conversationHistory);
-  const dataAccessReq=v274DataAccessRequirement(userPrompt,conversationHistory);
+  const bankContext=v273ConversationBankContext(userPrompt,contextHistory)||broadGraphEvent;
+  const staticPointLabels=v273PromptRequestsStaticPointLabels(userPrompt,contextHistory);
+  const dataAccessReq=v274DataAccessRequirement(userPrompt,contextHistory);
   const modelPolicy=v332InteractionPolicy(userPrompt);
   let model=modelPolicy.model,escalatedToFlash=false;
-  const tools=v261AgentTools(),systemInstruction=v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,userPrompt,conversationHistory,voiceConversation});
+  const tools=v261AgentTools(),systemInstruction=v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,userPrompt,conversationHistory:contextHistory,voiceConversation});
   // v2.0_exp: Gemini conserva el hilo nativo en servidor mediante previous_interaction_id.
   // CE no decide la respuesta; sí puede preconsultar un dossier personal compacto para conservar
   // la identidad y asegurar una fuente fresca cuando el usuario revisa/corrige un dato personal.
@@ -9488,25 +9723,28 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   }
   // Un follow-up bancario/gráfico no debe arrastrar el dossier de una persona nombrada varios turnos atrás.
   // Solo se conserva grounding personal en banco si el mensaje ACTUAL nombra explícitamente a una persona.
-  const explicitPersonThisTurn=arr(v26PersonHintsFromPrompt(userPrompt,state)).length>0;
-  const eventFocus=v310RecentEventFocus(state,userPrompt,conversationHistory);
+  const explicitPersonThisTurn=arr(v26PersonHintsFromPrompt(userPrompt,state)).filter(name=>!v337PersonMentionNegated(userPrompt,name)).length>0;
+  const opaque=v335OpaquePromptResponse({userPrompt,state,flowTrace,previousInteractionId:currentId});if(opaque)return opaque;
+  const donationContinuation=await v337DirectDonationContinuation({userPrompt,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId:currentId});if(donationContinuation)return donationContinuation;
+  const clarifiedComparison=await v336ResolvedComparisonAfterIdentityClarification({userPrompt,state,selectedEventId,conversationHistory:contextHistory,flowTrace,previousInteractionId:currentId});if(clarifiedComparison)return clarifiedComparison;
+  const comparisonContinuation=await v335PersonComparisonContinuation({userPrompt,state,selectedEventId,conversationHistory:contextHistory,flowTrace,previousInteractionId:currentId});if(comparisonContinuation)return comparisonContinuation;
   // El estado Ingreso=Pendiente es una semántica estructurada y se resuelve igual en voz/escrito.
-  const pendingIncomeMetric=await v334DirectPendingIncomeMetric({userPrompt,state,selectedEventId,eventFocus,conversationHistory,flowTrace,previousInteractionId:currentId});
+  const pendingIncomeMetric=await v334DirectPendingIncomeMetric({userPrompt,state,selectedEventId,eventFocus,conversationHistory:contextHistory,flowTrace,previousInteractionId:currentId});
   if(pendingIncomeMetric)return pendingIncomeMetric;
   if(!voiceConversation){
-    const pendingPurchaseMetric=await v331DirectPendingPurchaseMetric({userPrompt,state,selectedEventId,eventFocus,conversationHistory,flowTrace,previousInteractionId:currentId});
+    const pendingPurchaseMetric=await v331DirectPendingPurchaseMetric({userPrompt,state,selectedEventId,eventFocus,conversationHistory:contextHistory,flowTrace,previousInteractionId:currentId});
     if(pendingPurchaseMetric)return pendingPurchaseMetric;
   }
   if(!voiceConversation){
-    const structuredFact=await v333StructuredWrittenFactShortcut({userPrompt,state,selectedEventId,conversationHistory,eventFocus,flowTrace,previousInteractionId:currentId});
+    const structuredFact=await v333StructuredWrittenFactShortcut({userPrompt,state,selectedEventId,conversationHistory:contextHistory,eventFocus,flowTrace,previousInteractionId:currentId});
     if(structuredFact)return structuredFact;
   }
   // Comparación vigente y banco aíslan cualquier persona antigua. Una persona nombrada AHORA sí se conserva.
-  const suppressStalePersonGrounding=(bankContext||eventFocus?.comparison)&&!explicitPersonThisTurn;
-  const personalGrounding=suppressStalePersonGrounding?null:await v30PrefetchPersonGrounding({userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+  const suppressStalePersonGrounding=(contextPolicy.suppressPerson||bankContext||eventFocus?.comparison)&&!explicitPersonThisTurn;
+  const personalGrounding=suppressStalePersonGrounding?null:await v30PrefetchPersonGrounding({userPrompt,state,selectedEventId,conversationHistory:contextHistory,flowTrace});
   if(eventFocus?.comparison)zuzuTracePush(flowTrace,'v2.0_exp · Invariante de comparación','OK',`Contexto comparativo vigente: ${arr(eventFocus.eventNames).join(' / ')}. No se degrada a un único evento ni se reactiva una persona antigua.`);
   else if(eventFocus?.event&&v310EventFocusApplicable(userPrompt,personalGrounding,eventFocus))zuzuTracePush(flowTrace,'v2.0_exp · Foco canónico de evento','OK',`Evento vigente «${eventFocus.event}» (${eventFocus.source}). Se conserva en seguimientos que no nombren otro evento.`);
-  if(suppressStalePersonGrounding)zuzuTracePush(flowTrace,'v2.0_exp · Aislamiento de contexto','OK',eventFocus?.comparison?'La comparación actual prevalece sobre cualquier grounding personal heredado.':'El turno bancario ignora grounding personal heredado; solo se materializará la fuente bancaria solicitada.');
+  if(suppressStalePersonGrounding)zuzuTracePush(flowTrace,'v2.0_exp · Aislamiento de contexto','OK',contextPolicy.suppressPerson?'La pregunta actual está centrada en el evento/dominio, no en la persona heredada. Se descarta ese sujeto antiguo.':eventFocus?.comparison?'La comparación actual prevalece sobre cualquier grounding personal heredado.':'El turno bancario ignora grounding personal heredado; solo se materializará la fuente bancaria solicitada.');
   const epistemic=v314UnsupportedConsumptionAttribution(userPrompt,eventFocus,flowTrace,currentId);if(epistemic)return epistemic;
   const globalOverviewDirect=await v330GlobalOverviewDirect({userPrompt,state,flowTrace,previousInteractionId:currentId});if(globalOverviewDirect)return globalOverviewDirect;
   // v2.0_exp FIX6 · consulta escrita de compras por TIENDA sin evento nombrado en el
@@ -9524,7 +9762,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   if(personalGrounding?.result)allResults.push(personalGrounding.result);
   const eventStatusGrounding=await v304PrefetchEventStatus({userPrompt,state,flowTrace});
   if(eventStatusGrounding?.result)allResults.push(eventStatusGrounding.result);
-  const bankFollowUpGrounding=await v304PrefetchBankFollowUp({userPrompt,state,selectedEventId,conversationHistory,flowTrace});
+  const bankFollowUpGrounding=await v304PrefetchBankFollowUp({userPrompt,state,selectedEventId,conversationHistory:contextHistory,flowTrace});
   if(bankFollowUpGrounding?.result)allResults.push(bankFollowUpGrounding.result);
   // FIX2.2 se limita al canal escrito mientras congelamos el cerebro: voz queda exactamente igual.
   if(!voiceConversation){
@@ -9534,21 +9772,27 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
       const bankResult=bankFollowUpGrounding.result,hasTimeline=arr(bankResult?.tables).some(t=>trim(t?.key)==='reconciliation_timeline'&&arr(t?.rows).length);
       return v281LocalResponse({title:`Cuadre Banco · ${trim(bankResult?.facts?.event)||''}`,answer:bankStatus,results:[bankResult],showTables:timeline&&hasTimeline?[{tool_id:trim(bankResult.id),table_key:'reconciliation_timeline'}]:[],flowTrace,previousInteractionId:currentId,traceDirect:false,resultContext:{domain:'bank',event:trim(bankResult?.facts?.event),focus:timeline?'timeline':'justification'}});
     }
-    const documentationDerived=v326DocumentationDerivedFollowUp({userPrompt,conversationHistory,flowTrace,previousInteractionId:currentId});if(documentationDerived)return documentationDerived;
-    const compareDerived=v325ComparisonDerivedFollowUp({userPrompt,conversationHistory,flowTrace,previousInteractionId:currentId});if(compareDerived)return compareDerived;
-    const derived=v311DerivedFollowUp({userPrompt,conversationHistory,eventFocus,flowTrace,previousInteractionId:currentId});if(derived)return derived;
-    const personDirect=v325PersonGroundingDirect({userPrompt,grounding:personalGrounding,conversationHistory,flowTrace,previousInteractionId:currentId});if(personDirect)return personDirect;
-    const personDonation=await v311PersonDonationProducts({userPrompt,personalGrounding,state,selectedEventId,conversationHistory,flowTrace,previousInteractionId:currentId});if(personDonation)return personDonation;
+    const documentationDerived=v326DocumentationDerivedFollowUp({userPrompt,conversationHistory:contextHistory,flowTrace,previousInteractionId:currentId});if(documentationDerived)return documentationDerived;
+    const compareDerived=v325ComparisonDerivedFollowUp({userPrompt,conversationHistory:contextHistory,flowTrace,previousInteractionId:currentId});if(compareDerived)return compareDerived;
+    const derived=v311DerivedFollowUp({userPrompt,conversationHistory:contextHistory,eventFocus,flowTrace,previousInteractionId:currentId});if(derived)return derived;
+    const personDirect=v325PersonGroundingDirect({userPrompt,grounding:personalGrounding,conversationHistory:contextHistory,flowTrace,previousInteractionId:currentId});if(personDirect)return personDirect;
+    const personDonation=await v311PersonDonationProducts({userPrompt,personalGrounding,state,selectedEventId,conversationHistory:contextHistory,flowTrace,previousInteractionId:currentId});if(personDonation)return personDonation;
   }
   const prefetch=null;
+  if(contextPolicy.isolate&&currentId){
+    currentId='';resetInteractionId=true;
+    zuzuTracePush(flowTrace,'v2.0_exp · Frontera de contexto','OK',`Nueva transacción detectada: ${contextPolicy.reason||'mensaje autosuficiente'}. Se conserva solo el foco canónico imprescindible y no se arrastra la Interaction anterior.`);
+  }else if(contextPolicy.isolate){
+    zuzuTracePush(flowTrace,'v2.0_exp · Frontera de contexto','OK',`Nueva transacción detectada: ${contextPolicy.reason||'mensaje autosuficiente'}. No se inyecta historial antiguo.`);
+  }
   const hasNativeThread=!!currentId;
   let groundedUserInput=v30PersonGroundingInput(userPrompt,personalGrounding);
   groundedUserInput=v304EventStatusGroundingInput(groundedUserInput,eventStatusGrounding);
   groundedUserInput=v304BankGroundingInput(groundedUserInput,bankFollowUpGrounding);
   groundedUserInput=v310EventFocusInput(groundedUserInput,eventFocus,userPrompt,personalGrounding);
-  const initialInput=hasNativeThread?groundedUserInput:v284ConversationCapsuleInput(groundedUserInput,userPrompt,conversationHistory,conversationDigest);
+  const initialInput=hasNativeThread?groundedUserInput:v284ConversationCapsuleInput(groundedUserInput,userPrompt,contextHistory,contextPolicy.isolate?'':conversationDigest);
   if(hasNativeThread)zuzuTracePush(flowTrace,'v30 · Memoria Gemini nativa','OK',`Continuación con previous_interaction_id=${currentId.slice(0,40)}…; Gemini recupera el historial del servidor.`);
-  else if(arr(conversationHistory).length)zuzuTracePush(flowTrace,'v30 · Recuperación de contexto','OK','No hay Interaction nativa utilizable; se aporta una cápsula local de los últimos turnos para reconstruir el hilo sin pedir al usuario que repita nada.');
+  else if(arr(contextHistory).length)zuzuTracePush(flowTrace,'v30 · Recuperación de contexto','OK','No hay Interaction nativa utilizable; se aporta una cápsula local de los últimos turnos pertinentes para reconstruir el hilo sin arrastrar sujetos incompatibles.');
   try{
     payload=await v261CallInteraction({input:initialInput,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'v30 · Gemini interpreta y decide herramientas',toolChoice:'auto',externalSignal});
   }catch(error){
@@ -9556,14 +9800,14 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
       resetInteractionId=true;
       zuzuTracePush(flowTrace,'v30 · Recuperación de Interaction','WARN','El previous_interaction_id anterior ya no es válido. Se reconstruye el hilo con los últimos turnos locales y se crea una nueva cadena sin interrumpir al usuario.');
       currentId='';
-      payload=await v261CallInteraction({input:v261EmergencyConversationInput(groundedUserInput,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'v30 · Gemini reconstruye conversación',toolChoice:'auto',externalSignal});
+      payload=await v261CallInteraction({input:v261EmergencyConversationInput(groundedUserInput,contextHistory),model,systemInstruction,tools,flowTrace,stage:'v30 · Gemini reconstruye conversación',toolChoice:'auto',externalSignal});
     }else if(modelPolicy.tier==='lite'&&modelPolicy.flashModel&&modelPolicy.flashModel!==model&&v332CanEscalateLiteFailure(error)){
       // Fallo REAL de Lite antes de disponer de una respuesta: una sola recuperación con Flash.
       // Se abandona el previous_interaction_id técnico y se reconstruye el hilo desde la memoria
       // local para no depender de que Google permita cambiar de modelo dentro de la misma cadena.
       resetInteractionId=true;currentId='';escalatedToFlash=true;model=modelPolicy.flashModel;
       zuzuTracePush(flowTrace,'v2.0_exp · Escalado Lite → Flash','WARN',`Lite no completó el turno (${cleanGeminiError(error)}). Se reintenta una sola vez con ${model}, reconstruyendo el contexto local.`);
-      const flashInput=v284ConversationCapsuleInput(groundedUserInput,userPrompt,conversationHistory,conversationDigest);
+      const flashInput=v284ConversationCapsuleInput(groundedUserInput,userPrompt,contextHistory,contextPolicy.isolate?'':conversationDigest);
       payload=await v261CallInteraction({input:flashInput,previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'v2.0_exp · Flash de respaldo',toolChoice:'auto',externalSignal});
     }else throw error;
   }
@@ -9596,7 +9840,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
       }
     }));
     if(v330ShouldEarlyCanonicalClose(userPrompt,allResults)){
-      const early=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
+      const early=v305CanonicalClosureFromResults(userPrompt,allResults,contextHistory);
       if(early){
         canonicalClosure=early;resetInteractionId=true;
         zuzuTracePush(flowTrace,'v2.0_exp · Cierre factual rápido','OK',`Gemini eligió y ejecutó la fuente canónica; ControlEvent cierra la respuesta factual sin una segunda llamada IA (${calls.map(c=>trim(c.name)).join(', ')}).`);
@@ -9619,7 +9863,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     currentId=trim(payload?.id)||currentId;
   }
   if(!canonicalClosure&&v261FunctionCalls(payload).length){
-    canonicalClosure=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
+    canonicalClosure=v305CanonicalClosureFromResults(userPrompt,allResults,contextHistory);
     if(canonicalClosure){
       resetInteractionId=true;
       zuzuTracePush(flowTrace,'v2.0_exp · Cierre canónico tras herramientas','WARN','La IA pidió otra ronda aunque la fuente canónica elegida en este turno ya contenía la respuesta. CE cierra el dominio con esos mismos hechos y evita obligar al usuario a repetir la consulta.');
@@ -9627,7 +9871,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   }
   let final=canonicalClosure||v261ParseFinal(payload);
   if(!trim(final.answer)){
-    const domainClosure=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
+    const domainClosure=v305CanonicalClosureFromResults(userPrompt,allResults,contextHistory);
     const hasStructuredSource=(dataAccessReq.catalogEntity&&allResults.some(r=>r?.ok&&r?.name==='master_catalog'))||(dataAccessReq.purchaseDetail&&allResults.some(r=>r?.ok&&r?.name==='event_purchase_lines'));
     if(domainClosure){
       final=domainClosure;resetInteractionId=true;
@@ -9660,7 +9904,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
     try{
       const call={id:'v325_promised_tool',name:promisedTool,arguments:args};
       const full=await v261ExecuteAgentTool(call,state,selectedEventId,flowTrace);allResults.push({...full,id:call.id,name:promisedTool});
-      const responsible=v325PurchaseResponsibleAnswer(full,userPrompt),closure=responsible||v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
+      const responsible=v325PurchaseResponsibleAnswer(full,userPrompt),closure=responsible||v305CanonicalClosureFromResults(userPrompt,allResults,contextHistory);
       if(closure){final=closure;resetInteractionId=true;zuzuTracePush(flowTrace,'v2.0_exp · Finalización obligatoria','OK',`Gemini había prometido ${promisedTool} sin ejecutarla. ControlEvent la ejecuta en este mismo turno y devuelve los hechos, sin pedir «hazlo».`);}
     }catch(error){zuzuTracePush(flowTrace,'v2.0_exp · Finalización obligatoria','WARN',`La herramienta prometida ${promisedTool} no pudo ejecutarse: ${cleanGeminiError(error)}`);}
   }
@@ -9783,7 +10027,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   // Si existen resultados canónicos del mismo turno, reconstruimos una salida factual en lugar de
   // devolver un globo vacío al usuario.
   if(!trim(final.answer)&&allResults.some(r=>r?.ok)){
-    const closure=v305CanonicalClosureFromResults(userPrompt,allResults,conversationHistory);
+    const closure=v305CanonicalClosureFromResults(userPrompt,allResults,contextHistory);
     if(closure?.answer){final={...final,...closure,answer:v29SanitizeAnswerMarkup(closure.answer)};resetInteractionId=true;zuzuTracePush(flowTrace,'v2.0_exp · Rescate final de respuesta vacía','WARN','La prosa quedó vacía tras el saneo; se reconstruye desde las herramientas canónicas ya ejecutadas.');}
   }
   if((dataAccessReq.tableOnly||dataAccessReq.groupSegmentDestination)&&(dataAccessReq.catalogEntity||dataAccessReq.purchaseDetail)&&trim(final.answer).length>700)final={...final,answer:'Aquí tienes la tabla solicitada, ordenada y totalizada según tu petición.'};
@@ -9826,7 +10070,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   const completedInteractionId=finalStatus==='completed'&&persistNativeThread?currentId:'';
   if(completedInteractionId)zuzuTracePush(flowTrace,'v30 · Memoria de conversación','OK',`Interaction Lite completada y guardable para el siguiente turno: ${completedInteractionId.slice(0,40)}…`);
   else if(finalStatus==='completed'&&!persistNativeThread)zuzuTracePush(flowTrace,'v30 · Memoria de conversación','OK','El turno Flash no se encadena técnicamente: el siguiente turno vuelve a Lite y recupera este contexto desde la memoria local de la conversación.');
-  const resultContext=v310InteractionResultContext(userPrompt,allResults,eventFocus,personalGrounding,conversationHistory);
+  const resultContext=v310InteractionResultContext(userPrompt,allResults,eventFocus,personalGrounding,contextHistory);
   return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-interactions-v2-0-exp',model,interactionId:completedInteractionId,meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'Lite-first: Gemini Flash-Lite mantiene la conversación normal y decide herramientas; Flash se reserva para análisis/informes/opinión o respaldo ante fallo real de Lite; ControlEvent ejecuta, verifica y presenta hechos canónicos',modelTier:escalatedToFlash?'flash-fallback':modelPolicy.tier,interactionId:completedInteractionId,resetInteractionId,pendingAction,resultContext,tools:[...new Set(allResults.map(r=>trim(r?.name)).filter(Boolean))],geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
@@ -9911,7 +10155,7 @@ function finalizeZuzuResult(result, context, userPrompt, flowTrace = []) {
 
 function v26LocalCapabilitiesHelp(userPrompt,{usuarioLogado,user,authUser,ce_acceso}={}){
   const p=norm(userPrompt);
-  if(!/\b(que\s+(?:cosas\s+)?(?:te\s+)?puedo\s+preguntar|qué\s+(?:cosas\s+)?(?:te\s+)?puedo\s+preguntar|que\s+puedes\s+hacer|qué\s+puedes\s+hacer|capacidades|limitaciones|ayuda\s+de\s+zuzu)\b/.test(p))return null;
+  if(!/\b(que\s+(?:cosas\s+)?(?:te\s+)?puedo\s+preguntar|qué\s+(?:cosas\s+)?(?:te\s+)?puedo\s+preguntar|que\s+puedes\s+hacer|qué\s+puedes\s+hacer|que\s+es\s+lo\s+que\s+puedo\s+hacer\s+aqui|qué\s+es\s+lo\s+que\s+puedo\s+hacer\s+aqu[ií]|que\s+puedo\s+hacer\s+aqui|qué\s+puedo\s+hacer\s+aqu[ií]|di(?:me|em)\s+\d+\s+preguntas?\s+que\s+te\s+pueda\s+hacer|capacidades|limitaciones|ayuda\s+de\s+zuzu)\b/.test(p))return null;
   const displayName=zuzuLoggedUserDisplayName({usuarioLogado,user,authUser,ce_acceso});
   const answer=[
     'Puedes preguntarme de forma natural por la información de ControlEvent y pedirme que la analice, no solo que la liste: eventos, personas y parejas, ingresos, compras, donaciones, asistencia, tiendas, productos, Hitos/LG, tickets, documentos, comparativas, banco y planificación. También puedo consultar los catálogos generales no restringidos de EVENTOS, PERSONAS, TIENDAS y PRODUCTOS, y detallar las compras producto a producto con unidades, precio, importe, ticket, tienda y responsable. ACCESO/usuarios/credenciales queda restringido.',
@@ -10442,10 +10686,14 @@ function v29RecentPersonSubject(state,userPrompt,conversationHistory=[]){
   const current=v26PersonHintsFromPrompt(userPrompt,state);if(current.length)return current[0];
   for(const turn of arr(conversationHistory).slice(-6).reverse()){
     const ctx=(turn?.resultContext&&typeof turn.resultContext==='object')?turn.resultContext:null;
-    const ctxSubject=trim(ctx?.subject||ctx?.person||ctx?.persona);
-    if(ctxSubject&&['person','donations','purchases','management','incomes','attendance'].includes(trim(ctx?.domain||'person'))){
+    const ctxSubject=trim(ctx?.subject||ctx?.person||ctx?.persona),ctxDomain=trim(ctx?.domain||ctx?.topic);
+    if(ctxDomain==='context_reset'||ctxDomain==='meta')return'';
+    if(ctxSubject&&['person','donations','purchases','management','incomes','attendance'].includes(ctxDomain||'person')){
       const resolved=v26ResolvePersonFamily(state,ctxSubject);if(resolved?.ok)return resolved.nombre;
     }
+    // FIX21 · una respuesta canónica centrada en un evento y sin sujeto personal crea una barrera:
+    // no atravesamos esa barrera para rescatar una persona de varios turnos atrás.
+    if(!ctxSubject&&trim(ctx?.event)&&['event','purchases','donations','attendance','documentation','management','bank','breakdowns','incomes'].includes(ctxDomain))return'';
     const u=trim(turn?.user);if(!u)continue;
     const people=v26PersonHintsFromPrompt(u,state);if(people.length)return people[0];
     const events=exactEventTitlesFromPrompt(u,arr(state?.eventos)).map(x=>trim(x?.titulo)).filter(Boolean);
@@ -11537,6 +11785,14 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   const safeHistory=arr(conversationHistory).slice(-6).map(x=>({
     user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,1000),assistantTail:trim(x?.assistantTail).slice(-900),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null,resultContext:(x?.resultContext&&typeof x.resultContext==='object')?x.resultContext:null
   }));
+
+  // FIX21 · comandos de conversación y ayuda no necesitan ni deben heredar el hilo de datos.
+  if(v337FullResetRequest(userPrompt))return v337LocalConversationResetResponse(flowTrace);
+  const capabilities=v26LocalCapabilitiesHelp(userPrompt,{usuarioLogado,user,authUser,ce_acceso});
+  if(capabilities){
+    capabilities.meta={...(capabilities.meta||{}),resetInteractionId:!!trim(previousInteractionId),resultContext:{domain:'meta',focus:'capabilities'}};
+    return capabilities;
+  }
 
   // v2.0_exp · CORTE A ARQUITECTURA NUEVA.
   // Todos los turnos de Zuzu pasan primero por Gemini: interpreta el hilo y decide qué
@@ -14919,6 +15175,7 @@ export const __zuzuStructuralTesting = Object.freeze({
   v272IsShortAffirmativeFollowUp,
   v272ConversationRequestsCharts,
   v272AnswerClaimsChart,
+  v273RoutingInstruction,
   v27AutoChartSpecs,
   v273ConversationRequestsCharts,
   v273ConversationBankContext,
@@ -14928,10 +15185,22 @@ export const __zuzuStructuralTesting = Object.freeze({
   v310PersonDonationConsistencyRepair,
   v334PersonPendingCuriosityRepair,
   v310ImmediatePriorMoneyTotal,
+  v310InteractionResultContext,
   v314ResolveEventMention,
   v334GlobalEventContextReset,
   v334PendingIncomeMetricQuestion,
   v334DirectPendingIncomeMetric,
+  v337ContextIsolationPolicy,
+  v337DonationContinuationRequest,
+  v337FullResetRequest,
+  v337ForgetPersonRequest,
+  v336NormalizeStructuredPromptRefs,
+  v335OpaqueShortPrompt,
+  v335GenericMoreInfoPrompt,
+  v335PriorPersonComparisonContext,
+  v335PersonComparisonContinuation,
+  v336RecentComparisonIdentityPair,
+  v336ResolvedComparisonAfterIdentityClarification,
   v314ResolveOrdinalSibling,
   v325ResolveRelativeYearSibling,
   v325ResolveEmbeddedEventMention,

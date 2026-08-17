@@ -650,6 +650,16 @@
       if(!voiceConversation&&(!Array.isArray(data.charts)||!data.charts.length)&&wantsChart(prompt))data.charts=autoChartsFromTables(data.tables||[]);
       if(voiceConversation){data.charts=[];data.tables=[];data.files=[];}
       var returnedInteractionId=String((data.meta&&data.meta.interactionId)||data.interactionId||'').trim();
+      var serverConversationReset=!!(data.meta&&data.meta.resetConversation===true);
+      if(serverConversationReset){
+        window.__ceZuzuConversationV26=[];
+        window.__ceZuzuConversationContextV26=null;
+        window.__ceZuzuUsageTotalV285=emptyZuzuUsageTotal();
+        window.__ceLastZuzuResult=null;
+        window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
+        saveZuzuInteractionId('');
+        try{ sessionStorage.removeItem(zuzuConversationKey()); sessionStorage.removeItem(zuzuContextKey()); sessionStorage.removeItem(zuzuInteractionKey()); sessionStorage.removeItem(zuzuUsageTotalKey()); }catch(_){ }
+      }
       if(data.meta&&data.meta.resetInteractionId===true) saveZuzuInteractionId('');
       if(returnedInteractionId) saveZuzuInteractionId(returnedInteractionId);
       var returnedContext=(data.meta&&data.meta.conversationContext)||data.conversationContext||null;
@@ -662,9 +672,11 @@
       var fullAnswer=String(data.answer||'');
       var archiveHtml=resultCoreHtml(data,{includeFiles:false,includeTrace:false});
       var archiveTraceHtml=traceHtml(data);
-      window.__ceZuzuConversationV26.push({turnId:turnId,user:prompt,assistant:fullAnswer.slice(0,1200),assistantTail:fullAnswer.slice(-1000),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:returnedContext,pendingAction:pendingAction,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null,routerShadow:null,archiveHtml:archiveHtml,archiveTraceHtml:archiveTraceHtml,archiveMeta:archiveMetaForData(data)});
-      if(window.__ceZuzuConversationV26.length>100)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-100);
-      saveZuzuConversation();
+      if(!(data.meta&&data.meta.doNotArchiveTurn===true)){
+        window.__ceZuzuConversationV26.push({turnId:turnId,user:prompt,assistant:fullAnswer.slice(0,1200),assistantTail:fullAnswer.slice(-1000),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:returnedContext,pendingAction:pendingAction,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null,routerShadow:null,archiveHtml:archiveHtml,archiveTraceHtml:archiveTraceHtml,archiveMeta:archiveMetaForData(data)});
+        if(window.__ceZuzuConversationV26.length>100)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-100);
+        saveZuzuConversation();
+      }
       updateConversationMode();
       updateConversationTrail();
       await finishZuzuThinkingFast();
