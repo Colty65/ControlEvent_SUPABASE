@@ -191,11 +191,20 @@
     var m=wakeMatch(value);return !!(m.matched&&!clean(m.rest));
   }
   function isClearConversationPhrase(value){
-    var n=wakeNorm(value);
-    return /^(?:pasa\s+)?(?:la\s+)?escobita$/.test(n) ||
-      /^(?:pulsa|dale|pasa)\s+(?:el\s+)?(?:boton\s+de\s+la\s+)?escobita$/.test(n) ||
-      /^(?:reinicia|resetea|borra|limpia)\s+(?:la\s+)?conversacion$/.test(n) ||
-      /^(?:nueva|nuevo)\s+conversacion$/.test(n);
+    var n=wakeNorm(value).replace(/[^a-z0-9áéíóúüñ\s]/gi,' ').replace(/\s+/g,' ').trim();
+    if(!n)return false;
+    // La «escobita» es una orden de sistema, no una frase exacta. Debe funcionar aunque el
+    // usuario añada cortesía o contexto: «Hola Zuzu, pasa la escobita», «pero primero...»,
+    // «quiero que pases...», etc. Evitamos activarla si solo pregunta qué es la escobita.
+    if(/\bescobita\b/.test(n)){
+      if(/\b(?:pasa|pase|pases|pasar|pasame|pulsa|pulse|pulsar|dale|toca|tocar|usa|usar|utiliza|utilizar|activa|activar)\b[^.]{0,70}\bescobita\b/.test(n))return true;
+      if(/\b(?:quiero|necesito|haz|hazme|puedes|podrias|primero|antes|por favor)\b[^.]{0,90}\bescobita\b/.test(n))return true;
+      if(/\bescobita\b\s+(?:para|y|que)\s+(?:reinicia|reiniciar|resetea|resetear|limpia|limpiar|borra|borrar|vacia|vaciar|empieza|empezar|inicia|iniciar)\b/.test(n))return true;
+      if(/^(?:la\s+)?escobita$/.test(n))return true;
+    }
+    if(/\b(?:reinicia|reiniciar|resetea|resetear|borra|borrar|limpia|limpiar|vacia|vaciar)\b[^.]{0,60}\b(?:conversacion|memoria|historial|contexto)\b/.test(n))return true;
+    if(/\b(?:quiero|necesito|vamos a|puedes|podrias|por favor)\b[^.]{0,70}\b(?:vaciar|borrar|limpiar|reiniciar|resetear)\b[^.]{0,45}\b(?:conversacion|memoria|historial|contexto)\b/.test(n))return true;
+    return /\b(?:nueva conversacion|inicia (?:una|la) nueva conversacion|iniciar (?:una|la) nueva conversacion|empieza de cero|empezar de cero|empecemos de cero)\b/.test(n);
   }
   function clearConversationByVoice(){
     openZuzuForVoice(function(){
@@ -400,6 +409,9 @@
   }
   function submitVoiceUtterance(text){
     text=voiceAliasNormalize(text);if(!text)return;
+    // Defensa final: ningún comando de escobita/reset puede escapar hacia Gemini aunque haya
+    // llegado desde el wake word, desde un resultado acumulado o desde el envío por silencio.
+    if(isClearConversationPhrase(text)){clearConversationByVoice();return;}
     if(goodbyeMatch(text)){endVoiceConversation('goodbye');return;}
     if(state.requestInFlight){state.queuedUtterance=text;setVoiceStatus('Te he escuchado. Respondo a eso en cuanto termine el turno actual.','ok');return;}
     openZuzuForVoice(function(){
@@ -413,6 +425,9 @@
     resetVoiceUtterance();updateWakeBadge();startSessionRecording();
     openZuzuForVoice(function(){
       var first=clean(initialText);
+      // Si el wake word trae la orden completa («Hola Zuzu, pasa la escobita»), se ejecuta aquí
+      // antes de crear un turno. FIX16 no pasaba por processConversationSpeech en este caso.
+      if(first&&isClearConversationPhrase(first)){clearConversationByVoice();return;}
       if(first){
         appendVoiceFinal(first);showVoicePrompt(first);setVoiceStatus('Te escucho; cuando calles dos segundos te respondo.','ok');scheduleVoiceSubmission();
       }else{
