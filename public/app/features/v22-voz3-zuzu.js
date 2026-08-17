@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp · VOZ4 MOVIL ESTABLE
+/* ControlEvent v2.0_exp · VOZ4 FIX25 CONVERSACIÓN DIRECTA
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -69,7 +69,9 @@
     lastRecordingBlob: null,
     lastRecordingMime: '',
     recordingStartedAt: 0,
-    autoArmTried: false
+    autoArmTried: false,
+    gestureArmed: false,
+    recognitionEverStarted: false
   };
 
   function $(id){ return document.getElementById(id); }
@@ -294,9 +296,15 @@
     var p=promptEl();if(!p)return;p.value=clean(text);try{p.dispatchEvent(new Event('input',{bubbles:true}));p.setSelectionRange(p.value.length,p.value.length);}catch(_){ }
   }
   function openZuzuForVoice(done){
-    if($('ceGeminiLibreOverlay')){if(done)done();return;}
+    if($('ceGeminiLibreOverlay')){injectPanel();if(done)done();return;}
     try{if(window.ControlEventV113ZuzuAnalitica&&typeof window.ControlEventV113ZuzuAnalitica.open==='function')window.ControlEventV113ZuzuAnalitica.open();}catch(_){ }
-    setTimeout(function(){injectPanel();if(done)done();},110);
+    var attempts=0;
+    (function waitForZuzu(){
+      attempts++;
+      if($('ceGeminiLibreOverlay')){injectPanel();if(done)done();return;}
+      if(attempts<18){setTimeout(waitForZuzu,90);return;}
+      if(done)done();
+    })();
   }
   function scheduleVoiceSubmission(){
     clearTimeout(state.silenceTimer);
@@ -318,12 +326,20 @@
   }
   function beginVoiceConversation(initialText){
     if(state.conversationMode)return;
-    state.conversationMode=true;state.recognitionMode='conversation';state.wakeStartedAt=Date.now();state.requestInFlight=false;state.queuedUtterance='';state.ambientHeard='';
-    resetVoiceUtterance();updateWakeBadge();startSessionRecording();
+    state.conversationMode=true;state.recognitionMode='conversation';state.wakeStartedAt=Date.now();state.requestInFlight=false;state.queuedUtterance='';state.ambientHeard='';state.wantListening=true;
+    resetVoiceUtterance();updateWakeBadge();
     openZuzuForVoice(function(){
-      var first=clean(initialText)||'Hola Zuzu';
-      appendVoiceFinal(first);showVoicePrompt(first);setVoiceStatus('Hola. Te escucho; cuando calles dos segundos te respondo.','ok');scheduleVoiceSubmission();
+      var first=clean(initialText);
+      if(first){appendVoiceFinal(first);showVoicePrompt(first);setVoiceStatus('Te escucho; cuando calles dos segundos te respondo.','ok');scheduleVoiceSubmission();}
+      else{showVoicePrompt('');setVoiceStatus('Hola. Ya estoy aquí. Dime.','ok');}
     });
+    startRecognitionEngine();
+  }
+  function beginDirectVoiceConversation(){
+    if(!supportsRecognition()){setVoiceStatus('Este navegador no ofrece reconocimiento de voz web.','err');return;}
+    stopSpeaking(false);state.gestureArmed=true;state.conversationMode=true;state.recognitionMode='conversation';state.wantListening=true;state.requestInFlight=false;state.queuedUtterance='';state.ambientHeard='';
+    resetVoiceUtterance();updateWakeBadge();startRecognitionEngine();
+    openZuzuForVoice(function(){showVoicePrompt('');setVoiceStatus('Te escucho. Habla con naturalidad; enviaré cuando calles dos segundos.','ok');});
   }
   function processConversationSpeech(text,isFinal,confidence){
     text=voiceAliasNormalize(text);if(!text)return;
@@ -357,7 +373,7 @@
     state.ambientHeard=joinText(state.ambientHeard,text).slice(-180);
     var match=wakeMatch(state.ambientHeard);
     if(match.matched){
-      var first=match.rest?('Hola Zuzu. '+match.rest):'Hola Zuzu';
+      var first=match.rest?match.rest:'';
       state.ambientHeard='';beginVoiceConversation(first);return;
     }
     // Mantener solo unas pocas palabras evita activar por frases antiguas acumuladas.
@@ -413,9 +429,15 @@
   }
   function updateRecordButton(){
     var b=$('ceVoz3RecordDownload');if(!b)return;
-    b.disabled=!(state.recordingActive||(state.lastRecordingBlob&&state.lastRecordingBlob.size));
-    b.textContent=state.recordingActive?'⏺ Guardar voz':'⬇ Grabación';
-    b.title=state.recordingActive?'Finalizar la conversación oral y descargar la grabación':'Descargar la última grabación oral disponible';
+    var hasBlob=!!(state.lastRecordingBlob&&state.lastRecordingBlob.size);
+    b.disabled=!(state.conversationMode||state.recordingActive||hasBlob);
+    b.textContent=state.recordingActive?'⏹ Guardar voz':hasBlob?'⬇ Grabación':'⏺ Grabar';
+    b.title=state.recordingActive?'Finalizar y descargar la grabación':hasBlob?'Descargar la última grabación oral':'Iniciar grabación opcional de esta conversación';
+  }
+  function toggleConversationRecording(){
+    if(state.recordingActive){stopSessionRecording().then(downloadRecordingBlob);return;}
+    if(state.lastRecordingBlob&&state.lastRecordingBlob.size){downloadRecordingBlob(state.lastRecordingBlob);return;}
+    if(state.conversationMode)startSessionRecording();
   }
   function finishVoiceConversationState(reason){
     state.conversationMode=false;state.recognitionMode='ambient';state.requestInFlight=false;state.queuedUtterance='';resetVoiceUtterance();state.ambientHeard='';updateWakeBadge();
@@ -487,7 +509,7 @@
     var rec = new Ctor();
     rec.lang = 'es-ES';rec.continuous = true;rec.interimResults = true;rec.maxAlternatives = 5;installRecognitionGrammar(rec);
     rec.onstart = function(){
-      state.recognitionStarting=false;setMicUi(true);updateWakeBadge();
+      state.recognitionStarting=false;state.recognitionEverStarted=true;state.gestureArmed=true;setMicUi(true);updateWakeBadge();
       setVoiceStatus(state.conversationMode?'Te escucho. Habla con naturalidad; enviaré al detectar dos segundos de silencio.':state.recognitionMode==='manual'?'Escuchando dictado.':'Escucha ambiental activa: di «Hola Zuzu».','ok');
     };
     rec.onresult = function(ev){
@@ -504,7 +526,8 @@
       state.recognitionStarting=false;var code=String(ev&&ev.error||'desconocido');
       if(code==='aborted'&&!state.wantListening)return;
       var fatal=/not-allowed|service-not-allowed|audio-capture|language-not-supported/.test(code);
-      if(fatal)state.wantListening=false;setMicUi(state.wantListening&&!fatal);updateWakeBadge();setVoiceStatus(recognitionErrorText(code),fatal?'err':'');
+      if(fatal){state.wantListening=false;if(code==='not-allowed'||code==='service-not-allowed')state.gestureArmed=false;}
+      setMicUi(state.wantListening&&!fatal);updateWakeBadge();setVoiceStatus(recognitionErrorText(code),fatal?'err':'');
     };
     rec.onend = function(){
       state.recognitionStarting=false;resolveRecognitionEnd();
@@ -521,25 +544,26 @@
   }
   function startAmbientListening(fromGesture){
     if(!supportsRecognition()){updateWakeBadge();return;}
-    state.ambientEnabled=true;safeSet(STORAGE.ambientWake,'1');if(!state.conversationMode)state.recognitionMode='ambient';state.wantListening=true;updateWakeBadge();
-    if(fromGesture)ensureRecorderStream();startRecognitionEngine();
+    state.ambientEnabled=true;safeSet(STORAGE.ambientWake,'1');if(fromGesture)state.gestureArmed=true;
+    if(!state.conversationMode)state.recognitionMode='ambient';state.wantListening=true;updateWakeBadge();
+    // SpeechRecognition debe ser el único dueño del micro al arrancar. Abrir getUserMedia a la vez
+    // provoca audio-capture/not-allowed especialmente en móvil y Safari/WebKit.
+    startRecognitionEngine();
   }
   function stopAmbientListening(){
     state.ambientEnabled=false;safeSet(STORAGE.ambientWake,'0');state.wantListening=false;state.recognitionStarting=false;try{state.recognition&&state.recognition.stop();}catch(_){try{state.recognition&&state.recognition.abort();}catch(__){ }}setMicUi(false);updateWakeBadge();setVoiceStatus('Escucha ambiental pausada.','');
   }
   function startListening(){
-    if(!supportsRecognition()){setVoiceStatus('Este navegador no ofrece dictado web. Usa Chrome/Edge o el micrófono del teclado.','err');return;}
-    stopSpeaking(false);var p=promptEl();state.baseText=clean(p&&p.value);state.finalText='';state.finalSegments=[];state.recognitionMode='manual';state.wantListening=true;setMicUi(true);ensureRecorderStream();startRecognitionEngine();
+    beginDirectVoiceConversation();
   }
   function stopListening(message){
-    if(state.conversationMode){state.wantListening=state.ambientEnabled;state.recognitionMode='ambient';}
+    if(state.conversationMode){state.conversationMode=false;resetVoiceUtterance();state.wantListening=state.ambientEnabled;state.recognitionMode='ambient';}
     else{state.wantListening=false;state.recognitionMode='ambient';}
-    state.recognitionStarting=false;try{if(state.recognition)state.recognition.stop();}catch(_){try{state.recognition&&state.recognition.abort();}catch(__){ }}setMicUi(false);updateWakeBadge();if(message!==false)setVoiceStatus('Micrófono detenido.','');
+    state.recognitionStarting=false;try{if(state.recognition)state.recognition.stop();}catch(_){try{state.recognition&&state.recognition.abort();}catch(__){ }}setMicUi(false);updateWakeBadge();if(message!==false)setVoiceStatus(state.ambientEnabled?'Escucha ambiental activa. Di «Hola Zuzu».':'Micrófono detenido.','');
   }
   function toggleListening(){
-    if(state.conversationMode){setVoiceStatus('La conversación oral ya está escuchando. Di «Adiós, Zuzu» para finalizar.','ok');return;}
-    if(state.wantListening&&state.recognitionMode==='manual'){state.recognitionMode='ambient';state.baseText='';state.finalText='';state.finalSegments=[];setVoiceStatus('Escucha ambiental activa. Di «Hola Zuzu».','ok');updateWakeBadge();}
-    else startListening();
+    if(state.conversationMode){endVoiceConversation('manual');return;}
+    beginDirectVoiceConversation();
   }
 
   /* ---------- Conversión de cifras a lenguaje hablado ---------- */
@@ -965,7 +989,7 @@
     if(mode!=='male') mode='female';
     return ''+
       '<div id="'+PANEL_ID+'" role="group" aria-label="Controles de voz de Zuzu">'+
-        '<button type="button" id="ceVoz3Mic" class="ce-voz3-btn ce-voz3-mic" aria-pressed="false" title="Hablar / dictar la pregunta"'+(recognitionOk?'':' disabled')+'>🎙 Hablar</button>'+
+        '<button type="button" id="ceVoz3Mic" class="ce-voz3-btn ce-voz3-mic" aria-pressed="false" title="Hablar directamente con Zuzu"'+(recognitionOk?'':' disabled')+'>🎙 Hablar</button>'+
         '<label class="ce-voz3-auto" title="Leer automáticamente cada respuesta"><input id="ceVoz3AutoRead" type="checkbox" '+(auto?'checked':'')+'> Auto</label>'+
         '<button type="button" id="ceVoz3Read" class="ce-voz3-btn" title="Leer la respuesta">🔊 Leer</button>'+
         '<button type="button" id="ceVoz3RecordDownload" class="ce-voz3-btn" title="Descargar la grabación de la conversación oral" disabled>⬇ Grabación</button>'+
@@ -1020,7 +1044,7 @@
   function bindPanel(){
     var mic=$('ceVoz3Mic'); if(mic) mic.addEventListener('click',toggleListening);
     var read=$('ceVoz3Read'); if(read) read.addEventListener('click',speakResponse);
-    var recDownload=$('ceVoz3RecordDownload'); if(recDownload) recDownload.addEventListener('click',downloadConversationRecording);
+    var recDownload=$('ceVoz3RecordDownload'); if(recDownload) recDownload.addEventListener('click',toggleConversationRecording);
     var preview=$('ceVoz3Preview'); if(preview) preview.addEventListener('click',previewVoice);
     var pause=$('ceVoz3Pause'); if(pause) pause.addEventListener('click',pauseSpeaking);
     var resume=$('ceVoz3Resume'); if(resume) resume.addEventListener('click',resumeSpeaking);
@@ -1071,7 +1095,7 @@
           state.submitBypass=true;
           setVoiceStatus('','');
           runButton.click();
-          setTimeout(function(){if(state.ambientEnabled&&!state.conversationMode)startAmbientListening(false);},180);
+          setTimeout(function(){if(state.ambientEnabled&&state.gestureArmed&&!state.conversationMode)startAmbientListening(false);},180);
         });
       }else{
         stopListening(false);stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('','');
@@ -1102,11 +1126,14 @@
       setTimeout(function(){loadLocalVoices(true);},1200);
     }
     if(state.ambientEnabled){
-      setTimeout(function(){if(state.ambientEnabled&&!state.wantListening)startAmbientListening(false);},650);
-      // Si el navegador exige gesto de usuario, el primer clic vuelve a intentarlo y obtiene el permiso.
-      document.addEventListener('click',function ambientGestureArm(){
-        if(!state.ambientEnabled||state.wantListening)return;
-        ensureRecorderStream();startAmbientListening(true);
+      // Los navegadores móviles bloquean el micrófono iniciado por temporizador. Se arma en el
+      // primer gesto REAL del usuario y, desde entonces, «Hola Zuzu» queda escuchando globalmente.
+      document.addEventListener('click',function ambientGestureArm(ev){
+        if(!state.ambientEnabled||state.wantListening||state.recognitionStarting)return;
+        var target=ev&&ev.target;
+        if(target&&target.closest&&target.closest('#ceVoz3Mic,#ceZuzuWakeBadge'))return;
+        if(ev&&ev.isTrusted===false)return;
+        state.gestureArmed=true;startAmbientListening(true);
       },true);
     }
     if(window.MutationObserver){

@@ -4690,10 +4690,16 @@ function sanitizeResultStructure(result, context, userPrompt) {
   return {...result,tables,charts};
 }
 
+function zuzuLoggedUserProfile(context = {}) {
+  const raw = context?.usuarioLogado || context?.ce_acceso_usuario_logado || context?.user || context?.authUser || context?.ce_acceso || null;
+  const identificacion = trim(raw?.Identificacion ?? raw?.identificacion ?? raw?.IDENTIFICACION ?? raw?.usuario ?? raw?.user ?? '');
+  const nombre = trim(raw?.Nombre ?? raw?.nombre ?? raw?.NOMBRE ?? raw?.name ?? '');
+  const nivel = trim(raw?.Nivel ?? raw?.nivel ?? raw?.NIVEL ?? '');
+  return { identificacion, nombre, nivel };
+}
 function zuzuLoggedUserDisplayName(context = {}) {
-  const raw = context?.usuarioLogado || context?.ce_acceso_usuario_logado || context?.user || context?.authUser || null;
-  const name = trim(raw?.Identificacion ?? raw?.identificacion ?? raw?.usuario ?? raw?.user ?? raw?.Nombre ?? raw?.nombre ?? raw?.NOMBRE ?? raw?.name ?? '');
-  return name || 'Amigo';
+  const profile = zuzuLoggedUserProfile(context);
+  return profile.identificacion || profile.nombre || 'Amigo';
 }
 
 // FIX9.3.16 · ZUZU AGENTE SEMÁNTICO + CALIDAD DE RESPUESTA
@@ -9716,27 +9722,30 @@ function v40SccPlanTool(){
 }
 
 function v40SccToolCatalogText(){
-  const tableHints={
-    event_dossier:'KPIs, economics_chart, attendance_chart, management_chart, income_status, income_attention',
-    event_breakdowns:'stores, donors, destinations, segments, products_cost, products_units, income_methods',
-    master_catalog:'catalog y, al cruzar evento, catalog_with_event_purchases / catalog_purchase_totals_by_segment_destination',
-    event_purchase_lines:'purchase_lines, by_product, by_store_segment_destination_product, by_segment_destination, totals_by_segment_destination',
-    event_donation_lines:'donors, donor_products, donation_lines, donations_by_segment_destination',
-    event_people:'attendance, people, attention_signals, technical_corrections',
-    event_documentation:'income_receipts, purchase_tickets, documents, missing_evidence',
-    event_management:'tasks e hitos/gestión',
-    event_bank:'reconciliation_timeline, event_window_timeline, movements, ticket_links, reconciliation_justified_movements',
-    event_bank_timeline:'timeline bancaria persistida del evento',
-    person_dossier:'summary_by_event, participation_by_event, income_by_event, purchase_by_event, donations_by_event, management_by_event y detalle asociado',
-    participation_events:'eventos donde aparece la persona canónica',
-    people_activity:'people_activity global',
-    store_purchases:'by_event y detalle agregado de compras de tienda',
-    canonical_socios:'socios canónicos',
-    events_catalog:'events',
-    events_overview:'events_overview',
-    compare_events:'comparison'
+  // SCC solo necesita saber QUÉ fuente elegir. Las descripciones extensas de v261AgentTools
+  // se reservan para el agente legacy; repetirlas dos veces por turno encarecía cada Interaction.
+  const concise={
+    event_dossier:'Resumen agregado de un evento: estado, fechas, ingresos, compras, donaciones, saldo, valoración, asistencia y gestión.',
+    event_breakdowns:'Agregados de un evento por tienda, donante, segmento, destino, producto y método de ingreso.',
+    master_catalog:'Catálogos maestros; en productos puede cruzar compras de un evento.',
+    event_purchase_lines:'Compras de un evento, con filtro previo por producto/familia, tienda, ticket y estado; incluye agregados por producto.',
+    event_donation_lines:'Donaciones de un evento y detalle por donante/producto.',
+    event_people:'Asistencia y personas de un evento, con señales relevantes.',
+    event_documentation:'Justificantes de ingreso, tickets de compra, documentos y evidencias pendientes.',
+    event_management:'Hitos y tareas LG de un evento.',
+    event_bank:'Cuadre bancario canónico de un evento: resumen, movimientos y vínculos justificativos.',
+    event_bank_timeline:'Cronología bancaria persistida del evento.',
+    event_weather:'Meteorología vinculada al evento.',
+    person_dossier:'Ficha de una persona, en un evento o todos: participación, ingresos, compras, donaciones y gestión.',
+    participation_events:'Eventos en los que aparece una persona canónica.',
+    people_activity:'Actividad global de personas.',
+    store_purchases:'Compras agregadas de una tienda por evento o globalmente.',
+    canonical_socios:'Censo canónico de socios.',
+    events_catalog:'Catálogo de eventos y estados.',
+    events_overview:'Resumen transversal de eventos.',
+    compare_events:'Comparación canónica entre varios eventos.'
   };
-  return v261AgentTools().map(t=>`- ${t.name}: ${trim(t.description)}${tableHints[t.name]?` Tablas habituales: ${tableHints[t.name]}.`:''}`).join('\n');
+  return V40_SCC_DATA_TOOLS.map(name=>`- ${name}: ${concise[name]||'Fuente canónica de ControlEvent.'}`).join('\n');
 }
 function v40LastSccContext(conversationHistory=[]){
   for(const turn of arr(conversationHistory).slice(-12).reverse()){
@@ -9746,62 +9755,84 @@ function v40LastSccContext(conversationHistory=[]){
   }
   return null;
 }
+function v40CompactSccContext(raw={}){
+  if(!raw||typeof raw!=='object')return null;
+  const dataset=raw?.dataset&&typeof raw.dataset==='object'?{id:trim(raw.dataset.id).slice(0,90),description:trim(raw.dataset.description).slice(0,180),carry_forward:raw.dataset.carry_forward!==false}:null;
+  return {relation:trim(raw.relation).slice(0,20),scope:trim(raw.scope).slice(0,30),event:trim(raw.event).slice(0,140),events:arr(raw.events).map(x=>trim(x)).filter(Boolean).slice(0,5),subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50),operation:trim(raw.operation).slice(0,60),dataset};
+}
 function v40RelevantLocalRecovery(conversationHistory=[]){
-  const hist=arr(conversationHistory);if(!hist.length)return[];
-  let start=Math.max(0,hist.length-4);
-  for(let i=hist.length-1;i>=Math.max(0,hist.length-10);i--){
-    const rel=trim(hist[i]?.resultContext?.scc?.relation);
-    if(rel==='new_topic'||rel==='reset'){start=i;break;}
-  }
-  return hist.slice(start).slice(-4).map(t=>({
-    user:trim(t?.user).slice(0,500),assistant:trim(t?.assistant).slice(0,850),title:trim(t?.title).slice(0,140),scc:t?.resultContext?.scc||null
+  // La memoria de conversación entre turnos es LOCAL y acotada. Conservamos hasta ocho
+  // intercambios con su SCC estructurado, suficiente para 4/5 aclaraciones y cambios de foco,
+  // pero nunca reinyectamos tablas/tool-results de turnos antiguos.
+  return arr(conversationHistory).slice(-8).map(t=>({
+    user:trim(t?.user).replace(/\s+/g,' ').slice(0,360),
+    assistant:trim(t?.assistant).replace(/\s+/g,' ').slice(0,420),
+    title:trim(t?.title).slice(0,100),
+    scc:v40CompactSccContext(t?.resultContext?.scc||null)
   }));
 }
 function v40SccSystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,voiceConversation=false,conversationHistory=[]}={}){
   const active=v26EventById(state,selectedEventId);const activeName=trim(active?.titulo),activeText=activeName?`${activeName} (${trim(active?.situacion)||'sin estado'}, ${trim(active?.fechaIni)||'?'} a ${trim(active?.fechaFin)||'?'})`:'ninguno';
-  const display=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
+  const profile=zuzuLoggedUserProfile({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
+  const display=profile.identificacion||profile.nombre||'Amigo';
+  const userIdentity=`Identificación/apodo=${profile.identificacion||'—'}; nombre=${profile.nombre||'—'}; nivel=${profile.nivel||'—'}`;
   const lastScc=v40LastSccContext(conversationHistory);
   const localNow=trim(clientLocalDateTime).slice(0,120)||new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',dateStyle:'full',timeStyle:'medium'}).format(new Date());
   const tz=trim(clientTimeZone).slice(0,80)||'Europe/Madrid',utcNow=trim(clientNowIso).slice(0,80)||new Date().toISOString();
-  const voice=voiceConversation?'\nMODO ORAL: responde breve y natural (normalmente 2-5 frases), sin leer tablas ni Markdown. La decisión SCC y la elección de datos son idénticas al canal escrito.':'';
+  const voice=voiceConversation?'\nMODO ORAL: responde todavía más breve: normalmente 2-5 frases, sin leer tablas, Markdown, guiones ni encabezados.':'\nMODO ESCRITO CONVERSACIONAL: normalmente 2-6 frases o párrafos cortos. Solo amplía cuando el usuario pida detalle.';
   return `Eres Zuzu, asistente conversacional de ControlEvent v2.0_exp. Hablas en español natural con ${display}.${voice}
 
+USUARIO ACTUAL (ce_acceso, solo el usuario autenticado): ${userIdentity}.
+- Puedes usar la Identificación/apodo con naturalidad en charla informal y el Nombre en contextos formales, pero NO lo repitas como muletilla en cada respuesta.
+- Nunca reveles claves, credenciales ni datos de otros usuarios de acceso.
+- Ajusta el registro al interlocutor: si te habla con humor o de forma cachonda, puedes seguirle el tono con simpatía y sin forzar chistes. Si el tema exige precisión/solemnidad (incidencias, dinero delicado, errores), prioriza claridad. Si no es apropiado seguir una broma concreta, dilo en una frase y continúa con la ayuda útil.
+
 SCC 2.0 — REGLA PRINCIPAL:
-En el PRIMER paso de CADA turno debes llamar exactamente una vez a scc_execute_plan. Esa llamada es tu Sistema de Control de Contexto. Tú, no ControlEvent, decides si el mensaje CONTINÚA el asunto actual, abre NUEVO_TEMA, necesita ACLARACIÓN o pide RESET.
+En el PRIMER paso de CADA turno debes llamar exactamente una vez a scc_execute_plan. Esa llamada decide relación contextual, foco y fuentes. ControlEvent ejecutará las fuentes y te devolverá su resultado en la MISMA Interaction del turno antes de que redactes.
 
 Cómo decidir el contexto:
-- Usa la conversación nativa completa de Gemini y, especialmente, los planes SCC anteriores. El último plan con relation=new_topic/reset es una frontera: no arrastres entidades anteriores a esa frontera salvo que el usuario las recupere expresamente.
-- Una pregunta autosuficiente sobre un evento/persona/ámbito distinto es new_topic aunque antes se hablara de otra cosa. Una elipsis humana («esos ingresos», «el último que comentamos», «ordénalos», «¿y las donaciones?», «están desordenados», «sí, hazlo») es continue si el hilo permite resolverla.
-- Si el usuario pasa de una persona a una consulta general del evento, descarta la persona. Si pasa a «todos/cualquiera de los eventos», el ámbito es all_events/global y no conserves un evento concreto.
-- El evento visible es contexto AMBIENTAL, no foco obligatorio: ${activeText}. «este evento» sí puede usarlo; una pregunta sobre Pocholo, una tienda o todos los eventos no debe quedar encerrada en él.
-- Pregunta para aclarar solo cuando existan dos o más interpretaciones realmente plausibles DESPUÉS de usar el hilo, el último dataset y el contexto ambiental.
-- Mantén un dataset.id/description estable para el conjunto activo. Eso permite que un turno posterior como «ordénalos», «los cinco primeros», «¿cuál es el más caro?» o «esas donaciones» se refiera al conjunto correcto.
+- Recibes una cápsula local compacta de los turnos recientes y sus planes SCC. relation=new_topic/reset es frontera para HEREDAR por inercia, pero un asunto anterior puede recuperarse si el usuario lo nombra o dice de forma inequívoca «vuelve al anterior», «retoma el cuadre», etc.
+- Una pregunta autosuficiente sobre otro evento/persona/ámbito es new_topic. Una elipsis humana («esos ingresos», «ordénalos», «¿y las donaciones?», «ese hombre», «los de antes», «sí, hazlo») es continue si la cápsula permite resolverla.
+- Mantén hasta 4/5 aclaraciones sobre el mismo asunto sin perder evento, persona, dominio ni dataset. Si después el usuario cambia a otro evento, adopta el nuevo foco; si luego recupera un foco anterior explícitamente, recupéralo desde la cápsula en vez de mezclar ambos.
+- Si pasa de una persona a una consulta general del evento, descarta la persona. Si pide todos los eventos, scope=all_events/global y no encierres la respuesta en el evento de pantalla.
+- El evento visible es AMBIENTAL, no obligatorio: ${activeText}. «este evento» sí puede usarlo.
+- Aclara solo si quedan dos interpretaciones plausibles después de usar cápsula, dataset y evento ambiental.
+- Mantén dataset.id/description para conjuntos que puedan recibir seguimientos («estos», «los cinco primeros», «el más caro», «esas compras»).
 
-Datos:
-- ControlEvent es la única fuente factual de negocio. Si la respuesta necesita cifras, personas, productos, movimientos, tickets, documentos, tareas, eventos o listas, inclúyelos en data_requests. Puedes pedir varias fuentes en la misma llamada.
-- Herramientas de UN SOLO EVENTO (event_dossier, event_breakdowns, event_purchase_lines, event_donation_lines, event_people, event_documentation, event_management, event_bank, event_bank_timeline, event_weather): usa scope=active_event o named_event. No les pidas all_events. Para visión global usa events_overview/events_catalog o las herramientas globales adecuadas.
-- person_dossier y store_purchases sí admiten all_events. Si el usuario pregunta por una persona/tienda «en todos los eventos», usa ese scope. people_activity, events_catalog, events_overview y canonical_socios son globales por naturaleza.
-- CE ejecutará EXACTAMENTE las data_requests válidas y te devolverá SIEMPRE sus resultados en function_result. Después debes responder usando esos datos; no prometas «voy a consultar» ni pidas un «hazlo» adicional.
-- Si el usuario pide una tabla, orden, límite o gráfica, indícalo también en presentation. Aunque recuerdes datos del turno anterior, vuelve a pedir la fuente necesaria si CE debe materializar de nuevo la tabla/gráfica o aplicar una transformación física.
-- Ingreso=Pendiente significa un ingreso ya registrado todavía no recibido por Banco/Bizum/Efectivo. No es Pte.Compra.
-- Banco de evento: usa event_bank/event_bank_timeline; nunca reconstruyas el Cuadre con histórico general.
-- No inventes causas, umbrales ni atribuciones. Persona individual y pareja no son intercambiables para compras/Hitos/LG.
+Datos y eficiencia:
+- ControlEvent es la única fuente factual de negocio. Si hacen falta cifras, personas, productos, movimientos, tickets, documentos, tareas, eventos o listas, inclúyelos en data_requests; pide varias fuentes independientes en EL MISMO plan.
+- Herramientas de un evento (event_dossier, event_breakdowns, event_purchase_lines, event_donation_lines, event_people, event_documentation, event_management, event_bank, event_bank_timeline, event_weather): scope=active_event o named_event. Para global usa herramientas globales.
+- person_dossier y store_purchases admiten all_events. Para una persona concreta usa person_dossier; si hay varias personas, una petición por cada persona en el mismo plan.
+- Si eliges event_purchase_lines y el mensaje nombra un producto/familia, informa product. En un seguimiento («cada uno», «ordénalos», «ahora el precio») conserva también el filtro de producto/familia del dataset anterior. No cargues todas las compras para contestar por Coca-Cola, cerveza u otro producto.
+- Para un resumen bancario usa event_bank con detail=standard; pide detail=full solo si el usuario solicita movimientos concretos/exhaustivos. El Cuadre nunca se reconstruye con histórico general.
+- Aunque recuerdes datos anteriores, vuelve a pedir una fuente si hace falta materializar una tabla/gráfica nueva o comprobar hechos actuales.
+- Ingreso=Pendiente es ingreso registrado todavía no recibido; no es Pte.Compra.
+- No inventes causas, relaciones ni atribuciones. Persona individual y pareja no son intercambiables en compras/Hitos/LG.
+
+Estilo humano de respuesta:
+- La respuesta principal debe transmitir primero lo importante. Evita informes enciclopédicos en una charla normal.
+- Por defecto NO uses Markdown visible: nada de **asteriscos**, encabezados con # ni listas con guiones. Si hay varios datos, intégralos en prosa corta o líneas limpias.
+- NO dupliques la misma cifra en un resumen y luego en una lista.
+- Tablas: show_table=false por defecto. Úsalas cuando el usuario pida expresamente tabla/listado exhaustivo, o cuando una lista amplia sea realmente el objeto de la petición. Nunca adjuntes una tabla técnica completa por haber consultado una fuente. En una respuesta normal basta la síntesis.
+- Si se muestra tabla, debe ser la tabla relevante y filtrada. No expongas IDs internos, timestamps técnicos, tool_id/table_key ni columnas de implementación salvo petición técnica explícita.
+- Importes en conversación: salvo que el usuario pida exactitud, un precio unitario/producto, ticket o movimiento concreto, habla SIEMPRE en euros enteros. No recites céntimos en saldos, ingresos, gastos, compras, donaciones, totales o comparaciones.
+- No cierres cada turno con «¿quieres algo más?» ni coletillas automáticas. Ofrece detalle solo cuando aporte valor o el usuario lo pida.
 
 FUENTES CANÓNICAS DISPONIBLES:
 ${v40SccToolCatalogText()}
 
-ESTADO SCC ESTRUCTURADO MÁS RECIENTE (orientativo; el hilo nativo manda):
-${JSON.stringify(lastScc||{})}
+ESTADO SCC ESTRUCTURADO MÁS RECIENTE:
+${JSON.stringify(v40CompactSccContext(lastScc||{}))}
 
 TIEMPO: ${localNow} · zona ${tz} · UTC ${utcNow}.
 
-Tras recibir function_result de scc_execute_plan, NO vuelvas a llamar herramientas en este turno: redacta la respuesta final, elige show_tables/charts solo entre las fuentes que CE acaba de devolver y respeta relation/domain/dataset del plan. No menciones «SCC», herramientas, datasets ni arquitectura al usuario.`;
+Tras recibir function_result de scc_execute_plan, NO vuelvas a llamar herramientas: redacta la respuesta final solo con los datos devueltos y el contexto aportado por el usuario. No menciones SCC, herramientas, datasets, arquitectura ni la compactación.`;
 }
-function v40SccInitialInput(userPrompt,conversationHistory=[],hasNativeThread=false){
-  if(hasNativeThread)return userPrompt;
+function v40SccInitialInput(userPrompt,conversationHistory=[],conversationDigest=''){
   const recovery=v40RelevantLocalRecovery(conversationHistory);
-  if(!recovery.length)return userPrompt;
-  return `RECUPERACIÓN SCC LOCAL (el identificador nativo no está disponible). Usa solo estos turnos recientes desde la última frontera SCC; no recuperes asuntos anteriores a ella:\n${JSON.stringify(recovery)}\n\nMENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
+  const digest=trim(conversationDigest).replace(/\s+$/g,'').slice(-2600);
+  if(!recovery.length&&!digest)return userPrompt;
+  return `MEMORIA SCC LOCAL ACOTADA. Es memoria conversacional, NO una fuente factual de negocio. Usa el SCC estructurado para resolver pronombres y cambios de foco. No arrastres automáticamente sujetos de un new_topic; sí puedes recuperar un asunto anterior si el mensaje actual lo pide inequívocamente.\nTURNOS RECIENTES:\n${JSON.stringify(recovery)}${digest?`\nÍNDICE HISTÓRICO MUY COMPACTO (solo para reconocer asuntos anteriores; no uses sus cifras como fuente actual):\n${digest}`:''}\n\nMENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
 }
 function v40SccSanitizePlan(raw={},state,selectedEventId){
   const rel=['continue','new_topic','clarify','reset'].includes(trim(raw?.relation))?trim(raw.relation):'continue';
@@ -9833,6 +9864,17 @@ function v40SccArgsForRequest(request,plan){
   if(!trim(args.detail))args.detail='standard';
   return args;
 }
+function v40ExplicitNamedEventForRequest(args,plan,state,selectedEventId,toolName=''){
+  const eventTools=new Set(['event_dossier','event_breakdowns','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','person_dossier','store_purchases']);
+  if(!eventTools.has(toolName)||trim(args?.scope)==='all_events')return args;
+  const requested=trim(args?.event)||trim(plan?.event);if(!requested)return args;
+  const generic=/^(?:este\s+evento|el\s+evento|evento\s+actual|actual|activo|evento\s+activo)$/i.test(norm(requested));
+  if(generic)return args;
+  const active=v26EventById(state,selectedEventId);if(!active)return args;
+  const rr=v26ResolveEvent(state,selectedEventId,requested,'named_event');if(!rr.ok)return args;
+  if(norm(rr.nombre)!==norm(active?.titulo))return{...args,scope:'named_event',event:rr.nombre};
+  return args;
+}
 function v40MaybeNumber(v){
   if(typeof v==='number'&&Number.isFinite(v))return v;
   const raw=trim(v);if(!raw)return null;
@@ -9862,25 +9904,73 @@ function v40ApplyPhysicalPresentation(result,presentation={},flowTrace=[]){
   if(sortedAny||limitedAny)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Presentación física','OK',`${sortedAny?`Orden aplicado por «${field}» ${direction.toUpperCase()}. `:''}${limitedAny?`Límite físico ${limit} filas.`:''}`.trim());
   return{...result,tables};
 }
-function v40CompactSccResult(result,detail='standard'){
-  const maxPer=detail==='full'?90:detail==='brief'?8:28,maxTotal=detail==='full'?220:detail==='brief'?28:100;let used=0;
-  const tables=[];
-  for(const t of arr(result?.tables)){
-    if(used>=maxTotal)break;const rows=arr(t?.rows),take=Math.max(0,Math.min(rows.length,maxPer,maxTotal-used));used+=take;
-    tables.push({key:t?.key,title:t?.title,schema:t?.schema,rows:rows.slice(0,take),row_count:rows.length,truncated:rows.length>take,rendering_complete:true});
+function v40CompactFactValue(value,depth=0,limits={array:10,keys:36,string:360}){
+  if(value==null||typeof value==='boolean'||typeof value==='number')return value;
+  if(typeof value==='string')return value.length>limits.string?`${value.slice(0,limits.string)}…`:value;
+  if(depth>=3)return undefined;
+  if(Array.isArray(value))return value.slice(0,limits.array).map(v=>v40CompactFactValue(v,depth+1,limits)).filter(v=>v!==undefined);
+  if(typeof value!=='object')return String(value).slice(0,limits.string);
+  const out={};let used=0;
+  for(const [k,v] of Object.entries(value)){
+    if(used>=limits.keys)break;
+    if(/(?:raw|payload|html|base64|binary|blob|debug|trace)/i.test(k))continue;
+    if(depth>0&&/(?:rows|records|movements|history|evidence|links|items|lines)$/i.test(k)&&Array.isArray(v))continue;
+    const c=v40CompactFactValue(v,depth+1,limits);if(c===undefined)continue;out[k]=c;used++;
   }
-  return{id:trim(result?.id),name:trim(result?.name),ok:result?.ok!==false,title:trim(result?.title),facts:result?.facts||{},tables};
+  return out;
 }
-async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[]){
-  const fullResults=[],compactResults=[],errors=[];
-  for(const req of plan.data_requests){
-    const args=v40SccArgsForRequest(req,plan),call={id:`scc_${req.index}_${Date.now().toString(36)}`,name:req.tool,arguments:args};
+function v40CompactSccFacts(name,facts={},detail='standard'){
+  const f=(facts&&typeof facts==='object')?facts:{};
+  if(name==='event_bank'&&detail!=='full'){
+    const keep=['event','event_finalized','has_bank_reconciliation','has_stored_bank_rows','reconciliation_row_count','reconciliation_status','lifecycle_message','bank_data_available','event_start','event_end','period_start','period_end','period_relation_to_event','period_relation_reason','summary','reconciliation_complete','period_candidate_movement_count','movement_count','included_movement_count','excluded_movement_count','link_count','opening_balance','closing_balance','bank_impact','included_income_total','included_charge_total','justified_movement_count','unlinked_movement_count','ticket_linked_movement_count','income_linked_movement_count','event_window_movement_count','event_window_opening_balance','event_window_closing_balance','event_window_impact','event_window_income_total','event_window_charge_total','event_window_has_movements','note'];
+    const out={};for(const k of keep)if(Object.prototype.hasOwnProperty.call(f,k)){const c=v40CompactFactValue(f[k],0,{array:6,keys:24,string:300});if(c!==undefined)out[k]=c;}
+    return out;
+  }
+  const limits=detail==='full'?{array:24,keys:60,string:520}:detail==='brief'?{array:5,keys:28,string:280}:{array:10,keys:40,string:360};
+  return v40CompactFactValue(f,0,limits)||{};
+}
+function v40CompactSccResult(result,detail='standard'){
+  // Las tablas completas siguen en CE para renderizado; Gemini recibe solo una muestra acotada
+  // y hechos compactos. Así facts no reinyecta por detrás cientos de filas antiguas.
+  let compact=v261CompactToolResult(result,detail);
+  compact={...compact,facts:v40CompactSccFacts(trim(result?.name),result?.facts||{},detail)};
+  if(trim(result?.name)==='person_dossier'&&detail!=='full'){
+    const keep=new Set(['summary_by_event','participation_by_event','income_by_event','purchase_by_event','donations_by_event','management_by_event']);
+    compact={...compact,tables:arr(compact?.tables).filter(t=>keep.has(trim(t?.key))).slice(0,6)};
+  }
+  return compact;
+}
+async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPrompt=''){
+  const cache=new Map();
+  const jobs=plan.data_requests.map(async req=>{
+    let args=v40SccArgsForRequest(req,plan);
+    args=v40ExplicitNamedEventForRequest(args,plan,state,selectedEventId,req.tool);
+    // Gemini decide la fuente. CE solo completa el filtro de producto inequívoco presente
+    // en el MENSAJE ACTUAL para que la propia fuente no cargue filas ajenas.
+    if(req.tool==='event_purchase_lines'&&!trim(args.product)){
+      const product=v29ProductSearchTerm(state,`${userPrompt} ${plan.subjects.join(' ')} ${plan.dataset?.description||''}`);
+      if(product){args={...args,product};zuzuTracePush(flowTrace,'v2.0_exp · SCC · Filtro canónico de producto','OK',`event_purchase_lines filtrará «${product}» antes de agregar/compactar.`);}
+    }
+    const call={id:`scc_${req.index}_${Date.now().toString(36)}`,name:req.tool,arguments:args};
+    const cacheKey=`${req.tool}:${JSON.stringify(args)}`;
     try{
-      let full=await v261ExecuteAgentTool(call,state,selectedEventId,flowTrace);full={...full,id:call.id,name:req.tool};
-      full=v40ApplyPhysicalPresentation(full,plan.presentation,flowTrace);fullResults.push(full);
-      compactResults.push(v40CompactSccResult(full,trim(args.detail)||'standard'));
-      zuzuTracePush(flowTrace,`v2.0_exp · SCC · Tool ${req.tool}`,'OK',`${trim(full?.title)||req.tool}; tablas=${arr(full?.tables).length}; propósito=${req.purpose||'—'}.`);
-    }catch(error){const msg=cleanGeminiError(error);errors.push({tool:req.tool,error:msg});compactResults.push({id:call.id,name:req.tool,ok:false,error:msg});zuzuTracePush(flowTrace,`v2.0_exp · SCC · Tool ${req.tool}`,'WARN',msg);}
+      let pending=cache.get(cacheKey);
+      if(!pending){pending=v261ExecuteAgentTool(call,state,selectedEventId,flowTrace);cache.set(cacheKey,pending);}
+      let full=await pending;
+      full={...full,id:call.id,name:req.tool};
+      full=v40ApplyPhysicalPresentation(full,plan.presentation,flowTrace);
+      const compact=v40CompactSccResult(full,trim(args.detail)||'standard');
+      return{req,full,compact,error:null};
+    }catch(error){return{req,full:null,compact:null,error:cleanGeminiError(error),call};}
+  });
+  // Las fuentes del plan son independientes por contrato SCC: ejecutarlas en paralelo reduce
+  // la latencia en comparaciones/personas múltiples sin cambiar semántica ni permisos.
+  const settled=await Promise.all(jobs),fullResults=[],compactResults=[],errors=[];
+  for(const item of settled){
+    const req=item.req;
+    if(item.error){errors.push({tool:req.tool,error:item.error});compactResults.push({id:item?.call?.id||'',name:req.tool,ok:false,error:item.error});zuzuTracePush(flowTrace,`v2.0_exp · SCC · Tool ${req.tool}`,'WARN',item.error);continue;}
+    fullResults.push(item.full);compactResults.push(item.compact);
+    zuzuTracePush(flowTrace,`v2.0_exp · SCC · Tool ${req.tool}`,'OK',`${trim(item.full?.title)||req.tool}; tablas=${arr(item.full?.tables).length}; propósito=${req.purpose||'—'}.`);
   }
   return{fullResults,compactResults,errors};
 }
@@ -9898,63 +9988,111 @@ function v40DefaultShowTable(results=[],plan={}){
   }
   return[];
 }
-async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
+function v40ExplicitTableRequest(prompt=''){
+  return /\b(?:tabla|csv|cuadro\s+de\s+datos)\b/.test(norm(prompt));
+}
+function v40TechnicalColumnsRequested(prompt=''){
+  return /\b(?:columnas?\s+t[eé]cnicas?|ids?\b|identificadores?|timestamps?|traza\s+t[eé]cnica|datos\s+en\s+bruto)\b/.test(norm(prompt));
+}
+function v40ExplicitWideListRequest(prompt=''){
+  const p=norm(prompt);
+  return /\b(?:lista|listado|relacion|relación|todos|todas|complet[ao]|exhaustiv[ao])\b/.test(p)&&/\b(?:productos?|personas?|socios?|movimientos?|compras?|donaciones?|eventos?|tiendas?)\b/.test(p);
+}
+function v40HumanPresentationPlan(plan,userPrompt='',voiceConversation=false){
+  const explicitTable=v40ExplicitTableRequest(userPrompt),wideList=v40ExplicitWideListRequest(userPrompt);
+  const presentation={...(plan?.presentation||{})};
+  if(voiceConversation)presentation.show_table=false;
+  else if(!explicitTable&&!wideList)presentation.show_table=false;
+  // Una petición expresa de tabla/lista amplia puede renderizarla, pero no convierte una pregunta corriente en volcado masivo.
+  else if((explicitTable||wideList)&&presentation.show_table!==true)presentation.show_table=true;
+  return{...plan,presentation};
+}
+function v40WholeEuro(value){
+  const n=Number(value);if(!Number.isFinite(n))return'';
+  return `${new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}).format(Math.round(n))} €`;
+}
+function v40HumanizeAggregateMoney(answer,userPrompt=''){
+  let out=text(answer);const p=norm(userPrompt);
+  if(/\b(?:exact[oa]|c[eé]ntimos?|decimales?|con\s+detalle|movimientos?\s+(?:uno\s+a\s+uno|detallados?))\b/.test(p))return out;
+  // Cuando el usuario pide un precio/producto, ticket o movimiento concreto mantenemos céntimos.
+  // En conversación ordinaria todos los importes son magnitudes y se oyen mejor en euros enteros.
+  const exactDetail=/\b(?:precio(?:s)?|unitari[oa]s?|por\s+unidad|productos?|tickets?|tk\s*\d+|movimientos?\s+concretos?|cargo\s+concreto|abono\s+concreto)\b/.test(p);
+  if(exactDetail)return out;
+  const re=/[+-]?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)\s*€/g;
+  return out.replace(re,m=>{const n=v26ParseLocalizedDisplayNumber(m);return Number.isFinite(n)?v40WholeEuro(n):m;});
+}
+function v40ConversationalPolish(answer,userPrompt='',voiceConversation=false){
+  let out=v26PolishNarrative(v29StripRawTableMarkup(v29SanitizeAnswerMarkup(answer)));
+  out=v40HumanizeAggregateMoney(out,userPrompt);
+  // Incluso si el modelo deja restos Markdown, la salida hablada/escrita se presenta limpia.
+  out=out.replace(/\*\*/g,'').replace(/^\s*#{1,6}\s*/gm,'').replace(/^\s*[-*•]+\s+/gm,'').replace(/`{1,3}/g,'');
+  if(voiceConversation)out=out.replace(/\n+/g,' ').replace(/\s{2,}/g,' ').trim();
+  return trim(out);
+}
+function v40HumanizeRenderedTables(presentation,userPrompt=''){
+  if(!presentation||!Array.isArray(presentation.tables)||v40TechnicalColumnsRequested(userPrompt))return presentation;
+  const technical=/^(?:id(?:\s|$)|creado$|actualizado$|created(?:_at)?$|updated(?:_at)?$|uuid$|tool_id$|table_key$)/i;
+  const tables=presentation.tables.map(t=>{
+    const cols=arr(t?.columns),keep=cols.map((c,i)=>({c,i})).filter(x=>!technical.test(trim(x.c)));
+    if(!keep.length||keep.length===cols.length)return t;
+    return{...t,columns:keep.map(x=>x.c),rows:arr(t?.rows).map(r=>keep.map(x=>arr(r)[x.i]))};
+  });
+  return{...presentation,tables};
+}
+function v40ChoosePlanCall(calls=[],state,selectedEventId){
+  const scored=arr(calls).map((call,index)=>{const plan=v40SccSanitizePlan(call?.arguments||{},state,selectedEventId);const score=(plan.confidence*100)+(plan.data_requests.length*2)+(plan.event?1:0)+(plan.subjects.length?1:0);return{call,plan,index,score};});
+  return scored.sort((a,b)=>b.score-a.score||a.index-b.index)[0]||null;
+}
+async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
   userPrompt=v336NormalizeStructuredPromptRefs(userPrompt);
   const modelPolicy=v332InteractionPolicy(userPrompt);let model=modelPolicy.model;
   const planTool=v40SccPlanTool();
   const systemInstruction=v40SccSystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,voiceConversation,conversationHistory});
-  let currentId=trim(previousInteractionId),resetInteractionId=false,payload;
-  // SCC 2.0: no cortamos el hilo por número de turnos ni por cambiar Lite/Flash.
-  // previous_interaction_id es la memoria conversacional primaria; solo se abandona si la API
-  // declara que ese identificador ya no es utilizable. Las fronteras semánticas las marca Gemini
-  // dentro del propio SCC (new_topic/reset), sin destruir el historial necesario para referencias
-  // humanas posteriores como «el último», «esos ingresos» u «ordénalos».
-  zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un único plan obligatorio. CE no ejecuta rutas semánticas legacy antes del plan. Modelo=${model}.`);
-  const initialInput=v40SccInitialInput(userPrompt,conversationHistory,!!currentId);
-  try{
-    payload=await v261CallInteraction({input:initialInput,previousInteractionId:currentId,model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini planifica turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
-  }catch(error){
-    if(currentId&&v261PreviousIdFailure(error)){
-      resetInteractionId=true;currentId='';
-      payload=await v261CallInteraction({input:v40SccInitialInput(userPrompt,conversationHistory,false),previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Reconstrucción del turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
-    }else throw error;
-  }
-  currentId=trim(payload?.id)||currentId;
+  // ECONOMÍA SCC: la Interaction nativa vive solo durante ESTE turno (plan -> datos -> respuesta).
+  // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
+  // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
+  const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX25 VOZ + COSTE','OK','Build 20260817-FIX25: voz rearmada por gesto, SCC interturno sin predecessor nativo, facts compactos y euros conversacionales sin céntimos.');
+  zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
+  if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
+  const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
+  payload=await v261CallInteraction({input:initialInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini planifica turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+  currentId=trim(payload?.id)||'';
   const calls=v261FunctionCalls(payload).filter(c=>trim(c.name)==='scc_execute_plan');
-  if(calls.length!==1){const e=new Error(`SCC esperaba 1 plan y recibió ${calls.length}.`);e.status=502;throw e;}
-  const plan=v40SccSanitizePlan(calls[0]?.arguments||{},state,selectedEventId);
+  if(!calls.length){const e=new Error('SCC no devolvió el plan obligatorio.');e.status=502;throw e;}
+  const chosen=v40ChoosePlanCall(calls,state,selectedEventId);if(!chosen){const e=new Error('SCC no devolvió un plan utilizable.');e.status=502;throw e;}
+  let plan=v40HumanPresentationPlan(chosen.plan,userPrompt,voiceConversation);
+  if(calls.length>1)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Plan duplicado','WARN',`Gemini emitió ${calls.length} llamadas scc_execute_plan. Se ejecuta una sola decisión canónica y se responden las duplicadas como ignoradas para cerrar correctamente la Interaction.`);
   zuzuTracePush(flowTrace,'v2.0_exp · SCC · Decisión de contexto','OK',`${plan.relation.toUpperCase()} · ámbito=${plan.scope} · evento=${plan.event||'—'} · sujetos=${plan.subjects.join(' / ')||'—'} · dominio=${plan.domain} · operación=${plan.operation} · dataset=${plan.dataset.id||'—'} · confianza=${Math.round(plan.confidence*100)}%. ${plan.reason}`);
-  const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace);
-  const functionResult={type:'function_result',name:'scc_execute_plan',call_id:trim(calls[0].id),result:{ok:executed.errors.length===0,scc_plan:plan,canonical_results:executed.compactResults,errors:executed.errors,instruction:'Responde ahora al usuario con estos datos. No pidas otra herramienta. Conserva el dataset/contexto indicado por scc_plan para el siguiente turno.'}};
+  const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace,userPrompt);
+  const realResult={ok:executed.errors.length===0,scc_plan:plan,canonical_results:executed.compactResults,errors:executed.errors,instruction:'Responde ahora al usuario con estos datos. No pidas otra herramienta. Sé conversacional y breve salvo petición expresa de detalle.'};
+  const functionResults=calls.map(call=>trim(call.id)===trim(chosen.call.id)
+    ?{type:'function_result',name:'scc_execute_plan',call_id:trim(call.id),result:realResult}
+    :{type:'function_result',name:'scc_execute_plan',call_id:trim(call.id),result:{ok:true,ignored_duplicate:true,instruction:'Esta llamada fue un duplicado accidental. Usa exclusivamente el resultado canónico de la otra llamada scc_execute_plan de este turno.'}});
   try{
-    payload=await v261CallInteraction({input:[functionResult],previousInteractionId:currentId,model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini responde con datos CE',toolChoice:'none',externalSignal});
+    payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools:[],flowTrace,stage:'v2.0_exp · SCC · Gemini responde con datos CE',toolChoice:'none',externalSignal});
   }catch(error){error.canonicalResults=[...executed.fullResults];error.sccPlan=plan;throw error;}
-  currentId=trim(payload?.id)||currentId;
   let final=v261ParseFinal(payload);
-  if(!trim(final.answer)){
-    const e=new Error('Gemini terminó el turno SCC sin respuesta final legible.');e.status=502;e.canonicalResults=[...executed.fullResults];e.sccPlan=plan;throw e;
-  }
-  // Auditoría factual posterior: puede retirar una frase no respaldada, pero NUNCA cambia el plan,
-  // elige otra fuente ni responde antes de que Gemini haya recibido function_result.
+  if(!trim(final.answer)){const e=new Error('Gemini terminó el turno SCC sin respuesta final legible.');e.status=502;e.canonicalResults=[...executed.fullResults];e.sccPlan=plan;throw e;}
   final=v307BankAvailabilityRepair(final,executed.fullResults,userPrompt,flowTrace);
   final=v283DeterministicSafetyRepair(final,executed.fullResults,conversationHistory);
-  final={...final,answer:v29SanitizeAnswerMarkup(final.answer)};
+  final={...final,answer:v40ConversationalPolish(final.answer,userPrompt,voiceConversation)};
   let showTables=arr(final.showTables);
-  if(!showTables.length)showTables=v40DefaultShowTable(executed.fullResults,plan);
+  if(!plan.presentation.show_table)showTables=[];
+  else if(!showTables.length)showTables=v40DefaultShowTable(executed.fullResults,plan);
   final={...final,showTables};
   if(voiceConversation)final={...final,showTables:[],chartSpecs:[],answer:trim(final.answer).replace(/(?:Puedes|Puede)\s+(?:consultar|ver)[^.?!]*(?:tabla|gr[aá]fica)[^.?!]*[.?!]?/gi,'').replace(/(?:Aquí|A continuación)\s+(?:te\s+)?(?:muestro|tienes|presento)[^.?!]*(?:tabla|gr[aá]fica)[^.?!]*[.?!]?/gi,'').replace(/\s{2,}/g,' ').trim()};
-  const presentation=voiceConversation?{tables:[],charts:[],stats:{sourceResults:executed.fullResults.length,sourceTables:0,sourceRows:0,renderedTableRows:0,tableDuplicates:0,chartDuplicates:0}}:v26BuildPresentation(final,executed.fullResults,userPrompt,{wantsCharts:plan.presentation.show_chart,bankContext:plan.domain==='bank',staticPointLabels:false});
+  let presentation=voiceConversation?{tables:[],charts:[],stats:{sourceResults:executed.fullResults.length,sourceTables:0,sourceRows:0,renderedTableRows:0,tableDuplicates:0,chartDuplicates:0}}:v26BuildPresentation(final,executed.fullResults,userPrompt,{wantsCharts:plan.presentation.show_chart,bankContext:plan.domain==='bank',staticPointLabels:false});
+  presentation=v40HumanizeRenderedTables(presentation,userPrompt);
   const files=[];for(const t of (voiceConversation?[]:presentation.tables.slice(0,6))){const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));files.push({filename:fileSafe(`${t.title}_v2.0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});}
   const answer=v304EnsurePersonalOpening(final.answer,{usuarioLogado,user,authUser,ce_acceso_usuario_logado:usuarioLogado});
   const resultContext=v40SccResultContext(plan,executed.fullResults),usage=summarizeGeminiUsageFromTrace(flowTrace);
-  zuzuTracePush(flowTrace,'v2.0_exp · SCC · Datos y presentación','OK',`Fuentes=${executed.fullResults.map(r=>trim(r?.name)).join(', ')||'ninguna'}; tablas renderizadas=${presentation.tables.length}; gráficas=${presentation.charts.length}. Todos los datos solicitados por el plan se devolvieron a Gemini antes de redactar.`);
-  zuzuTracePush(flowTrace,'v2.0_exp · SCC · Memoria','OK',`Contexto guardado por Gemini: ${plan.relation} · ${plan.domain} · ${resultContext.event||'sin evento'} · dataset=${plan.dataset.id||'—'}.`);
-  const finalStatus=trim(payload?.status)||'completed',persist=finalStatus==='completed';
-  // Un turno Flash también forma parte de la conversación: si terminó correctamente se conserva
-  // como predecessor igual que Lite. Vaciarlo aquí rompía precisamente la frescura del SCC tras
-  // una opinión/análisis y obligaba a reconstruir el hilo de forma local.
-  const completedInteractionId=persist?currentId:'';if(!persist)resetInteractionId=true;
-  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-scc2-v2-0-exp',model,interactionId:completedInteractionId,meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.0: Gemini decide contexto + plan de datos; ControlEvent ejecuta fuentes canónicas y devuelve siempre los resultados a Gemini antes de la respuesta',modelTier:modelPolicy.tier,interactionId:completedInteractionId,resetInteractionId,pendingAction:null,resultContext,tools:[...new Set(executed.fullResults.map(r=>trim(r?.name)).filter(Boolean))],scc:resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  zuzuTracePush(flowTrace,'v2.0_exp · SCC · Datos y presentación','OK',`Fuentes=${executed.fullResults.map(r=>trim(r?.name)).join(', ')||'ninguna'}; tablas renderizadas=${presentation.tables.length}; gráficas=${presentation.charts.length}. Los datos pedidos por el plan se devolvieron a Gemini antes de redactar.`);
+  zuzuTracePush(flowTrace,'v2.0_exp · SCC · Memoria','OK',`Contexto SCC guardado localmente: ${plan.relation} · ${plan.domain} · ${resultContext.event||'sin evento'} · dataset=${plan.dataset.id||'—'}. El predecessor nativo NO se conserva entre turnos.`);
+  // La memoria persistente entre turnos es el historial local del navegador; devolver siempre vacío
+  // hace que una sesión antigua quede saneada desde la primera respuesta con este parche.
+  resetInteractionId=true;
+  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-scc2-v2-0-exp',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.0: Gemini decide contexto + plan; CE ejecuta fuentes canónicas; memoria interturno compacta para limitar coste/latencia',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId,pendingAction:null,resultContext,tools:[...new Set(executed.fullResults.map(r=>trim(r?.name)).filter(Boolean))],scc:resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
@@ -12072,8 +12210,8 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }
 
   let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
-  const safeHistory=arr(conversationHistory).slice(-6).map(x=>({
-    user:trim(x?.user).slice(0,700),assistant:trim(x?.assistant).slice(0,1000),assistantTail:trim(x?.assistantTail).slice(-900),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null,resultContext:(x?.resultContext&&typeof x.resultContext==='object')?x.resultContext:null
+  const safeHistory=arr(conversationHistory).slice(-8).map(x=>({
+    user:trim(x?.user).slice(0,650),assistant:trim(x?.assistant).slice(0,800),assistantTail:trim(x?.assistantTail).slice(-700),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null,resultContext:(x?.resultContext&&typeof x.resultContext==='object')?x.resultContext:null
   }));
 
   // SCC 2.0 · los únicos comandos interceptados fuera de Gemini son acciones locales reales
@@ -12083,7 +12221,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
 
   zuzuTracePush(flowTrace,'v2.0_exp · ARQUITECTURA SCC 2.0','OK',`Gemini decide relación contextual + fuentes de datos; ControlEvent ejecuta esas fuentes y devuelve SIEMPRE sus resultados a la misma Interaction antes de la respuesta. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
   try{
-    return await runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
+    return await runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(-5000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
     const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null;
