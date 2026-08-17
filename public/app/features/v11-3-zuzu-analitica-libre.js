@@ -35,7 +35,7 @@
     var src=stripZuzuCssLeak(value); if(!src) return src;
     // v2.0_exp: la respuesta empieza directamente. Eliminamos también el saludo
     // si llega de una conversación antigua o el modelo lo genera por inercia.
-    return src.replace(/^Te\s+comento\s*,\s*[^.:\n]{1,120}[.:]\s*/i,'').trim();
+    return src.replace(/^(?:Te|Le)\s+comento\s*,\s*[^.:\n]{1,120}[.:]\s*/i,'').replace(/^(?:Respuesta|Contestaci[oó]n|Informe)\s+(?:de\s+)?Zuzu\s*[:.\-–—]*\s*/i,'').replace(/^Zuzu\s+(?:responde|contesta)\s*[:.\-–—]*\s*/i,'').trim();
   }
   function mdTableCells(line){
     var raw=String(line||'').trim();
@@ -115,7 +115,9 @@
     data=data||{};
     var raw=trim(data.title||'');
     var p=trim(prompt||data.__prompt||'');
-    if(raw && !isTechnicalHeading(raw)) return raw;
+    var genericZuzu=/^(?:respuesta|contestaci[oó]n|informe)\s+(?:de\s+)?zuzu\b|^zuzu\s+(?:responde|contesta)\b/i.test(raw);
+    if(raw && !isTechnicalHeading(raw) && !genericZuzu) return raw;
+    if(genericZuzu) return '';
     var comparison=/\b(compara|comparativa|comparar|frente\s+a|versus|\bvs\b)\b/i.test(p);
     var weather=/\b(meteorol[oó]g\w*|metereol[oó]g\w*|meteo\w*|tiempo|clima|lluvia|temperatura|viento|previsi[oó]n)\b/i.test(p);
     if(comparison && weather) return 'Comparativa de eventos y meteorología';
@@ -334,7 +336,7 @@
     turn=turn||{};
     if(trim(turn.archiveHtml||'')) return withoutGeminiLabel(String(turn.archiveHtml));
     var answer=withoutGeminiLabel(String(turn.assistant||'').trim());
-    return '<div class="ce-ai-card ce-ai-answer-card"><h3>Respuesta de Zuzu</h3><div class="ce-ai-answer">'+answerDisplayHtml(answer||'Sin respuesta archivada para este turno.')+'</div></div>';
+    return '<div class="ce-ai-card ce-ai-answer-card"><div class="ce-ai-answer">'+answerDisplayHtml(answer||'Sin respuesta archivada para este turno.')+'</div></div>';
   }
   function archivedTraceHtml(turn){ return withoutGeminiLabel(trim(turn&&turn.archiveTraceHtml||'')||''); }
   // En pantalla la traza sigue plegada. Al imprimirla se abren sus <details> para que
@@ -566,7 +568,8 @@
   function resultCoreHtml(data,options){
     data=data||{};options=options||{};
     var promptText=trim(data.__prompt||''); var allowTechnical=explicitTechnicalView(promptText),html='',cls=data.rejected?' ce-ai-rejected':'';
-    html+='<div class="ce-ai-card ce-ai-answer-card'+cls+'"><h3>'+esc(userFacingTitle(data,promptText))+'</h3><div class="ce-ai-answer">'+answerDisplayHtml(data.answer||'')+'</div></div>';
+    var mainTitle=userFacingTitle(data,promptText);
+    html+='<div class="ce-ai-card ce-ai-answer-card'+cls+'">'+(mainTitle?'<h3>'+esc(mainTitle)+'</h3>':'')+'<div class="ce-ai-answer">'+answerDisplayHtml(data.answer||'')+'</div></div>';
     var visibleWarnings=userFacingWarnings(data.warnings,allowTechnical);
     if((data.rejected||data.showWarnings===true||data.provider==='gemini-rest-json-fallback')&&visibleWarnings.length)html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+visibleWarnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>';
     (data.charts||[]).forEach(function(ch){if(allowTechnical||!isTechnicalHeading(ch&&ch.title))html+=chartHtml(ch);});

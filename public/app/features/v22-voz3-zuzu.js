@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp · VOZ4 FIX25 CONVERSACIÓN DIRECTA
+/* ControlEvent v2.0_exp · VOZ4 FIX26 WAKE ESTABLE + ESPERA HUMANA
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -71,8 +71,45 @@
     recordingStartedAt: 0,
     autoArmTried: false,
     gestureArmed: false,
-    recognitionEverStarted: false
+    recognitionEverStarted: false,
+    recognitionGeneration: 0,
+    recognitionSuspended: false,
+    recognitionRestartTimer: null,
+    wakeCapture: false,
+    wakeCaptureTimer: null,
+    wakeCaptureText: '',
+    wakeCaptureLastAt: 0,
+    requestPrompt: '',
+    requestTitle: '',
+    entertainmentTimer: null,
+    entertainmentCount: 0,
+    entertainmentSpeaking: false,
+    entertainmentUtterance: null,
+    lastEntertainmentIndex: -1
   };
+
+  var ENTERTAINMENT_PHRASES = [
+    'Estoy rebuscando en los cajones de ControlEvent.',
+    'Dame un segundo, que esto tiene miga.',
+    'Estoy atando cabos, no te me escapes.',
+    'Un momento, que Zuzu está haciendo cuentas.',
+    'Estoy cruzando datos; ya casi lo tengo.',
+    'Esto está cocinándose, y huele bastante bien.',
+    'Déjame mirar debajo de la alfombra digital.',
+    'Estoy buscando la aguja en el pajar.',
+    'Voy tirando del hilo; aparece algo interesante.',
+    'Un segundo, que los números vienen corriendo.',
+    'Estoy poniendo orden en este pequeño sarao.',
+    'No me he ido, sigo husmeando datos.',
+    'Aquí hay tomate; déjame comprobarlo bien.',
+    'Estoy haciendo arqueología fina por ControlEvent.',
+    'Aguanta un instante, que esto promete.',
+    'Estoy separando el grano de la paja.',
+    'Los datos están hablando; estoy escuchándolos.',
+    'Un momento, que no quiero venderte humo.',
+    'Estoy comprobando que las cuentas no hagan trampas.',
+    'Ya veo movimiento; dame un pelín más.'
+  ];
 
   function $(id){ return document.getElementById(id); }
   function q(sel, root){ return (root || document).querySelector(sel); }
@@ -202,6 +239,33 @@
   function safeSet(key, value){ try{ localStorage.setItem(key, String(value)); }catch(_){ } }
   function supportsRecognition(){ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
   function supportsDeviceSpeech(){ return !!(window.speechSynthesis && window.SpeechSynthesisUtterance); }
+  function currentVoiceUser(){
+    try{return window.authUser || window.__CONTROL_EVENT_USER__ || (window.ControlEventApp&&window.ControlEventApp.authUser) || (window.ControlEventRuntime&&window.ControlEventRuntime.app&&window.ControlEventRuntime.app.authUser) || {};}catch(_){return{};}
+  }
+  function voiceAddressName(formal){
+    var u=currentVoiceUser();
+    var informal=clean(u.identificacion||u.Identificacion||u.usuario||u.user||u.nombre||u.Nombre||'');
+    var formalName=clean(u.nombre||u.Nombre||u.name||informal);
+    return formal?(formalName||'usuario'):(informal||formalName||'amigo');
+  }
+  function isFormalVoiceTurn(prompt,title){
+    var t=wakeNorm(joinText(prompt,title));
+    return /\b(informe\s+(?:formal|ejecutivo|oficial|tecnico|tecnica|auditoria|auditor|para\s+entregar)|memoria\s+formal|acta|documento\s+formal|comunicado\s+oficial|para\s+la\s+directiva|para\s+los\s+socios)\b/.test(t);
+  }
+  function stripVoiceAnswerLead(value){
+    return clean(value).replace(/^(?:respuesta|contestacion|informe)\s+(?:de\s+)?zuzu\s*[:.\-–—]*\s*/i,'').replace(/^zuzu\s+(?:responde|contesta)\s*[:.\-–—]*\s*/i,'').trim();
+  }
+  function voiceBridge(prompt,title){
+    var formal=isFormalVoiceTurn(prompt,title),name=voiceAddressName(formal);
+    return (formal?'Le comento, ':'Te comento, ')+name+'.';
+  }
+  function entertainmentIndex(second,count){
+    var seed=((Number(second)||0)+1)*1103515245+((Number(count)||0)+1)*12345;
+    seed=(seed>>>0);seed=(Math.imul(seed^0x9e3779b9,2654435761)>>>0);
+    var idx=seed%ENTERTAINMENT_PHRASES.length;
+    if(idx===state.lastEntertainmentIndex)idx=(idx+1)%ENTERTAINMENT_PHRASES.length;
+    state.lastEntertainmentIndex=idx;return idx;
+  }
 
   function injectStyle(){
     if($(STYLE_ID)) return;
@@ -326,20 +390,26 @@
   }
   function beginVoiceConversation(initialText){
     if(state.conversationMode)return;
+    stopRecognitionEngine(true);
     state.conversationMode=true;state.recognitionMode='conversation';state.wakeStartedAt=Date.now();state.requestInFlight=false;state.queuedUtterance='';state.ambientHeard='';state.wantListening=true;
     resetVoiceUtterance();updateWakeBadge();
     openZuzuForVoice(function(){
       var first=clean(initialText);
-      if(first){appendVoiceFinal(first);showVoicePrompt(first);setVoiceStatus('Te escucho; cuando calles dos segundos te respondo.','ok');scheduleVoiceSubmission();}
-      else{showVoicePrompt('');setVoiceStatus('Hola. Ya estoy aquí. Dime.','ok');}
+      if(first){
+        showVoicePrompt(first);setVoiceStatus('Te he escuchado. Estoy pensando…','ok');
+        state.recognitionSuspended=true;
+        setTimeout(function(){submitVoiceUtterance(first);},60);
+      }else{
+        showVoicePrompt('');setVoiceStatus('Hola. Ya estoy aquí. Dime.','ok');
+        resumeRecognitionEngine('conversation',80);
+      }
     });
-    startRecognitionEngine();
   }
   function beginDirectVoiceConversation(){
     if(!supportsRecognition()){setVoiceStatus('Este navegador no ofrece reconocimiento de voz web.','err');return;}
-    stopSpeaking(false);state.gestureArmed=true;state.conversationMode=true;state.recognitionMode='conversation';state.wantListening=true;state.requestInFlight=false;state.queuedUtterance='';state.ambientHeard='';
-    resetVoiceUtterance();updateWakeBadge();startRecognitionEngine();
-    openZuzuForVoice(function(){showVoicePrompt('');setVoiceStatus('Te escucho. Habla con naturalidad; enviaré cuando calles dos segundos.','ok');});
+    stopSpeaking(false);stopRecognitionEngine(true);state.gestureArmed=true;state.conversationMode=true;state.recognitionMode='conversation';state.wantListening=true;state.requestInFlight=false;state.queuedUtterance='';state.ambientHeard='';
+    resetVoiceUtterance();updateWakeBadge();
+    openZuzuForVoice(function(){showVoicePrompt('');setVoiceStatus('Te escucho. Habla con naturalidad; enviaré cuando calles dos segundos.','ok');resumeRecognitionEngine('conversation',70);});
   }
   function processConversationSpeech(text,isFinal,confidence){
     text=voiceAliasNormalize(text);if(!text)return;
@@ -368,15 +438,29 @@
     if(isFinal){appendVoiceFinal(text);state.voiceInterim='';}else state.voiceInterim=text;
     var full=currentVoiceUtterance();showVoicePrompt(full);scheduleVoiceSubmission();
   }
-  function processAmbientSpeech(text){
+  function mergeAmbientText(base,part){
+    base=clean(base);part=clean(part);if(!part)return base;if(!base)return part;
+    var nb=wakeNorm(base),np=wakeNorm(part);if(nb===np||nb.endsWith(np))return base;if(np.indexOf(nb)===0)return part;
+    return joinText(base,part).slice(-260);
+  }
+  function clearWakeCapture(){clearTimeout(state.wakeCaptureTimer);state.wakeCaptureTimer=null;state.wakeCapture=false;state.wakeCaptureText='';state.wakeCaptureLastAt=0;}
+  function commitAmbientWake(){
+    if(!state.wakeCapture)return;
+    var elapsed=Date.now()-Number(state.wakeCaptureLastAt||0);
+    if(elapsed<1450){clearTimeout(state.wakeCaptureTimer);state.wakeCaptureTimer=setTimeout(commitAmbientWake,1500-elapsed);return;}
+    var full=clean(state.wakeCaptureText),match=wakeMatch(full);clearWakeCapture();state.ambientHeard='';
+    if(!match.matched)return;
+    beginVoiceConversation(clean(match.rest||''));
+  }
+  function processAmbientSpeech(text,isFinal){
     text=voiceAliasNormalize(text);if(!text||isLikelyOwnVoice(text))return;
-    state.ambientHeard=joinText(state.ambientHeard,text).slice(-180);
+    state.ambientHeard=mergeAmbientText(state.ambientHeard,text);
     var match=wakeMatch(state.ambientHeard);
-    if(match.matched){
-      var first=match.rest?match.rest:'';
-      state.ambientHeard='';beginVoiceConversation(first);return;
+    if(match.matched||state.wakeCapture){
+      state.wakeCapture=true;state.wakeCaptureText=mergeAmbientText(state.wakeCaptureText,state.ambientHeard);state.wakeCaptureLastAt=Date.now();
+      clearTimeout(state.wakeCaptureTimer);state.wakeCaptureTimer=setTimeout(commitAmbientWake,isFinal?1250:1550);
+      updateWakeBadge();return;
     }
-    // Mantener solo unas pocas palabras evita activar por frases antiguas acumuladas.
     var words=state.ambientHeard.split(/\s+/);if(words.length>10)state.ambientHeard=words.slice(-10).join(' ');
   }
   function recordingMime(){
@@ -440,12 +524,12 @@
     if(state.conversationMode)startSessionRecording();
   }
   function finishVoiceConversationState(reason){
-    state.conversationMode=false;state.recognitionMode='ambient';state.requestInFlight=false;state.queuedUtterance='';resetVoiceUtterance();state.ambientHeard='';updateWakeBadge();
-    if(state.ambientEnabled){state.wantListening=true;startRecognitionEngine();}
+    stopEntertainment(true);clearWakeCapture();state.conversationMode=false;state.recognitionMode='ambient';state.recognitionSuspended=false;state.requestInFlight=false;state.requestPrompt='';state.requestTitle='';state.queuedUtterance='';resetVoiceUtterance();state.ambientHeard='';updateWakeBadge();
+    if(state.ambientEnabled){state.wantListening=true;resumeRecognitionEngine('ambient',140);}
     setVoiceStatus(reason==='pdf'?'Conversación oral finalizada al preparar el PDF. Di «Hola Zuzu» cuando quieras volver.':'Escucha ambiental activa. Di «Hola Zuzu» cuando quieras.','ok');
   }
   function endVoiceConversation(reason){
-    var was=state.conversationMode;clearTimeout(state.silenceTimer);state.silenceTimer=null;stopSpeaking(false);
+    var was=state.conversationMode;clearTimeout(state.silenceTimer);state.silenceTimer=null;stopEntertainment(true);clearWakeCapture();stopSpeaking(false);
     stopSessionRecording().then(function(){if(was)finishVoiceConversationState(reason);});
     if(reason==='goodbye'){
       state.conversationMode=false;state.recognitionMode='ambient';state.lastSpokenText='Hasta luego. Cuando quieras volver a hablar conmigo, di Hola Zuzu.';
@@ -503,63 +587,93 @@
     }catch(_){}
   }
 
-  function buildRecognition(){
+  function buildRecognition(generation){
     var Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
     if(!Ctor) return null;
     var rec = new Ctor();
+    var gen=Number(generation)||0;
     rec.lang = 'es-ES';rec.continuous = true;rec.interimResults = true;rec.maxAlternatives = 5;installRecognitionGrammar(rec);
     rec.onstart = function(){
+      if(gen!==state.recognitionGeneration)return;
       state.recognitionStarting=false;state.recognitionEverStarted=true;state.gestureArmed=true;setMicUi(true);updateWakeBadge();
       setVoiceStatus(state.conversationMode?'Te escucho. Habla con naturalidad; enviaré al detectar dos segundos de silencio.':state.recognitionMode==='manual'?'Escuchando dictado.':'Escucha ambiental activa: di «Hola Zuzu».','ok');
     };
     rec.onresult = function(ev){
+      if(gen!==state.recognitionGeneration)return;
       for(var i=ev.resultIndex;i<ev.results.length;i++){
         var picked=bestRecognitionAlternative(ev.results[i]),text=clean(picked.text);if(!text)continue;
         var isFinal=!!ev.results[i].isFinal;
         if(state.conversationMode)processConversationSpeech(text,isFinal,picked.confidence);
         else if(state.recognitionMode==='manual'){
           if(isFinal)appendFinalTranscript(text);else state.voiceInterim=text;updatePrompt(isFinal?'':text);
-        }else processAmbientSpeech(text);
+        }else processAmbientSpeech(text,isFinal);
       }
     };
     rec.onerror = function(ev){
+      if(gen!==state.recognitionGeneration)return;
       state.recognitionStarting=false;var code=String(ev&&ev.error||'desconocido');
-      if(code==='aborted'&&!state.wantListening)return;
+      if(code==='aborted')return;
       var fatal=/not-allowed|service-not-allowed|audio-capture|language-not-supported/.test(code);
       if(fatal){state.wantListening=false;if(code==='not-allowed'||code==='service-not-allowed')state.gestureArmed=false;}
       setMicUi(state.wantListening&&!fatal);updateWakeBadge();setVoiceStatus(recognitionErrorText(code),fatal?'err':'');
     };
     rec.onend = function(){
-      state.recognitionStarting=false;resolveRecognitionEnd();
-      if(state.wantListening&&(state.ambientEnabled||state.conversationMode||state.recognitionMode==='manual')){
-        setMicUi(true);updateWakeBadge();setTimeout(function(){if(state.wantListening)startRecognitionEngine();},260);
+      if(gen!==state.recognitionGeneration)return;
+      state.recognitionStarting=false;state.recognition=null;resolveRecognitionEnd();
+      if(state.wantListening&&!state.recognitionSuspended&&(state.ambientEnabled||state.conversationMode||state.recognitionMode==='manual')){
+        setMicUi(true);updateWakeBadge();
+        clearTimeout(state.recognitionRestartTimer);
+        state.recognitionRestartTimer=setTimeout(function(){if(state.wantListening&&!state.recognitionSuspended)startRecognitionEngine();},110);
       }else{setMicUi(false);updateWakeBadge();}
     };
     return rec;
   }
+  function stopRecognitionEngine(suspend){
+    clearTimeout(state.recognitionRestartTimer);state.recognitionRestartTimer=null;
+    if(suspend===true)state.recognitionSuspended=true;
+    state.recognitionStarting=false;
+    state.recognitionGeneration++;
+    var rec=state.recognition;state.recognition=null;
+    try{rec&&rec.abort();}catch(_){try{rec&&rec.stop();}catch(__){ }}
+    setMicUi(false);updateWakeBadge();
+  }
+  function resumeRecognitionEngine(mode,delay){
+    if(mode)state.recognitionMode=mode;
+    state.recognitionSuspended=false;state.wantListening=true;
+    clearTimeout(state.recognitionRestartTimer);
+    state.recognitionRestartTimer=setTimeout(function(){if(state.wantListening&&!state.recognitionSuspended)startRecognitionEngine();},Number(delay)||70);
+  }
   function startRecognitionEngine(){
-    if(!state.wantListening||state.recognitionStarting)return;if(!state.recognition)state.recognition=buildRecognition();if(!state.recognition)return;
-    try{state.recognitionStarting=true;state.recognition.start();}
-    catch(err){state.recognitionStarting=false;if(/already started|start/i.test(String(err&&err.message||''))){setMicUi(true);return;}setMicUi(false);updateWakeBadge();}
+    if(!state.wantListening||state.recognitionSuspended||state.recognitionStarting||state.recognition)return;
+    var gen=++state.recognitionGeneration,rec=buildRecognition(gen);if(!rec)return;
+    state.recognition=rec;
+    try{state.recognitionStarting=true;rec.start();}
+    catch(err){
+      state.recognitionStarting=false;state.recognition=null;
+      if(/already started|start/i.test(String(err&&err.message||''))){setMicUi(true);return;}
+      setMicUi(false);updateWakeBadge();
+      if(state.wantListening&&!state.recognitionSuspended){clearTimeout(state.recognitionRestartTimer);state.recognitionRestartTimer=setTimeout(startRecognitionEngine,180);}
+    }
   }
   function startAmbientListening(fromGesture){
     if(!supportsRecognition()){updateWakeBadge();return;}
     state.ambientEnabled=true;safeSet(STORAGE.ambientWake,'1');if(fromGesture)state.gestureArmed=true;
-    if(!state.conversationMode)state.recognitionMode='ambient';state.wantListening=true;updateWakeBadge();
-    // SpeechRecognition debe ser el único dueño del micro al arrancar. Abrir getUserMedia a la vez
-    // provoca audio-capture/not-allowed especialmente en móvil y Safari/WebKit.
+    if(!state.conversationMode)state.recognitionMode='ambient';state.wantListening=true;state.recognitionSuspended=false;updateWakeBadge();
     startRecognitionEngine();
   }
   function stopAmbientListening(){
-    state.ambientEnabled=false;safeSet(STORAGE.ambientWake,'0');state.wantListening=false;state.recognitionStarting=false;try{state.recognition&&state.recognition.stop();}catch(_){try{state.recognition&&state.recognition.abort();}catch(__){ }}setMicUi(false);updateWakeBadge();setVoiceStatus('Escucha ambiental pausada.','');
+    state.ambientEnabled=false;safeSet(STORAGE.ambientWake,'0');state.wantListening=false;state.recognitionSuspended=false;stopRecognitionEngine(false);setVoiceStatus('Escucha ambiental pausada.','');
   }
   function startListening(){
     beginDirectVoiceConversation();
   }
   function stopListening(message){
+    stopEntertainment(true);clearWakeCapture();
     if(state.conversationMode){state.conversationMode=false;resetVoiceUtterance();state.wantListening=state.ambientEnabled;state.recognitionMode='ambient';}
     else{state.wantListening=false;state.recognitionMode='ambient';}
-    state.recognitionStarting=false;try{if(state.recognition)state.recognition.stop();}catch(_){try{state.recognition&&state.recognition.abort();}catch(__){ }}setMicUi(false);updateWakeBadge();if(message!==false)setVoiceStatus(state.ambientEnabled?'Escucha ambiental activa. Di «Hola Zuzu».':'Micrófono detenido.','');
+    state.recognitionSuspended=false;stopRecognitionEngine(false);
+    if(state.ambientEnabled&&state.wantListening)resumeRecognitionEngine('ambient',120);
+    if(message!==false)setVoiceStatus(state.ambientEnabled?'Escucha ambiental activa. Di «Hola Zuzu».':'Micrófono detenido.','');
   }
   function toggleListening(){
     if(state.conversationMode){endVoiceConversation('manual');return;}
@@ -889,7 +1003,9 @@
   function speakDeviceNext(){
     if(!state.speaking||state.engine!=='local'||state.paused) return;
     if(state.speechIndex>=state.speechChunks.length){
-      state.speaking=false; state.paused=false; state.currentUtterance=null; updateSpeechButtons(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok'); return;
+      state.speaking=false; state.paused=false; state.currentUtterance=null; updateSpeechButtons(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok');
+      if(state.conversationMode&&!state.requestInFlight)resumeRecognitionEngine('conversation',120);
+      return;
     }
     var spokenChunk=state.speechChunks[state.speechIndex];
     state.currentSpokenChunk=spokenChunk;
@@ -916,15 +1032,17 @@
       if(code==='canceled'||code==='interrupted') return;
       state.speaking=false; state.paused=false; state.currentUtterance=null; updateSpeechButtons();
       setVoiceStatus('La lectura se ha detenido'+(code?': '+code:'.'),'err');
+      if(state.conversationMode&&!state.requestInFlight)resumeRecognitionEngine('conversation',120);
     };
     try{ window.speechSynthesis.speak(utter); }
-    catch(err){ state.speaking=false; updateSpeechButtons(); setVoiceStatus('No se pudo iniciar la lectura: '+clean(err&&err.message||err),'err'); }
+    catch(err){ state.speaking=false; updateSpeechButtons(); setVoiceStatus('No se pudo iniciar la lectura: '+clean(err&&err.message||err),'err'); if(state.conversationMode&&!state.requestInFlight)resumeRecognitionEngine('conversation',120); }
   }
   function startDeviceSpeech(text){
     if(!supportsDeviceSpeech()){
       state.speaking=false; updateSpeechButtons(); setVoiceStatus('Este dispositivo no dispone de lectura por voz.','err'); return;
     }
     loadLocalVoices(false);
+    try{window.speechSynthesis.resume();}catch(_){}
     state.engine='local'; state.lastSpokenText=clean(text); state.speechChunks=splitSpeech(text,speechChunkLimit()); state.speechIndex=0; state.speaking=true; state.paused=false; state.stopRequested=false;
     updateSpeechButtons();
     speakDeviceNext();
@@ -958,6 +1076,47 @@
       if(state.engine==='local'&&supportsDeviceSpeech()) window.speechSynthesis.resume();
       state.paused=false; updateSpeechButtons(); setVoiceStatus('Zuzu continúa leyendo…','ok');
     }catch(_){ }
+  }
+
+  function stopEntertainment(cancelSpeech){
+    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;
+    var was=state.entertainmentSpeaking;state.entertainmentSpeaking=false;state.entertainmentUtterance=null;
+    if(cancelSpeech&&was&&supportsDeviceSpeech()){try{window.speechSynthesis.cancel();}catch(_){}}
+  }
+  function scheduleEntertainment(delay){
+    clearTimeout(state.entertainmentTimer);
+    state.entertainmentTimer=setTimeout(function(){
+      if(!state.conversationMode||!state.requestInFlight)return;
+      speakEntertainmentPhrase();
+    },Number(delay)||4000);
+  }
+  function speakEntertainmentPhrase(){
+    if(!state.conversationMode||!state.requestInFlight||!supportsDeviceSpeech())return;
+    stopEntertainment(false);
+    var now=new Date(),secondOfHour=now.getMinutes()*60+now.getSeconds(),idx=entertainmentIndex(secondOfHour,state.entertainmentCount++),phrase=ENTERTAINMENT_PHRASES[idx];
+    try{
+      var utter=new SpeechSynthesisUtterance(phrase),voice=selectedDeviceVoice();
+      utter.lang=(voice&&voice.lang)||'es-ES';utter.rate=Math.min(1,selectedRate()+0.03);utter.pitch=1;utter.volume=0.96;if(voice)utter.voice=voice;
+      state.entertainmentSpeaking=true;state.entertainmentUtterance=utter;state.lastSpokenText=phrase;state.currentSpokenChunk=phrase;
+      utter.onend=function(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);};
+      utter.onerror=function(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);};
+      try{window.speechSynthesis.resume();}catch(_){}
+      window.speechSynthesis.speak(utter);
+    }catch(_){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);}
+  }
+  function startEntertainment(){
+    stopEntertainment(true);state.entertainmentCount=0;state.lastEntertainmentIndex=-1;
+    if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4000);
+  }
+  function speakRenderedVoiceAnswer(answer,title){
+    answer=stripVoiceAnswerLead(answer);if(!answer){resumeRecognitionEngine('conversation',120);return;}
+    stopEntertainment(true);stopSpeaking(false);
+    state.lastReadSignature=clean(answer).slice(0,500);
+    var spoken=voiceBridge(state.requestPrompt,title)+' '+answer;
+    setTimeout(function(){
+      if(!state.conversationMode)return;
+      startDeviceSpeech(prepareSpeechText(spoken));
+    },35);
   }
 
   function autoReadEnabled(){
@@ -1034,10 +1193,22 @@
       state.statusObserver.observe(status,{childList:true,subtree:true,characterData:true,attributes:true});
     }
   }
-  document.addEventListener('ce:zuzu-request-started',function(){state.requestInFlight=true;});
-  document.addEventListener('ce:zuzu-request-error',function(){state.requestInFlight=false;});
-  document.addEventListener('ce:zuzu-response-rendered',function(){
-    state.requestInFlight=false;
+  document.addEventListener('ce:zuzu-request-started',function(ev){
+    state.requestInFlight=true;state.requestPrompt=clean(ev&&ev.detail&&ev.detail.prompt||'');state.requestTitle='';
+    if(state.conversationMode){
+      stopSpeaking(false);state.recognitionSuspended=true;stopRecognitionEngine(true);setVoiceStatus('Estoy buscando la respuesta…','ok');startEntertainment();
+    }
+  });
+  document.addEventListener('ce:zuzu-request-error',function(){
+    state.requestInFlight=false;stopEntertainment(true);
+    if(state.conversationMode){setVoiceStatus('No he podido completar ese turno. Te escucho.','err');resumeRecognitionEngine('conversation',140);}
+  });
+  document.addEventListener('ce:zuzu-response-rendered',function(ev){
+    state.requestInFlight=false;state.requestTitle=clean(ev&&ev.detail&&ev.detail.title||'');
+    if(state.conversationMode){
+      speakRenderedVoiceAnswer(clean(ev&&ev.detail&&ev.detail.answer||''),state.requestTitle);
+      return;
+    }
     setTimeout(function(){ try{ maybeAutoRead(); }catch(_){ } },80);
   });
 
@@ -1080,7 +1251,7 @@
     if(runButton){
       if(state.conversationMode){
         state.lastReadSignature='';
-        // En conversación oral el micro NO se cierra al enviar: así el usuario puede interrumpir a Zuzu.
+        // En conversación oral se suspende el reconocimiento durante la consulta y vuelve al terminar la locución.
       }else if(state.submitBypass){
         state.submitBypass=false;
         stopSpeaking(false);state.lastReadSignature='';setVoiceStatus('','');
@@ -1110,10 +1281,10 @@
 
   function install(){
     injectStyle();injectPanel();injectWakeBadge();
-    // FIX23: rollback real al ciclo de voz estable de FIX14.
-    // Reactivación única para neutralizar un OFF persistido por FIX20–22;
-    // después se vuelve a respetar el interruptor normal de FIX14.
-    var rollbackRearmKey='ce_zuzu_fix23_rollback14_rearmed';
+    // FIX26: rearmado único de la escucha automática. Una instalación anterior pudo dejar
+    // ambientWake=0; esta versión lo reactiva una sola vez y, después, vuelve a respetar
+    // normalmente el interruptor del usuario.
+    var rollbackRearmKey='ce_zuzu_fix26_auto_wake_rearmed';
     if(safeGet(rollbackRearmKey,'')!=='1'){
       safeSet(STORAGE.ambientWake,'1');
       safeSet(rollbackRearmKey,'1');
@@ -1126,15 +1297,21 @@
       setTimeout(function(){loadLocalVoices(true);},1200);
     }
     if(state.ambientEnabled){
-      // Los navegadores móviles bloquean el micrófono iniciado por temporizador. Se arma en el
-      // primer gesto REAL del usuario y, desde entonces, «Hola Zuzu» queda escuchando globalmente.
-      document.addEventListener('click',function ambientGestureArm(ev){
-        if(!state.ambientEnabled||state.wantListening||state.recognitionStarting)return;
+      // FIX26 restaura el transporte de FIX14 que sí llegó a abrir Zuzu por «Hola Zuzu»:
+      // intento ambiental automático y, si el navegador exige gesto, reintento con el primer
+      // gesto real. No se engancha al login ni se crean polls/observers de autenticación.
+      setTimeout(function(){if(state.ambientEnabled&&!state.wantListening&&!state.recognitionStarting)startAmbientListening(false);},500);
+      var ambientGestureArm=function(ev){
+        if(!state.ambientEnabled||state.conversationMode||state.wantListening||state.recognitionStarting||state.recognition)return;
+        if(ev&&ev.isTrusted===false)return;
         var target=ev&&ev.target;
         if(target&&target.closest&&target.closest('#ceVoz3Mic,#ceZuzuWakeBadge'))return;
-        if(ev&&ev.isTrusted===false)return;
         state.gestureArmed=true;startAmbientListening(true);
-      },true);
+      };
+      document.addEventListener('pointerdown',ambientGestureArm,true);
+      document.addEventListener('touchstart',ambientGestureArm,{capture:true,passive:true});
+      document.addEventListener('keydown',ambientGestureArm,true);
+      document.addEventListener('click',ambientGestureArm,true);
     }
     if(window.MutationObserver){
       state.modalObserver=new MutationObserver(function(){if($('ceGeminiLibreOverlay'))injectPanel();else cleanupWhenClosed();});

@@ -9549,7 +9549,7 @@ function v304EnsurePersonalOpening(answer,context={}){
   const src=trim(answer); if(!src)return src;
   // Compatibilidad con respuestas antiguas y con posibles inercias del modelo:
   // la interfaz v2.0_exp empieza directamente por el contenido útil.
-  return src.replace(/^te\s+comento\s*,\s*[^.:\n]{1,120}[.:]\s*/i,'').trim();
+  return src.replace(/^(?:te|le)\s+comento\s*,\s*[^.:\n]{1,120}[.:]\s*/i,'').replace(/^(?:respuesta|contestaci[oó]n|informe)\s+(?:de\s+)?zuzu\s*[:.\-–—]*\s*/i,'').replace(/^zuzu\s+(?:responde|contesta)\s*[:.\-–—]*\s*/i,'').trim();
 }
 
 
@@ -10016,7 +10016,7 @@ function v40HumanizeAggregateMoney(answer,userPrompt=''){
   if(/\b(?:exact[oa]|c[eé]ntimos?|decimales?|con\s+detalle|movimientos?\s+(?:uno\s+a\s+uno|detallados?))\b/.test(p))return out;
   // Cuando el usuario pide un precio/producto, ticket o movimiento concreto mantenemos céntimos.
   // En conversación ordinaria todos los importes son magnitudes y se oyen mejor en euros enteros.
-  const exactDetail=/\b(?:precio(?:s)?|unitari[oa]s?|por\s+unidad|productos?|tickets?|tk\s*\d+|movimientos?\s+concretos?|cargo\s+concreto|abono\s+concreto)\b/.test(p);
+  const exactDetail=/\b(?:precio(?:s)?|unitari[oa]s?|por\s+unidad|precio\s+(?:del?|de\s+un)\s+producto|producto\s+.{0,24}precio|tickets?|tk\s*\d+|movimientos?\s+concretos?|cargo\s+concreto|abono\s+concreto)\b/.test(p);
   if(exactDetail)return out;
   const re=/[+-]?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?)\s*€/g;
   return out.replace(re,m=>{const n=v26ParseLocalizedDisplayNumber(m);return Number.isFinite(n)?v40WholeEuro(n):m;});
@@ -10026,6 +10026,7 @@ function v40ConversationalPolish(answer,userPrompt='',voiceConversation=false){
   out=v40HumanizeAggregateMoney(out,userPrompt);
   // Incluso si el modelo deja restos Markdown, la salida hablada/escrita se presenta limpia.
   out=out.replace(/\*\*/g,'').replace(/^\s*#{1,6}\s*/gm,'').replace(/^\s*[-*•]+\s+/gm,'').replace(/`{1,3}/g,'');
+  out=out.replace(/^(?:respuesta|contestaci[oó]n|informe)\s+(?:de\s+)?zuzu\s*[:.\-–—]*\s*/i,'').replace(/^zuzu\s+(?:responde|contesta)\s*[:.\-–—]*\s*/i,'').trim();
   if(voiceConversation)out=out.replace(/\n+/g,' ').replace(/\s{2,}/g,' ').trim();
   return trim(out);
 }
@@ -10052,7 +10053,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX25 VOZ + COSTE','OK','Build 20260817-FIX25: voz rearmada por gesto, SCC interturno sin predecessor nativo, facts compactos y euros conversacionales sin céntimos.');
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX26 VOZ ESTABLE + COSTE','OK','Build 20260817-FIX26: transporte de voz restaurado desde la base funcional FIX14, espera oral humana >4 s, SCC interturno compacto y euros agregados sin céntimos.');
   zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
   const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
