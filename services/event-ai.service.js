@@ -7474,16 +7474,22 @@ function v332FlashQualityPrompt(userPrompt=''){
   return /\b(?:informe(?:s)?(?:\s+ejecutiv\w*)?|opini[oó]n|qu[eé]\s+te\s+parece|c[oó]mo\s+lo\s+ves|analiza(?:r|me|lo|la)?|an[aá]lisis|auditor[ií]a|audita|recomienda|recomendaci[oó]n|riesgos?|conclusiones?\s+estrat[eé]gicas?|exhaustiv\w*|diagn[oó]stico\s+profundo|valoraci[oó]n\s+cr[ií]tica)\b/.test(p);
 }
 function v332InteractionPolicy(userPrompt=''){
-  const tier=trim(process.env.CONTROLEVENT_ZUZU_INTERACTIONS_TIER||'lite-first').toLowerCase();
-  const liteModel=trim(process.env.CONTROLEVENT_ZUZU_LITE_MODEL||'gemini-2.5-flash-lite').replace(/^models\//,'')||'gemini-2.5-flash-lite';
-  // Los antiguos overrides de Interaction/Narrativa se conservan como candidato Flash, no como
-  // modelo principal. Así un despliegue que antes fijaba Flash no anula silenciosamente el paso
-  // solicitado a Lite-first.
+  // FIX11 · Lite-first blindado.
+  // El cambio solicitado a Lite no puede quedar anulado por variables antiguas de Vercel.
+  // CONTROLEVENT_ZUZU_INTERACTIONS_TIER=flash fue útil durante la fase Flash, pero ahora se
+  // considera configuración heredada: para volver a forzar TODO a Flash debe usarse el nuevo
+  // CONTROLEVENT_ZUZU_FORCE_FLASH=1 de forma deliberada.
+  const legacyTier=trim(process.env.CONTROLEVENT_ZUZU_INTERACTIONS_TIER||'lite-first').toLowerCase();
+  const configuredLite=trim(process.env.CONTROLEVENT_ZUZU_LITE_MODEL||'gemini-2.5-flash-lite').replace(/^models\//,'');
+  // Si una variable vieja llamada *_LITE_MODEL apunta por error a Flash normal, no aceptamos
+  // silenciosamente ese valor: la rama Lite debe ser realmente Flash-Lite.
+  const liteModel=/flash-lite/i.test(configuredLite)?configuredLite:'gemini-2.5-flash-lite';
   const flashModel=trim(process.env.CONTROLEVENT_ZUZU_FLASH_MODEL||process.env.CONTROLEVENT_ZUZU_INTERACTIONS_MODEL||process.env.CONTROLEVENT_ZUZU_NARRATIVE_MODEL||process.env.CONTROLEVENT_EVENT_AI_MODEL||'gemini-2.5-flash').replace(/^models\//,'')||'gemini-2.5-flash';
-  if(/^(flash|calidad|premium|alta)$/.test(tier))return{tier:'flash',model:flashModel,liteModel,flashModel,persistNativeThread:false,reason:'forzado por CONTROLEVENT_ZUZU_INTERACTIONS_TIER'};
-  if(/^(lite|ahorro|econ[oó]mico|barato|low)$/.test(tier))return{tier:'lite',model:liteModel,liteModel,flashModel,persistNativeThread:true,reason:'Lite forzado por CONTROLEVENT_ZUZU_INTERACTIONS_TIER'};
+  const forceFlash=/^(1|true|yes|si|sí|on)$/i.test(trim(process.env.CONTROLEVENT_ZUZU_FORCE_FLASH||''));
+  if(forceFlash)return{tier:'flash',model:flashModel,liteModel,flashModel,persistNativeThread:false,reason:'Flash forzado expresamente por CONTROLEVENT_ZUZU_FORCE_FLASH'};
+  if(/^(lite|ahorro|econ[oó]mico|barato|low)$/.test(legacyTier))return{tier:'lite',model:liteModel,liteModel,flashModel,persistNativeThread:true,reason:'Lite forzado por CONTROLEVENT_ZUZU_INTERACTIONS_TIER'};
   if(v332FlashQualityPrompt(userPrompt))return{tier:'flash',model:flashModel,liteModel,flashModel,persistNativeThread:false,reason:'petición de análisis/informe/opinión'};
-  return{tier:'lite',model:liteModel,liteModel,flashModel,persistNativeThread:true,reason:'conversación normal Lite-first'};
+  return{tier:'lite',model:liteModel,liteModel,flashModel,persistNativeThread:true,reason:/^(flash|calidad|premium|alta)$/.test(legacyTier)?'Lite-first activo; se ignora el antiguo tier global Flash':'conversación normal Lite-first'};
 }
 function v261InteractionModel(userPrompt=''){
   return v332InteractionPolicy(userPrompt).model;
