@@ -88,14 +88,14 @@ function configuredGeminiModelsForTask(task = 'zuzu-structured', opts = {}) {
   splitModels(explicitByTask[t] || '').forEach(m => pushCleanModel(out, m));
   // Decisión por funcionalidad:
   // - Planificador Zuzu: Flash-Lite primero (JSON corto y barato).
-  // - Redacción/informes: Flash primero (calidad humana).
+  // - Redacción normal: Flash-Lite primero; análisis/informes premium pueden usar Flash.
   // - Planificación inicial TOTAL: Flash primero (razonamiento + propuesta de compra compleja).
   // - Planificación inicial PARCIAL: Flash-Lite primero, con Flash de respaldo.
-  // Si solo hay GEMINI_MODEL global, se respeta antes de los fallback.
-  splitModels(globalConfigured).forEach(m => pushCleanModel(out, m));
+  // Una variable global GEMINI_MODEL no debe anular silenciosamente la política Lite-first de Zuzu;
+  // las variables específicas CONTROLEVENT_ZUZU_* sí conservan prioridad explícita.
   let fallback;
   if (t === 'zuzu-planner') {
-    fallback = ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-flash-latest', 'gemini-2.0-flash'];
+    fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
   } else if (t === 'initial-planning-partial') {
     fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
   } else if (t === 'zuzu-narrative') {
@@ -108,7 +108,16 @@ function configuredGeminiModelsForTask(task = 'zuzu-structured', opts = {}) {
   } else {
     fallback = ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-flash-latest', 'gemini-2.0-flash'];
   }
-  fallback.forEach(m => pushCleanModel(out, m));
+  // Para las tareas de Zuzu, la política del producto va antes que GEMINI_MODEL global.
+  // Así Lite-first es real incluso si Vercel conserva una variable global antigua apuntando a Flash.
+  // Un override específico por tarea, añadido arriba, sigue ganando de forma deliberada.
+  if (t.startsWith('zuzu-')) {
+    fallback.forEach(m => pushCleanModel(out, m));
+    splitModels(globalConfigured).forEach(m => pushCleanModel(out, m));
+  } else {
+    splitModels(globalConfigured).forEach(m => pushCleanModel(out, m));
+    fallback.forEach(m => pushCleanModel(out, m));
+  }
   return out;
 }
 function configuredGeminiModels() { return configuredGeminiModelsForTask('zuzu-structured'); }

@@ -79,7 +79,15 @@ function resultHasPerson(result,name){
 }
 function usageOf(result){
   const u=result?.meta?.geminiUsageEstimate||{};
-  return {calls:num(u.calls),tokens:num(u.totalTokens||u.totalTokenCount),costEur:round(u.costEurApprox,6),costUsd:round(u.costUsdApprox,6)};
+  const trace=arr(result?.meta?.debugTrace);
+  const modelCalls={};
+  for(const item of trace){
+    const model=trim(item?.model),usage=item?.usage;
+    if(!model||!usage||(!num(usage?.promptTokens)&&!num(usage?.totalTokens)))continue;
+    modelCalls[model]=(modelCalls[model]||0)+1;
+  }
+  const models=Object.keys(modelCalls);
+  return {calls:num(u.calls),tokens:num(u.totalTokens||u.totalTokenCount),costEur:round(u.costEurApprox,6),costUsd:round(u.costUsdApprox,6),models,modelCalls};
 }
 function findTable(result,keyName){ return arr(result?.tables).find(t=>trim(t?.key)===keyName) || null; }
 function toolTable(tool,keyName){ return arr(tool?.tables).find(t=>trim(t?.key)===keyName) || null; }
@@ -121,7 +129,7 @@ function restoredHistoricalCase(raw={},mode=''){
   };
   const rule=trim(raw?.validationRule);
   if(rule==='nonexistent-event') c.validate=r=>{
-    const answer=text(r?.answer),denied=/(?:no\s+(?:lo\s+)?(?:encuentro|existe|figura|consta)|no\s+se\s+(?:encuentra|localiza)|no\s+est[aá]\s+registrad[oa]|no\s+hay\s+un\s+evento|ning[uú]n\s+evento[^.]{0,100}(?:coincid|parec|registr))/i.test(answer);
+    const answer=text(r?.answer),denied=/(?:no\s+(?:he\s+|hemos\s+)?encontrad[oa]|no\s+(?:lo\s+)?(?:encuentro|existe|figura|consta)|no\s+se\s+(?:encuentra|localiza)|no\s+est[aá]\s+registrad[oa]|no\s+hay\s+un\s+evento|ning[uú]n\s+evento[^.]{0,100}(?:coincid|parec|registr))/i.test(answer);
     return denied;
   };
   else if(rule==='nondeducible-consumption') c.validate=r=>/no (?:registra|puede|se puede)|no.*deduc|no.*acredit|no.*saber|no.*determinar/i.test(text(r?.answer))||/Dato no deducible/i.test(text(r?.title));
