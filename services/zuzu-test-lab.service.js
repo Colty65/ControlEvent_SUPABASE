@@ -80,14 +80,19 @@ function resultHasPerson(result,name){
 function usageOf(result){
   const u=result?.meta?.geminiUsageEstimate||{};
   const trace=arr(result?.meta?.debugTrace);
-  const modelCalls={};
+  const modelCalls={},attemptedModels=[];let fallbackReason='';
   for(const item of trace){
     const model=trim(item?.model),usage=item?.usage;
+    if(model&&!attemptedModels.includes(model))attemptedModels.push(model);
+    if(/escalado lite/i.test(trim(item?.step))&&!fallbackReason)fallbackReason=trim(item?.detail).slice(0,300);
     if(!model||!usage||(!num(usage?.promptTokens)&&!num(usage?.totalTokens)))continue;
     modelCalls[model]=(modelCalls[model]||0)+1;
   }
+  const finalModel=trim(result?.model);
+  if(/^gemini-/i.test(finalModel)&&!attemptedModels.includes(finalModel))attemptedModels.push(finalModel);
   const models=Object.keys(modelCalls);
-  return {calls:num(u.calls),tokens:num(u.totalTokens||u.totalTokenCount),costEur:round(u.costEurApprox,6),costUsd:round(u.costUsdApprox,6),models,modelCalls};
+  if(/^gemini-/i.test(finalModel)&&!models.includes(finalModel)&&num(u.calls)>0)models.push(finalModel);
+  return {calls:num(u.calls),tokens:num(u.totalTokens||u.totalTokenCount),costEur:round(u.costEurApprox,6),costUsd:round(u.costUsdApprox,6),models,modelCalls,attemptedModels,modelTier:trim(result?.meta?.modelTier),fallbackReason};
 }
 function findTable(result,keyName){ return arr(result?.tables).find(t=>trim(t?.key)===keyName) || null; }
 function toolTable(tool,keyName){ return arr(tool?.tables).find(t=>trim(t?.key)===keyName) || null; }

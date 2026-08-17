@@ -8204,14 +8204,19 @@ async function v261CallInteraction({input,previousInteractionId='',model,systemI
     zuzuTracePush(flowTrace,'v30 · Presupuesto conversacional','WARN',`La segunda llamada necesaria puede superar el objetivo interno (${hardCap.toFixed(3)} €), pero se completa para no romper el hilo ni dejar una herramienta sin respuesta.`);
   }
   const thinkingLevel=trim(process.env.CONTROLEVENT_ZUZU_THINKING_LEVEL||'low')||'low';const maxOutput=Math.max(1200,Math.min(4800,Number(process.env.CONTROLEVENT_ZUZU_MAX_OUTPUT_TOKENS)||1600));
-  const generationConfig={thinking_level:thinkingLevel,thinking_summaries:'none',max_output_tokens:maxOutput};
+  // FIX12 · Gemini 2.5 Flash-Lite tiene pensamiento desactivado por defecto. En la ruta
+  // Interactions evitamos enviar controles de pensamiento a Lite: algunas revisiones del endpoint
+  // traducen `thinking_level=low` a un presupuesto no válido y la petición cae inmediatamente al
+  // respaldo Flash. Para Lite solo fijamos el límite de salida; Flash conserva el nivel configurado.
+  const generationConfig={max_output_tokens:maxOutput};
+  if(!/^gemini-2\.5-flash-lite(?:$|-)/i.test(trim(model))){generationConfig.thinking_level=thinkingLevel;generationConfig.thinking_summaries='none';}
   const body={model,input,system_instruction:systemInstruction,response_format:{type:'text',mime_type:'application/json',schema:v261FinalSchema()},generation_config:generationConfig,store:true};
   if(arr(tools).length){body.tools=tools;generationConfig.tool_choice=toolChoice;}
   if(trim(previousInteractionId))body.previous_interaction_id=trim(previousInteractionId);
   const url='https://generativelanguage.googleapis.com/v1/interactions';
   let res,payload;
   try{({res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_INTERACTIONS_TIMEOUT_MS||45000),externalSignal));}
-  catch(error){zuzuTracePush(flowTrace,stage,'KO',cleanGeminiError(error));throw error;}
+  catch(error){zuzuTracePush(flowTrace,stage,'KO',cleanGeminiError(error),{model});throw error;}
   const usage=v261UsageSmall(payload,model);
   if(!res.ok){const e=new Error(payload?.error?.message||`Gemini Interactions HTTP ${res.status}`);e.status=res.status;e.details=payload;zuzuTracePush(flowTrace,stage,'KO',cleanGeminiError(e),{model,usage});throw e;}
   const status=trim(payload?.status)||'completed';
