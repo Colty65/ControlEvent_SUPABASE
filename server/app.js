@@ -15,6 +15,7 @@ import eventAiRoutes from '../routes/event-ai.routes.js';
 import hitosRoutes from '../routes/hitos.routes.js';
 import bankReconciliationRoutes from '../routes/bank-reconciliation.routes.js';
 import zuzuTestsRoutes from '../routes/zuzu-tests.routes.js';
+import zuzuVoiceRoutes from '../routes/zuzu-voice.routes.js';
 import { BACKEND_NAME, NODE_MODULES_DIR, PUBLIC_DIR, ROOT } from './paths.js';
 
 export function createApp() {
@@ -75,6 +76,7 @@ export function createApp() {
   app.use('/api', hitosRoutes);
   app.use('/api', bankReconciliationRoutes);
   app.use('/api', zuzuTestsRoutes);
+  app.use('/api', zuzuVoiceRoutes);
   app.use('/api', crudRoutes);
   app.use('/api', exportRoutes);
   app.use('/api', healthRoutes);
