@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp · VOZ6 CONVERSACIÓN HUMANA 1.1
+/* ControlEvent v2.0_exp · VOZ7 CONVERSACIÓN HUMANA 1.2
    Capa de voz independiente para Zuzu.
    - Conserva el dictado de voz de VOZ1/VOZ2.
    - Lee exclusivamente con las mejores voces españolas instaladas o expuestas por cada dispositivo.
@@ -76,7 +76,9 @@
     wakeOnlyAwaiting: false,
     permissionBlocked: false,
     lastInterruptAt: 0,
-    ignoreRecognitionUntil: 0
+    ignoreRecognitionUntil: 0,
+    recognitionHoldUntil: 0,
+    lastSpeechEndedAt: 0
   };
 
   function $(id){ return document.getElementById(id); }
@@ -156,6 +158,41 @@
     if((!state.speaking&&Date.now()>Number(state.speechEchoUntil||0))||!state.lastSpokenText)return false;
     var n=wakeNorm(value);if(n.length<3)return true;
     return maxOwnVoiceSimilarity(n)>=0.46;
+  }
+  function stripOwnVoicePrefix(value){
+    var raw=clean(value),words=wakeNorm(raw).split(' ').filter(Boolean);
+    if(words.length<3)return{text:raw,stripped:false,removed:0};
+    var candidates=[];
+    if(state.lastSpokenText)candidates.push(state.lastSpokenText);
+    (state.recentSpokenChunks||[]).slice(-5).forEach(function(x){if(x)candidates.push(x);});
+    var best=0;
+    candidates.forEach(function(spoken){
+      var sw=wakeNorm(spoken).split(' ').filter(Boolean);if(sw.length<3)return;
+      for(var start=0;start<sw.length;start++){
+        var k=0;
+        while(k<words.length&&start+k<sw.length&&tokenNear(words[k],sw[start+k]))k++;
+        if(k>best)best=k;
+      }
+    });
+    // Solo descontaminamos un prefijo suficientemente claro de la propia locución.
+    // Así «¿Qué información necesitas...? Toda la que tengas» conserva «toda la que tengas».
+    if(best>=4||(best>=3&&best/words.length>=0.60)){
+      return{text:clean(words.slice(best).join(' ')),stripped:true,removed:best};
+    }
+    return{text:raw,stripped:false,removed:0};
+  }
+  function flushRecognitionAfterOwnSpeech(){
+    if(!state.conversationMode)return;
+    var now=Date.now(),hold=now+360;
+    state.lastSpeechEndedAt=now;
+    state.speechEchoUntil=Math.max(Number(state.speechEchoUntil||0),now+1800);
+    state.ignoreRecognitionUntil=Math.max(Number(state.ignoreRecognitionUntil||0),hold);
+    state.recognitionHoldUntil=Math.max(Number(state.recognitionHoldUntil||0),hold);
+    resetVoiceUtterance();state.ambientHeard='';
+    // Cortamos y rearmamos SpeechRecognition al terminar la locución. Esto descarta el resultado
+    // provisional que empezó mientras sonaban los altavoces y que Chrome podía finalizar después
+    // mezclando la voz de Zuzu con las primeras palabras del usuario.
+    try{if(state.recognition)state.recognition.abort();}catch(_){}
   }
   function interruptCommand(value){
     var n=wakeNorm(value);
@@ -441,6 +478,14 @@
     text=voiceAliasNormalize(text);if(!text)return;
     if(Date.now()<Number(state.ignoreRecognitionUntil||0))return;
 
+    // Justo después de hablar Zuzu, algunos navegadores pueden entregar un resultado que empezó
+    // durante la locución: «eco de Zuzu + respuesta del usuario». Quitamos únicamente el prefijo
+    // que coincide con la voz propia y conservamos lo que el usuario añadió.
+    if(!state.speaking&&Date.now()-Number(state.lastSpeechEndedAt||0)<1900){
+      var decontaminated=stripOwnVoicePrefix(text);
+      if(decontaminated.stripped){text=clean(decontaminated.text);if(!text)return;}
+    }
+
     // Comandos locales que NO deben convertirse en prompts de Gemini.
     if(isFinal&&isClearConversationPhrase(text)){clearConversationByVoice();return;}
     if(isFinal&&isWakeOnlyPhrase(text)&&!state.speaking){
@@ -644,13 +689,17 @@
     rec.onend = function(){
       state.recognitionStarting=false;resolveRecognitionEnd();
       if(state.wantListening&&(state.ambientEnabled||state.conversationMode||state.recognitionMode==='manual')){
-        setMicUi(true);updateWakeBadge();setTimeout(function(){if(state.wantListening)startRecognitionEngine();},260);
+        var wait=Math.max(260,Number(state.recognitionHoldUntil||0)-Date.now()+20);
+        setMicUi(true);updateWakeBadge();setTimeout(function(){if(state.wantListening)startRecognitionEngine();},wait);
       }else{setMicUi(false);updateWakeBadge();}
     };
     return rec;
   }
   function startRecognitionEngine(){
-    if(!state.wantListening||state.recognitionStarting)return;if(!state.recognition)state.recognition=buildRecognition();if(!state.recognition)return;
+    if(!state.wantListening||state.recognitionStarting)return;
+    var hold=Number(state.recognitionHoldUntil||0)-Date.now();
+    if(hold>0){setTimeout(function(){if(state.wantListening)startRecognitionEngine();},hold+20);return;}
+    if(!state.recognition)state.recognition=buildRecognition();if(!state.recognition)return;
     try{state.recognitionStarting=true;state.recognition.start();}
     catch(err){state.recognitionStarting=false;if(/already started|start/i.test(String(err&&err.message||''))){setMicUi(true);return;}setMicUi(false);updateWakeBadge();}
   }
@@ -1004,8 +1053,8 @@
   function speakDeviceNext(){
     if(!state.speaking||state.engine!=='local'||state.paused) return;
     if(state.speechIndex>=state.speechChunks.length){
-      state.speaking=false; state.paused=false; state.currentUtterance=null; state.currentSpokenChunk=''; state.speechEchoUntil=Date.now()+1000;
-      resetVoiceUtterance();updateSpeechButtons();updateWakeBadge(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok'); return;
+      state.speaking=false; state.paused=false; state.currentUtterance=null; state.currentSpokenChunk=''; state.speechEchoUntil=Date.now()+1800;
+      flushRecognitionAfterOwnSpeech();updateSpeechButtons();updateWakeBadge(); setVoiceStatus(state.conversationMode?'Te escucho. Puedes hablar cuando quieras.':'Lectura terminada.','ok'); return;
     }
     var spokenChunk=state.speechChunks[state.speechIndex];
     state.currentSpokenChunk=spokenChunk;
@@ -1030,7 +1079,7 @@
       if(state.stopRequested||!state.speaking) return;
       var code=String(ev&&ev.error||'');
       if(code==='canceled'||code==='interrupted') return;
-      state.speaking=false; state.paused=false; state.currentUtterance=null; updateSpeechButtons();updateWakeBadge();
+      state.speaking=false; state.paused=false; state.currentUtterance=null; flushRecognitionAfterOwnSpeech();updateSpeechButtons();updateWakeBadge();
       setVoiceStatus('La lectura se ha detenido'+(code?': '+code:'.'),'err');
     };
     try{ window.speechSynthesis.speak(utter); }
