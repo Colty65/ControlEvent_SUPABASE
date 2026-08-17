@@ -9302,6 +9302,55 @@ async function v330GlobalOverviewDirect({userPrompt,state,flowTrace=[],previousI
   }
 }
 
+
+// FIX14 · tres consultas escritas, estructuradas e inequívocas se resuelven directamente
+// desde la fuente canónica. Lite sigue siendo el motor general; aquí evitamos pedirle que
+// vuelva a interpretar lo que ControlEvent ya puede contar/filtrar con exactitud.
+async function v333StructuredWrittenFactShortcut({userPrompt,state,selectedEventId,conversationHistory=[],eventFocus=null,flowTrace=[],previousInteractionId=''}){
+  const p=norm(userPrompt),eventArgs=v281EventToolArgs(state,selectedEventId,userPrompt,conversationHistory,true);
+  const eventName=trim(eventFocus?.event)||trim(eventArgs?.event)||trim(v26EventById(state,selectedEventId)?.titulo);
+  const namedArgs=eventName?{event:eventName,scope:'named_event'}:eventArgs;
+
+  // TKxx concreto. Se excluye expresamente cualquier contexto bancario para no robar
+  // consultas de conciliación/justificación de movimientos al dominio Banco.
+  const requestedTicket=v281TicketToken(userPrompt);
+  const bankish=/\b(banco|bancari\w*|cuadre|concili\w*|movimientos?|saldo|reintegro|cargos?|abonos?)\b/.test(p);
+  const ticketDetail=requestedTicket&&!bankish&&/\b(hablame|dime|cuentame|detalle|informacion|ticket|tk\s*\d+|productos?|importe|total)\b/.test(p);
+  if(ticketDetail){
+    const r=await v274ToolEventPurchaseLines({id:'v333_ticket_detail',name:'event_purchase_lines',...namedArgs,ticket:requestedTicket,status:'realized',detail:'full'},state,selectedEventId);
+    const f=r?.facts||{},ticket=trim(f.ticket)||requestedTicket,event=trim(f.event)||eventName||'este evento';
+    if(num(f.purchase_line_count)>0){
+      const evidence=v314PurchaseEvidence(r);
+      zuzuTracePush(flowTrace,'v2.0_exp FIX14 · TKxx canónico','OK',`${ticket} resuelto directamente en event_purchase_lines de ${event}: ${num(f.purchase_line_count)} registros.`);
+      return v281LocalResponse({title:`${ticket} · ${event}`,answer:`${ticket} · ${event}: ${v26CountPhrase(f.purchase_line_count,'registro de compra','registros de compra')}, ${v26CountPhrase(f.product_count,'producto','productos')} y un importe total de ${v26FormatEuro(f.total_amount)}.`,results:[r],showTables:[{tool_id:r.id,table_key:'purchase_lines'}],flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'purchases',event,focus:'ticket',ticket,evidence}});
+    }
+  }
+
+  // Pregunta explícita por los PRODUCTOS comprados. Conservamos el conjunto canónico
+  // completo (incluidos sus extremos) para que el siguiente «¿cuál fue el más caro?» sea
+  // una transformación local exacta y no otra interpretación generativa.
+  const productPurchase=/\b(?:que|cuales)\b[^?\n]{0,120}\b(?:productos?|articulos?)\b[^?\n]{0,120}\bcompr\w*/.test(p)
+    || /\b(?:productos?|articulos?)\b[^?\n]{0,100}\b(?:se\s+)?compr\w*/.test(p);
+  if(productPurchase&&!bankish){
+    const r=await v274ToolEventPurchaseLines({id:'v333_products_purchased',name:'event_purchase_lines',...namedArgs,status:'realized',detail:'full'},state,selectedEventId);
+    const f=r?.facts||{},event=trim(f.event)||eventName||'este evento',evidence=v314PurchaseEvidence(r);
+    zuzuTracePush(flowTrace,'v2.0_exp FIX14 · Productos comprados canónicos','OK',`${event}: ${num(f.purchase_line_count)} registros, ${num(f.product_count)} productos, ${v26FormatEuro(f.total_amount)}. El conjunto queda guardado para seguimientos.`);
+    return v281LocalResponse({title:`Productos comprados · ${event}`,answer:`${event}: ${v26CountPhrase(f.purchase_line_count,'registro de compra','registros de compra')}, ${v26CountPhrase(f.product_count,'producto distinto','productos distintos')} y un importe total de ${v26FormatEuro(f.total_amount)}.`,results:[r],showTables:[{tool_id:r.id,table_key:'by_product'}],flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'purchases',event,focus:'products',evidence}});
+  }
+
+  // Conteo explícito de REGISTROS DE INGRESO CON JUSTIFICANTE. La cifra sale de
+  // event_documentation.income_with_receipt; nunca del total de ingresos del dossier.
+  const receiptCount=/\bcuantos?\b[^?\n]{0,140}\bregistros?\s+de\s+ingreso\b[^?\n]{0,140}\bjustificante\w*/.test(p)
+    || /\bregistros?\s+de\s+ingreso\b[^?\n]{0,140}\bjustificante\w*[^?\n]{0,80}\bcuantos?\b/.test(p);
+  if(receiptCount){
+    const r=await v26ToolEventDocumentation({id:'v333_income_receipt_count',name:'event_documentation',...namedArgs,detail:'full'},state,selectedEventId);
+    const f=r?.facts||{},event=trim(f.event)||eventName||'este evento',withReceipt=num(f.income_with_receipt),total=num(f.income_records),evidence=v326DocumentationEvidence(r);
+    zuzuTracePush(flowTrace,'v2.0_exp FIX14 · Justificantes de ingreso canónicos','OK',`${event}: ${withReceipt}/${total} registros de ingreso con justificante.`);
+    return v281LocalResponse({title:`Justificantes de ingresos · ${event}`,answer:`En ${event}, ${v26CountPhrase(withReceipt,'registro de ingreso lleva','registros de ingreso llevan')} justificante, sobre ${v26CountPhrase(total,'registro de ingreso','registros de ingreso')}.`,results:[r],showTables:[{tool_id:r.id,table_key:'income_receipts'}],flowTrace,previousInteractionId,traceDirect:false,resultContext:{domain:'documentation',event,focus:'income_receipts',evidence}});
+  }
+  return null;
+}
+
 function v330ShouldEarlyCanonicalClose(userPrompt='',results=[]){
   const p=norm(userPrompt);
   if(!arr(results).some(r=>r?.ok!==false))return false;
@@ -9363,6 +9412,10 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   if(!voiceConversation){
     const pendingPurchaseMetric=await v331DirectPendingPurchaseMetric({userPrompt,state,selectedEventId,eventFocus,conversationHistory,flowTrace,previousInteractionId:currentId});
     if(pendingPurchaseMetric)return pendingPurchaseMetric;
+  }
+  if(!voiceConversation){
+    const structuredFact=await v333StructuredWrittenFactShortcut({userPrompt,state,selectedEventId,conversationHistory,eventFocus,flowTrace,previousInteractionId:currentId});
+    if(structuredFact)return structuredFact;
   }
   // Comparación vigente y banco aíslan cualquier persona antigua. Una persona nombrada AHORA sí se conserva.
   const suppressStalePersonGrounding=(bankContext||eventFocus?.comparison)&&!explicitPersonThisTurn;
