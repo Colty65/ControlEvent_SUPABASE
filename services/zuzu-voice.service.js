@@ -1,7 +1,7 @@
 /* ControlEvent v2.0_exp · FIX34 · Voz Zuzu
    - STT CE: transcripción corta de voz con Gemini Flash-Lite.
    - TTS estándar: una única voz masculina de Zuzu generada en servidor para PC/iPhone/iPad.
-   - FIX34 v3-prep: menor latencia, cache corto y metadatos de entidades de voz para normalización aprendida.
+   - FIX34: transporte TTS estable/stream normalizado, voz masculina y metadatos de voz para normalización aprendida.
    No cambia SCC ni datos del evento. */
 
 function clean(v, max = 20000000) {
@@ -192,20 +192,24 @@ export async function transcribeZuzuVoice(body = {}) {
 function zuzuTtsPrompt(transcript = '', style = 'normal') {
   const cleanText = clean(transcript, 2600);
   const cleanStyle = clean(style || 'normal', 30).toLowerCase();
-  const direction = cleanStyle === 'entertainment'
-    ? 'Interprétalo con humor seco y discreto; no sonrías demasiado ni teatralices.'
-    : 'Interprétalo como una conversación adulta, segura, sobria y natural.';
-  return [
-    'Habla en español de España.',
-    'Eres Zuzu, un HOMBRE adulto. Voz masculina potente, barítono medio-grave, firme y con cuerpo. Debe sonar humana, segura y sobria, no juvenil, no aguda, no excesivamente simpática y sin sonrisa comercial.',
-    'Acento español de España neutro. Evita tono de locutor, caricatura, entusiasmo artificial o voz robótica.',
-    'Ritmo conversacional ligeramente ágil. No arrastres las palabras. Haz pausas breves y perceptibles entre ideas.',
-    'En listas numeradas, cada elemento es una unidad independiente: di primero su ordinal o número, pausa brevemente, di el elemento completo y vuelve a pausar antes del siguiente número.',
-    'Respeta exactamente la información del texto: no añadas, no resumas y no elimines contenido.',
-    direction,
-    'Pronuncia ahora SOLO el siguiente texto, sin explicar estas instrucciones:',
-    cleanText
-  ].join('\\n');
+  const tone = cleanStyle === 'entertainment'
+    ? 'Humor seco y discreto, sin teatralizar.'
+    : 'Conversación adulta, firme, sobria y natural.';
+  // Prompt corto a propósito: la identidad sonora se mantiene, pero no hacemos pagar latencia
+  // a cada frase con una instrucción larga y redundante.
+  return `Español de España. Voz de HOMBRE adulto, barítono medio-grave, potente y sobria; ritmo conversacional ágil, sin tono de locutor. ${tone} Lee exactamente, sin añadir ni resumir: ${cleanText}`;
+}
+
+function extractStreamAudioBase64(payload = {}) {
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    for (const part of parts) {
+      const data = clean(part?.inlineData?.data || part?.inline_data?.data || '', 24_000_000);
+      if (data) return data;
+    }
+  }
+  return '';
 }
 
 export async function streamZuzuSpeech(body = {}, req, res) {
@@ -216,17 +220,16 @@ export async function streamZuzuSpeech(body = {}, req, res) {
     throw e;
   }
   const transcript = clean(body.text || body.transcript || '', 2600);
-  if (!transcript) {
-    res.status(204).end();
-    return;
-  }
+  if (!transcript) { res.status(204).end(); return; }
   const model = ttsModel();
   const voice = ttsVoice();
   const style = clean(body.style || 'normal', 30).toLowerCase();
   const prompt = zuzuTtsPrompt(transcript, style);
-  const url = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+  // Usamos el endpoint REST de streaming TTS y normalizamos la respuesta a SSE muy simple.
+  // El navegador de CE no necesita conocer el formato interno de Gemini.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
   const controller = new AbortController();
-  const timeoutMs = Number(process.env.CONTROLEVENT_ZUZU_TTS_STREAM_TIMEOUT_MS || 18000);
+  const timeoutMs = Number(process.env.CONTROLEVENT_ZUZU_TTS_STREAM_TIMEOUT_MS || 14000);
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const abortOnClose = () => { if (!res.writableEnded) controller.abort(); };
   req?.once?.('close', abortOnClose);
@@ -234,27 +237,20 @@ export async function streamZuzuSpeech(body = {}, req, res) {
   try {
     const upstream = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-        'Api-Revision': '2026-05-20'
-      },
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
       signal: controller.signal,
       body: JSON.stringify({
-        model,
-        input: prompt,
-        response_format: { type: 'audio' },
-        generation_config: {
-          speech_config: [{ voice }]
-        },
-        stream: true
+        contents: [{ parts: [{ text: prompt }] }],
+        generationConfig: {
+          responseModalities: ['AUDIO'],
+          speechConfig: { languageCode: 'es-ES', voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
+        }
       })
     });
     if (!upstream.ok) {
       const text = clean(await upstream.text().catch(() => ''), 1200);
       const e = new Error(text || `La voz streaming de Zuzu devolvió HTTP ${upstream.status}.`);
-      e.status = 502;
-      throw e;
+      e.status = 502; throw e;
     }
     res.status(200);
     res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
@@ -267,25 +263,34 @@ export async function streamZuzuSpeech(body = {}, req, res) {
     res.flushHeaders?.();
     if (!upstream.body) throw new Error('Gemini TTS no devolvió un flujo de audio.');
     const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+    let pending = '';
+    const consume = (text, final = false) => {
+      pending += text;
+      const blocks = pending.split(/\r?\n\r?\n/);
+      if (!final) pending = blocks.pop() || ''; else pending = '';
+      for (const block of blocks) {
+        const dataText = block.split(/\r?\n/).filter(line => /^data:/.test(line)).map(line => line.replace(/^data:\s?/, '')).join('\n').trim();
+        if (!dataText || dataText === '[DONE]') continue;
+        try {
+          const audio = extractStreamAudioBase64(JSON.parse(dataText));
+          if (audio && !res.writableEnded) { res.write(`data: ${JSON.stringify({ audio })}\n\n`); res.flush?.(); }
+        } catch (_) {}
+      }
+      if (final && pending) pending = '';
+    };
     while (!res.writableEnded) {
       const { done, value } = await reader.read();
       if (done) break;
-      if (value?.length) {
-        res.write(Buffer.from(value));
-        res.flush?.();
-      }
+      if (value?.length) consume(decoder.decode(value, { stream: true }), false);
     }
+    consume(decoder.decode(), true);
     if (!res.writableEnded) res.end();
   } catch (error) {
-    if (error?.name === 'AbortError') {
-      const e = new Error('La voz streaming de Zuzu agotó el tiempo de espera.');
-      e.status = 502;
-      throw e;
-    }
+    if (error?.name === 'AbortError') { const e = new Error('La voz streaming de Zuzu agotó el tiempo de espera.'); e.status = 502; throw e; }
     throw error;
   } finally {
-    clearTimeout(timer);
-    req?.off?.('close', abortOnClose);
+    clearTimeout(timer); req?.off?.('close', abortOnClose);
   }
 }
 

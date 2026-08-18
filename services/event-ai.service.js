@@ -7564,7 +7564,7 @@ async function runZuzuV26Tools({userPrompt,state,selectedEventId,flowTrace=[],co
     zuzuTracePush(flowTrace,'V27 · Plan ControlEvent','OK',`Plan local determinista: ${plan.tools.map(t=>t.name).join(', ')}. Se evita una llamada Gemini de planificación porque la intención ya es inequívoca.`);
   }else{
     try{plan=await callGeminiV26Planner(userPrompt,state,selectedEventId,flowTrace,conversationHistory);}
-    catch(error){return{ok:true,rejected:true,title:'Zuzu no ha podido interpretar la petición',answer:friendlyZuzuErrorMessage(error),warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'v26-tools-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
+    catch(error){return{ok:true,rejected:true,title:'Zuzu no ha podido interpretar la petición',answer:friendlyZuzuErrorMessage(error),warnings:[],charts:[],tables:[],files:[],provider:'v26-tools-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
   }
   if(plan.action==='clarify')return{ok:true,rejected:false,title:'Necesito concretar una cosa',answer:plan.clarification,warnings:[],charts:[],tables:[],files:[],provider:'v26-tools-clarify',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};
 
@@ -10229,6 +10229,14 @@ function v40SccSanityRepair(plan,userPrompt='',state={},selectedEventId='',flowT
       zuzuTracePush(flowTrace,'v2.0_exp · SCC · Entidad canónica','OK',`Evento aproximado «${before}» resuelto como «${out.event}» antes de ejecutar fuentes.`);
     }
   }
+  // Una pregunta nueva y explícita sobre una PERSONA no hereda por accidente el evento anterior.
+  // Si el usuario sí dice «en este evento» o nombra el evento en el propio mensaje, se conserva el ámbito de evento.
+  const personFresh=/\b(?:info(?:rmacion)?|informacion|hablame|cuentame|dime|que\s+sabes|qué\s+sabes)\s+(?:de|sobre)\s+/i.test(p),eventBound=/\b(?:en\s+este\s+evento|de\s+este\s+evento|en\s+el\s+evento|durante\s+el\s+evento|aqui|aquí)\b/i.test(p),mentionsPlanEvent=!!(trim(out.event)&&p.includes(norm(out.event)));
+  if(domain==='person'&&personFresh&&!eventBound&&!mentionsPlanEvent){
+    const before=trim(out.event);out.scope='all_events';out.event='';out.events=[];
+    out.data_requests=out.data_requests.map(r=>{if(trim(r?.tool)!=='person_dossier')return r;const a={...(r.arguments||{}),scope:'all_events'};delete a.event;return{...r,arguments:a};});
+    if(before)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Foco personal','OK',`Consulta nueva sobre persona: no se hereda el evento «${before}» al no haber sido solicitado en este mensaje.`);
+  }
   if(donationIntent&&!purchaseIntent)out.data_requests=out.data_requests.filter(r=>trim(r?.tool)!=='event_purchase_lines');
   if(purchaseIntent&&!donationIntent)out.data_requests=out.data_requests.filter(r=>trim(r?.tool)!=='event_donation_lines');
   out.data_requests=out.data_requests.slice(0,5).map((r,i)=>({...r,index:i+1}));
@@ -10334,7 +10342,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 WAKE + LATENCIA + SCC','OK','Build 20260818-FIX34: lifecycle de voz reparado, TTS streaming, charla simple en una llamada, SCC compacto/cacheable y saneo de entidades/fuentes; se mantienen listas canónicas y contexto textual.');
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 WAKE + LATENCIA + SCC','OK','Build 20260818-FIX34: transporte híbrido iOS restaurado, TTS auto/stream corregido, Android sin duplicación de dictado, charla simple en una llamada y SCC saneado; se mantienen listas canónicas y contexto textual.');
   zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
   const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
@@ -10344,7 +10352,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   }catch(planError){
     const invalidJson=Number(planError?.status)===400&&/invalid\s+json|could\s+not\s+be\s+parsed|json\s+syntax/i.test(cleanGeminiError(planError));
     if(!invalidJson)throw planError;
-    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Reintento de plan','WARN','Gemini devolvió argumentos JSON inválidos en el plan. Se reintenta UNA sola vez con la misma petición y una instrucción explícita de JSON válido; no se arrastra la Interaction rota.');
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Reintento de plan','RETRY','Gemini devolvió argumentos JSON inválidos en el plan. Se reintenta UNA sola vez con la misma petición y una instrucción explícita de JSON válido; no se arrastra la Interaction rota.');
     const retryInput=`${initialInput}\n\nREINTENTO TÉCNICO ÚNICO: la salida anterior no pudo parsearse. Emite exactamente una llamada scc_execute_plan con argumentos JSON válidos que cumplan el schema; sin texto adicional.`;
     payload=await v261CallInteraction({input:retryInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini reintenta plan válido',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
   }
@@ -10357,7 +10365,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   plan=v40SccSanityRepair(plan,userPrompt,state,selectedEventId,flowTrace);
   const planMs=Date.now()-planStarted;
   const explicitEnumeration=v40ExplicitEnumerationRequest(userPrompt)||v40PlanEnumerationRequest(plan);
-  if(calls.length>1)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Plan duplicado','WARN',`Gemini emitió ${calls.length} llamadas scc_execute_plan. Se ejecuta una sola decisión canónica y se responden las duplicadas como ignoradas para cerrar correctamente la Interaction.`);
+  if(calls.length>1)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Plan duplicado','INFO',`Gemini emitió ${calls.length} llamadas scc_execute_plan. Se ejecuta una sola decisión canónica y se responden las duplicadas como ignoradas para cerrar correctamente la Interaction.`);
   zuzuTracePush(flowTrace,'v2.0_exp · SCC · Decisión de contexto','OK',`${plan.relation.toUpperCase()} · ámbito=${plan.scope} · evento=${plan.event||'—'} · sujetos=${plan.subjects.join(' / ')||'—'} · dominio=${plan.domain} · operación=${plan.operation} · dataset=${plan.dataset.id||'—'} · confianza=${Math.round(plan.confidence*100)}%. ${plan.reason}`);
   const toolsStarted=Date.now();
   const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace,userPrompt);
@@ -10794,7 +10802,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   zuzuTracePush(flowTrace,'V27.1.5 · Presentación','OK',`Gemini se usó para interpretación/redacción. Herramientas ejecutadas=${allResults.length}; intención gráfica=${chartIntent?'sí':'no'}.`);
   const pendingAction=v284PendingActionFromAnswer(answer);
   const turnUsage=summarizeGeminiUsageFromTrace(flowTrace),turnCost=num(turnUsage?.costEurApprox);
-  zuzuTracePush(flowTrace,'v30 · Control de coste',turnCost>0.030?'WARN':turnCost>0.015?'WARN':'OK',`Turno: ${num(turnUsage?.calls)} llamada(s), ${num(turnUsage?.totalTokens)} tokens, coste estimado ${turnCost.toFixed(6)} €. La continuidad y la finalización de herramientas tienen prioridad; normalmente máximo 2 llamadas exitosas por turno (hasta 3 solo cuando una gráfica bancaria exige una segunda ronda de herramienta).`);
+  zuzuTracePush(flowTrace,'v30 · Control de coste',turnCost>0.030?'INFO':turnCost>0.015?'INFO':'OK',`Turno: ${num(turnUsage?.calls)} llamada(s), ${num(turnUsage?.totalTokens)} tokens, coste estimado ${turnCost.toFixed(6)} €. La continuidad y la finalización de herramientas tienen prioridad; normalmente máximo 2 llamadas exitosas por turno (hasta 3 solo cuando una gráfica bancaria exige una segunda ronda de herramienta).`);
   const finalStatus=trim(payload?.status)||'completed';
   const persistNativeThread=modelPolicy.tier==='lite'&&!escalatedToFlash;
   if(!persistNativeThread)resetInteractionId=true;
@@ -10807,7 +10815,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
 
 async function runZuzuSemanticAgent({userPrompt,state,selectedEventId,flowTrace=[]}){
   let plan;
-  try{plan=await callGeminiSemanticPlanner(userPrompt,state,selectedEventId,flowTrace);}catch(error){return{ok:true,rejected:true,title:'No puedo interpretar la consulta con garantías',answer:`Gemini no ha podido construir un plan semántico fiable. ${friendlyZuzuErrorMessage(error)}`,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-semantic-agent-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
+  try{plan=await callGeminiSemanticPlanner(userPrompt,state,selectedEventId,flowTrace);}catch(error){return{ok:true,rejected:true,title:'No puedo interpretar la consulta con garantías',answer:`Gemini no ha podido construir un plan semántico fiable. ${friendlyZuzuErrorMessage(error)}`,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-semantic-agent-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
   if(plan.action==='clarify')return{ok:true,rejected:false,title:'Necesito concretar una cosa',answer:plan.clarification,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-semantic-agent-clarification',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};
   const allResults=[]; const allQueries=[]; let currentQueries=plan.queries; let roundsExecuted=0;
   for(let round=1;round<=3;round++){
@@ -11116,7 +11124,7 @@ async function v2853RunPrefetchedAnalyst({userPrompt,state,selectedEventId,conve
   }
   const result=v281LocalResponse({title,answer,results:prefetch.results,chartSpecs:specs,flowTrace,previousInteractionId:'',traceDirect:false});
   const usage=summarizeGeminiUsageFromTrace(flowTrace),cost=num(usage?.costEurApprox);
-  zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'WARN':'OK',`Turno analítico: ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €. Objetivo: 0 € para consultas estructuradas; <=0,004 € si requiere redacción/razonamiento; 0,010 € es referencia interna, nunca un bloqueo visible.`);
+  zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'INFO':'OK',`Turno analítico: ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €. Objetivo: 0 € para consultas estructuradas; <=0,004 € si requiere redacción/razonamiento; 0,010 € es referencia interna, nunca un bloqueo visible.`);
   result.provider='gemini-plain-analyst-v29';result.model=model||'fallback-control-event';
   result.meta={...(result.meta||{}),version:'v2.0_exp',architecture:'CE preconsulta hechos -> 1 Gemini texto plano -> CE presenta; fallback local si Gemini falla',geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)};
   result.debugTrace=arr(flowTrace).slice(0,120);return result;
@@ -11760,7 +11768,7 @@ async function v29DirectCompoundEventQuery({userPrompt,state,selectedEventId,con
     const f=by.dossier?.facts||{};const bits=[];if(plan.purchases)bits.push(`compras ${v26FormatEuro(f.purchases_realized||0)}`);if(plan.donations)bits.push(`donaciones ${v26FormatEuro(f.donations_value||0)}`);if(plan.incomes)bits.push(`ingresos ${v26FormatEuro(f.income_total||0)}`);if(plan.attendance)bits.push(`asistencia ${num(f.attendees_canonical||0)} personas`);answer=`${rr.nombre}: ${bits.join('; ')}. Se han materializado en una sola respuesta todas las gráficas solicitadas con datos canónicos de ControlEvent.`;
   }
   const result=v281LocalResponse({title:plan.wantsOpinion?`Análisis y gráficas · ${rr.nombre}`:`Gráficas · ${rr.nombre}`,answer,results,chartSpecs:specs,flowTrace,previousInteractionId,traceDirect:!plan.wantsOpinion});
-  if(plan.wantsOpinion){const usage=summarizeGeminiUsageFromTrace(flowTrace),cost=num(usage?.costEurApprox);zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'WARN':'OK',`Petición compuesta: datos/gráficas resueltos localmente; solo la opinión usa Gemini. ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €.`);result.provider='control-event-v29-compound+gemini';result.model=model||'fallback-control-event';result.meta={...(result.meta||{}),geminiUsageEstimate:usage,architecture:'Planificador transaccional compuesto: CE ejecuta módulos/gráficas; Gemini solo redacta la parte analítica',debugTrace:arr(flowTrace).slice(0,120)};result.debugTrace=arr(flowTrace).slice(0,120);}
+  if(plan.wantsOpinion){const usage=summarizeGeminiUsageFromTrace(flowTrace),cost=num(usage?.costEurApprox);zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'INFO':'OK',`Petición compuesta: datos/gráficas resueltos localmente; solo la opinión usa Gemini. ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €.`);result.provider='control-event-v29-compound+gemini';result.model=model||'fallback-control-event';result.meta={...(result.meta||{}),geminiUsageEstimate:usage,architecture:'Planificador transaccional compuesto: CE ejecuta módulos/gráficas; Gemini solo redacta la parte analítica',debugTrace:arr(flowTrace).slice(0,120)};result.debugTrace=arr(flowTrace).slice(0,120);}
   return result;
 }
 
@@ -12507,7 +12515,7 @@ async function v34DirectConversationResponse({userPrompt,state,flowTrace=[],conv
     const answer=trim(geminiOutText(payload))||v34PureChatFallback(userPrompt),elapsed=Date.now()-started,usage=usageSmall(payload?.usageMetadata||{},model);
     zuzuTracePush(flowTrace,'v2.0_exp · Charla directa','OK',`Turno sin datos CE: 1 llamada · ${elapsed} ms.`,{model,usage,elapsedMs:elapsed});
     return{ok:true,rejected:false,title:'',answer,warnings:[],charts:[],tables:[],files:[],provider:'gemini-direct-chat-v2-0-exp',model,interactionId:'',meta:{...baseMeta,timings:{totalMs:elapsed},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
-  }catch(error){const elapsed=Date.now()-started;zuzuTracePush(flowTrace,'v2.0_exp · Charla directa','WARN',`Respaldo local tras ${elapsed} ms: ${cleanGeminiError(error)}`);return{ok:true,rejected:false,title:'',answer:v34PureChatFallback(userPrompt),warnings:[],charts:[],tables:[],files:[],provider:'control-event-direct-chat-fallback',model:'',interactionId:'',meta:{...baseMeta,timings:{totalMs:elapsed},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};}
+  }catch(error){const elapsed=Date.now()-started;zuzuTracePush(flowTrace,'v2.0_exp · Charla directa','INFO',`Respaldo local tras ${elapsed} ms: ${cleanGeminiError(error)}`);return{ok:true,rejected:false,title:'',answer:v34PureChatFallback(userPrompt),warnings:[],charts:[],tables:[],files:[],provider:'control-event-direct-chat-fallback',model:'',interactionId:'',meta:{...baseMeta,timings:{totalMs:elapsed},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};}
 }
 
 export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, voiceEntities, voiceTranscript, clientNowIso, clientLocalDateTime, clientTimeZone, externalSignal } = {}) {
@@ -12558,7 +12566,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
     const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null;
-    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Respaldo por fallo real','WARN',`Gemini no completó el turno SCC: ${cleanGeminiError(error)}. ${currentTurnResults.length?`CE conserva ${currentTurnResults.length} fuente(s) que Gemini había pedido, pero se corta la Interaction para no dejar un contexto que Gemini no haya visto completo.`:'No llegaron a ejecutarse fuentes canónicas.'}`);
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Respaldo por fallo real',currentTurnResults.length?'INFO':'WARN',`Gemini no completó el turno SCC: ${cleanGeminiError(error)}. ${currentTurnResults.length?`CE conserva ${currentTurnResults.length} fuente(s) canónica(s) y cierra localmente el turno sin perder los datos.`:'No llegaron a ejecutarse fuentes canónicas.'}`);
     if(!currentTurnResults.length){
       // FIX34 · última red de seguridad SOLO tras fallo real del planner. Una petición inequívoca
       // de catálogo/ordenación de eventos no puede quedar inútil porque Gemini haya emitido JSON
@@ -12569,7 +12577,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
         const recovered=await v26ToolEventsCatalog({id:'scc_recovery_events',name:'events_catalog',detail:'full'},state);
         const sd=v40PromptSortDirective(userPrompt,{}),recoveryPlan={relation:'continue',reason:'Recuperación determinista tras fallo técnico del planner',confidence:1,scope:'global',event:'',events:[],subjects:[],domain:'events',operation:sd.direction!=='none'?'sort':'list',dataset:{id:'events_catalog',description:'Catálogo completo de eventos',carry_forward:true},presentation:{show_table:true,show_chart:false,table_hint:'events',sort_field:sd.field||'',sort_direction:sd.direction,limit:0},data_requests:[{tool:'events_catalog',purpose:'Recuperación canónica tras fallo de planner',arguments:{detail:'full'},index:1}]};
         const sorted=v40ApplyPhysicalPresentation(recovered,recoveryPlan.presentation,flowTrace),answer=v40CanonicalEnumerationAnswer(userPrompt,recoveryPlan,[sorted],'');
-        const fallbackFinal={title:'Eventos registrados',answer:answer||`Eventos registrados: ${num(sorted?.facts?.event_count)}.`,warnings:['Gemini no pudo construir el plan técnico; ControlEvent resolvió esta lista inequívoca directamente desde el catálogo canónico de eventos.'],showTables:[{tool_id:sorted.id,table_key:'events'}],chartSpecs:[]};
+        const fallbackFinal={title:'Eventos registrados',answer:answer||`Eventos registrados: ${num(sorted?.facts?.event_count)}.`,warnings:[],showTables:[{tool_id:sorted.id,table_key:'events'}],chartSpecs:[]};
         const presentation=v26BuildPresentation(fallbackFinal,[sorted],userPrompt,{wantsCharts:false,bankContext:false,staticPointLabels:false});
         const resultContext=v40SccResultContext(recoveryPlan,[sorted]);
         zuzuTracePush(flowTrace,'v2.0_exp · SCC · Recuperación de lista','OK','Fallo real del planner: events_catalog se ejecutó localmente y CE devolvió la lista completa/ordenada sin pedir al usuario que repita.');
@@ -12580,12 +12588,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
       const listAnswer=v40CanonicalEnumerationAnswer(userPrompt,plan||{},currentTurnResults,'');
       const localClosure=!listAnswer?v305CanonicalClosureFromResults(userPrompt,currentTurnResults,safeHistory):null;
       const fallbackAnswer=listAnswer||trim(localClosure?.answer)||'ControlEvent ha recuperado los datos canónicos de este turno, aunque Gemini no haya podido cerrar la redacción. Se muestran los datos disponibles sin inventar conclusiones.';
-      const fallbackFinal={title:trim(localClosure?.title)||'Datos canónicos del turno',answer:fallbackAnswer,warnings:['La redacción Gemini no terminó correctamente; la respuesta anterior se ha cerrado directamente con los datos canónicos ya recuperados por ControlEvent.'],showTables:voiceConversation?[]:(arr(localClosure?.showTables).length?arr(localClosure.showTables):v40DefaultShowTable(currentTurnResults,plan||{presentation:{show_table:true}})),chartSpecs:[]};
+      const fallbackFinal={title:trim(localClosure?.title)||'Datos canónicos del turno',answer:fallbackAnswer,warnings:[],showTables:voiceConversation?[]:(arr(localClosure?.showTables).length?arr(localClosure.showTables):v40DefaultShowTable(currentTurnResults,plan||{presentation:{show_table:true}})),chartSpecs:[]};
       const presentation=voiceConversation?{tables:[],charts:[],stats:{}}:v26BuildPresentation(fallbackFinal,currentTurnResults,userPrompt,{wantsCharts:false,bankContext:false,staticPointLabels:false});
       const resultContext=plan?v40SccResultContext(plan,currentTurnResults):{domain:'scc_error',scc:{relation:'reset',reason:'fallo técnico de cierre',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'scc_error',operation:'retry',dataset:{id:'',description:'',carry_forward:false},presentation:{},tools:currentTurnResults.map(r=>trim(r?.name)).filter(Boolean)}};
       return{ok:true,rejected:false,title:fallbackFinal.title,answer:fallbackFinal.answer,warnings:fallbackFinal.warnings,charts:presentation.charts||[],tables:presentation.tables||[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',architecture:'SCC 2.0 fallback: solo fuentes pedidas por Gemini en este turno; cadena nativa reiniciada por cierre incompleto',interactionId:'',resetInteractionId:true,resultContext,tools:currentTurnResults.map(r=>trim(r?.name)).filter(Boolean),geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
     }
-    return{ok:true,rejected:false,title:'',answer:'No he podido cerrar bien esta consulta. Repíteme solo esta última pregunta y mantengo el hilo anterior.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{version:'v2.0_exp',interactionId:'',resetInteractionId:true,resultContext:{domain:'general',scc:{relation:'continue',reason:'Fallo técnico del turno actual; conservar el hilo previo',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'general',operation:'retry',dataset:{},presentation:{},tools:[]}},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'',answer:'No he podido cerrar bien esta consulta. Repíteme solo esta última pregunta y mantengo el hilo anterior.',warnings:[],charts:[],tables:[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{version:'v2.0_exp',interactionId:'',resetInteractionId:true,resultContext:{domain:'general',scc:{relation:'continue',reason:'Fallo técnico del turno actual; conservar el hilo previo',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'general',operation:'retry',dataset:{},presentation:{},tools:[]}},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }
 
   /* Código histórico conservado temporalmente para Planificación y trazabilidad de versiones previas.
