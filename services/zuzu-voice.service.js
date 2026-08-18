@@ -1,6 +1,7 @@
 /* ControlEvent v2.0_exp · FIX34 · Voz Zuzu
    - STT CE: transcripción corta de voz con Gemini Flash-Lite.
-   - TTS estándar: una única voz de Zuzu generada en servidor para PC/iPhone/iPad.
+   - TTS estándar: una única voz masculina de Zuzu generada en servidor para PC/iPhone/iPad.
+   - FIX34 v3-prep: menor latencia, cache corto y metadatos de entidades de voz para normalización aprendida.
    No cambia SCC ni datos del evento. */
 
 function clean(v, max = 20000000) {
@@ -25,13 +26,13 @@ function ttsKey() {
 }
 
 function ttsModel() {
-  return clean(process.env.CONTROLEVENT_ZUZU_TTS_MODEL || 'gemini-2.5-flash-preview-tts', 120).replace(/^models\//i, '');
+  return clean(process.env.CONTROLEVENT_ZUZU_TTS_MODEL || 'gemini-3.1-flash-tts-preview', 120).replace(/^models\//i, '');
 }
 
 function ttsVoice() {
   // Voz única y estable para todos los dispositivos. Se puede sustituir por variable de entorno
   // sin tocar el cliente, pero por defecto Zuzu conserva siempre la misma identidad sonora.
-  return clean(process.env.CONTROLEVENT_ZUZU_TTS_VOICE || 'Sulafat', 80) || 'Sulafat';
+  return clean(process.env.CONTROLEVENT_ZUZU_TTS_VOICE || 'Orus', 80) || 'Orus';
 }
 
 function supportedMime(v) {
@@ -53,18 +54,36 @@ function extractAudio(payload) {
   return { data: '', mimeType: '' };
 }
 
+const TTS_CACHE_MAX = 48;
+const ttsCache = new Map();
+function ttsCacheKey(model, voice, style, transcript) { return `${model}|${voice}|${style}|${transcript}`; }
+function ttsCacheGet(key) {
+  const hit = ttsCache.get(key); if (!hit) return null;
+  ttsCache.delete(key); ttsCache.set(key, hit); return { ...hit, cached: true };
+}
+function ttsCachePut(key, value) {
+  if (!value?.audioBase64) return;
+  ttsCache.delete(key); ttsCache.set(key, value);
+  while (ttsCache.size > TTS_CACHE_MAX) ttsCache.delete(ttsCache.keys().next().value);
+}
+
 function parseTranscript(raw) {
   let text = clean(raw, 2000);
   if (!text) return { text: '', wake: false };
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   try {
     const obj = JSON.parse(text);
+    const entities = Array.isArray(obj?.entities) ? obj.entities.slice(0, 12).map(row => ({
+      type: clean(row?.type || row?.datos || 'OTROS', 20).toUpperCase(),
+      text: clean(row?.text || row?.texto || row?.raw || '', 140)
+    })).filter(row => row.text) : [];
     return {
       text: clean(obj?.text || obj?.transcript || obj?.transcription || '', 900),
-      wake: obj?.wake === true
+      wake: obj?.wake === true,
+      entities
     };
   } catch (_) {
-    return { text: clean(text.replace(/^['\"]|['\"]$/g, ''), 900), wake: false };
+    return { text: clean(text.replace(/^['\"]|['\"]$/g, ''), 900), wake: false, entities: [] };
   }
 }
 
@@ -141,8 +160,8 @@ export async function transcribeZuzuVoice(body = {}) {
   const mimeType = supportedMime(body.mimeType);
   const mode = clean(body.mode || 'user', 20).toLowerCase();
   const instruction = mode === 'ambient'
-    ? 'Transcribe exactamente el habla inteligible de este audio en español. No respondas. Además indica wake=true si el hablante está llamando claramente a Zuzu (por ejemplo Hola Zuzu, Oye Zuzu o una pronunciación/transcripción cercana del nombre). Devuelve SOLO JSON válido: {"text":"transcripción","wake":true|false}. Si no hay habla inteligible, text vacío y wake=false.'
-    : 'Transcribe exactamente la pregunta o frase hablada de este audio en español. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No respondas a la pregunta. Devuelve SOLO JSON válido con esta forma: {"text":"transcripción"}. Si no hay habla inteligible, usa texto vacío.';
+    ? 'Transcribe exactamente el habla inteligible de este audio en español. No respondas. Además indica wake=true si el hablante está llamando claramente a Zuzu (por ejemplo Hola Zuzu, Oye Zuzu o una pronunciación/transcripción cercana del nombre). Extrae, sin corregirlos, los nombres o palabros que el hablante parezca usar como EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. Devuelve SOLO JSON válido: {"text":"transcripción","wake":true|false,"entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"texto literal oído"}]}. Si no hay habla inteligible, text vacío, wake=false y entities=[].'
+    : 'Transcribe exactamente la pregunta o frase hablada de este audio en español. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No respondas a la pregunta. Extrae, sin normalizarlos, los nombres o expresiones que el hablante parezca usar como EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. Devuelve SOLO JSON válido: {"text":"transcripción","entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"texto literal oído"}]}. Si no hay habla inteligible, usa texto vacío y entities=[].';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const payload = await fetchGeminiJson(url, apiKey, {
@@ -159,6 +178,7 @@ export async function transcribeZuzuVoice(body = {}) {
     ok: true,
     text: parsed.text,
     wake: mode === 'ambient' ? !!parsed.wake : false,
+    entities: parsed.entities || [],
     model,
     usage: {
       promptTokens: Number(usage.promptTokenCount || 0),
@@ -182,13 +202,17 @@ export async function synthesizeZuzuSpeech(body = {}) {
   const model = ttsModel();
   const voice = ttsVoice();
   const style = clean(body.style || 'normal', 30).toLowerCase();
+  const cacheKey = ttsCacheKey(model, voice, style, transcript);
+  const cached = ttsCacheGet(cacheKey); if (cached) return cached;
   const direction = style === 'entertainment'
-    ? 'Interprétalo con cercanía y una pizca de humor natural, sin teatralizar.'
-    : 'Interprétalo como una conversación cercana, adulta y natural.';
+    ? 'Interprétalo con humor seco y discreto; no sonrías demasiado ni teatralices.'
+    : 'Interprétalo como una conversación adulta, segura, sobria y natural.';
   const prompt = [
     'Habla en español de España.',
-    'Eres la voz estándar de Zuzu en ControlEvent: cálida, humana, relajada y clara; nada de locutor de radio, nada robótico y sin sobreactuar.',
-    'Ritmo medio natural, con micro-pausas entre ideas. En listas numeradas, marca una pausa clara después de cada elemento para que el número pertenezca inequívocamente al elemento que sigue.',
+    'Eres Zuzu, un HOMBRE adulto. Voz masculina potente, barítono medio-grave, firme y con cuerpo. Debe sonar humana, segura y sobria, no juvenil, no aguda, no excesivamente simpática y sin sonrisa comercial.',
+    'Acento español de España neutro. Evita tono de locutor, caricatura, entusiasmo artificial o voz robótica.',
+    'Ritmo conversacional ligeramente ágil. No arrastres las palabras. Haz pausas breves y perceptibles entre ideas.',
+    'En listas numeradas, cada elemento es una unidad independiente: di primero su ordinal o número, pausa brevemente, di el elemento completo y vuelve a pausar antes del siguiente número.',
     'Respeta exactamente la información del texto: no añadas, no resumas y no elimines contenido.',
     direction,
     'Pronuncia ahora SOLO el siguiente texto, sin explicar estas instrucciones:',
@@ -209,13 +233,13 @@ export async function synthesizeZuzuSpeech(body = {}) {
 
   let payload;
   let lastError;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let attempt = 0; attempt < 1; attempt++) {
     try {
       payload = await fetchGeminiJson(
         url,
         apiKey,
         requestBody,
-        Number(process.env.CONTROLEVENT_ZUZU_TTS_TIMEOUT_MS || 22000),
+        Number(process.env.CONTROLEVENT_ZUZU_TTS_TIMEOUT_MS || 11000),
         'La síntesis de voz de Zuzu'
       );
       const audio = extractAudio(payload);
@@ -224,18 +248,21 @@ export async function synthesizeZuzuSpeech(body = {}) {
         if (!pcm.length) throw new Error('Gemini TTS devolvió audio vacío.');
         const wav = pcm16leToWav(pcm, 24000, 1);
         const usage = payload?.usageMetadata || {};
-        return {
+        const result = {
           ok: true,
           audioBase64: wav.toString('base64'),
           mimeType: 'audio/wav',
           model,
           voice,
+          cached: false,
           usage: {
             promptTokens: Number(usage.promptTokenCount || 0),
             outputTokens: Number(usage.candidatesTokenCount || 0),
             totalTokens: Number(usage.totalTokenCount || 0)
           }
         };
+        if (style === 'entertainment' || transcript.length <= 190) ttsCachePut(cacheKey, result);
+        return result;
       }
       lastError = new Error('Gemini TTS no devolvió audio.');
     } catch (error) {

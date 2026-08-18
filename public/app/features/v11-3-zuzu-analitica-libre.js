@@ -635,10 +635,11 @@
       var history=conversationHistoryForApi();
       var previousInteractionId=loadZuzuInteractionId();
       var conversationContext=loadZuzuConversationContext();
+      var voiceMeta=null;try{if(voiceConversation&&window.__ceZuzuVoiceMeta&&typeof window.__ceZuzuVoiceMeta==='object')voiceMeta=window.__ceZuzuVoiceMeta;}catch(_){}
       var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();}
       requestController=typeof AbortController!=='undefined'?new AbortController():null;
       if(requestController)requestWatchdog=setTimeout(function(){try{requestController.abort();}catch(_){}},75000);
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,voiceEntities:voiceMeta&&Array.isArray(voiceMeta.entities)?voiceMeta.entities:[],voiceTranscript:voiceMeta&&voiceMeta.transcript?String(voiceMeta.transcript):'',conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -653,6 +654,7 @@
         }
       }
       data.__prompt = prompt;
+      try{if(voiceConversation&&window.__ceZuzuVoiceMeta)window.__ceZuzuVoiceMeta=null;}catch(_){}
       data.answer=withoutGeminiLabel(ensureZuzuUserPreface(data.answer||''));
       if(data.title) data.title=withoutGeminiLabel(data.title);
       if(Array.isArray(data.warnings)) data.warnings=data.warnings.map(withoutGeminiLabel);

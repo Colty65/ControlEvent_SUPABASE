@@ -24,6 +24,112 @@ function norm(value) {
   const s = text(value);
   return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s).toLowerCase().trim();
 }
+
+
+// FIX34 v3-prep · diccionario aprendido de nombres de voz/conversación.
+// No contiene aliases hard-codeados: la tabla arranca vacía y solo aporta equivalencias aprendidas.
+const ZUZU_NORMALIZATIONS_TABLE = 'ce_zuzu_normalizaciones';
+let zuzuNormCache = { at: 0, rows: [] };
+function zuzuNormKey(value) {
+  return norm(value).replace(/[^a-z0-9ñ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function zuzuNormType(value) {
+  const t = trim(value).toUpperCase();
+  return ['EVENTOS','PERSONAS','PRODUCTOS','TIENDAS','OTROS'].includes(t) ? t : 'OTROS';
+}
+function zuzuNormalizationTypeHints(prompt='') {
+  const p = ` ${zuzuNormKey(prompt)} `, out = new Set();
+  if (/\b(evento|eventos|jornada|fiesta|funcion|función|visita|cumple)\b/.test(p)) out.add('EVENTOS');
+  if (/\b(persona|personas|socio|socios|donante|responsable|quien|quién)\b/.test(p)) out.add('PERSONAS');
+  if (/\b(producto|productos|articulo|artículo|bebida|comida|donado|comprado)\b/.test(p)) out.add('PRODUCTOS');
+  if (/\b(tienda|tiendas|comercio|supermercado|proveedor)\b/.test(p)) out.add('TIENDAS');
+  return out;
+}
+async function zuzuLoadNormalizations() {
+  const now = Date.now();
+  if (now - zuzuNormCache.at < 60000) return zuzuNormCache.rows;
+  try {
+    const db = getSupabaseAdmin();
+    const { data, error } = await db.from(ZUZU_NORMALIZATIONS_TABLE)
+      .select('id,datos,texto,texto_norm,dato_bueno,dato_id,confianza,activo')
+      .eq('activo', true).limit(1000);
+    if (error) throw error;
+    const rows = arr(data).map(r => ({...r, datos:zuzuNormType(r?.datos), texto_norm:zuzuNormKey(r?.texto_norm||r?.texto), dato_bueno:trim(r?.dato_bueno)})).filter(r=>r.texto_norm&&r.dato_bueno);
+    zuzuNormCache = { at: now, rows }; return rows;
+  } catch (_) {
+    // La versión debe seguir funcionando aunque el SQL aún no se haya ejecutado.
+    zuzuNormCache = { at: now, rows: [] }; return [];
+  }
+}
+async function zuzuApplyLearnedNormalizations(prompt='') {
+  const rows = await zuzuLoadNormalizations();
+  if (!rows.length) return { prompt:trim(prompt), applied:[] };
+  const key = ` ${zuzuNormKey(prompt)} `, hints = zuzuNormalizationTypeHints(prompt), applied = [];
+  const grouped = new Map();
+  for (const r of rows) {
+    if (!key.includes(` ${r.texto_norm} `)) continue;
+    const k = r.texto_norm;
+    if (!grouped.has(k)) grouped.set(k, []);
+    grouped.get(k).push(r);
+  }
+  for (const matches of grouped.values()) {
+    let candidates = matches;
+    if (matches.length > 1 && hints.size) {
+      const narrowed = matches.filter(r=>hints.has(r.datos)); if (narrowed.length) candidates=narrowed;
+    }
+    const targets = [...new Set(candidates.map(r=>`${r.datos}|${r.dato_bueno}`))];
+    if (targets.length !== 1) continue;
+    const r=candidates[0]; applied.push({datos:r.datos,texto:trim(r.texto),dato_bueno:r.dato_bueno});
+  }
+  if (!applied.length) return { prompt:trim(prompt), applied:[] };
+  const note = applied.map(r=>`${r.datos}: «${r.texto}» = «${r.dato_bueno}»`).join('; ');
+  return { prompt:`${trim(prompt)}\n\n[CONTROL_EVENT_NORMALIZACION_APRENDIDA: ${note}. Usa los nombres canónicos indicados para resolver herramientas; no menciones esta nota al usuario.]`, applied };
+}
+function zuzuResultEntityNames(ctx={}) {
+  const e = ctx?.entities && typeof ctx.entities==='object' ? ctx.entities : {};
+  return {
+    EVENTOS: arr(e.EVENTOS||e.eventos).map(trim).filter(Boolean),
+    PERSONAS: arr(e.PERSONAS||e.personas).map(trim).filter(Boolean),
+    PRODUCTOS: arr(e.PRODUCTOS||e.productos).map(trim).filter(Boolean),
+    TIENDAS: arr(e.TIENDAS||e.tiendas).map(trim).filter(Boolean)
+  };
+}
+async function zuzuPersistLearnedNormalization({datos,texto:raw,dato_bueno,dato_id='',confianza=1}={}) {
+  const tipo=zuzuNormType(datos), texto=trim(raw), bueno=trim(dato_bueno), key=zuzuNormKey(texto);
+  if (tipo==='OTROS'||key.length<2||!bueno||key===zuzuNormKey(bueno)) return false;
+  try {
+    const db=getSupabaseAdmin(), now=new Date().toISOString();
+    const {data:existing,error:findError}=await db.from(ZUZU_NORMALIZATIONS_TABLE).select('id,usos,dato_bueno').eq('datos',tipo).eq('texto_norm',key).maybeSingle();
+    if(findError)throw findError;
+    if(existing?.id){
+      const {error}=await db.from(ZUZU_NORMALIZATIONS_TABLE).update({texto,dato_bueno:bueno,dato_id:trim(dato_id)||null,confianza:Math.max(0,Math.min(1,Number(confianza)||1)),usos:Math.max(1,Number(existing.usos)||0)+1,activo:true,updated_at:now,last_seen_at:now}).eq('id',existing.id);if(error)throw error;
+    }else{
+      const {error}=await db.from(ZUZU_NORMALIZATIONS_TABLE).insert({datos:tipo,texto,texto_norm:key,dato_bueno:bueno,dato_id:trim(dato_id)||null,origen:'voz-aprendizaje',confianza:Math.max(0,Math.min(1,Number(confianza)||1)),usos:1,activo:true,created_at:now,updated_at:now,last_seen_at:now});if(error)throw error;
+    }
+    zuzuNormCache.at=0; return true;
+  }catch(_){return false;}
+}
+function zuzuFallbackVoiceEntity(rawPrompt='', type='', canonical='') {
+  const raw=trim(rawPrompt), can=trim(canonical); if(!raw||!can)return'';
+  if(type==='EVENTOS'){
+    const cy=(can.match(/\b(20\d{2})\b/)||[])[1];
+    if(cy){const m=raw.match(new RegExp('(?:de|del|evento|sobre)?\\s*([^,.!?]{2,70}\\b'+cy+')','i'));if(m)return trim(m[1]).replace(/^(?:de|del|evento|sobre)\s+/i,'');}
+  }
+  if(type==='PERSONAS'){
+    const m=raw.match(/(?:de|sobre|persona|socio|donante|responsable)\s+([^,.!?]{2,60})/i);if(m)return trim(m[1]);
+  }
+  return'';
+}
+async function zuzuLearnFromVoiceTurn({rawPrompt='',voiceEntities=[],resultContext={}}={}) {
+  const names=zuzuResultEntityNames(resultContext), incoming=arr(voiceEntities).map(r=>({type:zuzuNormType(r?.type||r?.datos),text:trim(r?.text||r?.texto)})).filter(r=>r.text&&r.type!=='OTROS');
+  for(const type of ['EVENTOS','PERSONAS','PRODUCTOS','TIENDAS']){
+    const canon=[...new Set(arr(names[type]).filter(Boolean))], rawForType=incoming.filter(r=>r.type===type);
+    if(canon.length===1){
+      if(rawForType.length===1) void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[0].text,dato_bueno:canon[0],confianza:1});
+      else if(!rawForType.length){const guess=zuzuFallbackVoiceEntity(rawPrompt,type,canon[0]);if(guess)void zuzuPersistLearnedNormalization({datos:type,texto:guess,dato_bueno:canon[0],confianza:.92});}
+    }else if(canon.length&&rawForType.length===canon.length){for(let i=0;i<canon.length;i++)void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[i].text,dato_bueno:canon[i],confianza:.9});}
+  }
+}
 function arr(value) { return Array.isArray(value) ? value : []; }
 function byId(rows) {
   const out = new Map();
@@ -10005,7 +10111,15 @@ async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPro
 }
 function v40SccResultContext(plan,results=[]){
   const event=trim(plan.event)||arr(results).map(r=>trim(r?.facts?.event)).find(Boolean)||'';
-  return{domain:trim(plan.domain)||'general',event,subject:plan.subjects[0]||'',subjects:plan.subjects,eventNames:plan.events,focus:trim(plan.operation),scope:plan.scope,scc:{relation:plan.relation,reason:plan.reason,confidence:plan.confidence,scope:plan.scope,event,events:plan.events,subjects:plan.subjects,domain:plan.domain,operation:plan.operation,dataset:plan.dataset,presentation:plan.presentation,tools:plan.data_requests.map(r=>r.tool)}};
+  const uniq=xs=>[...new Set(arr(xs).map(trim).filter(Boolean))];
+  const args=arr(plan?.data_requests).map(r=>r?.arguments||{}),argValues=keys=>uniq(args.flatMap(a=>keys.flatMap(k=>Array.isArray(a?.[k])?a[k]:[a?.[k]])));
+  const entities={
+    EVENTOS:uniq([event,...arr(plan.events),...argValues(['event','events'])]),
+    PERSONAS:uniq([...arr(plan.subjects),...argValues(['person','people','responsable','donor','donante'])]),
+    PRODUCTOS:argValues(['product','products','producto','productos']),
+    TIENDAS:argValues(['store','stores','tienda','tiendas'])
+  };
+  return{domain:trim(plan.domain)||'general',event,subject:plan.subjects[0]||'',subjects:plan.subjects,eventNames:plan.events,focus:trim(plan.operation),scope:plan.scope,entities,scc:{relation:plan.relation,reason:plan.reason,confidence:plan.confidence,scope:plan.scope,event,events:plan.events,subjects:plan.subjects,domain:plan.domain,operation:plan.operation,dataset:plan.dataset,presentation:plan.presentation,tools:plan.data_requests.map(r=>r.tool)}};
 }
 function v40DefaultShowTable(results=[],plan={}){
   if(!plan?.presentation?.show_table)return[];
@@ -10039,6 +10153,8 @@ function v40HumanPresentationPlan(plan,userPrompt='',voiceConversation=false){
 }
 function v40ExplicitEnumerationRequest(prompt=''){
   const p=norm(prompt);
+  // «deja/olvida/quita esta lista» es una salida de modo lista, no una nueva enumeración.
+  if(/\b(?:dejate|deja|olvida|quita|abandona|sal\s+de|no\s+quiero|no\s+me\s+des)\b[^.!?]{0,36}\b(?:lista|listado|relacion)\b/.test(p))return false;
   return /\b(?:lista|listado|relacion|relación|enumera|enumerame|enumérame|nombra|nombrame|nómbrame|uno\s+por\s+uno|dime\s+(?:todos|todas|cuales|cuáles|quienes|quiénes)|cuales\s+son|cuáles\s+son|quienes\s+son|quiénes\s+son|todos\s+los|todas\s+las)\b/.test(p);
 }
 function v40PlanEnumerationRequest(plan={}){
@@ -10081,8 +10197,12 @@ function v40StrengthenPlanCoverage(plan,userPrompt='',voiceConversation=false,fl
     const listable=new Set(['master_catalog','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','person_dossier','participation_events','people_activity','store_purchases','canonical_socios','events_catalog','events_overview']);
     out.data_requests=out.data_requests.map((r,i)=>listable.has(trim(r?.tool))?{...r,index:i+1,arguments:{...(r?.arguments||{}),detail:'full'}}:{...r,index:i+1});
     const p=norm(userPrompt),scope=['active_event','named_event'].includes(out.scope)?out.scope:(trim(out.event)?'named_event':'active_event'),ea={scope,...(trim(out.event)?{event:trim(out.event)}:{}),detail:'full'};
+    // Una lista de PRODUCTOS DONADOS no puede contaminarse con compras solo porque contenga la palabra "productos".
+    // Si el usuario habla inequívocamente de donaciones, la fuente de compras solo permanece si también la pidió explícitamente.
+    const donationOnly=/\b(?:donacion(?:es)?|donad[oa]s?|donantes?|dono|donaron|donar|donaba(?:n)?|donan?|donaste(?:is)?|donamos)\b/.test(p)&&!/\b(?:compra|compras|comprado|comprados|ticket|tickets|tk\s*\d+)\b/.test(p);
+    if(donationOnly)out={...out,data_requests:arr(out.data_requests).filter(r=>trim(r?.tool)!=='event_purchase_lines').map((r,i)=>({...r,index:i+1}))};
     if(/\b(?:document|doc\b|docs\b|justificant|fototicket|evidenc)\b/.test(p))out=v40EnsurePlanRequest(out,'event_documentation','Enumeración documental explícita solicitada por el usuario',ea);
-    else if(/\b(?:donacion|donación|donaciones|donantes?)\b/.test(p))out=v40EnsurePlanRequest(out,'event_donation_lines','Lista de donaciones/donantes solicitada explícitamente',ea);
+    else if(/\b(?:donacion|donación|donaciones|donado|donados|donada|donadas|donantes?)\b/.test(p))out=v40EnsurePlanRequest(out,'event_donation_lines','Lista de donaciones/donantes solicitada explícitamente',ea);
     else if(/\b(?:compra|compras|producto|productos|tickets?|tk\s*\d*)\b/.test(p))out=v40EnsurePlanRequest(out,'event_purchase_lines','Lista de compras/productos/tickets solicitada explícitamente',{...ea,purchase_status:'all'});
     else if(/\b(?:asistent|personas?|socios?)\b/.test(p)&&['active_event','named_event'].includes(scope))out=v40EnsurePlanRequest(out,'event_people','Lista de personas/asistencia solicitada explícitamente',ea);
     else if(/\b(?:hitos?|tareas?|\blg\b|gestion|gestión)\b/.test(p))out=v40EnsurePlanRequest(out,'event_management','Lista de gestión solicitada explícitamente',ea);
@@ -10203,7 +10323,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 LISTAS CANÓNICAS + VOZ ROBUSTA','OK','Build 20260818-FIX34: listas numeradas/ordenadas físicamente por CE, recuperación de planner inválido, contexto textual reforzado y rearmado duro de voz tras PDF/descargas.');
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 VOZ V3-PREP + NORMALIZACIÓN','OK','Build 20260818-FIX34: voz masculina estándar de baja latencia, wake robusto PC/iOS, listas orales por elemento y normalización aprendida desde ce_zuzu_normalizaciones; se mantienen listas canónicas y contexto textual.');
   zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
   const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
@@ -12346,10 +12466,11 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
 }
 
 
-export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, clientNowIso, clientLocalDateTime, clientTimeZone, externalSignal } = {}) {
+export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, voiceEntities, voiceTranscript, clientNowIso, clientLocalDateTime, clientTimeZone, externalSignal } = {}) {
   const flowTrace = [];
-  const userPrompt = trim(prompt);
-  zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
+  const rawUserPrompt = trim(prompt);
+  let userPrompt = rawUserPrompt;
+  zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${rawUserPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
   if (!userPrompt) {
     const err = new Error('Escribe una pregunta o petición para Zuzu.');
     err.status = 400;
@@ -12374,6 +12495,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }
 
   let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
+  const learnedNorm=await zuzuApplyLearnedNormalizations(rawUserPrompt);
+  userPrompt=learnedNorm.prompt;
+  if(learnedNorm.applied.length)zuzuTracePush(flowTrace,'v2.0_exp · Normalización aprendida','OK',learnedNorm.applied.map(x=>`${x.datos}: «${x.texto}» → «${x.dato_bueno}»`).join(' · '));
   const safeHistory=arr(conversationHistory).slice(-8).map(x=>({
     user:trim(x?.user).slice(0,650),assistant:trim(x?.assistant).slice(0,800),assistantTail:trim(x?.assistantTail).slice(-700),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null,resultContext:(x?.resultContext&&typeof x.resultContext==='object')?x.resultContext:null
   }));
@@ -12385,7 +12509,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
 
   zuzuTracePush(flowTrace,'v2.0_exp · ARQUITECTURA SCC 2.0','OK',`Gemini decide relación contextual + fuentes de datos; ControlEvent ejecuta esas fuentes y devuelve SIEMPRE sus resultados a la misma Interaction antes de la respuesta. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
   try{
-    return await runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(-5000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
+    const result=await runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(-5000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
+    if(voiceConversation===true){const rc=result?.meta?.resultContext||result?.resultContext||{};void zuzuLearnFromVoiceTurn({rawPrompt:trim(voiceTranscript)||rawUserPrompt,voiceEntities:arr(voiceEntities),resultContext:rc});}
+    return result;
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
     const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null;
