@@ -695,7 +695,7 @@
       renderResult(data);
       setStatus(data.rejected?'Petición rechazada por ámbito.':'', data.rejected?'err':'');
       try{
-        document.dispatchEvent(new CustomEvent('ce:zuzu-response-rendered',{detail:{turnId:turnId,voiceConversation:voiceConversation,answer:String(data.answer||''),title:String(data.title||'')}}));
+        document.dispatchEvent(new CustomEvent('ce:zuzu-response-rendered',{detail:{turnId:turnId,voiceConversation:voiceConversation,answer:String(data.answer||''),title:String(data.title||''),voiceLexicon:(data.meta&&Array.isArray(data.meta.voiceLexicon))?data.meta.voiceLexicon:[]}}));
         if(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.maybeAutoRead==='function'){
           setTimeout(function(){ try{window.ControlEventV22Voz4.maybeAutoRead();}catch(_){ } },80);
         }

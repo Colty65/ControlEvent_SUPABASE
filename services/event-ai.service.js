@@ -27,7 +27,9 @@ function norm(value) {
 
 
 // FIX34 v3-prep · diccionario aprendido de nombres de voz/conversación.
-// No contiene aliases hard-codeados: la tabla arranca vacía y solo aporta equivalencias aprendidas.
+// No contiene aliases hard-codeados. Solo se aprende una equivalencia cuando una herramienta
+// canónica de ControlEvent RESUELVE realmente la entidad; los nombres inventados por el planner
+// nunca se convierten en aprendizaje.
 const ZUZU_NORMALIZATIONS_TABLE = 'ce_zuzu_normalizaciones';
 let zuzuNormCache = { at: 0, rows: [] };
 function zuzuNormKey(value) {
@@ -45,28 +47,56 @@ function zuzuNormalizationTypeHints(prompt='') {
   if (/\b(tienda|tiendas|comercio|supermercado|proveedor)\b/.test(p)) out.add('TIENDAS');
   return out;
 }
+function zuzuCanonicalExists(state,type,value='') {
+  const key=zuzuNormKey(value); if(!key)return false;
+  const rows=type==='EVENTOS'?arr(state?.eventos):type==='PERSONAS'?arr(state?.personas):type==='PRODUCTOS'?arr(state?.productos):type==='TIENDAS'?arr(state?.tiendas):[];
+  return rows.some(r=>zuzuNormKey(type==='EVENTOS'?(r?.titulo||r?.nombre):r?.nombre)===key);
+}
+function zuzuPlausibleAlias(type,raw='',canonical='') {
+  const t=zuzuNormType(type), k=zuzuNormKey(raw), good=zuzuNormKey(canonical);
+  if(t==='OTROS'||!k||!good||k===good||k.length<2||k.length>90)return false;
+  const words=k.split(' ').filter(Boolean);
+  if(words.length>12)return false;
+  if(/^(?:este|esta|estos|estas|ese|esa|esos|esas|aquel|aquella)\s+(?:evento|persona|producto|tienda)s?$/.test(k))return false;
+  if(/^(?:evento|persona|producto|tienda|donante|socio|responsable|lista|listado|todos|todas|ninguno|ninguna)$/.test(k))return false;
+  if(/^(?:\d+(?:[.,]\d+)?)\s*(?:ml|cl|l|lt|kg|g|gr|cm|mm|uds?)$/.test(k))return false;
+  if(/\b(?:dame|dime|sacame|sácame|busca|buscalo|búscalo|ordena|ordenados?|lista|listado|productos?\s+comprados?|eventos?\s+registrados?|vez\s+en\s+cuando|navegador|respuesta|pregunta|gracias|perdona|zuzu)\b/.test(k))return false;
+  if(t==='EVENTOS'){
+    const y=(good.match(/\b20\d{2}\b/)||[])[0], ry=(k.match(/\b20\d{2}\b/)||[])[0];
+    // Para eventos con año no aprendemos un alias sin año: podría apuntar a otra edición.
+    if(y&&ry!==y)return false;
+    if(words.length>10)return false;
+  }
+  if(t==='PERSONAS'&&words.length>7)return false;
+  if(t==='TIENDAS'&&words.length>8)return false;
+  return true;
+}
 async function zuzuLoadNormalizations() {
   const now = Date.now();
   if (now - zuzuNormCache.at < 60000) return zuzuNormCache.rows;
   try {
     const db = getSupabaseAdmin();
     const { data, error } = await db.from(ZUZU_NORMALIZATIONS_TABLE)
-      .select('id,datos,texto,texto_norm,dato_bueno,dato_id,confianza,activo')
+      .select('id,datos,texto,texto_norm,dato_bueno,dato_id,texto_voz,confianza,usos,origen,activo')
       .eq('activo', true).limit(1000);
     if (error) throw error;
-    const rows = arr(data).map(r => ({...r, datos:zuzuNormType(r?.datos), texto_norm:zuzuNormKey(r?.texto_norm||r?.texto), dato_bueno:trim(r?.dato_bueno)})).filter(r=>r.texto_norm&&r.dato_bueno);
+    const rows = arr(data).map(r => ({...r, datos:zuzuNormType(r?.datos), texto_norm:zuzuNormKey(r?.texto_norm||r?.texto), dato_bueno:trim(r?.dato_bueno), texto_voz:trim(r?.texto_voz)})).filter(r=>r.texto_norm&&r.dato_bueno);
     zuzuNormCache = { at: now, rows }; return rows;
   } catch (_) {
-    // La versión debe seguir funcionando aunque el SQL aún no se haya ejecutado.
+    // La versión debe seguir funcionando aunque la migración SQL aún no se haya ejecutado.
     zuzuNormCache = { at: now, rows: [] }; return [];
   }
 }
-async function zuzuApplyLearnedNormalizations(prompt='') {
+async function zuzuApplyLearnedNormalizations(prompt='',state={}) {
   const rows = await zuzuLoadNormalizations();
   if (!rows.length) return { prompt:trim(prompt), applied:[] };
   const key = ` ${zuzuNormKey(prompt)} `, hints = zuzuNormalizationTypeHints(prompt), applied = [];
   const grouped = new Map();
   for (const r of rows) {
+    // Blindaje doble: ni los registros antiguos contaminados ni un dato_bueno inexistente
+    // pueden entrar en SCC aunque sigan activos en la tabla.
+    if(!zuzuCanonicalExists(state,r.datos,r.dato_bueno))continue;
+    if(!zuzuPlausibleAlias(r.datos,r.texto,r.dato_bueno))continue;
     if (!key.includes(` ${r.texto_norm} `)) continue;
     const k = r.texto_norm;
     if (!grouped.has(k)) grouped.set(k, []);
@@ -79,14 +109,21 @@ async function zuzuApplyLearnedNormalizations(prompt='') {
     }
     const targets = [...new Set(candidates.map(r=>`${r.datos}|${r.dato_bueno}`))];
     if (targets.length !== 1) continue;
-    const r=candidates[0]; applied.push({datos:r.datos,texto:trim(r.texto),dato_bueno:r.dato_bueno});
+    const r=candidates.slice().sort((a,b)=>num(b?.confianza)-num(a?.confianza)||num(b?.usos)-num(a?.usos))[0];
+    applied.push({datos:r.datos,texto:trim(r.texto),dato_bueno:r.dato_bueno,texto_voz:trim(r.texto_voz)});
   }
   if (!applied.length) return { prompt:trim(prompt), applied:[] };
+  let rewritten=trim(prompt);
+  for(const r of applied.slice().sort((a,b)=>b.texto.length-a.texto.length)){
+    try{rewritten=rewritten.replace(new RegExp(escapeRegexText(r.texto),'gi'),r.dato_bueno);}catch(_){}
+  }
   const note = applied.map(r=>`${r.datos}: «${r.texto}» = «${r.dato_bueno}»`).join('; ');
-  return { prompt:`${trim(prompt)}\n\n[CONTROL_EVENT_NORMALIZACION_APRENDIDA: ${note}. Usa los nombres canónicos indicados para resolver herramientas; no menciones esta nota al usuario.]`, applied };
+  return { prompt:`${rewritten}\n\n[CONTROL_EVENT_NORMALIZACION_APRENDIDA: ${note}. Usa físicamente los nombres canónicos indicados al llamar herramientas; no menciones esta nota al usuario.]`, applied };
 }
 function zuzuResultEntityNames(ctx={}) {
-  const e = ctx?.entities && typeof ctx.entities==='object' ? ctx.entities : {};
+  // APRENDIZAJE: exclusivamente entidades confirmadas por resultados de herramientas.
+  // ctx.entities puede contener conjeturas del planner y NO se usa para aprender.
+  const e = ctx?.resolvedEntities && typeof ctx.resolvedEntities==='object' ? ctx.resolvedEntities : {};
   return {
     EVENTOS: arr(e.EVENTOS||e.eventos).map(trim).filter(Boolean),
     PERSONAS: arr(e.PERSONAS||e.personas).map(trim).filter(Boolean),
@@ -94,17 +131,19 @@ function zuzuResultEntityNames(ctx={}) {
     TIENDAS: arr(e.TIENDAS||e.tiendas).map(trim).filter(Boolean)
   };
 }
-async function zuzuPersistLearnedNormalization({datos,texto:raw,dato_bueno,dato_id='',confianza=1}={}) {
+async function zuzuPersistLearnedNormalization({datos,texto:raw,dato_bueno,dato_id='',texto_voz='',confianza=1,state={}}={}) {
   const tipo=zuzuNormType(datos), texto=trim(raw), bueno=trim(dato_bueno), key=zuzuNormKey(texto);
-  if (tipo==='OTROS'||key.length<2||!bueno||key===zuzuNormKey(bueno)) return false;
+  if(!zuzuCanonicalExists(state,tipo,bueno)||!zuzuPlausibleAlias(tipo,texto,bueno)) return false;
   try {
-    const db=getSupabaseAdmin(), now=new Date().toISOString();
+    const db=getSupabaseAdmin(), now=new Date().toISOString(), spoken=trim(texto_voz)||texto;
     const {data:existing,error:findError}=await db.from(ZUZU_NORMALIZATIONS_TABLE).select('id,usos,dato_bueno').eq('datos',tipo).eq('texto_norm',key).maybeSingle();
     if(findError)throw findError;
+    const payload={texto,dato_bueno:bueno,dato_id:trim(dato_id)||null,texto_voz:spoken||null,origen:'voz-aprendizaje-v2',confianza:Math.max(0,Math.min(1,Number(confianza)||1)),activo:true,updated_at:now,last_seen_at:now};
     if(existing?.id){
-      const {error}=await db.from(ZUZU_NORMALIZATIONS_TABLE).update({texto,dato_bueno:bueno,dato_id:trim(dato_id)||null,confianza:Math.max(0,Math.min(1,Number(confianza)||1)),usos:Math.max(1,Number(existing.usos)||0)+1,activo:true,updated_at:now,last_seen_at:now}).eq('id',existing.id);if(error)throw error;
+      payload.usos=Math.max(1,Number(existing.usos)||0)+1;
+      const {error}=await db.from(ZUZU_NORMALIZATIONS_TABLE).update(payload).eq('id',existing.id);if(error)throw error;
     }else{
-      const {error}=await db.from(ZUZU_NORMALIZATIONS_TABLE).insert({datos:tipo,texto,texto_norm:key,dato_bueno:bueno,dato_id:trim(dato_id)||null,origen:'voz-aprendizaje',confianza:Math.max(0,Math.min(1,Number(confianza)||1)),usos:1,activo:true,created_at:now,updated_at:now,last_seen_at:now});if(error)throw error;
+      const {error}=await db.from(ZUZU_NORMALIZATIONS_TABLE).insert({...payload,datos:tipo,texto_norm:key,usos:1,created_at:now});if(error)throw error;
     }
     zuzuNormCache.at=0; return true;
   }catch(_){return false;}
@@ -120,15 +159,32 @@ function zuzuFallbackVoiceEntity(rawPrompt='', type='', canonical='') {
   }
   return'';
 }
-async function zuzuLearnFromVoiceTurn({rawPrompt='',voiceEntities=[],resultContext={}}={}) {
+async function zuzuLearnFromVoiceTurn({rawPrompt='',voiceEntities=[],resultContext={},state={}}={}) {
   const names=zuzuResultEntityNames(resultContext), incoming=arr(voiceEntities).map(r=>({type:zuzuNormType(r?.type||r?.datos),text:trim(r?.text||r?.texto)})).filter(r=>r.text&&r.type!=='OTROS');
+  const jobs=[];
   for(const type of ['EVENTOS','PERSONAS','PRODUCTOS','TIENDAS']){
-    const canon=[...new Set(arr(names[type]).filter(Boolean))], rawForType=incoming.filter(r=>r.type===type);
+    const canon=[...new Set(arr(names[type]).filter(Boolean))], rawForType=incoming.filter(r=>r.type===type&&zuzuPlausibleAlias(type,r.text,canon.length===1?canon[0]:''));
     if(canon.length===1){
-      if(rawForType.length===1) void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[0].text,dato_bueno:canon[0],confianza:1});
-      else if(!rawForType.length){const guess=zuzuFallbackVoiceEntity(rawPrompt,type,canon[0]);if(guess)void zuzuPersistLearnedNormalization({datos:type,texto:guess,dato_bueno:canon[0],confianza:.92});}
-    }else if(canon.length&&rawForType.length===canon.length){for(let i=0;i<canon.length;i++)void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[i].text,dato_bueno:canon[i],confianza:.9});}
+      if(rawForType.length===1) jobs.push(zuzuPersistLearnedNormalization({datos:type,texto:rawForType[0].text,dato_bueno:canon[0],texto_voz:rawForType[0].text,confianza:1,state}));
+      else if(!rawForType.length){const guess=zuzuFallbackVoiceEntity(rawPrompt,type,canon[0]);if(guess&&zuzuPlausibleAlias(type,guess,canon[0]))jobs.push(zuzuPersistLearnedNormalization({datos:type,texto:guess,dato_bueno:canon[0],texto_voz:guess,confianza:.92,state}));}
+    }else if(canon.length&&rawForType.length===canon.length){
+      for(let i=0;i<canon.length;i++)if(zuzuPlausibleAlias(type,rawForType[i].text,canon[i]))jobs.push(zuzuPersistLearnedNormalization({datos:type,texto:rawForType[i].text,dato_bueno:canon[i],texto_voz:rawForType[i].text,confianza:.9,state}));
+    }
   }
+  if(jobs.length)await Promise.allSettled(jobs);
+}
+async function zuzuVoiceLexiconForAnswer(answer='',state={}) {
+  const body=trim(answer);if(!body)return[];
+  const rows=await zuzuLoadNormalizations(),byCanonical=new Map();
+  for(const r of rows){
+    if(!trim(r.texto_voz)||!zuzuCanonicalExists(state,r.datos,r.dato_bueno))continue;
+    if(!zuzuPlausibleAlias(r.datos,r.texto,r.dato_bueno))continue;
+    const canonical=trim(r.dato_bueno), spoken=trim(r.texto_voz);
+    if(!canonical||!spoken||!norm(body).includes(norm(canonical)))continue;
+    const k=`${r.datos}|${zuzuNormKey(canonical)}`,old=byCanonical.get(k);
+    if(!old||num(r.confianza)>num(old.confianza)||(num(r.confianza)===num(old.confianza)&&num(r.usos)>num(old.usos)))byCanonical.set(k,{datos:r.datos,canonical,spoken,confianza:num(r.confianza),usos:num(r.usos)});
+  }
+  return [...byCanonical.values()].slice(0,40);
 }
 function arr(value) { return Array.isArray(value) ? value : []; }
 function byId(rows) {
@@ -10110,8 +10166,9 @@ async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPro
   return{fullResults,compactResults,errors};
 }
 function v40SccResultContext(plan,results=[]){
-  const event=trim(plan.event)||arr(results).map(r=>trim(r?.facts?.event)).find(Boolean)||'';
   const uniq=xs=>[...new Set(arr(xs).map(trim).filter(Boolean))];
+  const okResults=arr(results).filter(r=>r?.ok!==false),resolvedEvent=okResults.map(r=>trim(r?.facts?.event||r?.facts?.scope_event)).find(Boolean)||'';
+  const event=resolvedEvent||trim(plan.event)||'';
   const args=arr(plan?.data_requests).map(r=>r?.arguments||{}),argValues=keys=>uniq(args.flatMap(a=>keys.flatMap(k=>Array.isArray(a?.[k])?a[k]:[a?.[k]])));
   const entities={
     EVENTOS:uniq([event,...arr(plan.events),...argValues(['event','events'])]),
@@ -10119,7 +10176,23 @@ function v40SccResultContext(plan,results=[]){
     PRODUCTOS:argValues(['product','products','producto','productos']),
     TIENDAS:argValues(['store','stores','tienda','tiendas'])
   };
-  return{domain:trim(plan.domain)||'general',event,subject:plan.subjects[0]||'',subjects:plan.subjects,eventNames:plan.events,focus:trim(plan.operation),scope:plan.scope,entities,scc:{relation:plan.relation,reason:plan.reason,confidence:plan.confidence,scope:plan.scope,event,events:plan.events,subjects:plan.subjects,domain:plan.domain,operation:plan.operation,dataset:plan.dataset,presentation:plan.presentation,tools:plan.data_requests.map(r=>r.tool)}};
+  // FIX34 · entidades RESUELTAS: solo salen de herramientas que realmente devolvieron datos.
+  // El aprendizaje de alias usa exclusivamente esta capa; nunca las conjeturas del planner.
+  const resolvedEntities={EVENTOS:[],PERSONAS:[],PRODUCTOS:[],TIENDAS:[]};
+  for(const r of okResults){
+    const f=r?.facts||{},name=trim(r?.name);
+    if(trim(f.event))resolvedEntities.EVENTOS.push(trim(f.event));
+    if(name==='person_dossier'&&trim(f.person))resolvedEntities.PERSONAS.push(trim(f.person));
+    if(name==='store_purchases'&&trim(f.store))resolvedEntities.TIENDAS.push(trim(f.store));
+    if(name==='event_purchase_lines'&&trim(f.product))resolvedEntities.PRODUCTOS.push(trim(f.product));
+    if(name==='event_donation_lines'&&trim(f.donor)){
+      const donors=arr(r?.tables).find(t=>trim(t?.key)==='donors');
+      const names=arr(donors?.rows).map(x=>trim(x?.Donante)).filter(Boolean);
+      if(names.length===1)resolvedEntities.PERSONAS.push(names[0]);
+    }
+  }
+  for(const k of Object.keys(resolvedEntities))resolvedEntities[k]=uniq(resolvedEntities[k]);
+  return{domain:trim(plan.domain)||'general',event,subject:plan.subjects[0]||'',subjects:plan.subjects,eventNames:plan.events,focus:trim(plan.operation),scope:plan.scope,entities,resolvedEntities,resolvedFromData:okResults.length>0,scc:{relation:plan.relation,reason:plan.reason,confidence:plan.confidence,scope:plan.scope,event,events:plan.events,subjects:plan.subjects,domain:plan.domain,operation:plan.operation,dataset:plan.dataset,presentation:plan.presentation,tools:plan.data_requests.map(r=>r.tool)}};
 }
 function v40DefaultShowTable(results=[],plan={}){
   if(!plan?.presentation?.show_table)return[];
@@ -10323,7 +10396,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 VOZ V3-PREP + NORMALIZACIÓN','OK','Build 20260818-FIX34: voz masculina estándar de baja latencia, wake robusto PC/iOS, listas orales por elemento y normalización aprendida desde ce_zuzu_normalizaciones; se mantienen listas canónicas y contexto textual.');
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 VOZ V3-PREP + NORMALIZACIÓN V2','OK','Build 20260818-FIX34: voz masculina estándar, espera oral sin cortes, turnos hablados largos, wake reforzado PC/iOS y normalización aprendida solo desde entidades canónicas realmente resueltas; se mantienen listas canónicas y contexto textual.');
   zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
   const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
@@ -11068,6 +11141,27 @@ async function v2853CallPlainAnalyst({userPrompt,prefetch,conversationHistory=[]
   if(!answer)throw Object.assign(new Error('Gemini no devolvió texto utilizable.'),{status:502});
   return{answer,model};
 }
+
+async function v40PlainConversationRescue({userPrompt,conversationHistory=[],flowTrace=[]}={}){
+  const apiKey=geminiKey();if(!apiKey)return'';
+  const model=v261InteractionModel(userPrompt);
+  const recent=arr(conversationHistory).slice(-4).map(t=>({usuario:trim(t?.user).slice(0,280),zuzu:trim(t?.assistant).slice(0,420)}));
+  const instruction=`Eres Zuzu en una conversación de ControlEvent. Esta llamada es un RESCATE DE REDACCIÓN porque la salida estructurada anterior no produjo texto legible.
+Responde SOLO con el texto final, en español, natural y directo. No menciones errores técnicos, JSON, Interaction, herramientas, prompts ni arquitectura.
+Si el mensaje es saludo, agradecimiento, broma, despedida, corrección lingüística o charla general, contesta con normalidad usando el contexto reciente.
+Si el usuario pide DATOS concretos de ControlEvent y en esta llamada no recibes hechos canónicos, NO inventes datos: di de forma breve que no has podido cerrar esa consulta concreta y pídele repetir solo esa petición, manteniendo el hilo.
+No reinicies la conversación por tu cuenta.`;
+  const body={contents:[{role:'user',parts:[{text:`${instruction}\n\nCONTEXTO RECIENTE:\n${JSON.stringify(recent)}\n\nMENSAJE ACTUAL:\n${trim(userPrompt)}`}]}],generationConfig:{temperature:.22,maxOutputTokens:260,responseMimeType:'text/plain',thinkingConfig:{thinkingBudget:0}}};
+  try{
+    const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const {res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,12000);
+    if(!res.ok)return'';
+    const answer=v281StripInternalIdentifiers(trim(geminiOutText(payload)).replace(/^```(?:text)?\s*/i,'').replace(/\s*```$/,''));
+    if(answer)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Rescate conversacional','OK','La salida estructurada no produjo texto; Zuzu cerró el turno con una llamada de texto plano sin herramientas ni JSON.');
+    return answer;
+  }catch(_){return'';}
+}
+
 function v2853FallbackAnswer(prefetch){
   const byName=name=>prefetch?.results?.find(r=>r?.name===name),d=byName('event_dossier')?.facts||{},b=byName('event_bank')?.facts||{},p=byName('event_people')?.facts||{},br=byName('event_breakdowns')?.facts||{},doc=byName('event_documentation')?.facts||{};
   const event=d.event||b.event||p.event||br.event||doc.event||prefetch?.event||'este evento';
@@ -12495,7 +12589,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   }
 
   let state = attachLoggedUserFix10(stateOverride && typeof stateOverride === 'object' ? stateOverride : await getState(), { usuarioLogado, user, authUser, ce_acceso });
-  const learnedNorm=await zuzuApplyLearnedNormalizations(rawUserPrompt);
+  const learnedNorm=await zuzuApplyLearnedNormalizations(rawUserPrompt,state);
   userPrompt=learnedNorm.prompt;
   if(learnedNorm.applied.length)zuzuTracePush(flowTrace,'v2.0_exp · Normalización aprendida','OK',learnedNorm.applied.map(x=>`${x.datos}: «${x.texto}» → «${x.dato_bueno}»`).join(' · '));
   const safeHistory=arr(conversationHistory).slice(-8).map(x=>({
@@ -12510,7 +12604,13 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   zuzuTracePush(flowTrace,'v2.0_exp · ARQUITECTURA SCC 2.0','OK',`Gemini decide relación contextual + fuentes de datos; ControlEvent ejecuta esas fuentes y devuelve SIEMPRE sus resultados a la misma Interaction antes de la respuesta. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
   try{
     const result=await runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(-5000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
-    if(voiceConversation===true){const rc=result?.meta?.resultContext||result?.resultContext||{};void zuzuLearnFromVoiceTurn({rawPrompt:trim(voiceTranscript)||rawUserPrompt,voiceEntities:arr(voiceEntities),resultContext:rc});}
+    if(voiceConversation===true){
+      const rc=result?.meta?.resultContext||result?.resultContext||{};
+      await zuzuLearnFromVoiceTurn({rawPrompt:trim(voiceTranscript)||rawUserPrompt,voiceEntities:arr(voiceEntities),resultContext:rc,state});
+      const voiceLexicon=await zuzuVoiceLexiconForAnswer(result?.answer||'',state);
+      result.meta=(result.meta&&typeof result.meta==='object')?result.meta:{};
+      result.meta.voiceLexicon=voiceLexicon;
+    }
     return result;
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
@@ -12542,7 +12642,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
       const resultContext=plan?v40SccResultContext(plan,currentTurnResults):{domain:'scc_error',scc:{relation:'reset',reason:'fallo técnico de cierre',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'scc_error',operation:'retry',dataset:{id:'',description:'',carry_forward:false},presentation:{},tools:currentTurnResults.map(r=>trim(r?.name)).filter(Boolean)}};
       return{ok:true,rejected:false,title:fallbackFinal.title,answer:fallbackFinal.answer,warnings:fallbackFinal.warnings,charts:presentation.charts||[],tables:presentation.tables||[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',architecture:'SCC 2.0 fallback: solo fuentes pedidas por Gemini en este turno; cadena nativa reiniciada por cierre incompleto',interactionId:'',resetInteractionId:true,resultContext,tools:currentTurnResults.map(r=>trim(r?.name)).filter(Boolean),geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
     }
-    return{ok:true,rejected:false,title:'Zuzu no pudo completar el turno',answer:'La conversación no ha podido completar este turno. He descartado la Interaction técnica incompleta para que la siguiente pregunta empiece limpia y no arrastre un contexto defectuoso.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{version:'v2.0_exp',interactionId:'',resetInteractionId:true,resultContext:{domain:'scc_error',scc:{relation:'reset',reason:'fallo técnico antes de disponer de datos',confidence:1}},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    const rescued=await v40PlainConversationRescue({userPrompt:rawUserPrompt,conversationHistory:safeHistory,flowTrace});
+    const priorContext=arr(safeHistory).slice().reverse().map(t=>t?.resultContext).find(x=>x&&typeof x==='object')||{domain:'general',scc:{relation:'continue',reason:'rescate de redacción sin datos nuevos',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'general',operation:'answer',dataset:{id:'',description:'',carry_forward:true},presentation:{},tools:[]}};
+    const answer=rescued||'No he podido cerrar esa respuesta concreta. Repíteme esa petición y seguimos desde donde estábamos.';
+    const result={ok:true,rejected:false,title:'',answer,warnings:[],charts:[],tables:[],files:[],provider:'control-event-scc2-text-rescue',model:'',interactionId:'',meta:{version:'v2.0_exp',interactionId:'',resetInteractionId:true,resultContext:priorContext,geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    if(voiceConversation===true)result.meta.voiceLexicon=await zuzuVoiceLexiconForAnswer(answer,state);
+    return result;
   }
 
   /* Código histórico conservado temporalmente para Planificación y trazabilidad de versiones previas.

@@ -68,7 +68,7 @@ function ttsCachePut(key, value) {
 }
 
 function parseTranscript(raw) {
-  let text = clean(raw, 2000);
+  let text = clean(raw, 6500);
   if (!text) return { text: '', wake: false };
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   try {
@@ -78,12 +78,12 @@ function parseTranscript(raw) {
       text: clean(row?.text || row?.texto || row?.raw || '', 140)
     })).filter(row => row.text) : [];
     return {
-      text: clean(obj?.text || obj?.transcript || obj?.transcription || '', 900),
+      text: clean(obj?.text || obj?.transcript || obj?.transcription || '', 2800),
       wake: obj?.wake === true,
       entities
     };
   } catch (_) {
-    return { text: clean(text.replace(/^['\"]|['\"]$/g, ''), 900), wake: false, entities: [] };
+    return { text: clean(text.replace(/^['\"]|['\"]$/g, ''), 2800), wake: false, entities: [] };
   }
 }
 
@@ -160,8 +160,8 @@ export async function transcribeZuzuVoice(body = {}) {
   const mimeType = supportedMime(body.mimeType);
   const mode = clean(body.mode || 'user', 20).toLowerCase();
   const instruction = mode === 'ambient'
-    ? 'Transcribe exactamente el habla inteligible de este audio en español. No respondas. Además indica wake=true si el hablante está llamando claramente a Zuzu (por ejemplo Hola Zuzu, Oye Zuzu o una pronunciación/transcripción cercana del nombre). Extrae, sin corregirlos, los nombres o palabros que el hablante parezca usar como EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. Devuelve SOLO JSON válido: {"text":"transcripción","wake":true|false,"entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"texto literal oído"}]}. Si no hay habla inteligible, text vacío, wake=false y entities=[].'
-    : 'Transcribe exactamente la pregunta o frase hablada de este audio en español. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No respondas a la pregunta. Extrae, sin normalizarlos, los nombres o expresiones que el hablante parezca usar como EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. Devuelve SOLO JSON válido: {"text":"transcripción","entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"texto literal oído"}]}. Si no hay habla inteligible, usa texto vacío y entities=[].';
+    ? 'Transcribe exactamente TODO el habla inteligible de este audio en español. No respondas ni resumas. Además indica wake=true si el hablante está llamando claramente a Zuzu (por ejemplo Hola Zuzu, Oye Zuzu o una pronunciación/transcripción cercana del nombre). En entities extrae SOLO nombres propios o nombres de catálogo explícitamente pronunciados que parezcan EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. NO clasifiques como entidad pronombres (este evento, esa persona), unidades (1 L, 500 ml), órdenes (dame la lista, productos ordenados), fragmentos conversacionales ni frases genéricas. Si dudas, usa OTROS o no lo incluyas. Devuelve SOLO JSON válido: {"text":"transcripción completa","wake":true|false,"entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"nombre literal oído"}]}. Si no hay habla inteligible, text vacío, wake=false y entities=[].'
+    : 'Transcribe exactamente y COMPLETA la intervención hablada de este audio en español, aunque sea larga. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No respondas, no resumas y no cortes la explicación. En entities extrae SOLO nombres propios o nombres de catálogo explícitamente pronunciados que parezcan EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. NO clasifiques pronombres (este evento), unidades (1 L), órdenes (dame la lista, productos ordenados), fragmentos de conversación ni frases genéricas. Si dudas, usa OTROS o no lo incluyas. Devuelve SOLO JSON válido: {"text":"transcripción completa","entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"nombre literal oído"}]}. Si no hay habla inteligible, usa texto vacío y entities=[].';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const payload = await fetchGeminiJson(url, apiKey, {
@@ -169,8 +169,8 @@ export async function transcribeZuzuVoice(body = {}) {
       { text: instruction },
       { inlineData: { mimeType, data: audioBase64 } }
     ] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 96, responseMimeType: 'application/json' }
-  }, Number(process.env.CONTROLEVENT_ZUZU_VOICE_TIMEOUT_MS || 14000), 'La transcripción de voz');
+    generationConfig: { temperature: 0, maxOutputTokens: 768, responseMimeType: 'application/json' }
+  }, Number(process.env.CONTROLEVENT_ZUZU_VOICE_TIMEOUT_MS || 22000), 'La transcripción de voz');
 
   const parsed = parseTranscript(extractText(payload));
   const usage = payload?.usageMetadata || {};
