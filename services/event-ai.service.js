@@ -9810,7 +9810,7 @@ Datos y eficiencia:
 - Herramientas de un evento (event_dossier, event_breakdowns, event_purchase_lines, event_donation_lines, event_people, event_documentation, event_management, event_bank, event_bank_timeline, event_weather): scope=active_event o named_event. Para global usa herramientas globales.
 - person_dossier y store_purchases admiten all_events. Para una persona concreta usa person_dossier; si hay varias personas, una petición por cada persona en el mismo plan.
 - PRINCIPIO DE DESCUBRIMIENTO: el usuario no tiene que conocer el nombre exacto del dato para obtener una respuesta útil. En preguntas humanas amplias o explicativas («háblame de X», «qué fue de X», «qué sabes de X», «por qué no aparece», «qué pasó con...») pide una fuente suficientemente amplia para descubrir el contexto relevante, no solo la comprobación mínima. Para persona, prefiere person_dossier; si además pregunta por su presencia o ausencia en un evento, combina person_dossier con event_people y, cuando la condición de socio sea material, canonical_socios. Para evento, una pregunta global debe incluir event_dossier.
-- TEXTO DEL EVENTO ES DATO: event_dossier contiene el campo ce_eventos.descripcion. Léelo como contexto de primera clase —programa, comidas, actividades, condicionantes, alergias, intención organizativa, etc.— y úsalo cuando explique la respuesta; no lo ignores por no ser numérico.
+- TEXTO DEL EVENTO ES DATO DE PRIMERA CLASE: event_dossier contiene ce_eventos.descripcion. En resúmenes, valoraciones, explicaciones, balance o preguntas amplias del evento debes pedir event_dossier y usar esa Descripción junto con los números: programa, comidas, actividades, condicionantes, alergias, intención organizativa, acuerdos o cualquier texto relevante. No la relegues por no ser numérica.
 - DOCUMENTOS TAMBIÉN DAN CONTEXTO: event_documentation conserva el texto/Descripción de los DOC. Cuando el usuario pregunte de forma narrativa por qué pasó, cómo se organizó, acuerdos, incidencias, programa, antecedentes o detalles que puedan constar en documentos, pide event_documentation además de event_dossier. Para una cifra puntual no cargues documentación sin motivo.
 - Si una consulta pide EXPLICAR una ausencia, diferencia o anomalía, no te limites a confirmar sí/no cuando otra fuente canónica del mismo turno puede explicar el contexto. Pide esa fuente complementaria en el mismo plan; máximo 1-2 complementos relevantes, sin cargar módulos ajenos.
 - Si eliges event_purchase_lines y el mensaje nombra un producto/familia, informa product. En un seguimiento («cada uno», «ordénalos», «ahora el precio») conserva también el filtro de producto/familia del dataset anterior. No cargues todas las compras para contestar por Coca-Cola, cerveza u otro producto.
@@ -9822,7 +9822,7 @@ Datos y eficiencia:
 Estilo humano de respuesta:
 - La respuesta principal debe transmitir primero lo importante. Evita informes enciclopédicos en una charla normal.
 - RESPUESTA CONTUNDENTE: la primera frase debe contestar de frente. No expliques durante varias frases lo que vas a revisar ni des rodeos.
-- LISTAS PEDIDAS SON OBLIGATORIAS: si el usuario pide «lista», «listado», «dime cuáles/quiénes», «todos/todas», «enumera» o equivalente, entrega la enumeración solicitada. No la sustituyas por un resumen, aunque la conversación sea hablada. Primero la lista; después, como máximo, una observación útil.
+- LISTAS PEDIDAS SON OBLIGATORIAS: si el usuario pide «lista», «listado», «dime cuáles/quiénes», «todos/todas», «enumera», «ordénalos» o equivalente, entrega TODOS los elementos. No recortes «para visualizar mejor». ControlEvent materializará y ordenará físicamente la lista; tú no debes escoger una muestra. La lista debe ser legible y numerada, también en conversación hablada. Primero la lista; después, como máximo, una observación útil.
 - PROACTIVIDAD ÚTIL: después de contestar lo preguntado, revisa los datos canónicos devueltos y añade de forma natural 1-2 hechos SALIENTES directamente relacionados que una persona razonable necesitaría saber aunque no conozca el campo exacto que debe preguntar. Prioriza excepciones, pendientes, ausencia/presencia relevante, exenciones/ajustes, responsabilidades reales de compra, donaciones, correcciones, tareas pendientes o vínculos bancarios/documentales que cambien la interpretación. No metas curiosidades irrelevantes ni conviertas la respuesta en un informe.
 - Si un dato saliente contradice una impresión inicial o explica por qué algo «no aparece», dilo en la PRIMERA respuesta en la que ese dato ya esté disponible. No obligues al usuario a descubrir la pregunta mágica para sacarlo.
 - Si una fuente devuelve varios bloques útiles, no ocultes silenciosamente el bloque que cambia materialmente la historia del sujeto. Resume ese bloque aunque no muestres tabla.
@@ -9908,7 +9908,7 @@ function v40ApplyPhysicalPresentation(result,presentation={},flowTrace=[]){
     if(field){
       const keys=Object.keys(rows[0]||{});key=keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'')===target)||keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'').includes(target)||target.includes(norm(k).replace(/[^a-z0-9]+/g,'')))||'';
       if(key&&['asc','desc'].includes(direction)){
-        const mult=direction==='desc'?-1:1;rows.sort((a,b)=>{const av=a?.[key],bv=b?.[key],an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});sortedAny=true;
+        const mult=direction==='desc'?-1:1;rows.sort((a,b)=>{const av=a?.[key],bv=b?.[key];if(/fecha/.test(norm(key))){const ad=v40ParseDateMillis(av),bd=v40ParseDateMillis(bv);if(ad!=null&&bd!=null)return mult*(ad-bd);}const an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});sortedAny=true;
       }
     }
     // Si hay campo de orden, el límite pertenece al mismo conjunto ordenado; no recorta tablas
@@ -10030,15 +10030,38 @@ function v40ExplicitWideListRequest(prompt=''){
 function v40HumanPresentationPlan(plan,userPrompt='',voiceConversation=false){
   const explicitTable=v40ExplicitTableRequest(userPrompt),wideList=v40ExplicitWideListRequest(userPrompt);
   const presentation={...(plan?.presentation||{})};
-  if(voiceConversation)presentation.show_table=false;
+  // FIX34: una conversación oral NO debe borrar una lista que el usuario ha pedido. La voz puede
+  // leerla y la ventana debe conservar la tabla/lista completa de forma legible.
+  if(voiceConversation&&!wideList&&!explicitTable)presentation.show_table=false;
   else if(!explicitTable&&!wideList)presentation.show_table=false;
-  // Una petición expresa de tabla/lista amplia puede renderizarla, pero no convierte una pregunta corriente en volcado masivo.
   else if((explicitTable||wideList)&&presentation.show_table!==true)presentation.show_table=true;
   return{...plan,presentation};
 }
 function v40ExplicitEnumerationRequest(prompt=''){
   const p=norm(prompt);
   return /\b(?:lista|listado|relacion|relación|enumera|enumerame|enumérame|nombra|nombrame|nómbrame|uno\s+por\s+uno|dime\s+(?:todos|todas|cuales|cuáles|quienes|quiénes)|cuales\s+son|cuáles\s+son|quienes\s+son|quiénes\s+son|todos\s+los|todas\s+las)\b/.test(p);
+}
+function v40PlanEnumerationRequest(plan={}){
+  const op=norm(plan?.operation),listable=new Set(['master_catalog','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','person_dossier','participation_events','people_activity','store_purchases','canonical_socios','events_catalog','events_overview']);
+  return /^(?:list|sort|order|enumerate|ranking)$/.test(op)&&arr(plan?.data_requests).some(r=>listable.has(trim(r?.tool)));
+}
+function v40PromptSortDirective(prompt='',plan={}){
+  const p=norm(prompt),pres=plan?.presentation||{};let field=trim(pres.sort_field),direction=trim(pres.sort_direction);
+  if(/(?:mas|más)\s+(?:viejo|antiguo)[^\n]{0,70}(?:mas|más)\s+(?:joven|nuevo|reciente)/.test(p)){field=field||'Fecha inicio';direction='asc';}
+  else if(/(?:mas|más)\s+(?:joven|nuevo|reciente)[^\n]{0,70}(?:mas|más)\s+(?:viejo|antiguo)/.test(p)){field=field||'Fecha inicio';direction='desc';}
+  else if(/\b(?:ascendente|de\s+menor\s+a\s+mayor)\b/.test(p)&&direction==='none')direction='asc';
+  else if(/\b(?:descendente|de\s+mayor\s+a\s+menor)\b/.test(p)&&direction==='none')direction='desc';
+  return{field,direction:['asc','desc'].includes(direction)?direction:'none'};
+}
+function v40ParseDateMillis(value){
+  const raw=trim(value);if(!raw)return null;
+  let m=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3]));
+  m=raw.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})/);if(m)return Date.UTC(Number(m[3]),Number(m[2])-1,Number(m[1]));
+  const t=Date.parse(raw);return Number.isFinite(t)?t:null;
+}
+function v40FormatListDate(value){
+  const t=v40ParseDateMillis(value);if(t==null)return trim(value);
+  const d=new Date(t),dd=String(d.getUTCDate()).padStart(2,'0'),mm=String(d.getUTCMonth()+1).padStart(2,'0');return `${dd}/${mm}/${d.getUTCFullYear()}`;
 }
 function v40NarrativeEventContextRequest(prompt='',plan={}){
   const p=norm(prompt),d=norm(plan?.domain);
@@ -10053,7 +10076,7 @@ function v40EnsurePlanRequest(plan,tool,purpose,args={}){
 }
 function v40StrengthenPlanCoverage(plan,userPrompt='',voiceConversation=false,flowTrace=[]){
   let out={...plan,data_requests:arr(plan?.data_requests).map((r,i)=>({...r,index:i+1,arguments:{...(r?.arguments||{})}}))};
-  const explicit=v40ExplicitEnumerationRequest(userPrompt);
+  const explicit=v40ExplicitEnumerationRequest(userPrompt)||v40PlanEnumerationRequest(out);
   if(explicit){
     const listable=new Set(['master_catalog','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','person_dossier','participation_events','people_activity','store_purchases','canonical_socios','events_catalog','events_overview']);
     out.data_requests=out.data_requests.map((r,i)=>listable.has(trim(r?.tool))?{...r,index:i+1,arguments:{...(r?.arguments||{}),detail:'full'}}:{...r,index:i+1});
@@ -10064,7 +10087,8 @@ function v40StrengthenPlanCoverage(plan,userPrompt='',voiceConversation=false,fl
     else if(/\b(?:asistent|personas?|socios?)\b/.test(p)&&['active_event','named_event'].includes(scope))out=v40EnsurePlanRequest(out,'event_people','Lista de personas/asistencia solicitada explícitamente',ea);
     else if(/\b(?:hitos?|tareas?|\blg\b|gestion|gestión)\b/.test(p))out=v40EnsurePlanRequest(out,'event_management','Lista de gestión solicitada explícitamente',ea);
     else if(/\b(?:movimientos?|cuadre|banc)\b/.test(p))out=v40EnsurePlanRequest(out,'event_bank','Lista bancaria solicitada explícitamente',ea);
-    out={...out,operation:'list',presentation:{...(out.presentation||{}),show_table:voiceConversation?false:(out.presentation?.show_table===true),show_chart:false}};
+    const sd=v40PromptSortDirective(userPrompt,out);
+    out={...out,operation:/^(?:sort|order)$/.test(norm(out.operation))?'sort':'list',presentation:{...(out.presentation||{}),show_table:true,show_chart:false,...(sd.field?{sort_field:sd.field}:{}),...(sd.direction!=='none'?{sort_direction:sd.direction}:{})}};
     zuzuTracePush(flowTrace,'v2.0_exp · SCC · Cobertura de lista','OK','La petición contiene una enumeración explícita: CE fuerza detalle completo en las fuentes listables y la lista prevalece sobre la brevedad oral.');
   }
   if(v40NarrativeEventContextRequest(userPrompt,out)&&(['active_event','named_event'].includes(out.scope||'')||!!trim(out.event))){
@@ -10072,6 +10096,12 @@ function v40StrengthenPlanCoverage(plan,userPrompt='',voiceConversation=false,fl
     out=v40EnsurePlanRequest(out,'event_dossier','Contexto narrativo del evento, incluyendo ce_eventos.descripcion',ea);
     out=v40EnsurePlanRequest(out,'event_documentation','Contexto textual de los documentos DOC del evento',ea);
     zuzuTracePush(flowTrace,'v2.0_exp · SCC · Contexto textual','OK','Pregunta narrativa de evento: se garantiza ce_eventos.descripcion y el texto de Documentos como fuentes contextuales, además de las cifras que haya pedido Gemini.');
+  }
+  const interpretiveEvent=/\b(?:resumen|resume|valoracion|valoración|opina|opinion|opinión|analiza|balance|como\s+va|cómo\s+va|como\s+salio|cómo\s+salió|como\s+fue|cómo\s+fue|explica|conclusi|situacion|situación|estado\s+general)\b/.test(norm(userPrompt));
+  if(interpretiveEvent&&(['active_event','named_event'].includes(out.scope||'')||!!trim(out.event))){
+    const scope=['active_event','named_event'].includes(out.scope)?out.scope:'named_event',ea={scope,...(trim(out.event)?{event:trim(out.event)}:{}),detail:'standard'};
+    out=v40EnsurePlanRequest(out,'event_dossier','Contexto interpretativo del evento, incluyendo ce_eventos.descripcion',ea);
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Descripción de evento','OK','Consulta interpretativa: ce_eventos.descripcion se incorpora como dato de contexto de primera clase, junto a las cifras pedidas.');
   }
   out.data_requests=arr(out.data_requests).slice(0,6).map((r,i)=>({...r,index:i+1}));
   return out;
@@ -10103,21 +10133,28 @@ function v40EnumerationTableScore(prompt='',toolName='',table={}){
   return score;
 }
 function v40CanonicalEnumerationAnswer(userPrompt='',plan={},results=[],existingAnswer=''){
-  if(!v40ExplicitEnumerationRequest(userPrompt))return'';
+  const explicit=v40ExplicitEnumerationRequest(userPrompt)||v40PlanEnumerationRequest(plan);if(!explicit)return'';
   const candidates=[];for(const r of arr(results)){for(const t of arr(r?.tables)){if(arr(t?.rows).length)candidates.push({r,t,score:v40EnumerationTableScore(userPrompt,trim(r?.name),t)});}}
-  if(!candidates.length)return'';candidates.sort((a,b)=>b.score-a.score||arr(b.t?.rows).length-arr(a.t?.rows).length);const best=candidates[0],rows=arr(best.t?.rows);if(!rows.length)return'';
+  if(!candidates.length)return'';candidates.sort((a,b)=>b.score-a.score||arr(b.t?.rows).length-arr(a.t?.rows).length);const best=candidates[0];let rows=arr(best.t?.rows).map(r=>({...r}));if(!rows.length)return'';
   const p=norm(userPrompt),primary=v40ListPrimaryColumn(userPrompt,rows[0]);if(!primary)return'';
-  const wantPrice=/\b(?:precio|unitari)\b/.test(p),wantAmount=/\b(?:importe|valor|total|gasto|coste|costo)\b/.test(p),wantUnits=/\b(?:unidades?|cantidad)\b/.test(p),wantDate=/\bfecha\b/.test(p),wantResponsible=/\bresponsab/.test(p),wantStore=/\btienda/.test(p),isDoc=/document/.test(norm(best.t?.key+' '+best.t?.title));
-  const keys=Object.keys(rows[0]||{}),find=(re)=>keys.find(k=>re.test(norm(k))),extras=[];
+  const keys=Object.keys(rows[0]||{}),find=(re)=>keys.find(k=>re.test(norm(k))),sort=v40PromptSortDirective(userPrompt,plan);let sortKey='';
+  if(sort.field){const target=norm(sort.field).replace(/[^a-z0-9]+/g,'');sortKey=keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'')===target)||keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'').includes(target)||target.includes(norm(k).replace(/[^a-z0-9]+/g,'')))||'';}
+  const isEvents=trim(best.r?.name)==='events_catalog'||/\beventos?\b/.test(p);if(!sortKey&&isEvents&&sort.direction!=='none')sortKey=find(/^fecha\s+inicio$|fecha.*inicio/);
+  if(sortKey&&['asc','desc'].includes(sort.direction)){
+    const mult=sort.direction==='desc'?-1:1;rows.sort((a,b)=>{let av=a?.[sortKey],bv=b?.[sortKey];if(/fecha/.test(norm(sortKey))){const ad=v40ParseDateMillis(av),bd=v40ParseDateMillis(bv);if(ad!=null&&bd!=null)return mult*(ad-bd);}const an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});
+  }
+  const wantPrice=/\b(?:precio|unitari)\b/.test(p),wantAmount=/\b(?:importe|valor|total|gasto|coste|costo)\b/.test(p),wantUnits=/\b(?:unidades?|cantidad)\b/.test(p),wantDate=/\bfecha\b/.test(p)||!!sortKey,wantResponsible=/\bresponsab/.test(p),wantStore=/\btienda/.test(p),isDoc=/document/.test(norm(best.t?.key+' '+best.t?.title)),extras=[];
   const addExtra=(re)=>{const k=find(re);if(k&&k!==primary&&!extras.includes(k))extras.push(k);};
+  if(isEvents){addExtra(/^fecha\s+inicio$|fecha.*inicio/);if(/\bestado\b|\ben\s+curso\b|\bfinaliz/.test(p))addExtra(/^estado$|situacion/);}
   if(isDoc){addExtra(/descripci[oó]n|texto/);addExtra(/^fecha$/);}
   if(/\bcompras?\b/.test(p)){addExtra(/^producto$|producto/);addExtra(/^(?:tkxx|ticket)$|ticket/);addExtra(/importe|valor|total/);addExtra(/tienda/);}
   if(/\bdonaciones?\b/.test(p)){addExtra(/^donante$|donante/);addExtra(/^producto$|producto/);addExtra(/unidades|cantidad/);addExtra(/importe|valor|total/);}
   if(/\bmovimientos?\b/.test(p)){addExtra(/importe|impacto/);addExtra(/fecha|momento/);}
-  if(wantPrice)addExtra(/precio.*unit|precio/);if(wantAmount)addExtra(/importe|valor|total/);if(wantUnits)addExtra(/unidades|cantidad/);if(wantDate)addExtra(/^fecha|momento/);if(wantResponsible)addExtra(/responsable/);if(wantStore)addExtra(/tienda/);
-  const lines=[],seen=new Set();for(const row of rows){const base=trim(row?.[primary]);if(!base)continue;const parts=[base];for(const k of extras.slice(0,3)){let v=row?.[k];if(v==null||trim(v)==='')continue;const kn=norm(k);if(typeof v==='number'&&/precio|importe|valor|total|coste|costo/.test(kn))v=/precio/.test(kn)?v26FormatEuro(v):v40WholeEuro(v);parts.push(`${k}: ${trim(v)}`);}const line=parts.join(' · '),key=norm(line);if(!seen.has(key)){seen.add(key);lines.push(line);}}
-  if(!lines.length)return'';const answerNorm=norm(existingAnswer),covered=lines.filter(x=>answerNorm.includes(norm(trim(x.split(' · ')[0])))).length,ratio=covered/lines.length;if(ratio>=0.8)return trim(existingAnswer);
-  const shown=lines.slice(0,120),more=lines.length-shown.length;return `La lista es: ${shown.join('; ')}.${more>0?` Quedan ${more} elementos más; el límite de seguridad de esta locución es 120.`:''}`;
+  if(wantPrice)addExtra(/precio.*unit|precio/);if(wantAmount)addExtra(/importe|valor|total/);if(wantUnits)addExtra(/unidades|cantidad/);if(wantDate&&!isEvents)addExtra(/^fecha|momento/);if(wantResponsible)addExtra(/responsable/);if(wantStore)addExtra(/tienda/);
+  const lines=[],seen=new Set();for(const row of rows){const base=trim(row?.[primary]);if(!base)continue;const parts=[base];for(const k of extras.slice(0,4)){let v=row?.[k];if(v==null||trim(v)==='')continue;const kn=norm(k);if(/fecha/.test(kn))v=v40FormatListDate(v);else if(typeof v==='number'&&/precio|importe|valor|total|coste|costo/.test(kn))v=/precio/.test(kn)?v26FormatEuro(v):v40WholeEuro(v);if(isEvents&&/fecha\s+inicio/.test(kn))parts.push(`(${trim(v)})`);else parts.push(`${k}: ${trim(v)}`);}const line=parts.join(' · ').replace(/ · \(/,' ('),key=norm(line);if(!seen.has(key)){seen.add(key);lines.push(line);}}
+  if(!lines.length)return'';
+  const header=isEvents?`Eventos (${lines.length})`:`Lista completa (${lines.length})`;
+  return `${header}:\n${lines.map((line,i)=>`${i+1}. ${line}`).join('\n')}`;
 }
 
 function v40WholeEuro(value){
@@ -10140,7 +10177,7 @@ function v40ConversationalPolish(answer,userPrompt='',voiceConversation=false){
   // Incluso si el modelo deja restos Markdown, la salida hablada/escrita se presenta limpia.
   out=out.replace(/\*\*/g,'').replace(/^\s*#{1,6}\s*/gm,'').replace(/^\s*[-*•]+\s+/gm,'').replace(/`{1,3}/g,'');
   out=out.replace(/^(?:respuesta|contestaci[oó]n|informe)\s+(?:de\s+)?zuzu\s*[:.\-–—]*\s*/i,'').replace(/^zuzu\s+(?:responde|contesta)\s*[:.\-–—]*\s*/i,'').trim();
-  if(voiceConversation)out=out.replace(/\n+/g,' ').replace(/\s{2,}/g,' ').trim();
+  if(voiceConversation&&!/\n\s*\d+[.)]\s/.test(out))out=out.replace(/\n+/g,' ').replace(/\s{2,}/g,' ').trim();
   return trim(out);
 }
 function v40HumanizeRenderedTables(presentation,userPrompt=''){
@@ -10166,18 +10203,26 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX33 CONVERSACIÓN ÚTIL','OK','Build 20260818-FIX33: listas explícitas garantizadas, ce_eventos.descripcion + texto de Documentos como contexto narrativo, respuestas más directas y recuperación de voz/descargas.');
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 LISTAS CANÓNICAS + VOZ ROBUSTA','OK','Build 20260818-FIX34: listas numeradas/ordenadas físicamente por CE, recuperación de planner inválido, contexto textual reforzado y rearmado duro de voz tras PDF/descargas.');
   zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
   const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
-  payload=await v261CallInteraction({input:initialInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini planifica turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+  try{
+    payload=await v261CallInteraction({input:initialInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini planifica turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+  }catch(planError){
+    const invalidJson=Number(planError?.status)===400&&/invalid\s+json|could\s+not\s+be\s+parsed|json\s+syntax/i.test(cleanGeminiError(planError));
+    if(!invalidJson)throw planError;
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Reintento de plan','WARN','Gemini devolvió argumentos JSON inválidos en el plan. Se reintenta UNA sola vez con la misma petición y una instrucción explícita de JSON válido; no se arrastra la Interaction rota.');
+    const retryInput=`${initialInput}\n\nREINTENTO TÉCNICO ÚNICO: la salida anterior no pudo parsearse. Emite exactamente una llamada scc_execute_plan con argumentos JSON válidos que cumplan el schema; sin texto adicional.`;
+    payload=await v261CallInteraction({input:retryInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini reintenta plan válido',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+  }
   currentId=trim(payload?.id)||'';
   const calls=v261FunctionCalls(payload).filter(c=>trim(c.name)==='scc_execute_plan');
   if(!calls.length){const e=new Error('SCC no devolvió el plan obligatorio.');e.status=502;throw e;}
   const chosen=v40ChoosePlanCall(calls,state,selectedEventId);if(!chosen){const e=new Error('SCC no devolvió un plan utilizable.');e.status=502;throw e;}
   let plan=v40HumanPresentationPlan(chosen.plan,userPrompt,voiceConversation);
   plan=v40StrengthenPlanCoverage(plan,userPrompt,voiceConversation,flowTrace);
-  const explicitEnumeration=v40ExplicitEnumerationRequest(userPrompt);
+  const explicitEnumeration=v40ExplicitEnumerationRequest(userPrompt)||v40PlanEnumerationRequest(plan);
   if(calls.length>1)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Plan duplicado','WARN',`Gemini emitió ${calls.length} llamadas scc_execute_plan. Se ejecuta una sola decisión canónica y se responden las duplicadas como ignoradas para cerrar correctamente la Interaction.`);
   zuzuTracePush(flowTrace,'v2.0_exp · SCC · Decisión de contexto','OK',`${plan.relation.toUpperCase()} · ámbito=${plan.scope} · evento=${plan.event||'—'} · sujetos=${plan.subjects.join(' / ')||'—'} · dominio=${plan.domain} · operación=${plan.operation} · dataset=${plan.dataset.id||'—'} · confianza=${Math.round(plan.confidence*100)}%. ${plan.reason}`);
   const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace,userPrompt);
@@ -10199,8 +10244,9 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   if(!plan.presentation.show_table)showTables=[];
   else if(!showTables.length)showTables=v40DefaultShowTable(executed.fullResults,plan);
   final={...final,showTables};
-  if(voiceConversation)final={...final,showTables:[],chartSpecs:[],answer:trim(final.answer).replace(/(?:Puedes|Puede)\s+(?:consultar|ver)[^.?!]*(?:tabla|gr[aá]fica)[^.?!]*[.?!]?/gi,'').replace(/(?:Aquí|A continuación)\s+(?:te\s+)?(?:muestro|tienes|presento)[^.?!]*(?:tabla|gr[aá]fica)[^.?!]*[.?!]?/gi,'').replace(/\s{2,}/g,' ').trim()};
-  let presentation=voiceConversation?{tables:[],charts:[],stats:{sourceResults:executed.fullResults.length,sourceTables:0,sourceRows:0,renderedTableRows:0,tableDuplicates:0,chartDuplicates:0}}:v26BuildPresentation(final,executed.fullResults,userPrompt,{wantsCharts:plan.presentation.show_chart,bankContext:plan.domain==='bank',staticPointLabels:false});
+  if(voiceConversation&&!explicitEnumeration)final={...final,showTables:[],chartSpecs:[],answer:trim(final.answer).replace(/(?:Puedes|Puede)\s+(?:consultar|ver)[^.?!]*(?:tabla|gr[aá]fica)[^.?!]*[.?!]?/gi,'').replace(/(?:Aquí|A continuación)\s+(?:te\s+)?(?:muestro|tienes|presento)[^.?!]*(?:tabla|gr[aá]fica)[^.?!]*[.?!]?/gi,'').replace(/\s{2,}/g,' ').trim()};
+  else if(voiceConversation)final={...final,chartSpecs:[]};
+  let presentation=(voiceConversation&&!explicitEnumeration)?{tables:[],charts:[],stats:{sourceResults:executed.fullResults.length,sourceTables:0,sourceRows:0,renderedTableRows:0,tableDuplicates:0,chartDuplicates:0}}:v26BuildPresentation(final,executed.fullResults,userPrompt,{wantsCharts:false,bankContext:plan.domain==='bank',staticPointLabels:false});
   presentation=v40HumanizeRenderedTables(presentation,userPrompt);
   const files=[];for(const t of (voiceConversation?[]:presentation.tables.slice(0,6))){const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));files.push({filename:fileSafe(`${t.title}_v2.0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});}
   const answer=v304EnsurePersonalOpening(final.answer,{usuarioLogado,user,authUser,ce_acceso_usuario_logado:usuarioLogado});
@@ -12344,6 +12390,23 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
     const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null;
     zuzuTracePush(flowTrace,'v2.0_exp · SCC · Respaldo por fallo real','WARN',`Gemini no completó el turno SCC: ${cleanGeminiError(error)}. ${currentTurnResults.length?`CE conserva ${currentTurnResults.length} fuente(s) que Gemini había pedido, pero se corta la Interaction para no dejar un contexto que Gemini no haya visto completo.`:'No llegaron a ejecutarse fuentes canónicas.'}`);
+    if(!currentTurnResults.length){
+      // FIX34 · última red de seguridad SOLO tras fallo real del planner. Una petición inequívoca
+      // de catálogo/ordenación de eventos no puede quedar inútil porque Gemini haya emitido JSON
+      // inválido dos veces: CE recupera la fuente canónica que el propio dominio exige.
+      const priorEventList=arr(safeHistory).slice(-4).reverse().some(t=>arr(t?.resultContext?.scc?.tools).includes('events_catalog')||trim(t?.resultContext?.scc?.dataset?.id)==='events_catalog');
+      const eventListRecovery=(v40ExplicitEnumerationRequest(userPrompt)&&/\beventos?\b/.test(norm(userPrompt)))||(priorEventList&&/\b(?:ordena|ordenalos|ordénalos|viejo|antiguo|joven|reciente|nuevo|todos|lista|listado)\b/.test(norm(userPrompt)));
+      if(eventListRecovery){
+        const recovered=await v26ToolEventsCatalog({id:'scc_recovery_events',name:'events_catalog',detail:'full'},state);
+        const sd=v40PromptSortDirective(userPrompt,{}),recoveryPlan={relation:'continue',reason:'Recuperación determinista tras fallo técnico del planner',confidence:1,scope:'global',event:'',events:[],subjects:[],domain:'events',operation:sd.direction!=='none'?'sort':'list',dataset:{id:'events_catalog',description:'Catálogo completo de eventos',carry_forward:true},presentation:{show_table:true,show_chart:false,table_hint:'events',sort_field:sd.field||'',sort_direction:sd.direction,limit:0},data_requests:[{tool:'events_catalog',purpose:'Recuperación canónica tras fallo de planner',arguments:{detail:'full'},index:1}]};
+        const sorted=v40ApplyPhysicalPresentation(recovered,recoveryPlan.presentation,flowTrace),answer=v40CanonicalEnumerationAnswer(userPrompt,recoveryPlan,[sorted],'');
+        const fallbackFinal={title:'Eventos registrados',answer:answer||`Eventos registrados: ${num(sorted?.facts?.event_count)}.`,warnings:['Gemini no pudo construir el plan técnico; ControlEvent resolvió esta lista inequívoca directamente desde el catálogo canónico de eventos.'],showTables:[{tool_id:sorted.id,table_key:'events'}],chartSpecs:[]};
+        const presentation=v26BuildPresentation(fallbackFinal,[sorted],userPrompt,{wantsCharts:false,bankContext:false,staticPointLabels:false});
+        const resultContext=v40SccResultContext(recoveryPlan,[sorted]);
+        zuzuTracePush(flowTrace,'v2.0_exp · SCC · Recuperación de lista','OK','Fallo real del planner: events_catalog se ejecutó localmente y CE devolvió la lista completa/ordenada sin pedir al usuario que repita.');
+        return{ok:true,rejected:false,title:fallbackFinal.title,answer:fallbackFinal.answer,warnings:fallbackFinal.warnings,charts:[],tables:presentation.tables||[],files:[],provider:'control-event-scc2-list-recovery',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',interactionId:'',resetInteractionId:true,resultContext,tools:['events_catalog'],geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+      }
+    }
     if(currentTurnResults.length){
       const listAnswer=v40CanonicalEnumerationAnswer(userPrompt,plan||{},currentTurnResults,'');
       const localClosure=!listAnswer?v305CanonicalClosureFromResults(userPrompt,currentTurnResults,safeHistory):null;

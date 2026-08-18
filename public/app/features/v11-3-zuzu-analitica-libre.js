@@ -365,8 +365,9 @@
     var hist=loadZuzuConversation(),selected=(selectedIndexes||[]).map(function(i){return {idx:Number(i),turn:hist[Number(i)]};}).filter(function(x){return x.turn;});
     if(!selected.length){ setStatus('Selecciona al menos una pregunta/respuesta para el PDF.','err'); return; }
     var now=new Date(),win=null;
+    try{document.dispatchEvent(new CustomEvent('ce:zuzu-pdf-print-started'));}catch(_){ }
     try{win=window.open('','_blank');}catch(_){win=null;}
-    if(!win){setStatus('El navegador ha bloqueado la ventana de impresión.','err');return;}
+    if(!win){try{document.dispatchEvent(new CustomEvent('ce:zuzu-pdf-print-finished'));}catch(_){ }setStatus('El navegador ha bloqueado la ventana de impresión.','err');return;}
     var title=selected.length===1?responsePdfTitle({__prompt:selected[0].turn.user},selected[0].turn.user):('ControlEvent_v2.0_exp-conversacion_Zuzu-'+dateStamp(now)+'.pdf');
     var userName=loggedUserDisplayName();
     var body=selected.map(function(item){
@@ -374,7 +375,7 @@
       return '<section class="ce-print-turn"><div class="ce-print-turn-head"><strong>Turno '+n+' · Pregunta</strong><div class="ce-print-turn-q">'+esc(turn.user||'')+'</div></div>'+archivedTurnHtml(turn)+(includeTrace?printableArchivedTraceHtml(turn):'')+'</section>';
     }).join('');
     win.document.open();
-    win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body><main class="ce-print-wrap"><header class="ce-print-head"><div class="ce-print-top"><div><h1>✨ Conversación Zuzu · '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'</h1><div class="ce-print-meta">Usuario: '+esc(userName)+'</div></div><div class="ce-print-datetime">'+esc(prettyDateTime(now))+'</div></div></header>'+body+'</main><script>window.onload=function(){setTimeout(function(){try{document.querySelectorAll(".ce-ai-trace details").forEach(function(d){d.open=true;d.setAttribute("open","open");});document.title='+JSON.stringify(title)+';window.focus();window.print();}catch(e){}},250)}<\/script></body></html>');
+    win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body><main class="ce-print-wrap"><header class="ce-print-head"><div class="ce-print-top"><div><h1>✨ Conversación Zuzu · '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'</h1><div class="ce-print-meta">Usuario: '+esc(userName)+'</div></div><div class="ce-print-datetime">'+esc(prettyDateTime(now))+'</div></div></header>'+body+'</main><script>window.onload=function(){setTimeout(function(){try{document.querySelectorAll(".ce-ai-trace details").forEach(function(d){d.open=true;d.setAttribute("open","open");});document.title='+JSON.stringify(title)+';window.focus();window.print();}catch(e){}},250)};window.onafterprint=function(){try{window.opener&&window.opener.document&&window.opener.document.dispatchEvent(new CustomEvent("ce:zuzu-pdf-print-finished"));}catch(e){}}<\/script></body></html>');
     win.document.close();
     closeZuzuPdfPicker();
     setStatus('Abierta impresión con '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'.','ok');
@@ -656,7 +657,7 @@
       if(data.title) data.title=withoutGeminiLabel(data.title);
       if(Array.isArray(data.warnings)) data.warnings=data.warnings.map(withoutGeminiLabel);
       if(!voiceConversation&&(!Array.isArray(data.charts)||!data.charts.length)&&wantsChart(prompt))data.charts=autoChartsFromTables(data.tables||[]);
-      if(voiceConversation){data.charts=[];data.tables=[];data.files=[];}
+      if(voiceConversation){data.charts=[];data.files=[];} // FIX34: el servidor decide si una lista oral necesita tabla visible; no la borra el cliente.
       var returnedInteractionId=String((data.meta&&data.meta.interactionId)||data.interactionId||'').trim();
       var serverConversationReset=!!(data.meta&&data.meta.resetConversation===true);
       if(serverConversationReset){
