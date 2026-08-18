@@ -68,7 +68,7 @@ function ttsCachePut(key, value) {
 }
 
 function parseTranscript(raw) {
-  let text = clean(raw, 6500);
+  let text = clean(raw, 2000);
   if (!text) return { text: '', wake: false };
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   try {
@@ -78,12 +78,12 @@ function parseTranscript(raw) {
       text: clean(row?.text || row?.texto || row?.raw || '', 140)
     })).filter(row => row.text) : [];
     return {
-      text: clean(obj?.text || obj?.transcript || obj?.transcription || '', 2800),
+      text: clean(obj?.text || obj?.transcript || obj?.transcription || '', 900),
       wake: obj?.wake === true,
       entities
     };
   } catch (_) {
-    return { text: clean(text.replace(/^['\"]|['\"]$/g, ''), 2800), wake: false, entities: [] };
+    return { text: clean(text.replace(/^['\"]|['\"]$/g, ''), 900), wake: false, entities: [] };
   }
 }
 
@@ -160,8 +160,8 @@ export async function transcribeZuzuVoice(body = {}) {
   const mimeType = supportedMime(body.mimeType);
   const mode = clean(body.mode || 'user', 20).toLowerCase();
   const instruction = mode === 'ambient'
-    ? 'Transcribe exactamente TODO el habla inteligible de este audio en español. No respondas ni resumas. Además indica wake=true si el hablante está llamando claramente a Zuzu (por ejemplo Hola Zuzu, Oye Zuzu o una pronunciación/transcripción cercana del nombre). En entities extrae SOLO nombres propios o nombres de catálogo explícitamente pronunciados que parezcan EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. NO clasifiques como entidad pronombres (este evento, esa persona), unidades (1 L, 500 ml), órdenes (dame la lista, productos ordenados), fragmentos conversacionales ni frases genéricas. Si dudas, usa OTROS o no lo incluyas. Devuelve SOLO JSON válido: {"text":"transcripción completa","wake":true|false,"entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"nombre literal oído"}]}. Si no hay habla inteligible, text vacío, wake=false y entities=[].'
-    : 'Transcribe exactamente y COMPLETA la intervención hablada de este audio en español, aunque sea larga. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No respondas, no resumas y no cortes la explicación. En entities extrae SOLO nombres propios o nombres de catálogo explícitamente pronunciados que parezcan EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. NO clasifiques pronombres (este evento), unidades (1 L), órdenes (dame la lista, productos ordenados), fragmentos de conversación ni frases genéricas. Si dudas, usa OTROS o no lo incluyas. Devuelve SOLO JSON válido: {"text":"transcripción completa","entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"nombre literal oído"}]}. Si no hay habla inteligible, usa texto vacío y entities=[].';
+    ? 'Transcribe exactamente el habla inteligible de este audio en español. No respondas. Además indica wake=true si el hablante está llamando claramente a Zuzu (por ejemplo Hola Zuzu, Oye Zuzu o una pronunciación/transcripción cercana del nombre). Extrae, sin corregirlos, los nombres o palabros que el hablante parezca usar como EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. Devuelve SOLO JSON válido: {"text":"transcripción","wake":true|false,"entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"texto literal oído"}]}. Si no hay habla inteligible, text vacío, wake=false y entities=[].'
+    : 'Transcribe exactamente la pregunta o frase hablada de este audio en español. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No respondas a la pregunta. Extrae, sin normalizarlos, los nombres o expresiones que el hablante parezca usar como EVENTOS, PERSONAS, PRODUCTOS o TIENDAS. Devuelve SOLO JSON válido: {"text":"transcripción","entities":[{"type":"EVENTOS|PERSONAS|PRODUCTOS|TIENDAS|OTROS","text":"texto literal oído"}]}. Si no hay habla inteligible, usa texto vacío y entities=[].';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const payload = await fetchGeminiJson(url, apiKey, {
@@ -169,8 +169,8 @@ export async function transcribeZuzuVoice(body = {}) {
       { text: instruction },
       { inlineData: { mimeType, data: audioBase64 } }
     ] }],
-    generationConfig: { temperature: 0, maxOutputTokens: 768, responseMimeType: 'application/json' }
-  }, Number(process.env.CONTROLEVENT_ZUZU_VOICE_TIMEOUT_MS || 22000), 'La transcripción de voz');
+    generationConfig: { temperature: 0, maxOutputTokens: 96, responseMimeType: 'application/json' }
+  }, Number(process.env.CONTROLEVENT_ZUZU_VOICE_TIMEOUT_MS || 14000), 'La transcripción de voz');
 
   const parsed = parseTranscript(extractText(payload));
   const usage = payload?.usageMetadata || {};
@@ -186,6 +186,107 @@ export async function transcribeZuzuVoice(body = {}) {
       totalTokens: Number(usage.totalTokenCount || 0)
     }
   };
+}
+
+
+function zuzuTtsPrompt(transcript = '', style = 'normal') {
+  const cleanText = clean(transcript, 2600);
+  const cleanStyle = clean(style || 'normal', 30).toLowerCase();
+  const direction = cleanStyle === 'entertainment'
+    ? 'Interprétalo con humor seco y discreto; no sonrías demasiado ni teatralices.'
+    : 'Interprétalo como una conversación adulta, segura, sobria y natural.';
+  return [
+    'Habla en español de España.',
+    'Eres Zuzu, un HOMBRE adulto. Voz masculina potente, barítono medio-grave, firme y con cuerpo. Debe sonar humana, segura y sobria, no juvenil, no aguda, no excesivamente simpática y sin sonrisa comercial.',
+    'Acento español de España neutro. Evita tono de locutor, caricatura, entusiasmo artificial o voz robótica.',
+    'Ritmo conversacional ligeramente ágil. No arrastres las palabras. Haz pausas breves y perceptibles entre ideas.',
+    'En listas numeradas, cada elemento es una unidad independiente: di primero su ordinal o número, pausa brevemente, di el elemento completo y vuelve a pausar antes del siguiente número.',
+    'Respeta exactamente la información del texto: no añadas, no resumas y no elimines contenido.',
+    direction,
+    'Pronuncia ahora SOLO el siguiente texto, sin explicar estas instrucciones:',
+    cleanText
+  ].join('\\n');
+}
+
+export async function streamZuzuSpeech(body = {}, req, res) {
+  const apiKey = ttsKey();
+  if (!apiKey) {
+    const e = new Error('Falta una clave Gemini para la voz estándar de Zuzu.');
+    e.status = 503;
+    throw e;
+  }
+  const transcript = clean(body.text || body.transcript || '', 2600);
+  if (!transcript) {
+    res.status(204).end();
+    return;
+  }
+  const model = ttsModel();
+  const voice = ttsVoice();
+  const style = clean(body.style || 'normal', 30).toLowerCase();
+  const prompt = zuzuTtsPrompt(transcript, style);
+  const url = 'https://generativelanguage.googleapis.com/v1beta/interactions';
+  const controller = new AbortController();
+  const timeoutMs = Number(process.env.CONTROLEVENT_ZUZU_TTS_STREAM_TIMEOUT_MS || 18000);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const abortOnClose = () => { if (!res.writableEnded) controller.abort(); };
+  req?.once?.('close', abortOnClose);
+  const started = Date.now();
+  try {
+    const upstream = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+        'Api-Revision': '2026-05-20'
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model,
+        input: prompt,
+        response_format: { type: 'audio' },
+        generation_config: {
+          speech_config: [{ voice }]
+        },
+        stream: true
+      })
+    });
+    if (!upstream.ok) {
+      const text = clean(await upstream.text().catch(() => ''), 1200);
+      const e = new Error(text || `La voz streaming de Zuzu devolvió HTTP ${upstream.status}.`);
+      e.status = 502;
+      throw e;
+    }
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.setHeader('X-ControlEvent-TTS-Model', model);
+    res.setHeader('X-ControlEvent-TTS-Voice', voice);
+    res.setHeader('X-ControlEvent-Upstream-Ms', String(Date.now() - started));
+    res.flushHeaders?.();
+    if (!upstream.body) throw new Error('Gemini TTS no devolvió un flujo de audio.');
+    const reader = upstream.body.getReader();
+    while (!res.writableEnded) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value?.length) {
+        res.write(Buffer.from(value));
+        res.flush?.();
+      }
+    }
+    if (!res.writableEnded) res.end();
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const e = new Error('La voz streaming de Zuzu agotó el tiempo de espera.');
+      e.status = 502;
+      throw e;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+    req?.off?.('close', abortOnClose);
+  }
 }
 
 export async function synthesizeZuzuSpeech(body = {}) {
@@ -204,20 +305,7 @@ export async function synthesizeZuzuSpeech(body = {}) {
   const style = clean(body.style || 'normal', 30).toLowerCase();
   const cacheKey = ttsCacheKey(model, voice, style, transcript);
   const cached = ttsCacheGet(cacheKey); if (cached) return cached;
-  const direction = style === 'entertainment'
-    ? 'Interprétalo con humor seco y discreto; no sonrías demasiado ni teatralices.'
-    : 'Interprétalo como una conversación adulta, segura, sobria y natural.';
-  const prompt = [
-    'Habla en español de España.',
-    'Eres Zuzu, un HOMBRE adulto. Voz masculina potente, barítono medio-grave, firme y con cuerpo. Debe sonar humana, segura y sobria, no juvenil, no aguda, no excesivamente simpática y sin sonrisa comercial.',
-    'Acento español de España neutro. Evita tono de locutor, caricatura, entusiasmo artificial o voz robótica.',
-    'Ritmo conversacional ligeramente ágil. No arrastres las palabras. Haz pausas breves y perceptibles entre ideas.',
-    'En listas numeradas, cada elemento es una unidad independiente: di primero su ordinal o número, pausa brevemente, di el elemento completo y vuelve a pausar antes del siguiente número.',
-    'Respeta exactamente la información del texto: no añadas, no resumas y no elimines contenido.',
-    direction,
-    'Pronuncia ahora SOLO el siguiente texto, sin explicar estas instrucciones:',
-    transcript
-  ].join('\n');
+  const prompt = zuzuTtsPrompt(transcript, style);
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const requestBody = {
@@ -275,4 +363,4 @@ export async function synthesizeZuzuSpeech(body = {}) {
 }
 
 // Exportado solo para pruebas unitarias del contenedor; no forma parte de la API HTTP.
-export const __voiceTest = { pcm16leToWav, ttsVoice, ttsModel };
+export const __voiceTest = { pcm16leToWav, ttsVoice, ttsModel, zuzuTtsPrompt };

@@ -189,7 +189,7 @@
       try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ }
     }
     var now=Date.now(); if(now-lastOpenTap<650) return; lastOpenTap=now;
-    openModal();
+    openModal(ev);
   }
   function bindOpenButton(btn){
     if(!btn || btn.__ceAnaliticaLibreBound) return; btn.__ceAnaliticaLibreBound=true;
@@ -437,16 +437,16 @@
       document.body.classList.remove('ce-g92-tip-open');
     }catch(_){ }
   }
-  function openModal(){
+  function openModal(sourceEvent){
     closeGraphInfoBubble();
     injectStyle();
     installPromptEventShield();
     var old=$('ceGeminiLibreOverlay'); if(old) old.remove();
     document.body.insertAdjacentHTML('beforeend', modalHtml());
     var closeBtn=$('ceAiClose');
-    if(closeBtn){ closeBtn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); closeModal(); }, true); }
-    $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(); });
-    document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(); document.removeEventListener('keydown', escClose, true); } }, true);
+    if(closeBtn){ closeBtn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); closeModal(ev); }, true); }
+    $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(ev); });
+    document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(ev); document.removeEventListener('keydown', escClose, true); } }, true);
     $('ceAiRun').onclick=runAi;
     $('ceAiClear').onclick=function(ev){ clearZuzu(ev); };
     var pdfBtn=$('ceAiDownloadResult');
@@ -457,9 +457,16 @@
       pdfBtn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation();} printZuzuPdf(); };
     }
     restoreConversationScreen();
+    // FIX34 robustez voz: la apertura/cierre del modal son la fuente de verdad del estado oral.
+    // Se despacha SINCRONICAMENTE para que Safari/iOS pueda reutilizar el gesto real del usuario.
+    try{window.dispatchEvent(new CustomEvent('controlevent:zuzu-opened',{detail:{trusted:!!(sourceEvent&&sourceEvent.isTrusted),source:sourceEvent?'manual':'programmatic'}}));}catch(_){ }
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
-  function closeModal(){ closeZuzuPdfPicker(); clearZuzuThinkingTimer(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
+  function closeModal(sourceEvent){
+    closeZuzuPdfPicker(); clearZuzuThinkingTimer();
+    var o=$('ceGeminiLibreOverlay'),had=!!o; if(o) o.remove();
+    if(had){try{window.dispatchEvent(new CustomEvent('controlevent:zuzu-closed',{detail:{trusted:!!(sourceEvent&&sourceEvent.isTrusted),source:sourceEvent?'manual':'programmatic'}}));}catch(_){ }}
+  }
   function setStatus(msg, kind){ var el=$('ceAiStatus'); if(!el) return; el.className='ce-ai-status '+(kind||''); el.textContent=msg||''; }
   function zuzuPromptFlags(prompt){
     var p=String(prompt||'').toLowerCase();
@@ -695,7 +702,7 @@
       renderResult(data);
       setStatus(data.rejected?'Petición rechazada por ámbito.':'', data.rejected?'err':'');
       try{
-        document.dispatchEvent(new CustomEvent('ce:zuzu-response-rendered',{detail:{turnId:turnId,voiceConversation:voiceConversation,answer:String(data.answer||''),title:String(data.title||''),voiceLexicon:(data.meta&&Array.isArray(data.meta.voiceLexicon))?data.meta.voiceLexicon:[]}}));
+        document.dispatchEvent(new CustomEvent('ce:zuzu-response-rendered',{detail:{turnId:turnId,voiceConversation:voiceConversation,answer:String(data.answer||''),title:String(data.title||'')}}));
         if(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.maybeAutoRead==='function'){
           setTimeout(function(){ try{window.ControlEventV22Voz4.maybeAutoRead();}catch(_){ } },80);
         }
@@ -984,7 +991,7 @@
   document.addEventListener('click',function(ev){ if(ev.target && ev.target.closest && ev.target.closest('#tabGraficasBtn')) setTimeout(tick,180); }, true);
   document.addEventListener('change',function(ev){ if(ev.target && ev.target.id==='selectedEvent') setTimeout(tick,250); }, true);
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
-  document.addEventListener('click',function(ev){ var t=ev.target; if(t && t.closest && t.closest('#ceGeminiLibreOverlay .ce-ai-close')){ ev.preventDefault(); ev.stopPropagation(); closeModal(); } }, true);
+  document.addEventListener('click',function(ev){ var t=ev.target; if(t && t.closest && t.closest('#ceGeminiLibreOverlay .ce-ai-close')){ ev.preventDefault(); ev.stopPropagation(); closeModal(ev); } }, true);
   document.addEventListener('touchend',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, { passive:false, capture:true });
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, true);
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceAiClear'); if(b){ clearZuzu(ev); } }, true);

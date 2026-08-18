@@ -7,9 +7,8 @@ create table if not exists public.ce_zuzu_normalizaciones (
   texto text not null,
   texto_norm text not null,
   dato_bueno text not null,
-  texto_voz text null,
   dato_id text null,
-  origen text not null default 'voz-aprendizaje-v2',
+  origen text not null default 'voz-aprendizaje',
   confianza numeric(5,4) not null default 1.0000 check (confianza >= 0 and confianza <= 1),
   usos integer not null default 1 check (usos >= 0),
   activo boolean not null default true,
@@ -18,11 +17,6 @@ create table if not exists public.ce_zuzu_normalizaciones (
   last_seen_at timestamptz not null default now(),
   constraint ce_zuzu_normalizaciones_tipo_texto_uq unique (datos, texto_norm)
 );
-
--- Si la tabla ya existía en una FIX34 anterior, CREATE TABLE IF NOT EXISTS no añade columnas.
-alter table public.ce_zuzu_normalizaciones
-  add column if not exists texto_voz text null;
-
 
 create index if not exists ce_zuzu_normalizaciones_lookup_idx
   on public.ce_zuzu_normalizaciones (datos, texto_norm)
@@ -42,10 +36,6 @@ comment on column public.ce_zuzu_normalizaciones.texto is
   'Texto tal como llegó de voz/conversación.';
 comment on column public.ce_zuzu_normalizaciones.dato_bueno is
   'Nombre canónico real usado por ControlEvent.';
-comment on column public.ce_zuzu_normalizaciones.texto_norm is
-  'Clave interna de búsqueda: texto normalizado en minúsculas, sin acentos/puntuación superflua y con espacios compactados.';
-comment on column public.ce_zuzu_normalizaciones.texto_voz is
-  'Forma opcional y natural en la que la voz estándar debe pronunciar dato_bueno; no altera pantalla ni PDF.';
 
 -- No se crean políticas para anon/authenticated: el navegador no debe escribir aquí.
 -- El backend de ControlEvent usa la service role y puede leer/aprender sin exponer la tabla al cliente.
