@@ -31,13 +31,16 @@ function extractText(payload) {
 
 function parseTranscript(raw) {
   let text = clean(raw, 2000);
-  if (!text) return '';
+  if (!text) return { text: '', wake: false };
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
   try {
     const obj = JSON.parse(text);
-    return clean(obj?.text || obj?.transcript || obj?.transcription || '', 900);
+    return {
+      text: clean(obj?.text || obj?.transcript || obj?.transcription || '', 900),
+      wake: obj?.wake === true
+    };
   } catch (_) {
-    return clean(text.replace(/^['\"]|['\"]$/g, ''), 900);
+    return { text: clean(text.replace(/^['\"]|['\"]$/g, ''), 900), wake: false };
   }
 }
 
@@ -61,7 +64,7 @@ export async function transcribeZuzuVoice(body = {}) {
   const mimeType = supportedMime(body.mimeType);
   const mode = clean(body.mode || 'user', 20).toLowerCase();
   const instruction = mode === 'ambient'
-    ? 'Transcribe exactamente el habla inteligible de este audio en español. No respondas ni interpretes. Devuelve SOLO JSON válido con esta forma: {"text":"transcripción"}. Si no hay habla inteligible, usa texto vacío.'
+    ? 'Transcribe exactamente el habla inteligible de este audio en español. No respondas. Además indica wake=true si el hablante está llamando claramente a Zuzu (por ejemplo Hola Zuzu, Oye Zuzu o una pronunciación/transcripción cercana del nombre). Devuelve SOLO JSON válido: {"text":"transcripción","wake":true|false}. Si no hay habla inteligible, text vacío y wake=false.'
     : 'Transcribe exactamente la pregunta o frase hablada de este audio en español. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No respondas a la pregunta. Devuelve SOLO JSON válido con esta forma: {"text":"transcripción"}. Si no hay habla inteligible, usa texto vacío.';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
@@ -96,11 +99,12 @@ export async function transcribeZuzuVoice(body = {}) {
     throw e;
   }
 
-  const text = parseTranscript(extractText(payload));
+  const parsed = parseTranscript(extractText(payload));
   const usage = payload?.usageMetadata || {};
   return {
     ok: true,
-    text,
+    text: parsed.text,
+    wake: mode === 'ambient' ? !!parsed.wake : false,
     model,
     usage: {
       promptTokens: Number(usage.promptTokenCount || 0),

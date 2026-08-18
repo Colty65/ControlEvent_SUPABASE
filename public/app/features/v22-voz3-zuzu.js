@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v2.0_exp-FIX34-VOICE-ROBUST-DIRECT-WAKE-HUMAN-SPOKEN-LABELS';
+  var BUILD='v2.0_exp-FIX34-VOICE-WAKE-ROBUST-SINGLE-STREAM';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -21,7 +21,7 @@
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
     recognition:null, recognitionGeneration:0, recognitionStarting:false, recognitionLive:false, needsGesture:false,
     localSpeechReady:false, localSpeechPreparing:false, localSpeechAttempted:false, localSpeechUnavailable:false, lastRecognitionError:'', pendingRecognitionKind:'ambient',
-    cloudFallback:false, cloudStream:null, cloudAudioContext:null, cloudSource:null, cloudAnalyser:null, cloudSplitter:null, cloudAnalysers:[], cloudChannelRms:[], cloudMonitor:null, cloudWanted:false, cloudKind:'ambient', cloudRecorder:null, cloudChunks:[], cloudRecording:false, cloudBusy:false, cloudLastVoiceAt:0, cloudRecordStartedAt:0,
+    cloudFallback:false, cloudStream:null, cloudAudioContext:null, cloudSource:null, cloudAnalyser:null, cloudSplitter:null, cloudAnalysers:[], cloudChannelRms:[], cloudMonitor:null, cloudWanted:false, cloudKind:'ambient', cloudRecorder:null, cloudChunks:[], cloudRecording:false, cloudBusy:false, cloudLastVoiceAt:0, cloudRecordStartedAt:0, cloudOpening:false, cloudOpenPromise:null, cloudStreamReadyAt:0, lastTrustedGestureAt:0, ambientHealthTimer:null,
     cloudThreshold:0.006, cloudNoiseFloor:0.001, cloudRms:0, cloudPeak:0, cloudVoiceFrames:0, cloudCalibratingUntil:0, cloudNoiseSamples:[], cloudCalibrationDone:false, cloudMeterLastPaint:0, cloudDeviceLabel:'', cloudDeviceId:'', cloudDeviceSettings:{}, cloudGeneration:0, cloudLastTranscript:'',
     wakeCapture:false, wakeText:'', wakeSession:'', wakeTimer:null, wakeLastAt:0,
     turnPrefix:'', turnSession:'', turnTimer:null, turnLastAt:0,
@@ -120,19 +120,20 @@
   function blobBase64(blob){return new Promise(function(resolve,reject){var fr=new FileReader();fr.onload=function(){var x=String(fr.result||''),i=x.indexOf(',');resolve(i>=0?x.slice(i+1):x);};fr.onerror=function(){reject(fr.error||new Error('No se pudo leer el audio.'));};fr.readAsDataURL(blob);});}
   function pauseCloudListening(){state.cloudWanted=false;if(state.cloudRecorder&&state.cloudRecording){try{state.cloudRecorder.__discard=true;state.cloudRecorder.stop();}catch(_){}}setMic(false);}
   function abortCloudTranscription(){try{state.cloudController&&state.cloudController.abort();}catch(_){}state.cloudController=null;state.cloudBusy=false;state.cloudBusySince=0;}
-  function closeCloudVoice(){state.cloudGeneration++;state.cloudWanted=false;abortCloudTranscription();clearInterval(state.cloudMonitor);state.cloudMonitor=null;try{if(state.cloudRecorder&&state.cloudRecording){state.cloudRecorder.__discard=true;state.cloudRecorder.stop();}}catch(_){}state.cloudRecorder=null;state.cloudRecording=false;try{(state.cloudAnalysers||[]).forEach(function(a){try{a.disconnect();}catch(_){}});}catch(_){}try{state.cloudSplitter&&state.cloudSplitter.disconnect();}catch(_){}state.cloudSplitter=null;state.cloudAnalysers=[];state.cloudChannelRms=[];try{state.cloudSource&&state.cloudSource.disconnect();}catch(_){}state.cloudSource=null;try{state.cloudAudioContext&&state.cloudAudioContext.close();}catch(_){}state.cloudAudioContext=null;state.cloudAnalyser=null;try{state.cloudStream&&state.cloudStream.getTracks().forEach(function(t){t.stop();});}catch(_){}state.cloudStream=null;state.cloudRms=0;state.cloudPeak=0;state.cloudVoiceFrames=0;state.cloudCalibrationDone=false;state.cloudCalibratingUntil=0;state.cloudNoiseSamples=[];updateMicMeter(true);setMic(false);}
+  function closeCloudVoice(){state.cloudGeneration++;state.cloudOpening=false;state.cloudOpenPromise=null;state.cloudWanted=false;abortCloudTranscription();clearInterval(state.cloudMonitor);state.cloudMonitor=null;try{if(state.cloudRecorder&&state.cloudRecording){state.cloudRecorder.__discard=true;state.cloudRecorder.stop();}}catch(_){}state.cloudRecorder=null;state.cloudRecording=false;try{(state.cloudAnalysers||[]).forEach(function(a){try{a.disconnect();}catch(_){}});}catch(_){}try{state.cloudSplitter&&state.cloudSplitter.disconnect();}catch(_){}state.cloudSplitter=null;state.cloudAnalysers=[];state.cloudChannelRms=[];try{state.cloudSource&&state.cloudSource.disconnect();}catch(_){}state.cloudSource=null;try{state.cloudAudioContext&&state.cloudAudioContext.close();}catch(_){}state.cloudAudioContext=null;state.cloudAnalyser=null;try{state.cloudStream&&state.cloudStream.getTracks().forEach(function(t){t.stop();});}catch(_){}state.cloudStream=null;state.cloudRms=0;state.cloudPeak=0;state.cloudVoiceFrames=0;state.cloudCalibrationDone=false;state.cloudCalibratingUntil=0;state.cloudNoiseSamples=[];updateMicMeter(true);setMic(false);}
   function sendCloudAudio(blob,kind,gen){
     if(!blob||blob.size<900||gen!==state.cloudGeneration)return Promise.resolve('');
     abortCloudTranscription();state.cloudBusy=true;state.cloudBusySince=Date.now();
     var controller=typeof AbortController!=='undefined'?new AbortController():null;state.cloudController=controller;
     var timeout=setTimeout(function(){try{controller&&controller.abort();}catch(_){}},17000);
     if(kind==='user')setStatus('Entendiendo lo que has dicho…','ok');
-    return blobBase64(blob).then(function(audioBase64){return fetch('/api/zuzu-voice/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller?controller.signal:undefined,body:JSON.stringify({audioBase64:audioBase64,mimeType:blob.type||'audio/webm',mode:kind})});}).then(function(res){return res.json().then(function(j){if(!res.ok||j.ok===false)throw new Error(j.error||('HTTP '+res.status));return clean(j.text||'');});}).then(function(text){
+    return blobBase64(blob).then(function(audioBase64){return fetch('/api/zuzu-voice/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller?controller.signal:undefined,body:JSON.stringify({audioBase64:audioBase64,mimeType:blob.type||'audio/webm',mode:kind})});}).then(function(res){return res.json().then(function(j){if(!res.ok||j.ok===false)throw new Error(j.error||('HTTP '+res.status));return{text:clean(j.text||''),wake:j.wake===true};});}).then(function(payload){
+      var text=clean(payload&&payload.text||''),wakeByServer=!!(payload&&payload.wake);
       clearTimeout(timeout);if(state.cloudController===controller)state.cloudController=null;state.cloudBusy=false;state.cloudBusySince=0;state.cloudLastTranscript=text;
       if(gen!==state.cloudGeneration)return'';
       if(!text){if(state.cloudWanted)cloudStatus(kind);return'';}
       if(kind==='ambient'){
-        if(hasWake(text)){pauseCloudListening();if(wakeOnly(text)){openZuzuOnly();}else{state.conversationMode=true;state.parked=false;state.mode='request';state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=text;updateBadge();setStatus('Procesando tu pregunta…','ok');if(window.ControlEventV113ZuzuAnalitica&&typeof window.ControlEventV113ZuzuAnalitica.submitVoicePrompt==='function')window.ControlEventV113ZuzuAnalitica.submitVoicePrompt(text);}return text;}
+        if(wakeByServer||hasWake(text)){pauseCloudListening();if(wakeOnly(text)){openZuzuOnly();}else{state.conversationMode=true;state.parked=false;state.mode='request';state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=text;updateBadge();setStatus('Procesando tu pregunta…','ok');if(window.ControlEventV113ZuzuAnalitica&&typeof window.ControlEventV113ZuzuAnalitica.submitVoicePrompt==='function')window.ControlEventV113ZuzuAnalitica.submitVoicePrompt(text);}return text;}
         cloudStatus('ambient');return text;
       }
       setPrompt(text);pauseCloudListening();state.requestPrompt=text;state.requestInFlight=true;state.awaitingResponse=true;state.mode='request';setStatus('Procesando…','ok');updateBadge();var b=$('ceAiRun');if(b)b.click();return text;
@@ -145,9 +146,36 @@
   function finishCloudUtterance(kind){var mr=state.cloudRecorder;if(!mr||!state.cloudRecording)return;state.cloudRecording=false;try{mr.stop();}catch(_){} }
   function startCloudUtterance(kind){if(state.cloudRecording||state.cloudBusy||!state.cloudStream)return;var mime=cloudMime(),mr;try{mr=mime?new MediaRecorder(state.cloudStream,{mimeType:mime}):new MediaRecorder(state.cloudStream);}catch(err){setStatus('Voz CE no puede grabar este micrófono.','err');return;}var gen=state.cloudGeneration;state.cloudRecorder=mr;state.cloudChunks=[];state.cloudRecording=true;state.cloudRecordStartedAt=Date.now();state.cloudLastVoiceAt=Date.now();mr.ondataavailable=function(e){if(e.data&&e.data.size)state.cloudChunks.push(e.data);};mr.onstop=function(){var discard=!!mr.__discard,chunks=state.cloudChunks.slice(),type=mr.mimeType||mime||'audio/webm';if(state.cloudRecorder===mr)state.cloudRecorder=null;state.cloudChunks=[];if(discard||gen!==state.cloudGeneration)return;var blob=new Blob(chunks,{type:type});try{console.info('[CE VOZ FIX34] Fragmento voz',{bytes:blob.size,rms:state.cloudRms,ruido:state.cloudNoiseFloor,umbral:state.cloudThreshold});}catch(_){}sendCloudAudio(blob,kind,gen);};try{mr.start(180);}catch(err){state.cloudRecording=false;state.cloudRecorder=null;setStatus('Voz CE no pudo iniciar la captura.','err');}}
   function analyserRms(an){if(!an)return 0;var arr=new Float32Array(an.fftSize||1024);try{an.getFloatTimeDomainData(arr);}catch(_){return 0;}var sum=0;for(var i=0;i<arr.length;i++)sum+=arr[i]*arr[i];return Math.sqrt(sum/Math.max(1,arr.length));}
-  function cloudMonitorTick(){if(state.cloudBusy){if(state.cloudBusySince&&Date.now()-state.cloudBusySince>18500){abortCloudTranscription();if(state.cloudWanted)cloudStatus(state.cloudKind);}return;}if(!state.cloudWanted||state.speaking||state.requestInFlight||state.awaitingResponse)return;var ans=(state.cloudAnalysers&&state.cloudAnalysers.length)?state.cloudAnalysers:(state.cloudAnalyser?[state.cloudAnalyser]:[]);if(!ans.length)return;var levels=ans.map(analyserRms),rms=0;for(var j=0;j<levels.length;j++)if(levels[j]>rms)rms=levels[j];state.cloudChannelRms=levels;var now=Date.now();state.cloudRms=rms;state.cloudPeak=Math.max(rms,state.cloudPeak*0.985);if(!state.cloudCalibrationDone){state.cloudNoiseSamples.push(rms);if(state.cloudNoiseSamples.length>90)state.cloudNoiseSamples.shift();updateMicMeter();if(now>=state.cloudCalibratingUntil)finishCloudCalibration();return;}if(!state.cloudRecording&&rms<state.cloudThreshold){state.cloudNoiseFloor=clamp(state.cloudNoiseFloor*0.988+rms*0.012,0.00015,0.02);var target=clamp(state.cloudNoiseFloor*1.45+0.00055,0.0016,0.014);state.cloudThreshold=state.cloudThreshold*0.985+target*0.015;}var ratio=rms/Math.max(0.0002,state.cloudNoiseFloor),kind=state.cloudKind||'ambient',needRatio=kind==='user'?1.22:1.32,softGate=clamp(state.cloudNoiseFloor*needRatio+0.00028,0.0012,0.012),voice=(rms>=state.cloudThreshold)||(rms>=softGate&&ratio>=needRatio);state.cloudVoiceFrames=voice?state.cloudVoiceFrames+1:0;if(voice&&state.cloudVoiceFrames>=(kind==='user'?2:3)){if(!state.cloudRecording)startCloudUtterance(kind);state.cloudLastVoiceAt=now;}if(state.cloudRecording){var elapsed=now-state.cloudRecordStartedAt,silent=now-state.cloudLastVoiceAt;if((elapsed>620&&silent>950)||elapsed>9000)finishCloudUtterance(kind);}updateMicMeter();}
-  function setupCloudStream(stream,kind){state.cloudStream=stream;state.cloudKind=kind;cloudTrackInfo(stream);state.cloudNoiseSamples=[];state.cloudNoiseFloor=0.001;state.cloudThreshold=0.006;state.cloudRms=0;state.cloudPeak=0;state.cloudVoiceFrames=0;state.cloudCalibrationDone=false;state.cloudCalibratingUntil=Date.now()+1350;var ac=ensureCloudAudioContext(false);if(!ac)throw new Error('AudioContext no disponible');state.cloudAudioContext=ac;state.cloudSource=ac.createMediaStreamSource(stream);state.cloudAnalysers=[];state.cloudChannelRms=[];var main=ac.createAnalyser();main.fftSize=1024;main.smoothingTimeConstant=0.12;state.cloudAnalyser=main;state.cloudSource.connect(main);state.cloudAnalysers.push(main);var settings=state.cloudDeviceSettings||{},channels=Number(settings.channelCount||state.cloudSource.channelCount||1);channels=Math.max(1,Math.min(4,channels||1));if(channels>1&&typeof ac.createChannelSplitter==='function'){try{var sp=ac.createChannelSplitter(channels);state.cloudSplitter=sp;state.cloudSource.connect(sp);for(var c=0;c<channels;c++){var ca=ac.createAnalyser();ca.fftSize=1024;ca.smoothingTimeConstant=0.12;sp.connect(ca,c,0);state.cloudAnalysers.push(ca);}}catch(_){state.cloudSplitter=null;}}state.cloudWanted=true;clearInterval(state.cloudMonitor);state.cloudMonitor=setInterval(cloudMonitorTick,45);try{var rp=ac.resume();if(rp&&typeof rp.catch==='function')rp.catch(function(){});}catch(_){}setStatus('Calibrando micrófono…','ok');refreshMicDevices();updateMicMeter(true);try{console.info('[CE VOZ FIX34] entrada',{label:state.cloudDeviceLabel,settings:settings,analizadores:state.cloudAnalysers.length});}catch(_){}return true;}
-  function startCloudRecognition(kind,fromGesture){kind=kind||'ambient';state.cloudFallback=true;state.cloudKind=kind;state.cloudWanted=true;state.needsGesture=false;if(!supportsCeVoice()){setStatus('Este navegador no permite la Voz CE por micrófono.','err');return false;}if(state.cloudStream){if(fromGesture)ensureCloudAudioContext(true);cloudStatus(kind);setMic(kind==='user');return true;}var gen=++state.cloudGeneration;setStatus('Activando Voz CE…','ok');navigator.mediaDevices.getUserMedia(cloudAudioConstraints()).then(function(stream){if(gen!==state.cloudGeneration){try{stream.getTracks().forEach(function(t){t.stop();});}catch(_){}return;}setupCloudStream(stream,kind);setMic(kind==='user');}).catch(function(err){if(clean(safeGet(STORAGE.mic,''))){safeSet(STORAGE.mic,'');setStatus('Ese micrófono no está disponible. Vuelvo al predeterminado…','err');setTimeout(function(){startCloudRecognition(kind,true);},100);return;}state.needsGesture=true;setStatus('Micrófono bloqueado: '+clean(err&&err.name||err&&err.message||'permiso')+'. Pulsa una vez en ControlEvent.','err');updateBadge();});return true;}
+  function cloudMonitorTick(){if(state.cloudBusy){if(state.cloudBusySince&&Date.now()-state.cloudBusySince>18500){abortCloudTranscription();if(state.cloudWanted)cloudStatus(state.cloudKind);}return;}if(!state.cloudWanted||state.speaking||state.requestInFlight||state.awaitingResponse)return;var ans=(state.cloudAnalysers&&state.cloudAnalysers.length)?state.cloudAnalysers:(state.cloudAnalyser?[state.cloudAnalyser]:[]);if(!ans.length)return;var levels=ans.map(analyserRms),rms=0;for(var j=0;j<levels.length;j++)if(levels[j]>rms)rms=levels[j];state.cloudChannelRms=levels;var now=Date.now();state.cloudRms=rms;state.cloudPeak=Math.max(rms,state.cloudPeak*0.985);if(!state.cloudCalibrationDone){state.cloudNoiseSamples.push(rms);if(state.cloudNoiseSamples.length>90)state.cloudNoiseSamples.shift();updateMicMeter();if(now>=state.cloudCalibratingUntil)finishCloudCalibration();return;}if(!state.cloudRecording&&rms<state.cloudThreshold){state.cloudNoiseFloor=clamp(state.cloudNoiseFloor*0.988+rms*0.012,0.00015,0.02);var target=clamp(state.cloudNoiseFloor*1.45+0.00055,0.0016,0.014);state.cloudThreshold=state.cloudThreshold*0.985+target*0.015;}var ratio=rms/Math.max(0.0002,state.cloudNoiseFloor),kind=state.cloudKind||'ambient',needRatio=1.22,softGate=clamp(state.cloudNoiseFloor*needRatio+0.00028,0.0012,0.012),voice=(rms>=state.cloudThreshold)||(rms>=softGate&&ratio>=needRatio);state.cloudVoiceFrames=voice?state.cloudVoiceFrames+1:0;if(voice&&state.cloudVoiceFrames>=2){if(!state.cloudRecording)startCloudUtterance(kind);state.cloudLastVoiceAt=now;}if(state.cloudRecording){var elapsed=now-state.cloudRecordStartedAt,silent=now-state.cloudLastVoiceAt;if((elapsed>620&&silent>950)||elapsed>9000)finishCloudUtterance(kind);}updateMicMeter();}
+  function setupCloudStream(stream,kind){state.cloudStream=stream;state.cloudKind=kind;cloudTrackInfo(stream);state.cloudNoiseSamples=[];state.cloudNoiseFloor=0.001;state.cloudThreshold=0.006;state.cloudRms=0;state.cloudPeak=0;state.cloudVoiceFrames=0;state.cloudCalibrationDone=false;state.cloudCalibratingUntil=Date.now()+700;var ac=ensureCloudAudioContext(false);if(!ac)throw new Error('AudioContext no disponible');state.cloudAudioContext=ac;state.cloudSource=ac.createMediaStreamSource(stream);state.cloudAnalysers=[];state.cloudChannelRms=[];var main=ac.createAnalyser();main.fftSize=1024;main.smoothingTimeConstant=0.12;state.cloudAnalyser=main;state.cloudSource.connect(main);state.cloudAnalysers.push(main);var settings=state.cloudDeviceSettings||{},channels=Number(settings.channelCount||state.cloudSource.channelCount||1);channels=Math.max(1,Math.min(4,channels||1));if(channels>1&&typeof ac.createChannelSplitter==='function'){try{var sp=ac.createChannelSplitter(channels);state.cloudSplitter=sp;state.cloudSource.connect(sp);for(var c=0;c<channels;c++){var ca=ac.createAnalyser();ca.fftSize=1024;ca.smoothingTimeConstant=0.12;sp.connect(ca,c,0);state.cloudAnalysers.push(ca);}}catch(_){state.cloudSplitter=null;}}state.cloudWanted=true;clearInterval(state.cloudMonitor);state.cloudMonitor=setInterval(cloudMonitorTick,45);try{var rp=ac.resume();if(rp&&typeof rp.catch==='function')rp.catch(function(){});}catch(_){}setStatus('Calibrando micrófono…','ok');refreshMicDevices();updateMicMeter(true);try{console.info('[CE VOZ FIX34] entrada',{label:state.cloudDeviceLabel,settings:settings,analizadores:state.cloudAnalysers.length});}catch(_){}return true;}
+  function streamAlive(stream){try{return !!(stream&&stream.active&&stream.getAudioTracks&&stream.getAudioTracks().some(function(t){return t.readyState==='live'&&t.enabled!==false;}));}catch(_){return false;}}
+  function startCloudRecognition(kind,fromGesture){
+    kind=kind||'ambient';state.cloudFallback=true;state.cloudKind=kind;state.cloudWanted=true;
+    if(!supportsCeVoice()){setStatus('Este navegador no permite la Voz CE por micrófono.','err');return false;}
+    // Clave de robustez: el AudioContext se crea/reanuda DENTRO del gesto real. En iPhone/Safari,
+    // hacerlo después de resolver getUserMedia puede dejar el analizador suspendido aunque el micro esté abierto.
+    if(fromGesture){state.needsGesture=false;ensureCloudAudioContext(true);}
+    if(streamAlive(state.cloudStream)){
+      if(fromGesture)ensureCloudAudioContext(true);cloudStatus(kind);setMic(kind==='user');return true;
+    }
+    if(state.cloudStream&&!streamAlive(state.cloudStream))closeCloudVoice();
+    // Un solo getUserMedia a la vez. touchstart/pointerdown/click del mismo gesto ya no abren tres streams
+    // que compitan entre sí y se cancelen por cloudGeneration.
+    if(state.cloudOpening&&state.cloudOpenPromise)return true;
+    state.cloudOpening=true;var gen=++state.cloudGeneration;setStatus('Activando Voz CE…','ok');
+    var opening=navigator.mediaDevices.getUserMedia(cloudAudioConstraints()).then(function(stream){
+      state.cloudOpening=false;state.cloudOpenPromise=null;
+      if(gen!==state.cloudGeneration){try{stream.getTracks().forEach(function(t){t.stop();});}catch(_){}return false;}
+      setupCloudStream(stream,state.cloudKind||kind);state.cloudStreamReadyAt=Date.now();setMic((state.cloudKind||kind)==='user');
+      try{stream.getAudioTracks().forEach(function(t){t.onended=function(){if(gen!==state.cloudGeneration)return;closeCloudVoice();state.needsGesture=true;setStatus('El micrófono se cerró. Pulsa una vez para rearmarlo.','err');updateBadge();};});}catch(_){}
+      return true;
+    }).catch(function(err){
+      state.cloudOpening=false;state.cloudOpenPromise=null;
+      if(clean(safeGet(STORAGE.mic,''))){safeSet(STORAGE.mic,'');setStatus('Ese micrófono no está disponible. Vuelvo al predeterminado…','err');setTimeout(function(){startCloudRecognition(state.cloudKind||kind,true);},100);return false;}
+      state.needsGesture=true;setStatus('Micrófono bloqueado: '+clean(err&&err.name||err&&err.message||'permiso')+'. Pulsa una vez en ControlEvent.','err');updateBadge();return false;
+    });
+    state.cloudOpenPromise=opening;return true;
+  }
   function fallbackToCeVoice(kind){state.localSpeechUnavailable=true;state.cloudFallback=true;stopRecognition();setStatus('Web Speech no responde. Activo Voz CE…','ok');startCloudRecognition(kind||state.pendingRecognitionKind||'ambient',false);return false;}
   function stopRecognition(){state.recognitionGeneration++;state.recognitionStarting=false;state.recognitionLive=false;var r=state.recognition;state.recognition=null;try{r&&r.abort();}catch(_){try{r&&r.stop();}catch(__){}}setMic(false);}
   function restartRecognitionKind(kind){setTimeout(function(){if(kind==='user'&&state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();else if(kind==='ambient'&&state.ambientEnabled&&!state.conversationMode)startAmbient(false);},120);}
@@ -204,12 +232,12 @@
   function startAmbient(fromGesture){if(!state.ambientEnabled||state.conversationMode||state.speaking||state.requestInFlight)return;state.mode='ambient';if(state.cloudFallback||!supportsRecognition())startCloudRecognition('ambient',!!fromGesture);else startRecognition('ambient',!!fromGesture);updateBadge();}
   function primeAmbientFromGesture(ev){
     if(ev&&ev.isTrusted===false)return;
-    ensureCloudAudioContext(true);
     if(!state.ambientEnabled||state.conversationMode)return;
     var t=ev&&ev.target;if(t&&t.closest&&t.closest('#ceVoz3Mic,#ceZuzuWakeBadge'))return;
-    if(state.cloudFallback||!supportsRecognition()){state.needsGesture=false;startCloudRecognition('ambient',true);return;}
-    if(state.needsGesture||state.recognitionStarting||(state.recognition&&!state.recognitionLive)){stopRecognition();state.needsGesture=false;startAmbient(true);return;}
-    if(!state.recognition&&!state.recognitionLive){state.needsGesture=false;startAmbient(true);}
+    var now=Date.now();if(now-state.lastTrustedGestureAt<650)return;state.lastTrustedGestureAt=now;
+    // En esta compilación la escucha ambiental usa SIEMPRE Voz CE. Un único gesto normal (Entrar,
+    // elegir evento, etc.) deja el motor persistente armado; no dependemos de Web Speech.
+    state.needsGesture=false;ensureCloudAudioContext(true);startCloudRecognition('ambient',true);
   }
 
   function clearTurnTimer(){clearTimeout(state.turnTimer);state.turnTimer=null;}
@@ -389,6 +417,19 @@
   document.addEventListener('visibilitychange',function(){if(!document.hidden&&state.conversationMode&&state.externalUiPause)hardRearmConversationMic('visibilidad restaurada');});
   window.addEventListener('pageshow',function(){if(state.conversationMode&&state.externalUiPause)hardRearmConversationMic('pageshow');});
 
+  function ambientHealthTick(){
+    if(document.hidden)return;
+    var shouldListen=state.ambientEnabled&&!state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse;
+    if(!shouldListen)return;
+    if(streamAlive(state.cloudStream)){
+      try{if(state.cloudAudioContext&&state.cloudAudioContext.state==='suspended')state.cloudAudioContext.resume().catch(function(){});}catch(_){}
+      if(!state.cloudWanted){state.cloudKind='ambient';state.cloudWanted=true;cloudStatus('ambient');}
+      return;
+    }
+    // Sin stream no lanzamos getUserMedia a escondidas: esperamos un gesto real para cumplir iOS/Safari.
+    state.needsGesture=true;updateBadge();
+  }
+
   function install(){
     injectStyle();injectBadge();injectPanel();
     // FIX27: la escucha queda ACTIVA por defecto en esta compilación. Si el navegador la
@@ -400,13 +441,17 @@
     // a encadenar Web Speech -> voz local -> Voz CE porque esa cascada ha sido la fuente de
     // estados distintos entre PC/iPhone. El mismo motor getUserMedia + STT se usa siempre.
     state.cloudFallback=true;
-    if(state.ambientEnabled)setTimeout(function(){startCloudRecognition('ambient',false);},350);
+    // No abrimos el micrófono antes del primer gesto: en iPhone/Safari eso produce un stream aparente
+    // pero un AudioContext suspendido. Se arma en la primera interacción normal del usuario.
+    state.needsGesture=true;updateBadge();
+    clearInterval(state.ambientHealthTimer);state.ambientHealthTimer=setInterval(ambientHealthTick,1500);
     document.addEventListener('pointerdown',primeAmbientFromGesture,true);
     document.addEventListener('touchstart',primeAmbientFromGesture,{capture:true,passive:true});
     document.addEventListener('keydown',primeAmbientFromGesture,true);
     document.addEventListener('click',primeAmbientFromGesture,true);
+    ['controlevent:app-ready','controlevent:auth-changed','controlevent:event-ready'].forEach(function(name){window.addEventListener(name,function(){if(!state.conversationMode&&state.ambientEnabled&&!streamAlive(state.cloudStream)){state.needsGesture=true;updateBadge();}},true);});
     if(window.MutationObserver){new MutationObserver(function(){if($('ceGeminiLibreOverlay'))injectPanel();}).observe(document.documentElement,{childList:true,subtree:true});}
-    window.addEventListener('beforeunload',function(){stopRecognition();closeCloudVoice();stopBarge();stopEntertainment(true);try{state.recorder&&state.recordingActive&&state.recorder.stop();}catch(_){}try{state.recorderStream&&state.recorderStream.getTracks().forEach(function(t){t.stop();});}catch(_){} });
+    window.addEventListener('beforeunload',function(){clearInterval(state.ambientHealthTimer);stopRecognition();closeCloudVoice();stopBarge();stopEntertainment(true);try{state.recorder&&state.recordingActive&&state.recorder.stop();}catch(_){}try{state.recorderStream&&state.recorderStream.getTracks().forEach(function(t){t.stop();});}catch(_){} });
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 
