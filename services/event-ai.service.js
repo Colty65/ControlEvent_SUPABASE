@@ -6793,7 +6793,8 @@ async function v26ToolEventDocumentation(tool,state,selectedEventId=''){
   tickets.filter(x=>x.Ticket!=='Sí').forEach(x=>missing.push({Tipo:'Compra',Referencia:x.TKxx||'Ticket',Detalle:`${v26CountPhrase(x['Registros de compra']||x.Líneas||0,'registro de compra','registros de compra')} · ${v26FormatEuro(x.Importe||0)}`,Falta:'Fototicket / justificante de compra'}));
   docs.filter(x=>x.Adjunto!=='Sí').forEach(x=>missing.push({Tipo:'Documento',Referencia:x.Documento||'DOC',Detalle:[x.Fecha,x.Descripción].filter(Boolean).join(' · '),Falta:'Adjunto del documento'}));
   const incomeJust=incomeRows.filter(x=>x.Justificante==='Sí').length,ticketJust=tickets.filter(x=>x.Ticket==='Sí').length,docJust=docs.filter(x=>x.Adjunto==='Sí').length;
-  const facts={event:rr.nombre,income_records:incomeRows.length,income_with_receipt:incomeJust,income_without_receipt:incomeRows.length-incomeJust,purchase_tickets:tickets.length,purchase_tickets_with_image:ticketJust,purchase_tickets_without_image:tickets.length-ticketJust,documents:docs.length,documents_with_attachment:docJust,documents_without_attachment:docs.length-docJust,missing_evidence_count:missing.length,missing_evidence:missing.slice(0,80),note:'Este bloque mide evidencias/adjuntos disponibles en ControlEvent. No debe equiparar automáticamente ausencia de foto con falta de conciliación bancaria.'};
+  const documentContext=docs.filter(x=>trim(x?.Descripción)).slice(0,40).map(x=>({document:trim(x?.Documento),date:trim(x?.Fecha),description:trim(x?.Descripción).slice(0,900),attachment:trim(x?.Adjunto)}));
+  const facts={event:rr.nombre,income_records:incomeRows.length,income_with_receipt:incomeJust,income_without_receipt:incomeRows.length-incomeJust,purchase_tickets:tickets.length,purchase_tickets_with_image:ticketJust,purchase_tickets_without_image:tickets.length-ticketJust,documents:docs.length,documents_with_attachment:docJust,documents_without_attachment:docs.length-docJust,document_context_count:documentContext.length,document_context:documentContext,document_context_semantics:'Los textos/Descripción de los DOC son contexto narrativo real del evento y pueden explicar organización, acuerdos, incidencias, programa o antecedentes. No son solo un contador de adjuntos.',missing_evidence_count:missing.length,missing_evidence:missing.slice(0,80),note:'Este bloque mide evidencias/adjuntos disponibles en ControlEvent y conserva además el texto descriptivo de los documentos. No debe equiparar automáticamente ausencia de foto con falta de conciliación bancaria.'};
   const documentationChartRows=[{Indicador:'Ingresos con justificante',Valor:incomeJust},{Indicador:'Ingresos sin justificante',Valor:incomeRows.length-incomeJust},{Indicador:'Tickets con imagen',Valor:ticketJust},{Indicador:'Tickets sin imagen',Valor:tickets.length-ticketJust},{Indicador:'Documentos con adjunto',Valor:docJust},{Indicador:'Documentos sin adjunto',Valor:docs.length-docJust}];
   return{id:tool.id,name:tool.name,ok:true,title:`Justificación documental · ${rr.nombre}`,facts,tables:[
     v26Table('documentation_chart',`Cobertura documental · ${rr.nombre}`,documentationChartRows,{Indicador:v26TextSchema('Tipo de evidencia'),Valor:v26CountSchema('elementos','Número de elementos documentales')}),
@@ -8045,7 +8046,12 @@ function v261CompactToolResult(result,detail='standard'){
     // Dossier/desgloses: los facts ya contienen KPIs, top y señales. Las tablas completas
     // permanecen en CE para presentación, pero no viajan fila a fila salvo detail=full.
     if(['event_dossier','event_breakdowns'].includes(name)&&detail!=='full')return 0;
-    if(detail==='brief'&&name==='event_documentation')return 0;
+    if(name==='event_documentation'&&detail!=='full'){
+      if(key==='documents')return detail==='brief'?4:12;
+      if(key==='documentation_chart')return 6;
+      if(key==='missing_evidence')return detail==='brief'?4:8;
+      if(key==='income_receipts'||key==='purchase_tickets')return 0;
+    }
     if(name==='event_bank'){
       // v2.0_exp: brief/standard = HECHOS agregados exclusivamente. Las líneas completas
       // permanecen en CE para gráficas/tablas deterministas y solo viajan a Gemini con detail=full.
@@ -8247,7 +8253,7 @@ async function v261ExecuteAgentTool(call,state,selectedEventId,flowTrace=[]){
   return v26ExecuteTool(tool,state,selectedEventId);
 }
 
-async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto',externalSignal=null}){
+async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto',externalSignal=null,maxOutputTokens=0}){
   const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para Zuzu.');e.status=503;throw e;}
   // v2.0_exp · calidad conversacional antes que microahorro: un turno con herramientas necesita
   // poder completar su segunda Interaction. Mantenemos normalmente máximo 2 llamadas exitosas por turno; una gráfica bancaria puede necesitar una tercera Interaction para materializarse, pero
@@ -8258,9 +8264,9 @@ async function v261CallInteraction({input,previousInteractionId='',model,systemI
   const predictedInputTokens=Math.ceil(inputChars/3.35),predictedOutputTokens=toolChoice==='none'?1200:700;
   const predicted=estimateGeminiCost(model,{promptTokenCount:predictedInputTokens,candidatesTokenCount:predictedOutputTokens,totalTokenCount:predictedInputTokens+predictedOutputTokens});
   if(num(spent?.calls)>=1&&num(spent?.costEurApprox)+num(predicted?.costEurApprox)>hardCap){
-    zuzuTracePush(flowTrace,'v30 · Presupuesto conversacional','WARN',`La segunda llamada necesaria puede superar el objetivo interno (${hardCap.toFixed(3)} €), pero se completa para no romper el hilo ni dejar una herramienta sin respuesta.`);
+    zuzuTracePush(flowTrace,'v30 · Presupuesto conversacional','INFO',`La segunda llamada necesaria puede superar el objetivo interno (${hardCap.toFixed(3)} €); se completa porque forma parte del mismo turno y evita dejar herramientas sin respuesta.`);
   }
-  const thinkingLevel=trim(process.env.CONTROLEVENT_ZUZU_THINKING_LEVEL||'low')||'low';const maxOutput=Math.max(1200,Math.min(4800,Number(process.env.CONTROLEVENT_ZUZU_MAX_OUTPUT_TOKENS)||1600));
+  const thinkingLevel=trim(process.env.CONTROLEVENT_ZUZU_THINKING_LEVEL||'low')||'low';const requestedMax=Number(maxOutputTokens)||0;const maxOutput=Math.max(1200,Math.min(4800,requestedMax||Number(process.env.CONTROLEVENT_ZUZU_MAX_OUTPUT_TOKENS)||1600));
   // FIX12 · Gemini 2.5 Flash-Lite tiene pensamiento desactivado por defecto. En la ruta
   // Interactions evitamos enviar controles de pensamiento a Lite: algunas revisiones del endpoint
   // traducen `thinking_level=low` a un presupuesto no válido y la petición cae inmediatamente al
@@ -9725,13 +9731,13 @@ function v40SccToolCatalogText(){
   // SCC solo necesita saber QUÉ fuente elegir. Las descripciones extensas de v261AgentTools
   // se reservan para el agente legacy; repetirlas dos veces por turno encarecía cada Interaction.
   const concise={
-    event_dossier:'Resumen agregado de un evento: estado, fechas, ingresos, compras, donaciones, saldo, valoración, asistencia y gestión.',
+    event_dossier:'Ficha global del evento: incluye SIEMPRE ce_eventos.descripcion como contexto narrativo, además de estado, fechas, ingresos, compras, donaciones, saldo, valoración, asistencia y gestión.',
     event_breakdowns:'Agregados de un evento por tienda, donante, segmento, destino, producto y método de ingreso.',
     master_catalog:'Catálogos maestros; en productos puede cruzar compras de un evento.',
     event_purchase_lines:'Compras de un evento, con filtro previo por producto/familia, tienda, ticket y estado; incluye agregados por producto.',
     event_donation_lines:'Donaciones de un evento y detalle por donante/producto.',
     event_people:'Asistencia y personas de un evento, con señales relevantes.',
-    event_documentation:'Justificantes de ingreso, tickets de compra, documentos y evidencias pendientes.',
+    event_documentation:'Documentos DOC del evento con su Descripción/texto (contexto narrativo) y, además, justificantes de ingreso, tickets/fototickets y evidencias pendientes.',
     event_management:'Hitos y tareas LG de un evento.',
     event_bank:'Cuadre bancario canónico de un evento: resumen, movimientos y vínculos justificativos.',
     event_bank_timeline:'Cronología bancaria persistida del evento.',
@@ -9779,7 +9785,7 @@ function v40SccSystemInstruction(state,selectedEventId,{usuarioLogado,user,authU
   const lastScc=v40LastSccContext(conversationHistory);
   const localNow=trim(clientLocalDateTime).slice(0,120)||new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',dateStyle:'full',timeStyle:'medium'}).format(new Date());
   const tz=trim(clientTimeZone).slice(0,80)||'Europe/Madrid',utcNow=trim(clientNowIso).slice(0,80)||new Date().toISOString();
-  const voice=voiceConversation?'\nMODO ORAL: responde todavía más breve: normalmente 2-5 frases, sin leer tablas, Markdown, guiones ni encabezados.':'\nMODO ESCRITO CONVERSACIONAL: normalmente 2-6 frases o párrafos cortos. Solo amplía cuando el usuario pida detalle.';
+  const voice=voiceConversation?'\nMODO ORAL: responde directo y normalmente en 1-4 frases. EXCEPCIÓN OBLIGATORIA: si el usuario pide una lista/listado, «cuáles», «quiénes», «todos» o una enumeración, la brevedad NO permite omitir elementos: enumera verbalmente el conjunto solicitado completo y sin convertirlo en tabla.':'\nMODO ESCRITO CONVERSACIONAL: normalmente 1-5 frases o párrafos cortos. Si el usuario pide una lista o detalle, entrégalo completo antes de cualquier comentario accesorio.';
   return `Eres Zuzu, asistente conversacional de ControlEvent v2.0_exp. Hablas en español natural con ${display}.${voice}
 
 USUARIO ACTUAL (ce_acceso, solo el usuario autenticado): ${userIdentity}.
@@ -9804,6 +9810,8 @@ Datos y eficiencia:
 - Herramientas de un evento (event_dossier, event_breakdowns, event_purchase_lines, event_donation_lines, event_people, event_documentation, event_management, event_bank, event_bank_timeline, event_weather): scope=active_event o named_event. Para global usa herramientas globales.
 - person_dossier y store_purchases admiten all_events. Para una persona concreta usa person_dossier; si hay varias personas, una petición por cada persona en el mismo plan.
 - PRINCIPIO DE DESCUBRIMIENTO: el usuario no tiene que conocer el nombre exacto del dato para obtener una respuesta útil. En preguntas humanas amplias o explicativas («háblame de X», «qué fue de X», «qué sabes de X», «por qué no aparece», «qué pasó con...») pide una fuente suficientemente amplia para descubrir el contexto relevante, no solo la comprobación mínima. Para persona, prefiere person_dossier; si además pregunta por su presencia o ausencia en un evento, combina person_dossier con event_people y, cuando la condición de socio sea material, canonical_socios. Para evento, una pregunta global debe incluir event_dossier.
+- TEXTO DEL EVENTO ES DATO: event_dossier contiene el campo ce_eventos.descripcion. Léelo como contexto de primera clase —programa, comidas, actividades, condicionantes, alergias, intención organizativa, etc.— y úsalo cuando explique la respuesta; no lo ignores por no ser numérico.
+- DOCUMENTOS TAMBIÉN DAN CONTEXTO: event_documentation conserva el texto/Descripción de los DOC. Cuando el usuario pregunte de forma narrativa por qué pasó, cómo se organizó, acuerdos, incidencias, programa, antecedentes o detalles que puedan constar en documentos, pide event_documentation además de event_dossier. Para una cifra puntual no cargues documentación sin motivo.
 - Si una consulta pide EXPLICAR una ausencia, diferencia o anomalía, no te limites a confirmar sí/no cuando otra fuente canónica del mismo turno puede explicar el contexto. Pide esa fuente complementaria en el mismo plan; máximo 1-2 complementos relevantes, sin cargar módulos ajenos.
 - Si eliges event_purchase_lines y el mensaje nombra un producto/familia, informa product. En un seguimiento («cada uno», «ordénalos», «ahora el precio») conserva también el filtro de producto/familia del dataset anterior. No cargues todas las compras para contestar por Coca-Cola, cerveza u otro producto.
 - Para un resumen bancario usa event_bank con detail=standard; pide detail=full solo si el usuario solicita movimientos concretos/exhaustivos. El Cuadre nunca se reconstruye con histórico general.
@@ -9813,7 +9821,9 @@ Datos y eficiencia:
 
 Estilo humano de respuesta:
 - La respuesta principal debe transmitir primero lo importante. Evita informes enciclopédicos en una charla normal.
-- PROACTIVIDAD ÚTIL: después de contestar lo preguntado, revisa los datos canónicos devueltos y añade de forma natural 1-3 hechos SALIENTES directamente relacionados que una persona razonable necesitaría saber aunque no conozca el campo exacto que debe preguntar. Prioriza excepciones, pendientes, ausencia/presencia relevante, exenciones/ajustes, responsabilidades reales de compra, donaciones, correcciones, tareas pendientes o vínculos bancarios/documentales que cambien la interpretación. No metas curiosidades irrelevantes ni conviertas la respuesta en un informe.
+- RESPUESTA CONTUNDENTE: la primera frase debe contestar de frente. No expliques durante varias frases lo que vas a revisar ni des rodeos.
+- LISTAS PEDIDAS SON OBLIGATORIAS: si el usuario pide «lista», «listado», «dime cuáles/quiénes», «todos/todas», «enumera» o equivalente, entrega la enumeración solicitada. No la sustituyas por un resumen, aunque la conversación sea hablada. Primero la lista; después, como máximo, una observación útil.
+- PROACTIVIDAD ÚTIL: después de contestar lo preguntado, revisa los datos canónicos devueltos y añade de forma natural 1-2 hechos SALIENTES directamente relacionados que una persona razonable necesitaría saber aunque no conozca el campo exacto que debe preguntar. Prioriza excepciones, pendientes, ausencia/presencia relevante, exenciones/ajustes, responsabilidades reales de compra, donaciones, correcciones, tareas pendientes o vínculos bancarios/documentales que cambien la interpretación. No metas curiosidades irrelevantes ni conviertas la respuesta en un informe.
 - Si un dato saliente contradice una impresión inicial o explica por qué algo «no aparece», dilo en la PRIMERA respuesta en la que ese dato ya esté disponible. No obligues al usuario a descubrir la pregunta mágica para sacarlo.
 - Si una fuente devuelve varios bloques útiles, no ocultes silenciosamente el bloque que cambia materialmente la historia del sujeto. Resume ese bloque aunque no muestres tabla.
 - Por defecto NO uses Markdown visible: nada de **asteriscos**, encabezados con # ni listas con guiones. Si hay varios datos, intégralos en prosa corta o líneas limpias.
@@ -9926,6 +9936,20 @@ function v40CompactFactValue(value,depth=0,limits={array:10,keys:36,string:360})
 }
 function v40CompactSccFacts(name,facts={},detail='standard'){
   const f=(facts&&typeof facts==='object')?facts:{};
+  if(name==='event_dossier'){
+    const limits=detail==='full'?{array:24,keys:64,string:900}:detail==='brief'?{array:5,keys:34,string:320}:{array:10,keys:46,string:420};
+    const out=v40CompactFactValue(f,0,limits)||{};
+    const maxDescription=detail==='full'?6000:detail==='brief'?1100:2800;
+    if(trim(f?.description)){out.description=trim(f.description).slice(0,maxDescription);out.description_source='ce_eventos.descripcion · contexto narrativo canónico del evento';}
+    return out;
+  }
+  if(name==='event_documentation'){
+    const limits=detail==='full'?{array:40,keys:60,string:900}:detail==='brief'?{array:4,keys:34,string:420}:{array:12,keys:46,string:650};
+    const out=v40CompactFactValue(f,0,limits)||{};
+    if(Array.isArray(f?.document_context))out.document_context=f.document_context.slice(0,detail==='full'?40:detail==='brief'?4:12).map(x=>({document:trim(x?.document),date:trim(x?.date),description:trim(x?.description).slice(0,detail==='full'?1000:650),attachment:trim(x?.attachment)}));
+    out.document_context_source='ce_documentos · campo Descripción/texto de documentos del evento';
+    return out;
+  }
   if(name==='event_bank'&&detail!=='full'){
     const keep=['event','event_finalized','has_bank_reconciliation','has_stored_bank_rows','reconciliation_row_count','reconciliation_status','lifecycle_message','bank_data_available','event_start','event_end','period_start','period_end','period_relation_to_event','period_relation_reason','summary','reconciliation_complete','period_candidate_movement_count','movement_count','included_movement_count','excluded_movement_count','link_count','opening_balance','closing_balance','bank_impact','included_income_total','included_charge_total','justified_movement_count','unlinked_movement_count','ticket_linked_movement_count','income_linked_movement_count','event_window_movement_count','event_window_opening_balance','event_window_closing_balance','event_window_impact','event_window_income_total','event_window_charge_total','event_window_has_movements','note'];
     const out={};for(const k of keep)if(Object.prototype.hasOwnProperty.call(f,k)){const c=v40CompactFactValue(f[k],0,{array:6,keys:24,string:300});if(c!==undefined)out[k]=c;}
@@ -10001,7 +10025,7 @@ function v40TechnicalColumnsRequested(prompt=''){
 }
 function v40ExplicitWideListRequest(prompt=''){
   const p=norm(prompt);
-  return /\b(?:lista|listado|relacion|relación|todos|todas|complet[ao]|exhaustiv[ao])\b/.test(p)&&/\b(?:productos?|personas?|socios?|movimientos?|compras?|donaciones?|eventos?|tiendas?)\b/.test(p);
+  return /\b(?:lista|listado|relacion|relación|todos|todas|complet[ao]|exhaustiv[ao])\b/.test(p)&&/\b(?:productos?|personas?|socios?|movimientos?|compras?|donaciones?|eventos?|tiendas?|documentos?|tickets?|hitos?|tareas?|lg)\b/.test(p);
 }
 function v40HumanPresentationPlan(plan,userPrompt='',voiceConversation=false){
   const explicitTable=v40ExplicitTableRequest(userPrompt),wideList=v40ExplicitWideListRequest(userPrompt);
@@ -10012,6 +10036,90 @@ function v40HumanPresentationPlan(plan,userPrompt='',voiceConversation=false){
   else if((explicitTable||wideList)&&presentation.show_table!==true)presentation.show_table=true;
   return{...plan,presentation};
 }
+function v40ExplicitEnumerationRequest(prompt=''){
+  const p=norm(prompt);
+  return /\b(?:lista|listado|relacion|relación|enumera|enumerame|enumérame|nombra|nombrame|nómbrame|uno\s+por\s+uno|dime\s+(?:todos|todas|cuales|cuáles|quienes|quiénes)|cuales\s+son|cuáles\s+son|quienes\s+son|quiénes\s+son|todos\s+los|todas\s+las)\b/.test(p);
+}
+function v40NarrativeEventContextRequest(prompt='',plan={}){
+  const p=norm(prompt),d=norm(plan?.domain);
+  if(!['event','general','documentation'].includes(d)&&arr(plan?.subjects).length)return false;
+  return /\b(?:hablame|háblame|cuentame|cuéntame|que\s+paso|qué\s+pasó|como\s+fue|cómo\s+fue|historia|contexto|organizacion|organización|programa|agenda|plan(?:ificacion|ificación)?|incidenc|acuerdo|observacion|observación|detalle|comida|cena|aperitivo|actividad|alerg|previst)\b/.test(p);
+}
+function v40EnsurePlanRequest(plan,tool,purpose,args={}){
+  if(arr(plan?.data_requests).some(r=>trim(r?.tool)===tool))return plan;
+  if(arr(plan?.data_requests).length>=6)return plan;
+  const req={tool,purpose,arguments:args,index:arr(plan.data_requests).length+1};
+  return{...plan,data_requests:[...arr(plan.data_requests),req]};
+}
+function v40StrengthenPlanCoverage(plan,userPrompt='',voiceConversation=false,flowTrace=[]){
+  let out={...plan,data_requests:arr(plan?.data_requests).map((r,i)=>({...r,index:i+1,arguments:{...(r?.arguments||{})}}))};
+  const explicit=v40ExplicitEnumerationRequest(userPrompt);
+  if(explicit){
+    const listable=new Set(['master_catalog','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','person_dossier','participation_events','people_activity','store_purchases','canonical_socios','events_catalog','events_overview']);
+    out.data_requests=out.data_requests.map((r,i)=>listable.has(trim(r?.tool))?{...r,index:i+1,arguments:{...(r?.arguments||{}),detail:'full'}}:{...r,index:i+1});
+    const p=norm(userPrompt),scope=['active_event','named_event'].includes(out.scope)?out.scope:(trim(out.event)?'named_event':'active_event'),ea={scope,...(trim(out.event)?{event:trim(out.event)}:{}),detail:'full'};
+    if(/\b(?:document|doc\b|docs\b|justificant|fototicket|evidenc)\b/.test(p))out=v40EnsurePlanRequest(out,'event_documentation','Enumeración documental explícita solicitada por el usuario',ea);
+    else if(/\b(?:donacion|donación|donaciones|donantes?)\b/.test(p))out=v40EnsurePlanRequest(out,'event_donation_lines','Lista de donaciones/donantes solicitada explícitamente',ea);
+    else if(/\b(?:compra|compras|producto|productos|tickets?|tk\s*\d*)\b/.test(p))out=v40EnsurePlanRequest(out,'event_purchase_lines','Lista de compras/productos/tickets solicitada explícitamente',{...ea,purchase_status:'all'});
+    else if(/\b(?:asistent|personas?|socios?)\b/.test(p)&&['active_event','named_event'].includes(scope))out=v40EnsurePlanRequest(out,'event_people','Lista de personas/asistencia solicitada explícitamente',ea);
+    else if(/\b(?:hitos?|tareas?|\blg\b|gestion|gestión)\b/.test(p))out=v40EnsurePlanRequest(out,'event_management','Lista de gestión solicitada explícitamente',ea);
+    else if(/\b(?:movimientos?|cuadre|banc)\b/.test(p))out=v40EnsurePlanRequest(out,'event_bank','Lista bancaria solicitada explícitamente',ea);
+    out={...out,operation:'list',presentation:{...(out.presentation||{}),show_table:voiceConversation?false:(out.presentation?.show_table===true),show_chart:false}};
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Cobertura de lista','OK','La petición contiene una enumeración explícita: CE fuerza detalle completo en las fuentes listables y la lista prevalece sobre la brevedad oral.');
+  }
+  if(v40NarrativeEventContextRequest(userPrompt,out)&&(['active_event','named_event'].includes(out.scope||'')||!!trim(out.event))){
+    const scope=['active_event','named_event'].includes(out.scope)?out.scope:'named_event',ea={scope,...(trim(out.event)?{event:trim(out.event)}:{}),detail:'standard'};
+    out=v40EnsurePlanRequest(out,'event_dossier','Contexto narrativo del evento, incluyendo ce_eventos.descripcion',ea);
+    out=v40EnsurePlanRequest(out,'event_documentation','Contexto textual de los documentos DOC del evento',ea);
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Contexto textual','OK','Pregunta narrativa de evento: se garantiza ce_eventos.descripcion y el texto de Documentos como fuentes contextuales, además de las cifras que haya pedido Gemini.');
+  }
+  out.data_requests=arr(out.data_requests).slice(0,6).map((r,i)=>({...r,index:i+1}));
+  return out;
+}
+function v40ListPrimaryColumn(prompt='',row={}){
+  const p=norm(prompt),keys=Object.keys(row||{}),find=(re)=>keys.find(k=>re.test(norm(k))),tryPick=(promptRe,colRe)=>{if(!promptRe.test(p))return'';return find(colRe)||'';};
+  const ordered=[
+    [/\b(?:document\w*|docs?)\b/,/^(?:documento|codigo|código)$|document/],
+    [/\b(?:tickets?|tkxx|tk\s*\d*)\b/,/^(?:tkxx|ticket)$|ticket/],
+    [/\bproductos?\b/,/^producto$|producto/],
+    [/\bdonantes?\b/,/^donante$|donante/],
+    [/\b(?:asistent\w*|personas?|socios?)\b/,/^(?:asistente|persona|entidad)$|persona|asistent|entidad/],
+    [/\beventos?\b/,/^evento$|evento/],
+    [/\btiendas?\b/,/^tienda$|tienda/],
+    [/\bhitos?\b/,/^hito$|hito/],
+    [/\b(?:tareas?|\blg\b)\b/,/^(?:tarea|lg|descripcion)$|tarea|descripcion/],
+    [/\bmovimientos?\b/,/^(?:concepto|movimiento)$|concepto|movimiento/]
+  ];
+  for(const pair of ordered){const k=tryPick(pair[0],pair[1]);if(k)return k;}
+  return find(/^(?:producto|persona|asistente|evento|documento|tkxx|ticket|donante|tienda|hito|tarea|descripcion)$/)||keys.find(k=>!/^id\b|creado|actualizado|timestamp/i.test(norm(k))&&typeof row[k]!=='object');
+}
+function v40EnumerationTableScore(prompt='',toolName='',table={}){
+  const p=norm(prompt),txt=norm(`${toolName} ${table?.key||''} ${table?.title||''}`);let score=0;
+  const pairs=[[/\bproductos?\b/,'product'],[/\b(?:personas?|socios?|asistent\w*)\b/,'person'],[/\b(?:document\w*|docs?)\b/,'document'],[/\b(?:tickets?|tkxx)\b/,'ticket'],[/\bdonantes?\b/,'donor'],[/\bdonaciones?\b/,'donat'],[/\beventos?\b/,'event'],[/\btiendas?\b/,'store'],[/\b(?:hitos?|tareas?|\blg\b)\b/,'management'],[/\bmovimientos?\b/,'movement']];
+  for(const [re,token] of pairs)if(re.test(p)&&txt.includes(token))score+=20;
+  if(/purchase_lines|donation_lines|attendance|documents|events|people|management|movements|timeline/.test(txt))score+=6;
+  if(/chart|summary|kpi|breakdown|totals?/.test(txt))score-=8;
+  score+=Math.min(5,arr(table?.rows).length/5);
+  return score;
+}
+function v40CanonicalEnumerationAnswer(userPrompt='',plan={},results=[],existingAnswer=''){
+  if(!v40ExplicitEnumerationRequest(userPrompt))return'';
+  const candidates=[];for(const r of arr(results)){for(const t of arr(r?.tables)){if(arr(t?.rows).length)candidates.push({r,t,score:v40EnumerationTableScore(userPrompt,trim(r?.name),t)});}}
+  if(!candidates.length)return'';candidates.sort((a,b)=>b.score-a.score||arr(b.t?.rows).length-arr(a.t?.rows).length);const best=candidates[0],rows=arr(best.t?.rows);if(!rows.length)return'';
+  const p=norm(userPrompt),primary=v40ListPrimaryColumn(userPrompt,rows[0]);if(!primary)return'';
+  const wantPrice=/\b(?:precio|unitari)\b/.test(p),wantAmount=/\b(?:importe|valor|total|gasto|coste|costo)\b/.test(p),wantUnits=/\b(?:unidades?|cantidad)\b/.test(p),wantDate=/\bfecha\b/.test(p),wantResponsible=/\bresponsab/.test(p),wantStore=/\btienda/.test(p),isDoc=/document/.test(norm(best.t?.key+' '+best.t?.title));
+  const keys=Object.keys(rows[0]||{}),find=(re)=>keys.find(k=>re.test(norm(k))),extras=[];
+  const addExtra=(re)=>{const k=find(re);if(k&&k!==primary&&!extras.includes(k))extras.push(k);};
+  if(isDoc){addExtra(/descripci[oó]n|texto/);addExtra(/^fecha$/);}
+  if(/\bcompras?\b/.test(p)){addExtra(/^producto$|producto/);addExtra(/^(?:tkxx|ticket)$|ticket/);addExtra(/importe|valor|total/);addExtra(/tienda/);}
+  if(/\bdonaciones?\b/.test(p)){addExtra(/^donante$|donante/);addExtra(/^producto$|producto/);addExtra(/unidades|cantidad/);addExtra(/importe|valor|total/);}
+  if(/\bmovimientos?\b/.test(p)){addExtra(/importe|impacto/);addExtra(/fecha|momento/);}
+  if(wantPrice)addExtra(/precio.*unit|precio/);if(wantAmount)addExtra(/importe|valor|total/);if(wantUnits)addExtra(/unidades|cantidad/);if(wantDate)addExtra(/^fecha|momento/);if(wantResponsible)addExtra(/responsable/);if(wantStore)addExtra(/tienda/);
+  const lines=[],seen=new Set();for(const row of rows){const base=trim(row?.[primary]);if(!base)continue;const parts=[base];for(const k of extras.slice(0,3)){let v=row?.[k];if(v==null||trim(v)==='')continue;const kn=norm(k);if(typeof v==='number'&&/precio|importe|valor|total|coste|costo/.test(kn))v=/precio/.test(kn)?v26FormatEuro(v):v40WholeEuro(v);parts.push(`${k}: ${trim(v)}`);}const line=parts.join(' · '),key=norm(line);if(!seen.has(key)){seen.add(key);lines.push(line);}}
+  if(!lines.length)return'';const answerNorm=norm(existingAnswer),covered=lines.filter(x=>answerNorm.includes(norm(trim(x.split(' · ')[0])))).length,ratio=covered/lines.length;if(ratio>=0.8)return trim(existingAnswer);
+  const shown=lines.slice(0,120),more=lines.length-shown.length;return `La lista es: ${shown.join('; ')}.${more>0?` Quedan ${more} elementos más; el límite de seguridad de esta locución es 120.`:''}`;
+}
+
 function v40WholeEuro(value){
   const n=Number(value);if(!Number.isFinite(n))return'';
   return `${new Intl.NumberFormat('es-ES',{maximumFractionDigits:0}).format(Math.round(n))} €`;
@@ -10058,7 +10166,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX32 CONVERSACIÓN HUMANA','OK','Build 20260818-FIX32: respuestas más proactivas con hechos salientes, voz sin muletilla de nombre y repertorio oral de 20 frases sin repetir hasta agotarlo.');
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX33 CONVERSACIÓN ÚTIL','OK','Build 20260818-FIX33: listas explícitas garantizadas, ce_eventos.descripcion + texto de Documentos como contexto narrativo, respuestas más directas y recuperación de voz/descargas.');
   zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
   const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
@@ -10068,21 +10176,25 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   if(!calls.length){const e=new Error('SCC no devolvió el plan obligatorio.');e.status=502;throw e;}
   const chosen=v40ChoosePlanCall(calls,state,selectedEventId);if(!chosen){const e=new Error('SCC no devolvió un plan utilizable.');e.status=502;throw e;}
   let plan=v40HumanPresentationPlan(chosen.plan,userPrompt,voiceConversation);
+  plan=v40StrengthenPlanCoverage(plan,userPrompt,voiceConversation,flowTrace);
+  const explicitEnumeration=v40ExplicitEnumerationRequest(userPrompt);
   if(calls.length>1)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Plan duplicado','WARN',`Gemini emitió ${calls.length} llamadas scc_execute_plan. Se ejecuta una sola decisión canónica y se responden las duplicadas como ignoradas para cerrar correctamente la Interaction.`);
   zuzuTracePush(flowTrace,'v2.0_exp · SCC · Decisión de contexto','OK',`${plan.relation.toUpperCase()} · ámbito=${plan.scope} · evento=${plan.event||'—'} · sujetos=${plan.subjects.join(' / ')||'—'} · dominio=${plan.domain} · operación=${plan.operation} · dataset=${plan.dataset.id||'—'} · confianza=${Math.round(plan.confidence*100)}%. ${plan.reason}`);
   const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace,userPrompt);
-  const realResult={ok:executed.errors.length===0,scc_plan:plan,canonical_results:executed.compactResults,errors:executed.errors,instruction:'Responde ahora al usuario con estos datos. No pidas otra herramienta. Contesta primero a lo preguntado y añade 1-3 hechos salientes directamente relacionados que cambien o completen de forma útil la interpretación, sin esperar a que el usuario conozca la pregunta exacta. Sé conversacional y breve salvo petición expresa de detalle.'};
+  const realInstruction=explicitEnumeration?'El usuario ha pedido una LISTA/ENUMERACIÓN. Debes devolverla ahora, completa con los elementos canónicos disponibles y sin sustituirla por un resumen. No pidas otra herramienta. Da primero la lista y, después, como máximo una observación contextual útil.':'Responde ahora al usuario con estos datos. No pidas otra herramienta. Contesta de frente en la primera frase y añade como máximo 1-2 hechos salientes que cambien o completen de forma útil la interpretación. Usa ce_eventos.descripcion y el texto de Documentos si están presentes y son pertinentes. Evita rodeos.';
+  const realResult={ok:executed.errors.length===0,scc_plan:plan,canonical_results:executed.compactResults,errors:executed.errors,instruction:realInstruction};
   const functionResults=calls.map(call=>trim(call.id)===trim(chosen.call.id)
     ?{type:'function_result',name:'scc_execute_plan',call_id:trim(call.id),result:realResult}
     :{type:'function_result',name:'scc_execute_plan',call_id:trim(call.id),result:{ok:true,ignored_duplicate:true,instruction:'Esta llamada fue un duplicado accidental. Usa exclusivamente el resultado canónico de la otra llamada scc_execute_plan de este turno.'}});
   try{
-    payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools:[],flowTrace,stage:'v2.0_exp · SCC · Gemini responde con datos CE',toolChoice:'none',externalSignal});
+    payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools:[],flowTrace,stage:'v2.0_exp · SCC · Gemini responde con datos CE',toolChoice:'none',externalSignal,maxOutputTokens:explicitEnumeration?2600:0});
   }catch(error){error.canonicalResults=[...executed.fullResults];error.sccPlan=plan;throw error;}
   let final=v261ParseFinal(payload);
   if(!trim(final.answer)){const e=new Error('Gemini terminó el turno SCC sin respuesta final legible.');e.status=502;e.canonicalResults=[...executed.fullResults];e.sccPlan=plan;throw e;}
   final=v307BankAvailabilityRepair(final,executed.fullResults,userPrompt,flowTrace);
   final=v283DeterministicSafetyRepair(final,executed.fullResults,conversationHistory);
   final={...final,answer:v40ConversationalPolish(final.answer,userPrompt,voiceConversation)};
+  if(explicitEnumeration){const guaranteed=v40CanonicalEnumerationAnswer(userPrompt,plan,executed.fullResults,final.answer);if(guaranteed)final={...final,answer:v40ConversationalPolish(guaranteed,userPrompt,voiceConversation)};}
   let showTables=arr(final.showTables);
   if(!plan.presentation.show_table)showTables=[];
   else if(!showTables.length)showTables=v40DefaultShowTable(executed.fullResults,plan);
@@ -12233,7 +12345,10 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null;
     zuzuTracePush(flowTrace,'v2.0_exp · SCC · Respaldo por fallo real','WARN',`Gemini no completó el turno SCC: ${cleanGeminiError(error)}. ${currentTurnResults.length?`CE conserva ${currentTurnResults.length} fuente(s) que Gemini había pedido, pero se corta la Interaction para no dejar un contexto que Gemini no haya visto completo.`:'No llegaron a ejecutarse fuentes canónicas.'}`);
     if(currentTurnResults.length){
-      const fallbackFinal={title:'Datos canónicos del turno',answer:'Gemini no ha podido cerrar la respuesta de este turno, pero ControlEvent sí ha recuperado las fuentes que ella había solicitado. Te muestro esos datos sin inventar una interpretación adicional.',warnings:['La Interaction se reiniciará en el siguiente turno para no conservar una conversación incompleta.'],showTables:v40DefaultShowTable(currentTurnResults,plan||{presentation:{show_table:true}}),chartSpecs:[]};
+      const listAnswer=v40CanonicalEnumerationAnswer(userPrompt,plan||{},currentTurnResults,'');
+      const localClosure=!listAnswer?v305CanonicalClosureFromResults(userPrompt,currentTurnResults,safeHistory):null;
+      const fallbackAnswer=listAnswer||trim(localClosure?.answer)||'ControlEvent ha recuperado los datos canónicos de este turno, aunque Gemini no haya podido cerrar la redacción. Se muestran los datos disponibles sin inventar conclusiones.';
+      const fallbackFinal={title:trim(localClosure?.title)||'Datos canónicos del turno',answer:fallbackAnswer,warnings:['La redacción Gemini no terminó correctamente; la respuesta anterior se ha cerrado directamente con los datos canónicos ya recuperados por ControlEvent.'],showTables:voiceConversation?[]:(arr(localClosure?.showTables).length?arr(localClosure.showTables):v40DefaultShowTable(currentTurnResults,plan||{presentation:{show_table:true}})),chartSpecs:[]};
       const presentation=voiceConversation?{tables:[],charts:[],stats:{}}:v26BuildPresentation(fallbackFinal,currentTurnResults,userPrompt,{wantsCharts:false,bankContext:false,staticPointLabels:false});
       const resultContext=plan?v40SccResultContext(plan,currentTurnResults):{domain:'scc_error',scc:{relation:'reset',reason:'fallo técnico de cierre',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'scc_error',operation:'retry',dataset:{id:'',description:'',carry_forward:false},presentation:{},tools:currentTurnResults.map(r=>trim(r?.name)).filter(Boolean)}};
       return{ok:true,rejected:false,title:fallbackFinal.title,answer:fallbackFinal.answer,warnings:fallbackFinal.warnings,charts:presentation.charts||[],tables:presentation.tables||[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',architecture:'SCC 2.0 fallback: solo fuentes pedidas por Gemini en este turno; cadena nativa reiniciada por cierre incompleto',interactionId:'',resetInteractionId:true,resultContext,tools:currentTurnResults.map(r=>trim(r?.name)).filter(Boolean),geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};

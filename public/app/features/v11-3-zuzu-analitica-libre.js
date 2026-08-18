@@ -620,6 +620,8 @@
   async function runAi(){
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
+    if(window.__ceZuzuRunBusy){setStatus('Zuzu todavía está cerrando la consulta anterior.','');return;}
+    window.__ceZuzuRunBusy=true;var requestController=null,requestWatchdog=null;
     // v2.0_exp: la conversación nativa de Gemini es el hilo principal. El evento de pantalla
     // sigue siendo contexto ambiental y ControlEvent aporta herramientas/hechos canónicos.
     setStatus('', '');
@@ -632,7 +634,10 @@
       var history=conversationHistoryForApi();
       var previousInteractionId=loadZuzuInteractionId();
       var conversationContext=loadZuzuConversationContext();
-      var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();} var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
+      var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();}
+      requestController=typeof AbortController!=='undefined'?new AbortController():null;
+      if(requestController)requestWatchdog=setTimeout(function(){try{requestController.abort();}catch(_){}},75000);
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -695,9 +700,12 @@
       // Router sombra conservado como herramienta de diagnóstico/regresión, pero fuera del flujo normal de producción.
     }catch(err){
       stopZuzuThinking();
-      resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Zuzu</h3><div class="ce-ai-answer">'+esc(err&&err.message||err)+'</div></div>';
-      setStatus('Error', 'err');
-      try{document.dispatchEvent(new CustomEvent('ce:zuzu-request-error',{detail:{message:String(err&&err.message||err||'Error')}}));}catch(_){ }
+      var timedOut=err&&err.name==='AbortError',message=timedOut?'La consulta ha superado 75 segundos. He liberado la conversación para que puedas seguir hablando sin recargar ControlEvent.':String(err&&err.message||err||'Error');
+      resEl.innerHTML='<div class="ce-ai-card ce-ai-rejected"><h3>No se pudo consultar Zuzu</h3><div class="ce-ai-answer">'+esc(message)+'</div></div>';
+      setStatus(timedOut?'Consulta liberada':'Error', 'err');
+      try{document.dispatchEvent(new CustomEvent('ce:zuzu-request-error',{detail:{message:message}}));}catch(_){ }
+    }finally{
+      if(requestWatchdog)clearTimeout(requestWatchdog);window.__ceZuzuRunBusy=false;
     }
   }
   function usageHtml(data){
