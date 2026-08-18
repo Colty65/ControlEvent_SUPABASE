@@ -132,13 +132,21 @@ function zuzuFallbackVoiceEntity(rawPrompt='', type='', canonical='') {
   return'';
 }
 async function zuzuLearnFromVoiceTurn({rawPrompt='',voiceEntities=[],resultContext={}}={}) {
-  const names=zuzuResultEntityNames(resultContext), incoming=arr(voiceEntities).map(r=>({type:zuzuNormType(r?.type||r?.datos),text:trim(r?.text||r?.texto)})).filter(r=>r.text&&r.type!=='OTROS');
+  const names=zuzuResultEntityNames(resultContext), promptKey=` ${zuzuNormKey(rawPrompt)} `;
+  const incoming=arr(voiceEntities).map(r=>({type:zuzuNormType(r?.type||r?.datos),text:trim(r?.text||r?.texto)})).filter(r=>r.text&&r.type!=='OTROS');
+  const entityLike=(raw,type,canonical)=>{
+    const key=zuzuNormKey(raw), words=key.split(/\s+/).filter(Boolean);if(!key||words.length>6||!promptKey.includes(` ${key} `))return false;
+    if(/\b(?:dame|dime|lista|listado|ordena|busca|muestra|quiero|ahora|este|esta|estos|estas|registrados|info|informacion|información)\b/.test(key)&&words.length>2)return false;
+    if(type==='EVENTOS'){const cy=(String(canonical).match(/\b20\d{2}\b/)||[])[0];if(cy&&!key.includes(cy)&&!zuzuNormKey(canonical).split(' ').some(x=>x.length>=4&&key.includes(x)))return false;}
+    return true;
+  };
   for(const type of ['EVENTOS','PERSONAS','PRODUCTOS','TIENDAS']){
     const canon=[...new Set(arr(names[type]).filter(Boolean))], rawForType=incoming.filter(r=>r.type===type);
-    if(canon.length===1){
-      if(rawForType.length===1) void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[0].text,dato_bueno:canon[0],confianza:1});
-      else if(!rawForType.length){const guess=zuzuFallbackVoiceEntity(rawPrompt,type,canon[0]);if(guess)void zuzuPersistLearnedNormalization({datos:type,texto:guess,dato_bueno:canon[0],confianza:.92});}
-    }else if(canon.length&&rawForType.length===canon.length){for(let i=0;i<canon.length;i++)void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[i].text,dato_bueno:canon[i],confianza:.9});}
+    if(canon.length===1&&rawForType.length===1&&entityLike(rawForType[0].text,type,canon[0])){
+      void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[0].text,dato_bueno:canon[0],confianza:1});
+    }else if(canon.length&&rawForType.length===canon.length){
+      for(let i=0;i<canon.length;i++)if(entityLike(rawForType[i].text,type,canon[i]))void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[i].text,dato_bueno:canon[i],confianza:.9});
+    }
   }
 }
 function arr(value) { return Array.isArray(value) ? value : []; }
@@ -9882,15 +9890,26 @@ function v40CompactSccContext(raw={}){
   return {relation:trim(raw.relation).slice(0,20),scope:trim(raw.scope).slice(0,30),event:trim(raw.event).slice(0,140),events:arr(raw.events).map(x=>trim(x)).filter(Boolean).slice(0,5),subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50),operation:trim(raw.operation).slice(0,60),dataset};
 }
 function v40RelevantLocalRecovery(conversationHistory=[]){
-  // La memoria de conversación entre turnos es LOCAL y acotada. Conservamos hasta ocho
-  // intercambios con su SCC estructurado, suficiente para 4/5 aclaraciones y cambios de foco,
-  // pero nunca reinyectamos tablas/tool-results de turnos antiguos.
-  return arr(conversationHistory).slice(-8).map(t=>({
-    user:trim(t?.user).replace(/\s+/g,' ').slice(0,360),
-    assistant:trim(t?.assistant).replace(/\s+/g,' ').slice(0,420),
-    title:trim(t?.title).slice(0,100),
+  // Doble memoria local: solo los últimos 5 turnos conservan texto literal suficiente para
+  // elipsis/correcciones. El resto se representa por estado SCC + digest, nunca por tablas viejas.
+  return arr(conversationHistory).slice(-5).map(t=>({
+    user:trim(t?.user).replace(/\s+/g,' ').slice(0,280),
+    assistant:trim(t?.assistant).replace(/\s+/g,' ').slice(0,300),
+    title:trim(t?.title).slice(0,80),
     scc:v40CompactSccContext(t?.resultContext?.scc||null)
   }));
+}
+function v40CurrentStateSnapshot(conversationHistory=[]){
+  const turns=arr(conversationHistory).slice(-10), latest=v40LastSccContext(turns)||{};
+  const recentTopics=[];
+  for(const t of turns.slice().reverse()){
+    const c=v40CompactSccContext(t?.resultContext?.scc||null);if(!c)continue;
+    const key=JSON.stringify([c.scope,c.event,c.subjects,c.domain,c.operation,c.dataset?.id||'']);
+    if(recentTopics.some(x=>x.key===key))continue;
+    recentTopics.push({key,relation:c.relation,scope:c.scope,event:c.event,subjects:c.subjects,domain:c.domain,operation:c.operation,dataset:c.dataset?.id||''});
+    if(recentTopics.length>=3)break;
+  }
+  return {current:v40CompactSccContext(latest),recent_topics:recentTopics.map(({key,...x})=>x)};
 }
 function v40SccSystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,voiceConversation=false,conversationHistory=[]}={}){
   const active=v26EventById(state,selectedEventId);const activeName=trim(active?.titulo),activeText=activeName?`${activeName} (${trim(active?.situacion)||'sin estado'}, ${trim(active?.fechaIni)||'?'} a ${trim(active?.fechaFin)||'?'})`:'ninguno';
@@ -9940,13 +9959,28 @@ Evento visible=${activeText}
 SCC reciente=${JSON.stringify(v40CompactSccContext(lastScc||{}))}
 Hora=${localNow} · zona=${tz} · UTC=${utcNow}
 
+JERARQUÍA DE VERDAD: 1) mensaje/corrección explícita ACTUAL del usuario; 2) resultados canónicos de herramientas de ESTE turno; 3) ESTADO_ACTUAL_SCC; 4) últimos turnos literales; 5) índice histórico. Una capa inferior nunca contradice a una superior.
 Tras function_result: responde solo con los datos devueltos y el contexto del usuario; no pidas otra herramienta.`;
 }
 function v40SccInitialInput(userPrompt,conversationHistory=[],conversationDigest=''){
   const recovery=v40RelevantLocalRecovery(conversationHistory);
-  const digest=trim(conversationDigest).replace(/\s+$/g,'').slice(-2600);
+  const snapshot=v40CurrentStateSnapshot(conversationHistory);
+  const digest=trim(conversationDigest).replace(/\s+$/g,'').slice(-1400);
   if(!recovery.length&&!digest)return userPrompt;
-  return `MEMORIA SCC LOCAL ACOTADA. Es memoria conversacional, NO una fuente factual de negocio. Usa el SCC estructurado para resolver pronombres y cambios de foco. No arrastres automáticamente sujetos de un new_topic; sí puedes recuperar un asunto anterior si el mensaje actual lo pide inequívocamente.\nTURNOS RECIENTES:\n${JSON.stringify(recovery)}${digest?`\nÍNDICE HISTÓRICO MUY COMPACTO (solo para reconocer asuntos anteriores; no uses sus cifras como fuente actual):\n${digest}`:''}\n\nMENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
+  return `MEMORIA SCC LOCAL DE DOBLE CAPA. NO es fuente factual de negocio.
+ESTADO_ACTUAL_SCC (foto estructurada del foco vigente):
+${JSON.stringify(snapshot)}
+
+ÚLTIMOS TURNOS LITERALES (máximo 5, para elipsis/correcciones):
+${JSON.stringify(recovery)}${digest?`
+
+ÍNDICE HISTÓRICO COMPRIMIDO (solo localizar temas previos, nunca cifras):
+${digest}`:''}
+
+PRIORIDAD: MENSAJE ACTUAL > herramientas actuales > ESTADO_ACTUAL_SCC > turnos recientes > índice histórico. Si el mensaje actual corrige algo, sustituye lo anterior.
+
+MENSAJE ACTUAL DEL USUARIO:
+${userPrompt}`;
 }
 function v40SccSanitizePlan(raw={},state,selectedEventId){
   const rel=['continue','new_topic','clarify','reset'].includes(trim(raw?.relation))?trim(raw.relation):'continue';
@@ -10057,14 +10091,23 @@ function v40CompactSccFacts(name,facts={},detail='standard'){
   const limits=detail==='full'?{array:24,keys:60,string:520}:detail==='brief'?{array:5,keys:28,string:280}:{array:10,keys:40,string:360};
   return v40CompactFactValue(f,0,limits)||{};
 }
-function v40CompactSccResult(result,detail='standard'){
-  // Las tablas completas siguen en CE para renderizado; Gemini recibe solo una muestra acotada
-  // y hechos compactos. Así facts no reinyecta por detrás cientos de filas antiguas.
+function v40CompactSccResult(result,detail='standard',userPrompt=''){
+  // CE conserva SIEMPRE fullResults para tabla/lista/PDF. Gemini recibe solo las tablas
+  // semánticamente necesarias para redactar; detail=full no significa reinyectar 11 tablas.
   let compact=v261CompactToolResult(result,detail);
   compact={...compact,facts:v40CompactSccFacts(trim(result?.name),result?.facts||{},detail)};
-  if(trim(result?.name)==='person_dossier'&&detail!=='full'){
-    const keep=new Set(['summary_by_event','participation_by_event','income_by_event','purchase_by_event','donations_by_event','management_by_event']);
-    compact={...compact,tables:arr(compact?.tables).filter(t=>keep.has(trim(t?.key))).slice(0,6)};
+  if(trim(result?.name)==='person_dossier'){
+    const p=norm(userPrompt), keep=new Set(['summary_by_event']);
+    if(/\b(?:donacion|donación|donaciones|donad|donante)\b/.test(p))keep.add('donations_by_event');
+    if(/\b(?:compra|compras|ticket|tk\s*\d+|responsab)\b/.test(p))keep.add('purchase_by_event');
+    if(/\b(?:ingreso|ingresos|cuota|cuotas|pago|pagos)\b/.test(p))keep.add('income_by_event');
+    if(/\b(?:hito|hitos|tarea|tareas|\blg\b|gestion|gestión)\b/.test(p))keep.add('management_by_event');
+    if(/\b(?:asist|particip|presencia|aparece|evento|eventos)\b/.test(p))keep.add('participation_by_event');
+    // Ficha amplia sin dimensión explícita: resumen + las señales esenciales, nunca todo el detalle.
+    if(keep.size===1&&!/\b(?:lista|listado|todos?|eventos?)\b/.test(p)){
+      keep.add('participation_by_event');keep.add('income_by_event');keep.add('purchase_by_event');keep.add('donations_by_event');keep.add('management_by_event');
+    }
+    compact={...compact,tables:arr(compact?.tables).filter(t=>keep.has(trim(t?.key))).slice(0,6).map(t=>({...t,rows:arr(t?.rows).slice(0,detail==='full'?18:10)}))};
   }
   return compact;
 }
@@ -10087,7 +10130,7 @@ async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPro
       let full=await pending;
       full={...full,id:call.id,name:req.tool};
       full=v40ApplyPhysicalPresentation(full,plan.presentation,flowTrace);
-      const compact=v40CompactSccResult(full,trim(args.detail)||'standard');
+      const compact=v40CompactSccResult(full,trim(args.detail)||'standard',userPrompt);
       return{req,full,compact,error:null};
     }catch(error){return{req,full:null,compact:null,error:cleanGeminiError(error),call};}
   });
@@ -10219,7 +10262,20 @@ function v40StrengthenPlanCoverage(plan,userPrompt='',voiceConversation=false,fl
 function v40SccSanityRepair(plan,userPrompt='',state={},selectedEventId='',flowTrace=[]){
   let out={...plan,subjects:arr(plan?.subjects).map(trim).filter(Boolean),events:arr(plan?.events).map(trim).filter(Boolean),data_requests:arr(plan?.data_requests).map(r=>({...r,arguments:{...(r?.arguments||{})}}))};
   const p=norm(userPrompt),domain=norm(out.domain),purchaseIntent=/\b(?:compra|compras|comprad[oa]s?|ticket|tickets|tk\s*\d+)\b/.test(p),donationIntent=/\b(?:donacion|donación|donaciones|donad[oa]s?|donantes?|donar|donaron|dono)\b/.test(p);
-  if(domain==='event'||(/\bevento\b/.test(p)&&!/(?:persona|socio|quien|quién|asistent)/.test(p)))out.subjects=[];
+  const explicitPeople=v26PersonHintsFromPrompt(userPrompt,state);
+  const explicitPersonIntent=explicitPeople.length>0&&/\b(?:info|informacion|información|hablame|háblame|cuentame|cuéntame|dime|sabes|sobre|de|persona|socio|socia|donante|responsable|todos\s+los\s+eventos|eventos\s+registrados)\b/.test(p);
+  if(explicitPersonIntent){
+    const eventBoundExplicit=/\b(?:en\s+este\s+evento|de\s+este\s+evento|en\s+el\s+evento|durante\s+el\s+evento|aqui|aquí)\b/.test(p);
+    out.domain='person';out.subjects=explicitPeople.slice(0,4);
+    if(!eventBoundExplicit){out.scope='all_events';out.event='';out.events=[];}
+    let pd=out.data_requests.filter(r=>trim(r?.tool)==='person_dossier');
+    if(!pd.length)pd=out.subjects.map((person,i)=>({tool:'person_dossier',purpose:'Ficha canónica de la persona nombrada por el usuario',arguments:{person,scope:eventBoundExplicit?'active_event':'all_events',detail:'standard'},index:i+1}));
+    pd=pd.map((r,i)=>{const person=out.subjects[Math.min(i,out.subjects.length-1)]||out.subjects[0],a={...(r.arguments||{}),person,scope:eventBoundExplicit?(trim(r?.arguments?.scope)||'active_event'):'all_events'};if(!eventBoundExplicit)delete a.event;return{...r,arguments:a};});
+    const complements=out.data_requests.filter(r=>['event_people','canonical_socios'].includes(trim(r?.tool))&&eventBoundExplicit);
+    out.data_requests=[...pd,...complements];
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Foco personal canónico','OK',`Persona nombrada en el mensaje actual: ${out.subjects.join(', ')}. ${eventBoundExplicit?'Se conserva el evento pedido.':'Ámbito global; no se hereda el evento visible/anterior.'}`);
+  }
+  if(norm(out.domain)==='event'||(/\bevento\b/.test(p)&&!explicitPeople.length&&!/(?:persona|socio|quien|quién|asistent)/.test(p)))out.subjects=[];
   const candidate=trim(out.event);
   if(candidate&&!/^(?:este\s+evento|el\s+evento|evento\s+actual|actual|activo|evento\s+activo)$/i.test(norm(candidate))){
     const rr=v26ResolveEvent(state,selectedEventId,candidate,'named_event');
@@ -10232,7 +10288,7 @@ function v40SccSanityRepair(plan,userPrompt='',state={},selectedEventId='',flowT
   // Una pregunta nueva y explícita sobre una PERSONA no hereda por accidente el evento anterior.
   // Si el usuario sí dice «en este evento» o nombra el evento en el propio mensaje, se conserva el ámbito de evento.
   const personFresh=/\b(?:info(?:rmacion)?|informacion|hablame|cuentame|dime|que\s+sabes|qué\s+sabes)\s+(?:de|sobre)\s+/i.test(p),eventBound=/\b(?:en\s+este\s+evento|de\s+este\s+evento|en\s+el\s+evento|durante\s+el\s+evento|aqui|aquí)\b/i.test(p),mentionsPlanEvent=!!(trim(out.event)&&p.includes(norm(out.event)));
-  if(domain==='person'&&personFresh&&!eventBound&&!mentionsPlanEvent){
+  if(norm(out.domain)==='person'&&personFresh&&!eventBound&&!mentionsPlanEvent){
     const before=trim(out.event);out.scope='all_events';out.event='';out.events=[];
     out.data_requests=out.data_requests.map(r=>{if(trim(r?.tool)!=='person_dossier')return r;const a={...(r.arguments||{}),scope:'all_events'};delete a.event;return{...r,arguments:a};});
     if(before)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Foco personal','OK',`Consulta nueva sobre persona: no se hereda el evento «${before}» al no haber sido solicitado en este mensaje.`);
@@ -10272,7 +10328,11 @@ function v40EnumerationTableScore(prompt='',toolName='',table={}){
 function v40CanonicalEnumerationAnswer(userPrompt='',plan={},results=[],existingAnswer=''){
   const explicit=v40ExplicitEnumerationRequest(userPrompt)||v40PlanEnumerationRequest(plan);if(!explicit)return'';
   const candidates=[];for(const r of arr(results)){for(const t of arr(r?.tables)){if(arr(t?.rows).length)candidates.push({r,t,score:v40EnumerationTableScore(userPrompt,trim(r?.name),t)});}}
-  if(!candidates.length)return'';candidates.sort((a,b)=>b.score-a.score||arr(b.t?.rows).length-arr(a.t?.rows).length);const best=candidates[0];let rows=arr(best.t?.rows).map(r=>({...r}));if(!rows.length)return'';
+  if(!candidates.length)return'';
+  const personAllEvents=/\beventos?\b/.test(norm(userPrompt))&&(trim(plan?.scope)==='all_events'||/\b(?:todos|registrados|cualquiera)\b/.test(norm(userPrompt)));
+  let best=personAllEvents?candidates.find(x=>trim(x?.r?.name)==='person_dossier'&&trim(x?.t?.key)==='summary_by_event'):null;
+  if(!best){candidates.sort((a,b)=>b.score-a.score||arr(b.t?.rows).length-arr(a.t?.rows).length);best=candidates[0];}
+  let rows=arr(best.t?.rows).map(r=>({...r}));if(!rows.length)return'';
   const p=norm(userPrompt),primary=v40ListPrimaryColumn(userPrompt,rows[0]);if(!primary)return'';
   const keys=Object.keys(rows[0]||{}),find=(re)=>keys.find(k=>re.test(norm(k))),sort=v40PromptSortDirective(userPrompt,plan);let sortKey='';
   if(sort.field){const target=norm(sort.field).replace(/[^a-z0-9]+/g,'');sortKey=keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'')===target)||keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'').includes(target)||target.includes(norm(k).replace(/[^a-z0-9]+/g,'')))||'';}
@@ -10342,7 +10402,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 WAKE + LATENCIA + SCC','OK','Build 20260818-FIX34: transporte híbrido iOS restaurado, TTS auto/stream corregido, Android sin duplicación de dictado, charla simple en una llamada y SCC saneado; se mantienen listas canónicas y contexto textual.');
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 VOZ ESTABLE + SCC MEMORIA','OK','Build 20260818-FIX34: transporte híbrido iOS restaurado, TTS auto/stream corregido, Android sin duplicación de dictado, charla simple en una llamada y SCC saneado; se mantienen listas canónicas y contexto textual.');
   zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
   const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
@@ -12498,9 +12558,19 @@ function v34PureConversationTurn(prompt='',conversationHistory=[]){
   const business=/\b(?:evento|eventos|sisa|sysa|compra|compras|producto|productos|donacion|donación|donaciones|donante|ingreso|ingresos|banco|saldo|ticket|tk\d*|document|hito|\blg\b|socio|socios|persona|personas|tienda|tiendas|presupuesto|grafica|gráfica|lista|listado|ordena|tabla|responsable|asistencia|cuota|gasto|gastos|20\d{2})\b/.test(p);
   if(business)return false;
   const follow=/^(?:si|sí|vale|ok|o k|hazlo|adelante|eso|correcto|continua|continúa|sigue)$/i.test(p);if(follow&&arr(conversationHistory).length)return false;
-  return /^(?:hola(?:\s+zuzu)?\b|buen[oa]s?\b|gracias\b|muchas gracias\b|adios\b|adiós\b|hasta luego\b|nos vemos\b|que tal\b|qué tal\b|como estas\b|cómo estás\b|vamos a jugar\b|hola zuzu vamos a jugar\b|jaj+a\b|jeje+\b)/i.test(p)||/\b(?:vamos a jugar|gracias zuzu|muy buena conversación|muy buena conversacion)\b/i.test(p);
+  const stop=/^(?:callate|cállate|para|parate|párate|silencio|deja ya|basta)[.!?]*$/i.test(p);if(stop)return true;
+  const greeting=/^(?:hola(?:\s+zuzu)?|buen[oa]s?)(?:[,.! ]+|$)/i;
+  if(greeting.test(p)){
+    const rest=p.replace(greeting,'').trim();if(!rest)return true;
+    if(/^(?:que tal|qué tal|como estas|cómo estás|vamos a (?:hablar|charlar|jugar)(?: un poco)?|vamos a jugar|jaj+a|jeje+)[.!?]*$/i.test(rest))return true;
+    // «Hola Zuzu, dame info de Pocholo» es una consulta de negocio aunque Pocholo no sea
+    // una palabra genérica del dominio. No la mandamos a charla directa.
+    if(/\b(?:dame|dime|cuentame|cuéntame|hablame|háblame|busca|mira|revisa|info|informacion|información|datos|lista|quiero|saca|compara|ordena|quien|quién|cual|cuál|cuanto|cuánto)\b/.test(rest))return false;
+    return rest.split(/\s+/).length<=5;
+  }
+  return /^(?:gracias|muchas gracias|adios|adiós|hasta luego|nos vemos|que tal|qué tal|como estas|cómo estás|vamos a jugar|jaj+a|jeje+)[.!?]*$/i.test(p)||/\b(?:gracias zuzu|muy buena conversación|muy buena conversacion)\b/i.test(p);
 }
-function v34PureChatFallback(prompt=''){const p=norm(prompt);if(/gracias/.test(p))return'De nada.';if(/(?:adios|hasta luego|nos vemos)/.test(p))return'Nos vemos.';if(/jugar/.test(p))return'Claro. Dime a qué jugamos.';return'Aquí estoy.';}
+function v34PureChatFallback(prompt=''){const p=norm(prompt);if(/^(?:callate|cállate|para|parate|párate|silencio|deja ya|basta)/.test(p))return'Vale.';if(/gracias/.test(p))return'De nada.';if(/(?:adios|hasta luego|nos vemos)/.test(p))return'Nos vemos.';if(/jugar/.test(p))return'Claro. Dime a qué jugamos.';return'Aquí estoy.';}
 async function v34DirectConversationResponse({userPrompt,state,flowTrace=[],conversationHistory=[],usuarioLogado,user,authUser,ce_acceso,externalSignal=null}={}){
   const started=Date.now(),apiKey=geminiKey(),model='gemini-2.5-flash-lite';
   const profile=zuzuLoggedUserProfile({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
@@ -12565,8 +12635,11 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     return result;
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
-    const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null;
-    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Respaldo por fallo real',currentTurnResults.length?'INFO':'WARN',`Gemini no completó el turno SCC: ${cleanGeminiError(error)}. ${currentTurnResults.length?`CE conserva ${currentTurnResults.length} fuente(s) canónica(s) y cierra localmente el turno sin perder los datos.`:'No llegaron a ejecutarse fuentes canónicas.'}`);
+    const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null,planNoTools=!!(plan&&!arr(plan?.data_requests).length);
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Respaldo por fallo real',currentTurnResults.length||planNoTools?'INFO':'WARN',`Gemini no completó el turno SCC: ${cleanGeminiError(error)}. ${currentTurnResults.length?`CE conserva ${currentTurnResults.length} fuente(s) canónica(s) y cierra localmente el turno sin perder los datos.`:planNoTools?'El plan no necesitaba datos CE; se rescata como conversación directa sin romper el hilo.':'No llegaron a ejecutarse fuentes canónicas.'}`);
+    if(!currentTurnResults.length&&planNoTools){
+      return v34DirectConversationResponse({userPrompt:rawUserPrompt,state,flowTrace,conversationHistory:safeHistory,usuarioLogado,user,authUser,ce_acceso,externalSignal});
+    }
     if(!currentTurnResults.length){
       // FIX34 · última red de seguridad SOLO tras fallo real del planner. Una petición inequívoca
       // de catálogo/ordenación de eventos no puede quedar inútil porque Gemini haya emitido JSON
@@ -15914,6 +15987,9 @@ export const __zuzuStructuralTesting = Object.freeze({
   v40SccArgsForRequest,
   v40ApplyPhysicalPresentation,
   v40RelevantLocalRecovery,
+  v40CurrentStateSnapshot,
+  v40CompactSccResult,
+  v40CanonicalEnumerationAnswer,
   v40SccResultContext,
   v337ContextIsolationPolicy,
   v337DonationContinuationRequest,

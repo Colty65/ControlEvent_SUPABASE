@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v2.0_exp-FIX34-VOICE-IOS-HYBRID-AUTO-TTS-ANDROID-CLEAN';
+  var BUILD='v2.0_exp-FIX34-VOICE-STABLE-AUTO-TTS-SCC-MEMORY';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -31,8 +31,8 @@
     bargeRecognition:null, bargeGeneration:0,
     voices:[],
     recorderStream:null, recorder:null, recorderChunks:[], recordingActive:false, lastRecordingBlob:null, lastRecordingMime:'',
-    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentAudioSource:null, entertainmentStreamSources:[], entertainmentPrefetch:null, entertainmentDone:null, lastEntertainmentIndex:-1, entertainmentUsed:[], entertainmentCycle:0, entertainmentLoaded:false,
-    ttsUnlocked:false
+    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentAudioSource:null, entertainmentStreamSources:[], entertainmentPrefetch:null, entertainmentWarm:null, entertainmentDone:null, lastEntertainmentIndex:-1, entertainmentUsed:[], entertainmentCycle:0, entertainmentLoaded:false,
+    ttsUnlocked:false, lastAutoReadKey:'', lastAutoReadAt:0
   };
 
   var ENTERTAINMENT_PHRASES=[
@@ -67,8 +67,13 @@
   function supportsRecognition(){return !!(window.SpeechRecognition||window.webkitSpeechRecognition);}
   function supportsSpeech(){return !!(window.speechSynthesis&&window.SpeechSynthesisUtterance);}
   function isAppleMobile(){var ua=String(navigator.userAgent||''),platform=String(navigator.platform||'');return /iPad|iPhone|iPod/i.test(ua)||(/Mac/i.test(platform)&&Number(navigator.maxTouchPoints||0)>1);}
-  function preferCloudAmbient(){return false;}
-  function preferNativeApple(){return isAppleMobile()&&supportsRecognition();}
+  function isIPhone(){return /iPhone|iPod/i.test(String(navigator.userAgent||''));}
+  function isIPad(){var ua=String(navigator.userAgent||''),platform=String(navigator.platform||'');return /iPad/i.test(ua)||(/Mac/i.test(platform)&&Number(navigator.maxTouchPoints||0)>1);}
+  // iPad conserva el transporte nativo que ya ha demostrado abrir Zuzu por voz.
+  // iPhone usa Voz CE de forma preferente: evita depender del servicio Web Speech de Safari,
+  // que en las pruebas reales queda activo pero no entrega resultados de forma consistente.
+  function preferCloudAmbient(){return isIPhone();}
+  function preferNativeApple(){return isIPad()&&supportsRecognition();}
   function promptEl(){return $('ceAiPrompt');}
   function setPrompt(v){var p=promptEl();if(!p)return;p.value=clean(v);try{p.dispatchEvent(new Event('input',{bubbles:true}));p.setSelectionRange(p.value.length,p.value.length);}catch(_){} }
   function setStatus(msg,kind){var e=$('ceVoz3Status');if(!e)return;e.className='ce-voz3-status'+(kind?' '+kind:'');e.textContent=msg||'';}
@@ -123,12 +128,20 @@
   }
   function ensureCloudAudioContext(fromGesture){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;var ac=state.cloudAudioContext;try{if(!ac||ac.state==='closed'){ac=new AC();state.cloudAudioContext=ac;}if(ac.state==='suspended'){var pr=ac.resume();if(pr&&typeof pr.catch==='function')pr.catch(function(){});}}catch(_){return ac||null;}return ac;}
   function unlockTtsAudioFromGesture(){
-    var ac=ensureTtsAudioContext(true);if(!ac)return false;try{var b=ac.createBuffer(1,1,22050),src=ac.createBufferSource();src.buffer=b;src.connect(ac.destination);src.start(0);state.ttsUnlocked=true;return true;}catch(_){return false;}
+    var ac=ensureTtsAudioContext(true);if(!ac)return false;
+    function silentUnlock(){try{var b=ac.createBuffer(1,1,22050),src=ac.createBufferSource();src.buffer=b;src.connect(ac.destination);src.start(0);state.ttsUnlocked=ac.state==='running';return state.ttsUnlocked;}catch(_){return false;}}
+    try{
+      if(ac.state==='running')return silentUnlock();
+      var pr=ac.resume();
+      if(pr&&typeof pr.then==='function')pr.then(function(){silentUnlock();}).catch(function(){});
+      else silentUnlock();
+      return true;
+    }catch(_){return false;}
   }
   function cloudTrackInfo(stream){try{var t=stream&&stream.getAudioTracks&&stream.getAudioTracks()[0];state.cloudDeviceLabel=clean(t&&t.label||'Micrófono predeterminado');state.cloudDeviceSettings=t&&t.getSettings?t.getSettings():{};state.cloudDeviceId=clean(state.cloudDeviceSettings.deviceId||safeGet(STORAGE.mic,''));}catch(_){state.cloudDeviceLabel='Micrófono';state.cloudDeviceSettings={};}}
   function refreshMicDevices(){var sel=$('ceVoz3MicChoice');if(!sel||!navigator.mediaDevices||!navigator.mediaDevices.enumerateDevices)return;var selected=clean(safeGet(STORAGE.mic,state.cloudDeviceId||''));navigator.mediaDevices.enumerateDevices().then(function(list){var ins=list.filter(function(d){return d.kind==='audioinput';});sel.innerHTML='<option value="">Mic automático</option>'+ins.map(function(d,i){var id=clean(d.deviceId),label=clean(d.label)||('Micrófono '+(i+1));return '<option value="'+id.replace(/"/g,'&quot;')+'"'+(id===selected?' selected':'')+'>'+label.replace(/</g,'&lt;')+'</option>';}).join('');if(!selected&&state.cloudDeviceId)sel.value=state.cloudDeviceId;}).catch(function(){});}
   function updateMicMeter(force){var now=Date.now();if(!force&&now-state.cloudMeterLastPaint<90)return;state.cloudMeterLastPaint=now;var fill=$('ceVoz3MeterFill'),val=$('ceVoz3MeterValue'),wrap=$('ceVoz3Meter'),rms=Number(state.cloudRms)||0,thr=Math.max(0.0001,Number(state.cloudThreshold)||0.006),pct=clamp((rms/(thr*2.2))*100,0,100),chs=(state.cloudChannelRms||[]).map(function(x){return(Number(x||0)*1000).toFixed(1);}).join('/');if(fill)fill.style.width=pct.toFixed(0)+'%';if(val)val.textContent=(rms*1000).toFixed(1);if(wrap){wrap.title='Mic: '+(state.cloudDeviceLabel||'—')+' · RMS '+rms.toFixed(5)+(chs?' · canales '+chs:'')+' · ruido '+Number(state.cloudNoiseFloor||0).toFixed(5)+' · umbral '+thr.toFixed(5)+(state.cloudRecording?' · VOZ':'');wrap.setAttribute('aria-label',wrap.title);}}
-  function finishCloudCalibration(){if(state.cloudCalibrationDone)return;var a=state.cloudNoiseSamples.filter(function(x){return Number.isFinite(x)&&x>=0;}).sort(function(x,y){return x-y;}),floor=a.length?a[Math.min(a.length-1,Math.floor(a.length*0.28))]:Math.max(0.0004,state.cloudRms||0);state.cloudNoiseFloor=clamp(floor,0.00015,0.02);state.cloudThreshold=clamp(state.cloudNoiseFloor*2.35+0.0010,0.0022,0.022);state.cloudCalibrationDone=true;state.cloudCalibratingUntil=0;state.cloudVoiceFrames=0;cloudStatus(state.cloudKind);updateMicMeter(true);try{console.info('[CE VOZ FIX34] MIC calibrado',{label:state.cloudDeviceLabel,rms:state.cloudRms,ruido:state.cloudNoiseFloor,umbral:state.cloudThreshold,settings:state.cloudDeviceSettings});}catch(_){}}
+  function finishCloudCalibration(){if(state.cloudCalibrationDone)return;var a=state.cloudNoiseSamples.filter(function(x){return Number.isFinite(x)&&x>=0;}).sort(function(x,y){return x-y;}),floor=a.length?a[Math.min(a.length-1,Math.floor(a.length*(isIPhone()?0.18:0.28)))]:Math.max(0.0004,state.cloudRms||0);state.cloudNoiseFloor=clamp(floor,0.00012,isIPhone()?0.008:0.02);state.cloudThreshold=isIPhone()?clamp(state.cloudNoiseFloor*1.55+0.00035,0.00070,0.010):clamp(state.cloudNoiseFloor*2.35+0.0010,0.0022,0.022);state.cloudCalibrationDone=true;state.cloudCalibratingUntil=0;state.cloudVoiceFrames=0;cloudStatus(state.cloudKind);updateMicMeter(true);try{console.info('[CE VOZ FIX34] MIC calibrado',{label:state.cloudDeviceLabel,rms:state.cloudRms,ruido:state.cloudNoiseFloor,umbral:state.cloudThreshold,settings:state.cloudDeviceSettings});}catch(_){}}
   function blobBase64(blob){return new Promise(function(resolve,reject){var fr=new FileReader();fr.onload=function(){var x=String(fr.result||''),i=x.indexOf(',');resolve(i>=0?x.slice(i+1):x);};fr.onerror=function(){reject(fr.error||new Error('No se pudo leer el audio.'));};fr.readAsDataURL(blob);});}
   function abortCloudTranscription(){state.cloudRequestSeq++;var c=state.cloudAbortController;state.cloudAbortController=null;try{c&&c.abort();}catch(_){}state.cloudBusy=false;}
   function resetCloudTurn(kind){abortCloudTranscription();if(state.cloudRecorder&&state.cloudRecording){try{state.cloudRecorder.__discard=true;state.cloudRecorder.stop();}catch(_){}}state.cloudRecorder=null;state.cloudRecording=false;state.cloudChunks=[];state.cloudVoiceFrames=0;state.cloudKind=kind||state.cloudKind||'ambient';state.cloudLastVoiceAt=0;state.cloudRecordStartedAt=0;}
@@ -165,10 +178,10 @@
   }
 
   function finishCloudUtterance(kind){var mr=state.cloudRecorder;if(!mr||!state.cloudRecording)return;state.cloudRecording=false;try{mr.stop();}catch(_){} }
-  function startCloudUtterance(kind){if(state.cloudRecording||state.cloudBusy||!state.cloudStream)return;var mime=cloudMime(),mr;try{mr=mime?new MediaRecorder(state.cloudStream,{mimeType:mime}):new MediaRecorder(state.cloudStream);}catch(err){setStatus('Voz CE no puede grabar este micrófono.','err');return;}var gen=state.cloudGeneration;state.cloudRecorder=mr;state.cloudChunks=[];state.cloudRecording=true;state.cloudRecordStartedAt=Date.now();state.cloudLastVoiceAt=Date.now();mr.ondataavailable=function(e){if(e.data&&e.data.size)state.cloudChunks.push(e.data);};mr.onstop=function(){var discard=!!mr.__discard,chunks=state.cloudChunks.slice(),type=mr.mimeType||mime||'audio/webm';if(state.cloudRecorder===mr)state.cloudRecorder=null;state.cloudChunks=[];if(discard||gen!==state.cloudGeneration)return;var blob=new Blob(chunks,{type:type});try{console.info('[CE VOZ FIX34] Fragmento voz',{bytes:blob.size,rms:state.cloudRms,ruido:state.cloudNoiseFloor,umbral:state.cloudThreshold});}catch(_){}sendCloudAudio(blob,kind,gen);};try{mr.start(180);}catch(err){state.cloudRecording=false;state.cloudRecorder=null;setStatus('Voz CE no pudo iniciar la captura.','err');}}
+  function startCloudUtterance(kind){if(state.cloudRecording||state.cloudBusy||!state.cloudStream)return;if(kind==='user')primeEntertainmentWarm();var mime=cloudMime(),mr;try{mr=mime?new MediaRecorder(state.cloudStream,{mimeType:mime}):new MediaRecorder(state.cloudStream);}catch(err){setStatus('Voz CE no puede grabar este micrófono.','err');return;}var gen=state.cloudGeneration;state.cloudRecorder=mr;state.cloudChunks=[];state.cloudRecording=true;state.cloudRecordStartedAt=Date.now();state.cloudLastVoiceAt=Date.now();mr.ondataavailable=function(e){if(e.data&&e.data.size)state.cloudChunks.push(e.data);};mr.onstop=function(){var discard=!!mr.__discard,chunks=state.cloudChunks.slice(),type=mr.mimeType||mime||'audio/webm';if(state.cloudRecorder===mr)state.cloudRecorder=null;state.cloudChunks=[];if(discard||gen!==state.cloudGeneration)return;var blob=new Blob(chunks,{type:type});try{console.info('[CE VOZ FIX34] Fragmento voz',{bytes:blob.size,rms:state.cloudRms,ruido:state.cloudNoiseFloor,umbral:state.cloudThreshold});}catch(_){}sendCloudAudio(blob,kind,gen);};try{mr.start(180);}catch(err){state.cloudRecording=false;state.cloudRecorder=null;setStatus('Voz CE no pudo iniciar la captura.','err');}}
   function analyserRms(an){if(!an)return 0;var arr=new Float32Array(an.fftSize||1024);try{an.getFloatTimeDomainData(arr);}catch(_){return 0;}var sum=0;for(var i=0;i<arr.length;i++)sum+=arr[i]*arr[i];return Math.sqrt(sum/Math.max(1,arr.length));}
-  function cloudMonitorTick(){if(!state.cloudWanted||state.speaking||state.requestInFlight||state.awaitingResponse||state.cloudBusy)return;var ans=(state.cloudAnalysers&&state.cloudAnalysers.length)?state.cloudAnalysers:(state.cloudAnalyser?[state.cloudAnalyser]:[]);if(!ans.length)return;var levels=ans.map(analyserRms),rms=0;for(var j=0;j<levels.length;j++)if(levels[j]>rms)rms=levels[j];state.cloudChannelRms=levels;var now=Date.now();state.cloudRms=rms;state.cloudPeak=Math.max(rms,state.cloudPeak*0.985);if(!state.cloudCalibrationDone){state.cloudNoiseSamples.push(rms);if(state.cloudNoiseSamples.length>90)state.cloudNoiseSamples.shift();updateMicMeter();if(now>=state.cloudCalibratingUntil)finishCloudCalibration();return;}if(!state.cloudRecording&&rms<state.cloudThreshold){state.cloudNoiseFloor=clamp(state.cloudNoiseFloor*0.985+rms*0.015,0.00015,0.02);var target=clamp(state.cloudNoiseFloor*2.35+0.0010,0.0022,0.022);state.cloudThreshold=state.cloudThreshold*0.985+target*0.015;}var ratio=rms/Math.max(0.0002,state.cloudNoiseFloor),apple=isAppleMobile(),voice=(rms>=(apple?state.cloudThreshold*0.68:state.cloudThreshold))||(rms>=(apple?0.00075:0.0014)&&ratio>=(apple?1.25:1.65));if(voice)state.cloudLastActivityAt=now;state.cloudVoiceFrames=voice?state.cloudVoiceFrames+1:0;if(voice&&state.cloudVoiceFrames>=2){if(!state.cloudRecording)startCloudUtterance(state.cloudKind);state.cloudLastVoiceAt=now;}if(state.cloudRecording){var elapsed=now-state.cloudRecordStartedAt,silent=now-state.cloudLastVoiceAt;if((elapsed>650&&silent>1350)||elapsed>45000)finishCloudUtterance(state.cloudKind);}updateMicMeter();}
-  function setupCloudStream(stream,kind){kind=state.cloudKind||kind||'ambient';state.cloudStream=stream;state.cloudKind=kind;cloudTrackInfo(stream);state.cloudNoiseSamples=[];state.cloudNoiseFloor=0.001;state.cloudThreshold=0.006;state.cloudRms=0;state.cloudPeak=0;state.cloudVoiceFrames=0;state.cloudCalibrationDone=false;state.cloudCalibratingUntil=Date.now()+(isAppleMobile()?850:1200);state.cloudLastActivityAt=Date.now();try{var tr=stream.getAudioTracks&&stream.getAudioTracks()[0];if(tr){tr.onended=function(){if(state.ambientEnabled&&!document.hidden){closeCloudVoice();setTimeout(function(){startAmbient(false);},220);}};tr.onmute=function(){state.cloudLastActivityAt=Date.now();};}}catch(_){}var ac=ensureCloudAudioContext(false);if(!ac)throw new Error('AudioContext no disponible');state.cloudAudioContext=ac;state.cloudSource=ac.createMediaStreamSource(stream);state.cloudAnalysers=[];state.cloudChannelRms=[];var main=ac.createAnalyser();main.fftSize=1024;main.smoothingTimeConstant=0.12;state.cloudAnalyser=main;state.cloudSource.connect(main);state.cloudAnalysers.push(main);var settings=state.cloudDeviceSettings||{},channels=Number(settings.channelCount||state.cloudSource.channelCount||1);channels=Math.max(1,Math.min(4,channels||1));if(channels>1&&typeof ac.createChannelSplitter==='function'){try{var sp=ac.createChannelSplitter(channels);state.cloudSplitter=sp;state.cloudSource.connect(sp);for(var c=0;c<channels;c++){var ca=ac.createAnalyser();ca.fftSize=1024;ca.smoothingTimeConstant=0.12;sp.connect(ca,c,0);state.cloudAnalysers.push(ca);}}catch(_){state.cloudSplitter=null;}}state.cloudWanted=true;clearInterval(state.cloudMonitor);state.cloudMonitor=setInterval(cloudMonitorTick,45);try{var rp=ac.resume();if(rp&&typeof rp.catch==='function')rp.catch(function(){});}catch(_){}setStatus('Calibrando micrófono…','ok');refreshMicDevices();updateMicMeter(true);try{console.info('[CE VOZ FIX34] entrada',{label:state.cloudDeviceLabel,settings:settings,analizadores:state.cloudAnalysers.length});}catch(_){}return true;}
+  function cloudMonitorTick(){if(!state.cloudWanted||state.speaking||state.requestInFlight||state.awaitingResponse||state.cloudBusy)return;var ans=(state.cloudAnalysers&&state.cloudAnalysers.length)?state.cloudAnalysers:(state.cloudAnalyser?[state.cloudAnalyser]:[]);if(!ans.length)return;var levels=ans.map(analyserRms),rms=0;for(var j=0;j<levels.length;j++)if(levels[j]>rms)rms=levels[j];state.cloudChannelRms=levels;var now=Date.now();state.cloudRms=rms;state.cloudPeak=Math.max(rms,state.cloudPeak*0.985);if(!state.cloudCalibrationDone){state.cloudNoiseSamples.push(rms);if(state.cloudNoiseSamples.length>90)state.cloudNoiseSamples.shift();updateMicMeter();if(now>=state.cloudCalibratingUntil)finishCloudCalibration();return;}if(!state.cloudRecording&&rms<state.cloudThreshold){state.cloudNoiseFloor=clamp(state.cloudNoiseFloor*0.985+rms*0.015,0.00015,0.02);var target=clamp(state.cloudNoiseFloor*2.35+0.0010,0.0022,0.022);state.cloudThreshold=state.cloudThreshold*0.985+target*0.015;}var ratio=rms/Math.max(0.0002,state.cloudNoiseFloor),apple=isAppleMobile(),voice=(rms>=(apple?state.cloudThreshold*0.68:state.cloudThreshold))||(rms>=(apple?0.00075:0.0014)&&ratio>=(apple?1.25:1.65));if(voice)state.cloudLastActivityAt=now;state.cloudVoiceFrames=voice?state.cloudVoiceFrames+1:0;if(voice&&state.cloudVoiceFrames>=2){if(!state.cloudRecording)startCloudUtterance(state.cloudKind);state.cloudLastVoiceAt=now;}if(state.cloudRecording){var elapsed=now-state.cloudRecordStartedAt,silent=now-state.cloudLastVoiceAt;if((elapsed>750&&silent>1850)||elapsed>45000)finishCloudUtterance(state.cloudKind);}updateMicMeter();}
+  function setupCloudStream(stream,kind){kind=state.cloudKind||kind||'ambient';state.cloudStream=stream;state.cloudKind=kind;cloudTrackInfo(stream);state.cloudNoiseSamples=[];state.cloudNoiseFloor=0.001;state.cloudThreshold=0.006;state.cloudRms=0;state.cloudPeak=0;state.cloudVoiceFrames=0;state.cloudCalibrationDone=false;state.cloudCalibratingUntil=Date.now()+(isIPhone()?420:isAppleMobile()?850:1200);state.cloudLastActivityAt=Date.now();try{var tr=stream.getAudioTracks&&stream.getAudioTracks()[0];if(tr){tr.onended=function(){if(state.ambientEnabled&&!document.hidden){closeCloudVoice();setTimeout(function(){startAmbient(false);},220);}};tr.onmute=function(){state.cloudLastActivityAt=Date.now();};}}catch(_){}var ac=ensureCloudAudioContext(false);if(!ac)throw new Error('AudioContext no disponible');state.cloudAudioContext=ac;state.cloudSource=ac.createMediaStreamSource(stream);state.cloudAnalysers=[];state.cloudChannelRms=[];var main=ac.createAnalyser();main.fftSize=1024;main.smoothingTimeConstant=0.12;state.cloudAnalyser=main;state.cloudSource.connect(main);state.cloudAnalysers.push(main);var settings=state.cloudDeviceSettings||{},channels=Number(settings.channelCount||state.cloudSource.channelCount||1);channels=Math.max(1,Math.min(4,channels||1));if(channels>1&&typeof ac.createChannelSplitter==='function'){try{var sp=ac.createChannelSplitter(channels);state.cloudSplitter=sp;state.cloudSource.connect(sp);for(var c=0;c<channels;c++){var ca=ac.createAnalyser();ca.fftSize=1024;ca.smoothingTimeConstant=0.12;sp.connect(ca,c,0);state.cloudAnalysers.push(ca);}}catch(_){state.cloudSplitter=null;}}state.cloudWanted=true;clearInterval(state.cloudMonitor);state.cloudMonitor=setInterval(cloudMonitorTick,45);try{var rp=ac.resume();if(rp&&typeof rp.catch==='function')rp.catch(function(){});}catch(_){}setStatus('Calibrando micrófono…','ok');refreshMicDevices();updateMicMeter(true);try{console.info('[CE VOZ FIX34] entrada',{label:state.cloudDeviceLabel,settings:settings,analizadores:state.cloudAnalysers.length});}catch(_){}return true;}
   function startCloudRecognition(kind,fromGesture){
     kind=kind||'ambient';state.cloudFallback=true;state.cloudKind=kind;state.cloudWanted=true;state.needsGesture=false;
     if(!supportsCeVoice()){setStatus('Este navegador no permite la Voz CE por micrófono.','err');return false;}
@@ -206,12 +219,20 @@
   function collapseRecognitionNoise(v){return clean(v).replace(/\b([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{1,24})(?:\s+\1){1,}\b/gi,'$1');}
   function mergeRecognitionParts(parts){var out=[];parts.forEach(function(part){var ws=clean(part).split(/\s+/).filter(Boolean);if(!ws.length)return;ws=collapseRecognitionNoise(ws.join(' ')).split(/\s+/).filter(Boolean);if(!out.length){out=ws;return;}var a=out.map(norm),b=ws.map(norm),max=Math.min(a.length,b.length),over=0;for(var k=max;k>0;k--){var ok=true;for(var j=0;j<k;j++){if(a[a.length-k+j]!==b[j]){ok=false;break;}}if(ok){over=k;break;}}if(over===b.length)return;if(over>0)out=out.concat(ws.slice(over));else{var aa=a.join(' '),bb=b.join(' ');if(bb&&aa.endsWith(bb))return;if(aa&&bb.startsWith(aa)){out=ws;return;}out=out.concat(ws);}});return collapseRecognitionNoise(out.join(' '));}
   function recognitionSnapshot(r,ev){
-    r.__ceResults=r.__ceResults||[];var start=Number.isFinite(Number(ev&&ev.resultIndex))?Number(ev.resultIndex):0;
-    for(var i=start;i<(ev&&ev.results?ev.results.length:0);i++){var row=ev.results[i],t=clean(row&&row[0]&&row[0].transcript);if(t)r.__ceResults[i]={text:t,final:!!row.isFinal};}
-    var parts=[],last='';for(var j=0;j<r.__ceResults.length;j++){var x=r.__ceResults[j];if(!x||!x.text)continue;var txt=collapseRecognitionNoise(x.text),k=norm(txt);if(!k||k===last)continue;parts.push(txt);last=k;}return mergeRecognitionParts(parts);
+    r.__ceFinals=r.__ceFinals||{};r.__ceInterim=r.__ceInterim||null;
+    var start=Number.isFinite(Number(ev&&ev.resultIndex))?Number(ev.resultIndex):0,results=ev&&ev.results?ev.results:[];
+    for(var i=start;i<results.length;i++){
+      var row=results[i],t=clean(row&&row[0]&&row[0].transcript);if(!t)continue;
+      t=collapseRecognitionNoise(t);
+      if(row.isFinal){r.__ceFinals[i]=t;if(r.__ceInterim&&r.__ceInterim.index===i)r.__ceInterim=null;}
+      else r.__ceInterim={index:i,text:t};
+    }
+    var parts=Object.keys(r.__ceFinals).map(Number).sort(function(a,b){return a-b;}).map(function(i){return r.__ceFinals[i];});
+    if(r.__ceInterim&&r.__ceInterim.text&&!Object.prototype.hasOwnProperty.call(r.__ceFinals,r.__ceInterim.index))parts.push(r.__ceInterim.text);
+    return mergeRecognitionParts(parts);
   }
   function newRecognition(kind){
-    var C=recognitionCtor();if(!C)return null;var r=new C(),gen=++state.recognitionGeneration;r.lang='es-ES';r.continuous=true;r.interimResults=true;r.maxAlternatives=3;r.__ceResults=[];if(state.localSpeechReady&&'processLocally' in r)r.processLocally=true;r.__gen=gen;r.__kind=kind;
+    var C=recognitionCtor();if(!C)return null;var r=new C(),gen=++state.recognitionGeneration;r.lang='es-ES';r.continuous=true;r.interimResults=true;r.maxAlternatives=3;r.__ceResults=[];r.__ceFinals={};r.__ceInterim=null;if(state.localSpeechReady&&'processLocally' in r)r.processLocally=true;r.__gen=gen;r.__kind=kind;
     r.onstart=function(){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=true;state.needsGesture=false;state.lastRecognitionError='';setMic(kind==='user');if(kind==='ambient')setStatus(state.wakeCapture?'Sigue hablando…':state.localSpeechReady?'Voz local activa. Di «Hola Zuzu».':'Escucha activa. Di «Hola Zuzu».','ok');if(kind==='user')setStatus(state.localSpeechReady?'Te escucho (voz local)…':'Te escucho…','ok');updateBadge();};
     r.onerror=function(ev){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=false;var code=clean(ev&&ev.error),message=clean(ev&&ev.message);state.lastRecognitionError=code+(message?' · '+message:'');if(code==='network'){state.pendingRecognitionKind=kind;setStatus('La voz del navegador no responde. Paso a Voz CE…','ok');setTimeout(function(){fallbackToCeVoice(kind);},0);}else if(code==='language-not-supported'&&state.localSpeechReady){state.localSpeechReady=false;state.localSpeechUnavailable=false;state.pendingRecognitionKind=kind;setTimeout(function(){prepareLocalSpeech(kind);},0);}else if(code==='not-allowed'||code==='service-not-allowed'){state.needsGesture=true;setStatus('La escucha se rearmará con tu siguiente pulsación normal.','err');}else if(code&&code!=='no-speech'&&code!=='aborted')setStatus('Micrófono: '+code+(message?' · '+message:''),'err');updateBadge();};
     r.onend=function(){if(gen!==state.recognitionGeneration)return;state.recognitionStarting=false;state.recognitionLive=false;state.recognition=null;setMic(false);if(state.needsGesture||state.localSpeechPreparing){updateBadge();return;}if(state.lastRecognitionError==='network'&&!state.localSpeechReady){updateBadge();return;}if(kind==='ambient'&&state.ambientEnabled&&!state.conversationMode)setTimeout(function(){startAmbient(false);},90);else if(kind==='user'&&state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)setTimeout(startUser,90);};
@@ -234,7 +255,7 @@
     clearWakeTimer();state.wakeTimer=setTimeout(commitWake,1500);
   }
   function openZuzuOnly(){
-    resetCloudTurn('user');state.conversationMode=true;state.parked=false;state.mode='user';state.requestInFlight=false;state.awaitingResponse=false;state.voiceTurnActive=false;updateBadge();
+    ensureTtsAudioContext(false);resetCloudTurn('user');state.conversationMode=true;state.parked=false;state.mode='user';state.requestInFlight=false;state.awaitingResponse=false;state.voiceTurnActive=false;updateBadge();
     try{if(window.ControlEventV113ZuzuAnalitica&&typeof window.ControlEventV113ZuzuAnalitica.open==='function')window.ControlEventV113ZuzuAnalitica.open();}catch(_){}
     setStatus('Te escucho…','ok');setTimeout(startUser,160);
   }
@@ -249,7 +270,7 @@
     if(!state.ambientEnabled||state.conversationMode||state.speaking||state.requestInFlight)return;
     state.mode='ambient';
     // Transporte híbrido: Web Speech primero también en Safari/iOS; Voz CE queda como respaldo real.
-    if(state.cloudFallback||!supportsRecognition())startCloudRecognition('ambient',!!fromGesture);else startRecognition('ambient',!!fromGesture);
+    if(preferCloudAmbient()||state.cloudFallback||!supportsRecognition()){state.cloudFallback=true;startCloudRecognition('ambient',!!fromGesture);}else startRecognition('ambient',!!fromGesture);
     updateBadge();
   }
   function primeAmbientFromGesture(ev){
@@ -272,9 +293,9 @@
 
   function clearTurnTimer(){clearTimeout(state.turnTimer);state.turnTimer=null;}
   function currentTurn(){return mergeText(state.turnPrefix,state.turnSession);}
-  function scheduleTurnCommit(){clearTurnTimer();state.turnLastAt=Date.now();state.turnTimer=setTimeout(commitUserTurn,1500);}
-  function handleUserText(text){if(!text)return;state.turnSession=text;setPrompt(currentTurn());scheduleTurnCommit();}
-  function commitUserTurn(){var elapsed=Date.now()-state.turnLastAt;if(elapsed<1400){clearTurnTimer();state.turnTimer=setTimeout(commitUserTurn,1450-elapsed);return;}var text=clean(currentTurn());if(!text)return;rememberVoiceMeta(text,[],'user');clearTurnTimer();stopRecognition();state.turnPrefix='';state.turnSession='';state.voiceTurnActive=true;state.requestPrompt=text;state.requestInFlight=true;state.awaitingResponse=true;state.mode='request';setPrompt(text);setStatus('Procesando…','ok');updateBadge();startEntertainment(2000);var b=$('ceAiRun');if(b)b.click();}
+  function scheduleTurnCommit(){clearTurnTimer();state.turnLastAt=Date.now();state.turnTimer=setTimeout(commitUserTurn,1950);}
+  function handleUserText(text){if(!text)return;primeEntertainmentWarm();state.turnSession=text;setPrompt(currentTurn());scheduleTurnCommit();}
+  function commitUserTurn(){var elapsed=Date.now()-state.turnLastAt;if(elapsed<1800){clearTurnTimer();state.turnTimer=setTimeout(commitUserTurn,1850-elapsed);return;}var text=clean(currentTurn());if(!text)return;rememberVoiceMeta(text,[],'user');clearTurnTimer();stopRecognition();state.turnPrefix='';state.turnSession='';state.voiceTurnActive=true;state.requestPrompt=text;state.requestInFlight=true;state.awaitingResponse=true;state.mode='request';setPrompt(text);setStatus('Procesando…','ok');updateBadge();startEntertainment(2000);var b=$('ceAiRun');if(b)b.click();}
   function startUser(seed){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;stopBarge();state.turnPrefix=clean(seed||state.turnPrefix);state.turnSession='';if(state.turnPrefix&&!state.cloudFallback){setPrompt(state.turnPrefix);scheduleTurnCommit();}state.mode='user';if(state.cloudFallback||!supportsRecognition())startCloudRecognition('user',false);else startRecognition('user',false);updateBadge();}
 
   function stopBarge(){state.bargeGeneration++;var r=state.bargeRecognition;state.bargeRecognition=null;try{r&&r.abort();}catch(_){try{r&&r.stop();}catch(__){}}}
@@ -360,7 +381,9 @@
       function schedule(b64){var buf;try{buf=pcmBase64ToAudioBuffer(ac,b64);}catch(e){doneReject(e);return;}if(!buf)return;var src=ac.createBufferSource();src.buffer=buf;src.connect(ac.destination);var sourceList=target==='entertainment'?state.entertainmentStreamSources:state.ttsStreamSources;sourceList.push(src);var at=Math.max(ac.currentTime+0.035,scheduledUntil||0);scheduledUntil=at+buf.duration;lastSource=src;src.onended=function(){var i=sourceList.indexOf(src);if(i>=0)sourceList.splice(i,1);maybeDone();};if(!first){first=true;state.ttsFirstAudioAt=Date.now();try{onFirstAudio&&onFirstAudio(state.ttsFirstAudioAt-started);}catch(_){} }try{src.start(at);}catch(e){doneReject(e);}}
       function pushAudio(b64){if(!b64)return;if(gateOpen)schedule(b64);else queued.push(b64);}
       function flush(){if(!gateOpen)return;while(queued.length)schedule(queued.shift());maybeDone();}
-      Promise.resolve(gatePromise).catch(function(){}).then(function(){gateOpen=true;try{if(ac.state==='suspended')return ac.resume();}catch(_){} }).then(flush).catch(doneReject);
+      var firstAudioWatch=null;
+      Promise.resolve(gatePromise).catch(function(){}).then(function(){gateOpen=true;try{if(ac.state==='suspended')return ac.resume();}catch(_){} }).then(function(){flush();if(!first){firstAudioWatch=setTimeout(function(){if(first)return;try{ctrl&&ctrl.abort();}catch(_){}doneReject(new Error('TTS streaming sin primer audio a tiempo'));},3600);}}).catch(doneReject);
+      done.finally(function(){clearTimeout(firstAudioWatch);}).catch(function(){});
       function consume(txt,final){pending+=txt;var parts=pending.split(/\r?\n\r?\n/);if(!final)pending=parts.pop();else pending='';parts.forEach(function(block){var obj=parseSseBlock(block),b=streamAudioDelta(obj);if(b)pushAudio(b);});if(final&&pending){var obj=parseSseBlock(pending),b=streamAudioDelta(obj);if(b)pushAudio(b);}}
       function pump(){return reader.read().then(function(r){if(r.done){consume(decoder.decode(),true);streamDone=true;flush();maybeDone();return;}consume(decoder.decode(r.value,{stream:true}),false);return pump();});}
       pump().catch(doneReject);return done.finally(function(){releaseTtsController(rec);});
@@ -413,26 +436,53 @@
     state.entertainmentUsed.push(idx);state.lastEntertainmentIndex=idx;persistEntertainmentState();return idx;
   }
   function stopEntertainment(cancelSpeech){
-    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;state.entertainmentPrefetch=null;abortTtsRequests('entertainment');
+    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;
+    var warm=state.entertainmentWarm,pre=state.entertainmentPrefetch;state.entertainmentWarm=null;state.entertainmentPrefetch=null;
+    if(warm)warm.cancelled=true;if(pre)pre.cancelled=true;abortTtsRequests('entertainment');
     var was=state.entertainmentSpeaking;state.entertainmentSpeaking=false;state.entertainmentDone=null;
-    if(cancelSpeech&&was){try{state.entertainmentAudioSource&&state.entertainmentAudioSource.stop(0);}catch(_){}state.entertainmentAudioSource=null;try{state.entertainmentStreamSources.splice(0).forEach(function(src){try{src.stop(0);}catch(_){}});}catch(_){}}
+    if(cancelSpeech&&was){try{state.entertainmentAudioSource&&state.entertainmentAudioSource.stop(0);}catch(_){}state.entertainmentAudioSource=null;try{state.entertainmentStreamSources.splice(0).forEach(function(src){try{src.stop(0);}catch(_){}});}catch(_){} }
   }
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Number(delay)||2000);}
+  function deferredEntertainmentGate(){var resolve;var promise=new Promise(function(r){resolve=r;});return{promise:promise,resolve:resolve};}
+  function nextEntertainmentPrefetch(){
+    var now=new Date(),secondOfHour=now.getMinutes()*60+now.getSeconds(),idx=entertainmentIndex(secondOfHour,state.entertainmentCount++),phrase=ENTERTAINMENT_PHRASES[idx],gate=deferredEntertainmentGate();
+    var pre={idx:idx,phrase:phrase,gate:gate,cancelled:false,createdAt:Date.now(),started:false,playPromise:null};
+    // Precalentamos el MISMO streaming oficial que usa la respuesta real. El audio puede llegar
+    // mientras el usuario habla, pero queda en cola hasta abrir gate a los ~2 s de espera.
+    pre.playPromise=playStandardStream(phrase,gate.promise,null,'entertainment','entertainment');
+    pre.playPromise.catch(function(){});return pre;
+  }
+  function primeEntertainmentWarm(){
+    if(state.entertainmentWarm||state.entertainmentPrefetch||state.entertainmentSpeaking||state.requestInFlight)return state.entertainmentWarm;
+    state.entertainmentWarm=nextEntertainmentPrefetch();return state.entertainmentWarm;
+  }
   function prepareEntertainment(){
-    if(!state.conversationMode||!state.requestInFlight)return null;var now=new Date(),secondOfHour=now.getMinutes()*60+now.getSeconds(),idx=entertainmentIndex(secondOfHour,state.entertainmentCount++),phrase=ENTERTAINMENT_PHRASES[idx];
-    var promise=requestStandardTts(phrase,'entertainment');promise.catch(function(){});state.entertainmentPrefetch={idx:idx,phrase:phrase,promise:promise,cancelled:false};return state.entertainmentPrefetch;
+    if(!state.conversationMode||!state.requestInFlight)return null;
+    if(state.entertainmentWarm){var warm=state.entertainmentWarm;state.entertainmentWarm=null;state.entertainmentPrefetch=warm;return warm;}
+    var pre=nextEntertainmentPrefetch();state.entertainmentPrefetch=pre;return pre;
   }
   function speakEntertainmentPhrase(){
-    if(!state.conversationMode||!state.requestInFlight)return;clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;var pre=state.entertainmentPrefetch||prepareEntertainment();state.entertainmentPrefetch=null;if(!pre)return;
-    state.entertainmentDone=pre.promise.then(function(payload){if(pre.cancelled||!state.conversationMode||!state.requestInFlight)return;state.entertainmentSpeaking=true;return playStandardPayload(payload,'entertainment');}).then(function(){state.entertainmentSpeaking=false;state.entertainmentAudioSource=null;state.entertainmentDone=null;if(state.conversationMode&&state.requestInFlight){prepareEntertainment();scheduleEntertainment(4000);}}).catch(function(){state.entertainmentSpeaking=false;state.entertainmentAudioSource=null;state.entertainmentDone=null;if(state.conversationMode&&state.requestInFlight){prepareEntertainment();scheduleEntertainment(4000);}});
+    if(!state.conversationMode||!state.requestInFlight)return;clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;
+    var pre=state.entertainmentPrefetch||prepareEntertainment();state.entertainmentPrefetch=null;if(!pre||pre.cancelled)return;
+    pre.started=true;state.entertainmentSpeaking=true;try{pre.gate&&pre.gate.resolve&&pre.gate.resolve();}catch(_){}
+    state.entertainmentDone=Promise.resolve(pre.playPromise).catch(function(){
+      if(pre.cancelled||!state.conversationMode||!state.requestInFlight)return;
+      // Respaldo estable: si el streaming de la frase falla, usamos el TTS WAV que ya ha
+      // demostrado funcionar con [Leer]. Nunca recurrimos a otra voz del navegador.
+      return requestStandardTts(pre.phrase,'entertainment').then(function(payload){if(pre.cancelled)return;return playStandardPayload(payload,'entertainment');});
+    }).then(function(){state.entertainmentSpeaking=false;state.entertainmentDone=null;if(state.conversationMode&&state.requestInFlight){prepareEntertainment();scheduleEntertainment(4000);}}).catch(function(){state.entertainmentSpeaking=false;state.entertainmentDone=null;if(state.conversationMode&&state.requestInFlight){prepareEntertainment();scheduleEntertainment(4000);}});
   }
   function waitEntertainmentBeforeMain(){
     clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;
-    // Solo esperamos si la frase YA ha empezado a sonar. Una frase aún pendiente no retrasa la respuesta real.
+    // Si YA ha empezado, termina la frase completa. Si estaba solo precalentada, la anulamos
+    // y la respuesta real no espera ni una palabra de relleno que todavía no sonaba.
     if(state.entertainmentSpeaking&&state.entertainmentDone)return Promise.resolve(state.entertainmentDone).catch(function(){});
-    if(state.entertainmentPrefetch)state.entertainmentPrefetch.cancelled=true;state.entertainmentPrefetch=null;abortTtsRequests('entertainment');return Promise.resolve();
+    var pre=state.entertainmentPrefetch||state.entertainmentWarm;if(pre)pre.cancelled=true;state.entertainmentPrefetch=null;state.entertainmentWarm=null;abortTtsRequests('entertainment');return Promise.resolve();
   }
-  function startEntertainment(delay){stopEntertainment(true);state.entertainmentCount=0;state.entertainmentPrefetch=null;if(state.conversationMode&&state.requestInFlight){prepareEntertainment();scheduleEntertainment(Number(delay)||2000);}}
+  function startEntertainment(delay){
+    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;
+    if(state.conversationMode&&state.requestInFlight){if(!state.entertainmentPrefetch)prepareEntertainment();scheduleEntertainment(Number(delay)||2000);}
+  }
 
   function resumeConversationListening(delay){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;setTimeout(function(){if(state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();},Number(delay)||180);}
   function cloudStreamAlive(){try{return !!(state.cloudStream&&state.cloudStream.getAudioTracks&&state.cloudStream.getAudioTracks().some(function(t){return t.readyState==='live';}));}catch(_){return false;}}
@@ -444,11 +494,12 @@
   function toggleRecording(){if(state.recordingActive&&state.recorder){var mr=state.recorder;mr.addEventListener('stop',function once(){mr.removeEventListener('stop',once);setTimeout(downloadAndReleaseRecording,60);});try{mr.stop();}catch(_){state.recordingActive=false;resumeConversationListening(180);}return;}if(state.lastRecordingBlob){downloadAndReleaseRecording();return;}startManualRecording();}
 
   function activateDirectConversation(fromGesture){
+    if(fromGesture){ensureCloudAudioContext(true);unlockTtsAudioFromGesture();}
     if(state.requestInFlight||state.awaitingResponse||state.speaking){state.conversationMode=true;state.parked=false;updateBadge();return true;}
     resetCloudTurn('user');clearWakeTimer();clearTurnTimer();stopEntertainment(true);stopBarge();state.conversationMode=true;state.parked=false;state.mode='user';state.requestInFlight=false;state.awaitingResponse=false;state.voiceTurnActive=false;state.turnPrefix='';state.turnSession='';
     stopRecognition();state.needsGesture=false;
     // La última base que sí conversaba manualmente en iPhone/iPad era híbrida: nativo primero y Voz CE solo si falla/no existe.
-    if(preferNativeApple()&&fromGesture!==false)state.cloudFallback=false;
+    if(isIPhone())state.cloudFallback=true;else if(preferNativeApple()&&fromGesture!==false)state.cloudFallback=false;
     if(state.cloudFallback||!supportsRecognition()){state.cloudFallback=true;startCloudRecognition('user',fromGesture!==false);}else startRecognition('user',fromGesture!==false);
     updateBadge();return true;
   }
@@ -473,9 +524,27 @@
   function endConversation(){clearWakeTimer();clearTurnTimer();stopEntertainment(true);stopRecognition();stopBarge();stopSpeaking(true);resetCloudTurn('ambient');state.conversationMode=false;state.parked=false;state.requestInFlight=false;state.awaitingResponse=false;state.voiceTurnActive=false;state.turnPrefix='';state.turnSession='';state.mode='ambient';updateBadge();if(state.ambientEnabled)startAmbient(false);}
   function parkConversation(fromGesture){clearTurnTimer();stopEntertainment(true);stopRecognition();stopBarge();stopSpeaking(true);resetCloudTurn('ambient');state.conversationMode=false;state.parked=true;state.requestInFlight=false;state.awaitingResponse=false;state.voiceTurnActive=false;state.mode='ambient';state.cloudKind='ambient';updateBadge();if(state.ambientEnabled){startAmbient(!!fromGesture);setTimeout(function(){if(!state.conversationMode&&state.ambientEnabled&&!state.cloudWanted&&!state.recognitionLive)startAmbient(false);},220);}}
 
-  document.addEventListener('ce:zuzu-request-started',function(ev){if(!state.conversationMode&&!state.voiceTurnActive)return;state.voiceTurnActive=state.voiceTurnActive||state.conversationMode;pauseCloudListening();state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=clean(ev&&ev.detail&&ev.detail.prompt||state.requestPrompt);stopRecognition();clearTurnTimer();setStatus('Consultando ControlEvent…','ok');if(!state.entertainmentTimer&&!state.entertainmentPrefetch&&!state.entertainmentSpeaking)startEntertainment(2000);});
+  function autoReadKey(answer){return norm(answer).slice(0,700);}
+  function handleRenderedVoiceResponse(answer,voiceConversation){
+    answer=stripVoiceAnswerLead(clean(answer));
+    if(voiceConversation&&$('ceGeminiLibreOverlay')){state.conversationMode=true;state.parked=false;}
+    if(!state.conversationMode&&!state.voiceTurnActive&&!voiceConversation)return false;
+    state.requestInFlight=false;state.awaitingResponse=false;
+    if(!answer){state.voiceTurnActive=false;stopEntertainment(true);if(state.conversationMode)setTimeout(startUser,120);return false;}
+    var auto=$('ceVoz3AutoRead'),enabled=!auto||auto.checked!==false,key=autoReadKey(answer),now=Date.now();
+    if(!enabled){state.voiceTurnActive=false;stopEntertainment(true);if(state.conversationMode)setTimeout(startUser,120);return false;}
+    if(state.speaking)return true;
+    if(key&&key===state.lastAutoReadKey&&now-state.lastAutoReadAt<2500)return true;
+    state.lastAutoReadKey=key;state.lastAutoReadAt=now;state.voiceTurnActive=true;speakChunks(answer);return true;
+  }
+  function maybeAutoRead(){
+    var a=q('#ceAiResult .ce-ai-answer'),answer=a?clean(a.textContent||a.innerText||''):'';
+    if(!answer)return false;return handleRenderedVoiceResponse(answer,!!state.conversationMode||!!state.voiceTurnActive);
+  }
+
+  document.addEventListener('ce:zuzu-request-started',function(ev){var vc=!!(ev&&ev.detail&&ev.detail.voiceConversation);if(!state.conversationMode&&!state.voiceTurnActive&&!vc)return;if(vc){state.conversationMode=true;state.parked=false;}state.voiceTurnActive=true;state.lastRequestWasVoice=vc||state.conversationMode;pauseCloudListening();state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=clean(ev&&ev.detail&&ev.detail.prompt||state.requestPrompt);stopRecognition();clearTurnTimer();setStatus('Consultando ControlEvent…','ok');if(!state.entertainmentTimer&&!state.entertainmentPrefetch&&!state.entertainmentSpeaking)startEntertainment(2000);});
   document.addEventListener('ce:zuzu-request-error',function(){if(!state.conversationMode&&!state.voiceTurnActive)return;state.requestInFlight=false;state.awaitingResponse=false;state.voiceTurnActive=false;stopEntertainment(true);setStatus('No se pudo completar. Te escucho.','err');if(state.conversationMode)setTimeout(startUser,180);});
-  document.addEventListener('ce:zuzu-response-rendered',function(ev){if(!state.conversationMode&&!state.voiceTurnActive)return;state.requestInFlight=false;state.awaitingResponse=false;var answer=stripVoiceAnswerLead(clean(ev&&ev.detail&&ev.detail.answer));if(!answer){state.voiceTurnActive=false;stopEntertainment(true);if(state.conversationMode)setTimeout(startUser,120);return;}var auto=$('ceVoz3AutoRead');if(!auto||auto.checked!==false)speakChunks(answer);else{state.voiceTurnActive=false;stopEntertainment(true);if(state.conversationMode)startUser();}});
+  document.addEventListener('ce:zuzu-response-rendered',function(ev){var vc=!!(ev&&ev.detail&&ev.detail.voiceConversation)||!!state.lastRequestWasVoice;handleRenderedVoiceResponse(ev&&ev.detail&&ev.detail.answer,vc);state.lastRequestWasVoice=false;});
   window.addEventListener('controlevent:zuzu-opened',function(ev){injectPanel();var trusted=!!(ev&&ev.detail&&ev.detail.trusted);if(trusted)unlockTtsAudioFromGesture();if(!state.requestInFlight&&!state.speaking)activateDirectConversation(trusted);});
   window.addEventListener('controlevent:zuzu-closed',function(ev){parkConversation(!!(ev&&ev.detail&&ev.detail.trusted));});
   document.addEventListener('click',function(ev){var t=ev.target;if(t&&t.closest&&t.closest('#ceAiDownloadResult')&&state.conversationMode)stopEntertainment(true);},true);
@@ -524,8 +593,8 @@
     version:BUILD,isConversationalMode:function(){return !!state.conversationMode;},
     startAmbientListening:function(){state.ambientEnabled=true;state.needsGesture=false;safeSet(STORAGE.ambient,'1');startAmbient(true);},startDirectConversation:activateDirectConversation,
     endVoiceConversation:endConversation,downloadConversationRecording:toggleRecording,
-    speakResponse:speakResponse,stopSpeaking:stopSpeaking,supportsRecognition:supportsRecognition,supportsDeviceSpeech:supportsSpeech,spokenPreview:function(text){return prepareSpeechText(text);},speechChunksPreview:function(text){return chunkSpeech(text);},
-    debugState:function(){return{build:BUILD,standardTts:true,appleMobile:isAppleMobile(),ambientEnabled:state.ambientEnabled,conversationMode:state.conversationMode,voiceTurnActive:state.voiceTurnActive,recognitionStarting:state.recognitionStarting,recognitionLive:state.recognitionLive,needsGesture:state.needsGesture,mode:state.mode,localSpeechReady:state.localSpeechReady,localSpeechPreparing:state.localSpeechPreparing,localSpeechUnavailable:state.localSpeechUnavailable,lastRecognitionError:state.lastRecognitionError,cloudFallback:state.cloudFallback,cloudWanted:state.cloudWanted,cloudRecording:state.cloudRecording,cloudBusy:state.cloudBusy,cloudLastTranscript:state.cloudLastTranscript,mic:{label:state.cloudDeviceLabel,id:state.cloudDeviceId,rms:state.cloudRms,channels:state.cloudChannelRms,peak:state.cloudPeak,noise:state.cloudNoiseFloor,threshold:state.cloudThreshold,calibrated:state.cloudCalibrationDone,settings:state.cloudDeviceSettings}};}
+    speakResponse:speakResponse,maybeAutoRead:maybeAutoRead,stopSpeaking:stopSpeaking,supportsRecognition:supportsRecognition,supportsDeviceSpeech:supportsSpeech,spokenPreview:function(text){return prepareSpeechText(text);},speechChunksPreview:function(text){return chunkSpeech(text);},
+    debugState:function(){return{build:BUILD,standardTts:true,appleMobile:isAppleMobile(),iphone:isIPhone(),ipad:isIPad(),ttsUnlocked:state.ttsUnlocked,ambientEnabled:state.ambientEnabled,conversationMode:state.conversationMode,voiceTurnActive:state.voiceTurnActive,recognitionStarting:state.recognitionStarting,recognitionLive:state.recognitionLive,needsGesture:state.needsGesture,mode:state.mode,localSpeechReady:state.localSpeechReady,localSpeechPreparing:state.localSpeechPreparing,localSpeechUnavailable:state.localSpeechUnavailable,lastRecognitionError:state.lastRecognitionError,cloudFallback:state.cloudFallback,cloudWanted:state.cloudWanted,cloudRecording:state.cloudRecording,cloudBusy:state.cloudBusy,cloudLastTranscript:state.cloudLastTranscript,mic:{label:state.cloudDeviceLabel,id:state.cloudDeviceId,rms:state.cloudRms,channels:state.cloudChannelRms,peak:state.cloudPeak,noise:state.cloudNoiseFloor,threshold:state.cloudThreshold,calibrated:state.cloudCalibrationDone,settings:state.cloudDeviceSettings}};}
   };
   window.ControlEventVoiceV2=window.ControlEventVoiceTurns;
   window.ControlEventV22Voz4=window.ControlEventVoiceTurns;

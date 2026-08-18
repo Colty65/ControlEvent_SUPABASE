@@ -225,9 +225,11 @@ export async function streamZuzuSpeech(body = {}, req, res) {
   const voice = ttsVoice();
   const style = clean(body.style || 'normal', 30).toLowerCase();
   const prompt = zuzuTtsPrompt(transcript, style);
-  // Usamos el endpoint REST de streaming TTS y normalizamos la respuesta a SSE muy simple.
-  // El navegador de CE no necesita conocer el formato interno de Gemini.
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+
+  // FIX34 · ruta oficial de streaming TTS de Gemini 3.1: Interactions API.
+  // El antiguo :streamGenerateContent aceptaba AUDIO, pero no es el contrato actual de
+  // streaming TTS. Interactions entrega eventos step.delta / delta.type=audio.
+  const url = 'https://generativelanguage.googleapis.com/v1beta/interactions';
   const controller = new AbortController();
   const timeoutMs = Number(process.env.CONTROLEVENT_ZUZU_TTS_STREAM_TIMEOUT_MS || 14000);
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -237,14 +239,18 @@ export async function streamZuzuSpeech(body = {}, req, res) {
   try {
     const upstream = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey,
+        'Api-Revision': '2026-05-20'
+      },
       signal: controller.signal,
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          responseModalities: ['AUDIO'],
-          speechConfig: { languageCode: 'es-ES', voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } }
-        }
+        model,
+        input: prompt,
+        response_format: { type: 'audio' },
+        generation_config: { speech_config: [{ voice }] },
+        stream: true
       })
     });
     if (!upstream.ok) {
@@ -262,30 +268,50 @@ export async function streamZuzuSpeech(body = {}, req, res) {
     res.setHeader('X-ControlEvent-Upstream-Ms', String(Date.now() - started));
     res.flushHeaders?.();
     if (!upstream.body) throw new Error('Gemini TTS no devolvió un flujo de audio.');
+
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
-    let pending = '';
+    let pending = '', chunks = 0;
+    const audioFromEvent = (evt = {}) => {
+      if (evt?.event_type === 'step.delta' && evt?.delta?.type === 'audio' && evt?.delta?.data) return clean(evt.delta.data, 24_000_000);
+      // Compatibilidad defensiva si Google añade un envoltorio o cambia snake/camel case.
+      if (evt?.eventType === 'step.delta' && evt?.delta?.type === 'audio' && evt?.delta?.data) return clean(evt.delta.data, 24_000_000);
+      return '';
+    };
+    const consumeBlock = (block) => {
+      const dataText = String(block || '').split(/\r?\n/)
+        .filter(line => /^data:/.test(line))
+        .map(line => line.replace(/^data:\s?/, ''))
+        .join('\n').trim();
+      if (!dataText || dataText === '[DONE]') return;
+      try {
+        const audio = audioFromEvent(JSON.parse(dataText));
+        if (audio && !res.writableEnded) {
+          chunks++;
+          res.write(`data: ${JSON.stringify({ audio })}\n\n`);
+          res.flush?.();
+        }
+      } catch (_) {}
+    };
     const consume = (text, final = false) => {
       pending += text;
       const blocks = pending.split(/\r?\n\r?\n/);
-      if (!final) pending = blocks.pop() || ''; else pending = '';
-      for (const block of blocks) {
-        const dataText = block.split(/\r?\n/).filter(line => /^data:/.test(line)).map(line => line.replace(/^data:\s?/, '')).join('\n').trim();
-        if (!dataText || dataText === '[DONE]') continue;
-        try {
-          const audio = extractStreamAudioBase64(JSON.parse(dataText));
-          if (audio && !res.writableEnded) { res.write(`data: ${JSON.stringify({ audio })}\n\n`); res.flush?.(); }
-        } catch (_) {}
-      }
-      if (final && pending) pending = '';
+      if (!final) pending = blocks.pop() || '';
+      else pending = '';
+      for (const block of blocks) consumeBlock(block);
     };
     while (!res.writableEnded) {
       const { done, value } = await reader.read();
       if (done) break;
       if (value?.length) consume(decoder.decode(value, { stream: true }), false);
     }
-    consume(decoder.decode(), true);
-    if (!res.writableEnded) res.end();
+    const tail = decoder.decode();
+    if (tail) consume(tail, false);
+    if (pending) consumeBlock(pending);
+    if (!res.writableEnded) {
+      res.write(`data: ${JSON.stringify({ done: true, chunks })}\n\n`);
+      res.end();
+    }
   } catch (error) {
     if (error?.name === 'AbortError') { const e = new Error('La voz streaming de Zuzu agotó el tiempo de espera.'); e.status = 502; throw e; }
     throw error;
