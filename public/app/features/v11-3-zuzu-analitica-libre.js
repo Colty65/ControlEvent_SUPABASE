@@ -189,7 +189,7 @@
       try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ }
     }
     var now=Date.now(); if(now-lastOpenTap<650) return; lastOpenTap=now;
-    openModal(ev);
+    openModal();
   }
   function bindOpenButton(btn){
     if(!btn || btn.__ceAnaliticaLibreBound) return; btn.__ceAnaliticaLibreBound=true;
@@ -437,16 +437,16 @@
       document.body.classList.remove('ce-g92-tip-open');
     }catch(_){ }
   }
-  function openModal(sourceEvent){
+  function openModal(){
     closeGraphInfoBubble();
     injectStyle();
     installPromptEventShield();
     var old=$('ceGeminiLibreOverlay'); if(old) old.remove();
     document.body.insertAdjacentHTML('beforeend', modalHtml());
     var closeBtn=$('ceAiClose');
-    if(closeBtn){ closeBtn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); closeModal(ev); }, true); }
-    $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(ev); });
-    document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(ev); document.removeEventListener('keydown', escClose, true); } }, true);
+    if(closeBtn){ closeBtn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); closeModal(); }, true); }
+    $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(); });
+    document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(); document.removeEventListener('keydown', escClose, true); } }, true);
     $('ceAiRun').onclick=runAi;
     $('ceAiClear').onclick=function(ev){ clearZuzu(ev); };
     var pdfBtn=$('ceAiDownloadResult');
@@ -457,16 +457,9 @@
       pdfBtn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation();} printZuzuPdf(); };
     }
     restoreConversationScreen();
-    // FIX34 robustez voz: la apertura/cierre del modal son la fuente de verdad del estado oral.
-    // Se despacha SINCRONICAMENTE para que Safari/iOS pueda reutilizar el gesto real del usuario.
-    try{window.dispatchEvent(new CustomEvent('controlevent:zuzu-opened',{detail:{trusted:!!(sourceEvent&&sourceEvent.isTrusted),source:sourceEvent?'manual':'programmatic'}}));}catch(_){ }
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
-  function closeModal(sourceEvent){
-    closeZuzuPdfPicker(); clearZuzuThinkingTimer();
-    var o=$('ceGeminiLibreOverlay'),had=!!o; if(o) o.remove();
-    if(had){try{window.dispatchEvent(new CustomEvent('controlevent:zuzu-closed',{detail:{trusted:!!(sourceEvent&&sourceEvent.isTrusted),source:sourceEvent?'manual':'programmatic'}}));}catch(_){ }}
-  }
+  function closeModal(){ closeZuzuPdfPicker(); clearZuzuThinkingTimer(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
   function setStatus(msg, kind){ var el=$('ceAiStatus'); if(!el) return; el.className='ce-ai-status '+(kind||''); el.textContent=msg||''; }
   function zuzuPromptFlags(prompt){
     var p=String(prompt||'').toLowerCase();
@@ -642,11 +635,10 @@
       var history=conversationHistoryForApi();
       var previousInteractionId=loadZuzuInteractionId();
       var conversationContext=loadZuzuConversationContext();
-      var voiceMeta=null;try{if(voiceConversation&&window.__ceZuzuVoiceMeta&&typeof window.__ceZuzuVoiceMeta==='object')voiceMeta=window.__ceZuzuVoiceMeta;}catch(_){}
       var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();}
       requestController=typeof AbortController!=='undefined'?new AbortController():null;
       if(requestController)requestWatchdog=setTimeout(function(){try{requestController.abort();}catch(_){}},75000);
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,voiceEntities:voiceMeta&&Array.isArray(voiceMeta.entities)?voiceMeta.entities:[],voiceTranscript:voiceMeta&&voiceMeta.transcript?String(voiceMeta.transcript):'',conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -661,7 +653,6 @@
         }
       }
       data.__prompt = prompt;
-      try{if(voiceConversation&&window.__ceZuzuVoiceMeta)window.__ceZuzuVoiceMeta=null;}catch(_){}
       data.answer=withoutGeminiLabel(ensureZuzuUserPreface(data.answer||''));
       if(data.title) data.title=withoutGeminiLabel(data.title);
       if(Array.isArray(data.warnings)) data.warnings=data.warnings.map(withoutGeminiLabel);
@@ -991,7 +982,7 @@
   document.addEventListener('click',function(ev){ if(ev.target && ev.target.closest && ev.target.closest('#tabGraficasBtn')) setTimeout(tick,180); }, true);
   document.addEventListener('change',function(ev){ if(ev.target && ev.target.id==='selectedEvent') setTimeout(tick,250); }, true);
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',tick,{once:true}); else tick();
-  document.addEventListener('click',function(ev){ var t=ev.target; if(t && t.closest && t.closest('#ceGeminiLibreOverlay .ce-ai-close')){ ev.preventDefault(); ev.stopPropagation(); closeModal(ev); } }, true);
+  document.addEventListener('click',function(ev){ var t=ev.target; if(t && t.closest && t.closest('#ceGeminiLibreOverlay .ce-ai-close')){ ev.preventDefault(); ev.stopPropagation(); closeModal(); } }, true);
   document.addEventListener('touchend',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, { passive:false, capture:true });
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, true);
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceAiClear'); if(b){ clearZuzu(ev); } }, true);

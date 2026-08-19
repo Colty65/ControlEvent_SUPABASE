@@ -24,131 +24,6 @@ function norm(value) {
   const s = text(value);
   return (s.normalize ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : s).toLowerCase().trim();
 }
-
-
-// FIX34 v3-prep · diccionario aprendido de nombres de voz/conversación.
-// No contiene aliases hard-codeados: la tabla arranca vacía y solo aporta equivalencias aprendidas.
-const ZUZU_NORMALIZATIONS_TABLE = 'ce_zuzu_normalizaciones';
-let zuzuNormCache = { at: 0, rows: [] };
-function zuzuNormKey(value) {
-  return norm(value).replace(/[^a-z0-9ñ]+/g, ' ').replace(/\s+/g, ' ').trim();
-}
-function zuzuNormType(value) {
-  const t = trim(value).toUpperCase();
-  return ['EVENTOS','PERSONAS','PRODUCTOS','TIENDAS','OTROS'].includes(t) ? t : 'OTROS';
-}
-function zuzuNormalizationTypeHints(prompt='') {
-  const p = ` ${zuzuNormKey(prompt)} `, out = new Set();
-  if (/\b(evento|eventos|jornada|fiesta|funcion|función|visita|cumple)\b/.test(p)) out.add('EVENTOS');
-  if (/\b(persona|personas|socio|socios|donante|responsable|quien|quién)\b/.test(p)) out.add('PERSONAS');
-  if (/\b(producto|productos|articulo|artículo|bebida|comida|donado|comprado)\b/.test(p)) out.add('PRODUCTOS');
-  if (/\b(tienda|tiendas|comercio|supermercado|proveedor)\b/.test(p)) out.add('TIENDAS');
-  return out;
-}
-async function zuzuLoadNormalizations() {
-  const now = Date.now();
-  if (now - zuzuNormCache.at < 60000) return zuzuNormCache.rows;
-  try {
-    const db = getSupabaseAdmin();
-    const { data, error } = await db.from(ZUZU_NORMALIZATIONS_TABLE)
-      .select('id,datos,texto,texto_norm,dato_bueno,dato_id,confianza,activo')
-      .eq('activo', true).limit(1000);
-    if (error) throw error;
-    const rows = arr(data).map(r => ({...r, datos:zuzuNormType(r?.datos), texto_norm:zuzuNormKey(r?.texto_norm||r?.texto), dato_bueno:trim(r?.dato_bueno)})).filter(r=>r.texto_norm&&r.dato_bueno);
-    zuzuNormCache = { at: now, rows }; return rows;
-  } catch (_) {
-    // La versión debe seguir funcionando aunque el SQL aún no se haya ejecutado.
-    zuzuNormCache = { at: now, rows: [] }; return [];
-  }
-}
-async function zuzuApplyLearnedNormalizations(prompt='',state=null) {
-  const rows = await zuzuLoadNormalizations();
-  if (!rows.length) return { prompt:trim(prompt), applied:[] };
-  const typeMap={EVENTOS:'event',PERSONAS:'person',PRODUCTOS:'product',TIENDAS:'store'};
-  const canonicalOk=(row)=>{
-    const kind=typeMap[row?.datos];
-    if(!kind)return row?.datos==='OTROS';
-    const catalog=semanticCatalogRows(state||{},kind);
-    const target=norm(row?.dato_bueno),id=trim(row?.dato_id);
-    return catalog.some(x=>(id&&trim(x?.id)===id)||norm(x?.nombre)===target);
-  };
-  const key = ` ${zuzuNormKey(prompt)} `, hints = zuzuNormalizationTypeHints(prompt), applied = [];
-  const grouped = new Map();
-  for (const r of rows) {
-    if (!canonicalOk(r) || !key.includes(` ${r.texto_norm} `)) continue;
-    if (!grouped.has(r.texto_norm)) grouped.set(r.texto_norm, []);
-    grouped.get(r.texto_norm).push(r);
-  }
-  for (const matches of grouped.values()) {
-    let candidates = matches;
-    if (matches.length > 1 && hints.size) {
-      const narrowed = matches.filter(r=>hints.has(r.datos)); if (narrowed.length) candidates=narrowed;
-    }
-    const targets = [...new Set(candidates.map(r=>`${r.datos}|${r.dato_bueno}`))];
-    if (targets.length !== 1) continue;
-    const r=candidates[0]; applied.push({datos:r.datos,texto:trim(r.texto),dato_bueno:r.dato_bueno});
-  }
-  if (!applied.length) return { prompt:trim(prompt), applied:[] };
-  const note = applied.map(r=>`${r.datos}: «${r.texto}» = «${r.dato_bueno}»`).join('; ');
-  return { prompt:`${trim(prompt)}\n\n[CONTROL_EVENT_NORMALIZACION_APRENDIDA: ${note}. Usa los nombres canónicos indicados para resolver herramientas; no menciones esta nota al usuario.]`, applied };
-}
-function zuzuResultEntityNames(ctx={}) {
-  const e = ctx?.entities && typeof ctx.entities==='object' ? ctx.entities : {};
-  return {
-    EVENTOS: arr(e.EVENTOS||e.eventos).map(trim).filter(Boolean),
-    PERSONAS: arr(e.PERSONAS||e.personas).map(trim).filter(Boolean),
-    PRODUCTOS: arr(e.PRODUCTOS||e.productos).map(trim).filter(Boolean),
-    TIENDAS: arr(e.TIENDAS||e.tiendas).map(trim).filter(Boolean)
-  };
-}
-async function zuzuPersistLearnedNormalization({datos,texto:raw,dato_bueno,dato_id='',confianza=1}={}) {
-  const tipo=zuzuNormType(datos), texto=trim(raw), bueno=trim(dato_bueno), key=zuzuNormKey(texto);
-  const words=key.split(/\s+/).filter(Boolean);
-  const generic=/^(?:este|esta|ese|esa|estos|estas|esos|esas|aqui|ahi|esto|eso|evento|eventos|persona|personas|producto|productos|tienda|tiendas)$/i.test(key);
-  const unitOnly=/^\d+(?:[.,]\d+)?\s*(?:l|lt|ml|cl|kg|g|gr|cm|m|ud|uds|unidades?)$/i.test(key);
-  const instructionLike=words.length>5&&/\b(?:dame|saca|lista|listado|ordena|ordenados|busca|muestra|quiero|ahora|registrados)\b/i.test(key);
-  if(tipo==='OTROS'||key.length<2||!bueno||key===zuzuNormKey(bueno)||generic||unitOnly||instructionLike) return false;
-  try {
-    const db=getSupabaseAdmin(), now=new Date().toISOString();
-    const {data:existing,error:findError}=await db.from(ZUZU_NORMALIZATIONS_TABLE).select('id,usos,dato_bueno').eq('datos',tipo).eq('texto_norm',key).maybeSingle();
-    if(findError)throw findError;
-    if(existing?.id){
-      const {error}=await db.from(ZUZU_NORMALIZATIONS_TABLE).update({texto,dato_bueno:bueno,dato_id:trim(dato_id)||null,confianza:Math.max(0,Math.min(1,Number(confianza)||1)),usos:Math.max(1,Number(existing.usos)||0)+1,activo:true,updated_at:now,last_seen_at:now}).eq('id',existing.id);if(error)throw error;
-    }else{
-      const {error}=await db.from(ZUZU_NORMALIZATIONS_TABLE).insert({datos:tipo,texto,texto_norm:key,dato_bueno:bueno,dato_id:trim(dato_id)||null,origen:'voz-aprendizaje',confianza:Math.max(0,Math.min(1,Number(confianza)||1)),usos:1,activo:true,created_at:now,updated_at:now,last_seen_at:now});if(error)throw error;
-    }
-    zuzuNormCache.at=0; return true;
-  }catch(_){return false;}
-}
-function zuzuFallbackVoiceEntity(rawPrompt='', type='', canonical='') {
-  const raw=trim(rawPrompt), can=trim(canonical); if(!raw||!can)return'';
-  if(type==='EVENTOS'){
-    const cy=(can.match(/\b(20\d{2})\b/)||[])[1];
-    if(cy){const m=raw.match(new RegExp('(?:de|del|evento|sobre)?\\s*([^,.!?]{2,70}\\b'+cy+')','i'));if(m)return trim(m[1]).replace(/^(?:de|del|evento|sobre)\s+/i,'');}
-  }
-  if(type==='PERSONAS'){
-    const m=raw.match(/(?:de|sobre|persona|socio|donante|responsable)\s+([^,.!?]{2,60})/i);if(m)return trim(m[1]);
-  }
-  return'';
-}
-async function zuzuLearnFromVoiceTurn({rawPrompt='',voiceEntities=[],resultContext={}}={}) {
-  const names=zuzuResultEntityNames(resultContext), promptKey=` ${zuzuNormKey(rawPrompt)} `;
-  const incoming=arr(voiceEntities).map(r=>({type:zuzuNormType(r?.type||r?.datos),text:trim(r?.text||r?.texto)})).filter(r=>r.text&&r.type!=='OTROS');
-  const entityLike=(raw,type,canonical)=>{
-    const key=zuzuNormKey(raw), words=key.split(/\s+/).filter(Boolean);if(!key||words.length>6||!promptKey.includes(` ${key} `))return false;
-    if(/\b(?:dame|dime|lista|listado|ordena|busca|muestra|quiero|ahora|este|esta|estos|estas|registrados|info|informacion|información)\b/.test(key)&&words.length>2)return false;
-    if(type==='EVENTOS'){const cy=(String(canonical).match(/\b20\d{2}\b/)||[])[0];if(cy&&!key.includes(cy)&&!zuzuNormKey(canonical).split(' ').some(x=>x.length>=4&&key.includes(x)))return false;}
-    return true;
-  };
-  for(const type of ['EVENTOS','PERSONAS','PRODUCTOS','TIENDAS']){
-    const canon=[...new Set(arr(names[type]).filter(Boolean))], rawForType=incoming.filter(r=>r.type===type);
-    if(canon.length===1&&rawForType.length===1&&entityLike(rawForType[0].text,type,canon[0])){
-      void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[0].text,dato_bueno:canon[0],confianza:1});
-    }else if(canon.length&&rawForType.length===canon.length){
-      for(let i=0;i<canon.length;i++)if(entityLike(rawForType[i].text,type,canon[i]))void zuzuPersistLearnedNormalization({datos:type,texto:rawForType[i].text,dato_bueno:canon[i],confianza:.9});
-    }
-  }
-}
 function arr(value) { return Array.isArray(value) ? value : []; }
 function byId(rows) {
   const out = new Map();
@@ -2660,12 +2535,11 @@ function summarizeGeminiUsageFromTrace(trace = []) {
     acc.candidateTokens += num(x.usage.candidateTokens);
     acc.outputTokens += num(x.usage.outputTokens || x.usage.billableOutputTokens);
     acc.hiddenOutputTokens += num(x.usage.hiddenOutputTokens);
-    acc.cachedTokens += num(x.usage.cachedTokens);
     acc.totalTokens += num(x.usage.totalTokens);
     acc.costUsd += num(x.usage.costUsd);
     acc.costEurApprox += num(x.usage.costEurApprox);
     return acc;
-  }, { promptTokens:0, candidateTokens:0, outputTokens:0, hiddenOutputTokens:0, cachedTokens:0, totalTokens:0, costUsd:0, costEurApprox:0 });
+  }, { promptTokens:0, candidateTokens:0, outputTokens:0, hiddenOutputTokens:0, totalTokens:0, costUsd:0, costEurApprox:0 });
   total.costUsd = Number(total.costUsd.toFixed(6));
   total.costEurApprox = Number(total.costEurApprox.toFixed(6));
   return { calls: items.length, ...total, note: 'Coste estimado por ControlEvent usando output facturable = max(candidatesTokenCount, totalTokenCount - promptTokenCount). La factura real puede variar por caché, región, impuestos o cambios de tarifa.' };
@@ -6783,7 +6657,7 @@ async function v26ToolPersonDossier(tool,state,selectedEventId=''){
   for(const c of arr(state?.colaboradores).filter(x=>ids.has(trim(x?.personaId||x?.persona_id))&&inScope(x?.eventId||x?.event_id))){const pid=trim(c?.personaId||c?.persona_id),eid=trim(c?.eventId||c?.event_id),ev=eventMap.get(eid)||{},inc=h.income(c),registered=trim(h.people.get(pid)?.nombre)||inc.identity.name;linkedIncome+=inc.total;if(directIds.has(pid)){directIncome+=inc.total;if(eid)directEvents.add(eid);}else{compositeIncome+=inc.total;if(eid)compositeEvents.add(eid);}if(inc.voluntary<0)negatives.push({event:trim(ev?.titulo),registered_as:registered,voluntary:inc.voluntary,mandatory:inc.mandatory,total:inc.total});participation.push({Evento:trim(ev?.titulo),'Fecha inicio':trim(ev?.fechaIni),'Fecha fin':trim(ev?.fechaFin),'Registrado como':registered,'Estado ingreso':trim(c?.situacion||c?.formaPago||c?.ingreso)||'Sin clasificar','Número':inc.numero});incomes.push({Evento:trim(ev?.titulo),'Registrado como':registered,'Estado ingreso':trim(c?.situacion||c?.formaPago||c?.ingreso)||'Sin clasificar',Importe:inc.total,'Importe obligatorio':inc.mandatory,'Importe voluntario':inc.voluntary});}
   const purchaseRows=arr(state?.compras).filter(c=>inScope(c?.eventId||c?.event_id)&&operationalIds.has(trim(c?.responsableId||c?.responsable_id))&&!isDonationTicket(ticketText(c))&&!isPendingTicket(ticketText(c))).map(c=>{const ev=eventMap.get(trim(c?.eventId||c?.event_id))||{},pid=trim(c?.responsableId||c?.responsable_id),productId=trim(c?.productoId||c?.producto_id),prod=products.get(productId)||{};return{Evento:trim(ev?.titulo),Responsable:trim(h.people.get(pid)?.nombre)||r.nombre,TKxx:v26TicketToken(ticketText(c))||ticketText(c),Producto:trim(c?.productoNombre||c?.producto||c?.nombreProducto||c?.nombre||prod?.nombre||productId||'Sin producto'),Unidades:round(num(c?.unidades??c?.cantidad??c?.uds),3),Precio:v26Money(c?.precio??prod?.defaultPrecio??prod?.precio),Importe:valueOfLine(c)};});
   purchaseRows.sort((a,b)=>text(b.Evento).localeCompare(text(a.Evento),'es')||text(a.TKxx).localeCompare(text(b.TKxx),'es',{numeric:true})||text(a.Producto).localeCompare(text(b.Producto),'es'));
-  const donationRows=arr(state?.compras).filter(c=>inScope(c?.eventId||c?.event_id)&&isDonationTicket(ticketText(c))&&ids.has(trim(text(c?.donorRef||c?.donor_ref).replace(/^P:/,'')))).map(c=>{const ev=eventMap.get(trim(c?.eventId||c?.event_id))||{},pid=trim(text(c?.donorRef||c?.donor_ref).replace(/^P:/,''));return{Evento:trim(ev?.titulo),Donante:trim(h.people.get(pid)?.nombre)||r.nombre,Tipo:ticketText(c),Importe:valueOfLine(c)};});
+  const donationRows=arr(state?.compras).filter(c=>inScope(c?.eventId||c?.event_id)&&isDonationTicket(ticketText(c))&&ids.has(trim(text(c?.donorRef||c?.donor_ref).replace(/^P:/,'')))).map(c=>{const ev=eventMap.get(trim(c?.eventId||c?.event_id))||{},pid=trim(text(c?.donorRef||c?.donor_ref).replace(/^P:/,'')),productId=trim(c?.productoId||c?.producto_id),prod=products.get(productId)||{};return{Evento:trim(ev?.titulo),Donante:trim(h.people.get(pid)?.nombre)||r.nombre,Tipo:ticketText(c),Producto:trim(c?.productoNombre||c?.producto||c?.nombreProducto||c?.nombre||prod?.nombre||productId||'Sin producto'),Unidades:round(num(c?.unidades??c?.cantidad??c?.uds),3),Precio:v26Money(c?.precio??prod?.defaultPrecio??prod?.precio),Importe:valueOfLine(c)};});
   let hitos=[],lgs=[];try{const localHitos=arr(state?.hitos),localLgs=arr(state?.lgs);const hs=(localHitos.length||localLgs.length)?{hitos:localHitos,lgs:localLgs}:await listAllHitosState();const isOperationalOwner=x=>operationalIds.has(trim(x?.responsableId||x?.responsable_id))||operationalNameKeys.has(canonicalNameKey(x?.responsableNombre||x?.responsable_nombre));hitos=arr(hs?.hitos).filter(x=>inScope(x?.eventId||x?.event_id)&&isOperationalOwner(x));lgs=arr(hs?.lgs).filter(x=>inScope(x?.eventId||x?.event_id)&&isOperationalOwner(x));}catch(_){ }
   const taskRows=[...hitos.map(x=>({Tipo:'HITO',Evento:trim(eventMap.get(trim(x?.eventId||x?.event_id))?.titulo),Responsable:trim(x?.responsableNombre),Descripción:trim(x?.nombreHito||x?.descripcion),Estado:''})),...lgs.map(x=>({Tipo:'LG',Evento:trim(eventMap.get(trim(x?.eventId||x?.event_id))?.titulo),Responsable:trim(x?.responsableNombre),Descripción:trim(x?.descripcion),Estado:x?.cumplida?'Cumplida':'Pendiente'}))];
   const uniqueEvents=new Set([...participation.map(x=>x.Evento),...purchaseRows.map(x=>x.Evento),...donationRows.map(x=>x.Evento),...taskRows.map(x=>x.Evento)].filter(Boolean));
@@ -6824,7 +6698,7 @@ async function v26ToolPersonDossier(tool,state,selectedEventId=''){
     {...v26Table('participation',`Detalle de participación vinculada a ${r.nombre}`,participation,schemaP),chartable:false},
     {...v26Table('incomes',`Detalle de ingresos vinculados a ${r.nombre}`,incomes,schemaI),chartable:false},
     {...v26Table('purchase_responsibility',`Detalle de compras bajo responsabilidad de ${r.nombre}`,purchaseRows,{Evento:v26TextSchema(),Responsable:v26TextSchema(),TKxx:v26TextSchema(),Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades del registro'),Precio:v26MoneySchema('Precio unitario del registro'),Importe:v26MoneySchema()}),chartable:false},
-    {...v26Table('donations',`Detalle de donaciones vinculadas a ${r.nombre}`,donationRows,{Evento:v26TextSchema(),Donante:v26TextSchema(),Tipo:v26TextSchema(),Importe:v26MoneySchema()}),chartable:false},
+    {...v26Table('donations',`Detalle de donaciones vinculadas a ${r.nombre}`,donationRows,{Evento:v26TextSchema(),Donante:v26TextSchema(),Tipo:v26TextSchema(),Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades donadas'),Precio:v26MoneySchema('Precio unitario registrado'),Importe:v26MoneySchema()}),chartable:false},
     {...v26Table('tasks',`Detalle de Hitos y LG vinculados a ${r.nombre}`,taskRows,{Tipo:v26TextSchema(),Evento:v26TextSchema(),Responsable:v26TextSchema(),Descripción:v26TextSchema(),Estado:v26StatusSchema()}),chartable:false}
   ].filter(t=>t.rows.length);
   return{id:tool.id,name:tool.name,ok:true,title:`Dossier personal · ${r.nombre}${scopeEvent?` · ${scopeEvent.nombre}`:''}`,facts,facts_schema,provenance:'ControlEvent · hechos canónicos',tables:presentationTables.concat(detailTables)};
@@ -7572,7 +7446,7 @@ async function runZuzuV26Tools({userPrompt,state,selectedEventId,flowTrace=[],co
     zuzuTracePush(flowTrace,'V27 · Plan ControlEvent','OK',`Plan local determinista: ${plan.tools.map(t=>t.name).join(', ')}. Se evita una llamada Gemini de planificación porque la intención ya es inequívoca.`);
   }else{
     try{plan=await callGeminiV26Planner(userPrompt,state,selectedEventId,flowTrace,conversationHistory);}
-    catch(error){return{ok:true,rejected:true,title:'Zuzu no ha podido interpretar la petición',answer:friendlyZuzuErrorMessage(error),warnings:[],charts:[],tables:[],files:[],provider:'v26-tools-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
+    catch(error){return{ok:true,rejected:true,title:'Zuzu no ha podido interpretar la petición',answer:friendlyZuzuErrorMessage(error),warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'v26-tools-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
   }
   if(plan.action==='clarify')return{ok:true,rejected:false,title:'Necesito concretar una cosa',answer:plan.clarification,warnings:[],charts:[],tables:[],files:[],provider:'v26-tools-clarify',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};
 
@@ -8403,14 +8277,13 @@ async function v261CallInteraction({input,previousInteractionId='',model,systemI
   if(arr(tools).length){body.tools=tools;generationConfig.tool_choice=toolChoice;}
   if(trim(previousInteractionId))body.previous_interaction_id=trim(previousInteractionId);
   const url='https://generativelanguage.googleapis.com/v1/interactions';
-  const callStarted=Date.now();
   let res,payload;
   try{({res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_INTERACTIONS_TIMEOUT_MS||45000),externalSignal));}
-  catch(error){const elapsedMs=Date.now()-callStarted;zuzuTracePush(flowTrace,stage,'KO',`${cleanGeminiError(error)} · ${elapsedMs} ms`,{model,elapsedMs});throw error;}
-  const elapsedMs=Date.now()-callStarted,usage=v261UsageSmall(payload,model);
-  if(!res.ok){const e=new Error(payload?.error?.message||`Gemini Interactions HTTP ${res.status}`);e.status=res.status;e.details=payload;zuzuTracePush(flowTrace,stage,'KO',`${cleanGeminiError(e)} · ${elapsedMs} ms`,{model,usage,elapsedMs});throw e;}
+  catch(error){zuzuTracePush(flowTrace,stage,'KO',cleanGeminiError(error),{model});throw error;}
+  const usage=v261UsageSmall(payload,model);
+  if(!res.ok){const e=new Error(payload?.error?.message||`Gemini Interactions HTTP ${res.status}`);e.status=res.status;e.details=payload;zuzuTracePush(flowTrace,stage,'KO',cleanGeminiError(e),{model,usage});throw e;}
   const status=trim(payload?.status)||'completed';
-  zuzuTracePush(flowTrace,stage,status==='failed'?'KO':'OK',`Interactions ${status}; pasos=${arr(payload?.steps).length}; id=${trim(payload?.id).slice(0,48)} · ${elapsedMs} ms · caché=${num(usage.cachedTokens)} tokens.`,{model,usage,elapsedMs});
+  zuzuTracePush(flowTrace,stage,status==='failed'?'KO':'OK',`Interactions ${status}; pasos=${arr(payload?.steps).length}; id=${trim(payload?.id).slice(0,48)}.`,{model,usage});
   if(['failed','cancelled','budget_exceeded'].includes(status)){const e=new Error(payload?.error?.message||`Gemini Interactions terminó con estado ${status}.`);e.status=502;e.details=payload;throw e;}
   return payload;
 }
@@ -9838,18 +9711,23 @@ function v40SccDataArgumentSchema(){
   }};
 }
 function v40SccPlanTool(){
-  return {type:'function',name:'scc_execute_plan',description:'Primer paso de un turno que necesita datos CE: decide continuidad, ámbito, foco y fuentes canónicas. Devuelve solo el plan; no respondas al usuario.',parameters:{type:'object',properties:{
-    relation:{type:'string',enum:['continue','new_topic','clarify','reset']},
-    reason:{type:'string',description:'Una frase muy breve.'},
+  return {type:'function',name:'scc_execute_plan',description:'OBLIGATORIA en el primer paso de cada turno. Decide la relación del mensaje con la conversación, el foco vigente y las fuentes canónicas de ControlEvent que deben ejecutarse. No responde al usuario: devuelve el plan para que ControlEvent ejecute exactamente las fuentes pedidas y te devuelva sus resultados antes de redactar.',parameters:{type:'object',properties:{
+    relation:{type:'string',enum:['continue','new_topic','clarify','reset'],description:'continue si el mensaje depende realmente del hilo actual; new_topic si es autosuficiente/cambia de tema; clarify solo si ni el hilo ni el contexto ambiental permiten resolverlo; reset solo si el usuario pide explícitamente olvidar/reiniciar.'},
+    reason:{type:'string'},
     confidence:{type:'number'},
     scope:{type:'string',enum:['active_event','named_event','all_events','global','none']},
-    event:{type:'string'},events:{type:'array',items:{type:'string'}},subjects:{type:'array',items:{type:'string'}},
-    domain:{type:'string'},operation:{type:'string'},
-    dataset:{type:'object',properties:{id:{type:'string'},description:{type:'string'},carry_forward:{type:'boolean'}}},
-    presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},table_hint:{type:'string'},sort_field:{type:'string'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}}},
-    data_requests:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:V40_SCC_DATA_TOOLS},purpose:{type:'string'},arguments:v40SccDataArgumentSchema()},required:['tool']}}
-  },required:['relation','scope','domain','operation','data_requests']}};
+    event:{type:'string',description:'Evento canónico o aproximado que debe gobernar el turno. Vacío si no procede.'},
+    events:{type:'array',items:{type:'string'},description:'Conjunto de eventos cuando la consulta es comparativa/múltiple.'},
+    subjects:{type:'array',items:{type:'string'},description:'Personas/entidades principales del turno, sin arrastrar sujetos anteriores irrelevantes.'},
+    domain:{type:'string',description:'Dominio conversacional principal: event, incomes, purchases, donations, attendance, management, documentation, bank, person, comparison, catalog, metrics, meta, general u otro nombre breve.'},
+    operation:{type:'string',description:'Qué quiere hacer el usuario con el conjunto: summary, detail, list, sort, compare, count, max, min, explain, chart, etc.'},
+    requested_object:{type:'string',enum:['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics'],description:'Objeto concreto que el usuario espera recibir. Conserva este objeto en seguimientos elípticos; no lo sustituyas por el nombre de una tabla o por el dominio general.'},
+    dataset:{type:'object',properties:{id:{type:'string'},description:{type:'string'},carry_forward:{type:'boolean'}},description:'Identidad lógica del conjunto activo que permitirá entender después «estos», «ordénalos», «el más caro», «esas donaciones», etc.'},
+    presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},table_hint:{type:'string'},sort_field:{type:'string'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}},description:'Transformación/presentación que CE debe aplicar físicamente. Para Z-A usa sort_direction=desc; A-Z=asc.'},
+    data_requests:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:V40_SCC_DATA_TOOLS},purpose:{type:'string'},arguments:v40SccDataArgumentSchema()},required:['tool']},description:'Fuentes canónicas que ControlEvent debe ejecutar EN ESTE TURNO. Puede estar vacío solo si la respuesta no necesita datos o si se pide una aclaración puramente conversacional.'}
+  },required:['relation','reason','confidence','scope','event','events','subjects','domain','operation','dataset','presentation','data_requests']}};
 }
+
 function v40SccToolCatalogText(){
   // SCC solo necesita saber QUÉ fuente elegir. Las descripciones extensas de v261AgentTools
   // se reservan para el agente legacy; repetirlas dos veces por turno encarecía cada Interaction.
@@ -9887,100 +9765,138 @@ function v40LastSccContext(conversationHistory=[]){
 function v40CompactSccContext(raw={}){
   if(!raw||typeof raw!=='object')return null;
   const dataset=raw?.dataset&&typeof raw.dataset==='object'?{id:trim(raw.dataset.id).slice(0,90),description:trim(raw.dataset.description).slice(0,180),carry_forward:raw.dataset.carry_forward!==false}:null;
-  return {relation:trim(raw.relation).slice(0,20),scope:trim(raw.scope).slice(0,30),event:trim(raw.event).slice(0,140),events:arr(raw.events).map(x=>trim(x)).filter(Boolean).slice(0,5),subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50),operation:trim(raw.operation).slice(0,60),dataset};
+  return {relation:trim(raw.relation).slice(0,20),scope:trim(raw.scope).slice(0,30),event:trim(raw.event).slice(0,140),events:arr(raw.events).map(x=>trim(x)).filter(Boolean).slice(0,5),subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50),operation:trim(raw.operation).slice(0,60),requested_object:trim(raw.requested_object).slice(0,40),dataset};
 }
 function v40RelevantLocalRecovery(conversationHistory=[]){
-  // Doble memoria local: solo los últimos 5 turnos conservan texto literal suficiente para
-  // elipsis/correcciones. El resto se representa por estado SCC + digest, nunca por tablas viejas.
+  // La memoria de conversación entre turnos es LOCAL y acotada. Conservamos hasta cinco
+  // intercambios con su SCC estructurado, suficiente para 4/5 aclaraciones y cambios de foco,
+  // pero nunca reinyectamos tablas/tool-results de turnos antiguos.
   return arr(conversationHistory).slice(-5).map(t=>({
-    user:trim(t?.user).replace(/\s+/g,' ').slice(0,280),
-    assistant:trim(t?.assistant).replace(/\s+/g,' ').slice(0,300),
-    title:trim(t?.title).slice(0,80),
+    user:trim(t?.user).replace(/\s+/g,' ').slice(0,360),
+    assistant:trim(t?.assistant).replace(/\s+/g,' ').slice(0,420),
+    title:trim(t?.title).slice(0,100),
     scc:v40CompactSccContext(t?.resultContext?.scc||null)
   }));
 }
-function v40CurrentStateSnapshot(conversationHistory=[]){
-  const turns=arr(conversationHistory).slice(-10), latest=v40LastSccContext(turns)||{};
-  const recentTopics=[];
-  for(const t of turns.slice().reverse()){
-    const c=v40CompactSccContext(t?.resultContext?.scc||null);if(!c)continue;
-    const key=JSON.stringify([c.scope,c.event,c.subjects,c.domain,c.operation,c.dataset?.id||'']);
-    if(recentTopics.some(x=>x.key===key))continue;
-    recentTopics.push({key,relation:c.relation,scope:c.scope,event:c.event,subjects:c.subjects,domain:c.domain,operation:c.operation,dataset:c.dataset?.id||''});
-    if(recentTopics.length>=3)break;
+
+// SCC 2.1 · Libro de contexto. No contiene nombres de negocio hard-codeados: solo estado
+// conversacional, referencias genéricas y nombres canónicos ya presentes en ControlEvent.
+function v41InferRequestedObject(prompt='',fallback='none'){
+  const p=norm(prompt);
+  if(/\bproductos?|art[ií]culos?\b/.test(p))return'products';
+  if(/\bdonantes?\b/.test(p))return'donors';
+  if(/\b(?:donaci[oó]n|donaciones|donado|donados|donada|donadas|don[oó]|donar|donaron|donaba|donaron)\b/.test(p))return'donations';
+  if(/\b(?:compra|compras|comprado|comprados|compr[oó]|comprar|gasto|gastos)\b/.test(p))return'purchases';
+  if(/\b(?:personas?|socios?|asistent(?:e|es|es)?|participaci[oó]n)\b/.test(p))return'people';
+  if(/\beventos\b|\bediciones\b/.test(p))return'events';
+  if(/\b(?:documentos?|docs?|justificantes?|evidencias?)\b/.test(p))return'documents';
+  if(/\bmovimientos?|apuntes?|cargos?|abonos?\b/.test(p))return'movements';
+  if(/\b(?:banco|bancario|cuadre|conciliaci[oó]n|saldo bancario)\b/.test(p))return'bank';
+  if(/\b(?:hitos?|tareas?|\blg\b|gesti[oó]n)\b/.test(p))return'tasks';
+  if(/\b(?:tickets?|tk\s*\d+)\b/.test(p))return'tickets';
+  if(/\btiendas?|proveedores?\b/.test(p))return'stores';
+  if(/\bingresos?|cuotas?|bizum|efectivo\b/.test(p))return'incomes';
+  if(/\b(?:total|importe|valor|saldo|cu[aá]nto|cuanto|media|promedio|m[aá]ximo|m[ií]nimo)\b/.test(p)&&fallback&&fallback!=='none')return fallback;
+  if(/\b(?:info|informaci[oó]n|resumen|res[uú]meme|h[aá]blame|hablame|cu[eé]ntame|cuentame)\b/.test(p))return'summary';
+  return trim(fallback)||'none';
+}
+function v41ExplicitActiveEventReference(prompt=''){
+  return /\b(?:este|ese|actual|activo)\s+evento\b|\bevento\s+(?:activo|actual)\b|\ben\s+este\s+evento\b|\bal\s+evento\s+activo\b/.test(norm(prompt));
+}
+function v41ExplicitAllEventsReference(prompt=''){
+  return /\b(?:en\s+)?todos\s+los\s+eventos\b|\btodas\s+las\s+ediciones\b|\bglobalmente\b|\bhist[oó]rico\s+(?:completo|global)\b/.test(norm(prompt));
+}
+function v41BuildContextBook(state,selectedEventId,conversationHistory=[],userPrompt=''){
+  const active=v26EventById(state,selectedEventId),last=v40LastSccContext(conversationHistory)||{};
+  const recent=[];const seen=new Set();
+  for(const turn of arr(conversationHistory).slice(-12).reverse()){
+    const c=v40CompactSccContext(turn?.resultContext?.scc||null);if(!c)continue;
+    const key=JSON.stringify([c.event,c.subjects,c.domain,c.requested_object,c.scope,c.dataset?.id]);if(seen.has(key))continue;seen.add(key);
+    recent.push({event:c.event,subjects:c.subjects,scope:c.scope,domain:c.domain,requested_object:c.requested_object||'none',dataset:c.dataset});if(recent.length>=4)break;
   }
-  return {current:v40CompactSccContext(latest),recent_topics:recentTopics.map(({key,...x})=>x)};
+  const fallbackObject=trim(last?.requested_object)||v41InferRequestedObject('',trim(last?.domain)==='donations'?'donations':'none');
+  return{
+    visible_event:{id:trim(active?.id),name:trim(active?.titulo),status:trim(active?.situacion)},
+    conversation:{event:trim(last?.event),events:arr(last?.events).map(trim).filter(Boolean),subjects:arr(last?.subjects).map(trim).filter(Boolean),scope:trim(last?.scope),domain:trim(last?.domain),operation:trim(last?.operation),requested_object:fallbackObject,dataset:last?.dataset||null},
+    current_message:{requested_object:v41InferRequestedObject(userPrompt,fallbackObject),explicit_active_event:v41ExplicitActiveEventReference(userPrompt),explicit_all_events:v41ExplicitAllEventsReference(userPrompt)},
+    recent_focus:recent
+  };
 }
 function v40SccSystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,voiceConversation=false,conversationHistory=[]}={}){
   const active=v26EventById(state,selectedEventId);const activeName=trim(active?.titulo),activeText=activeName?`${activeName} (${trim(active?.situacion)||'sin estado'}, ${trim(active?.fechaIni)||'?'} a ${trim(active?.fechaFin)||'?'})`:'ninguno';
   const profile=zuzuLoggedUserProfile({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
+  const display=profile.identificacion||profile.nombre||'Amigo';
   const userIdentity=`Identificación/apodo=${profile.identificacion||'—'}; nombre=${profile.nombre||'—'}; nivel=${profile.nivel||'—'}`;
-  const lastScc=v40LastSccContext(conversationHistory),localNow=trim(clientLocalDateTime).slice(0,120)||new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',dateStyle:'full',timeStyle:'medium'}).format(new Date()),tz=trim(clientTimeZone).slice(0,80)||'Europe/Madrid',utcNow=trim(clientNowIso).slice(0,80)||new Date().toISOString();
-  const mode=voiceConversation?'ORAL: 1-4 frases normalmente; si pide lista, la lista sigue completa.':'ESCRITO: 1-5 frases/párrafos normalmente; si pide lista/detalle, sigue completo.';
-  return `Eres Zuzu, asistente conversacional de ControlEvent v2.0_exp. Español natural, claro y directo.
+  const lastScc=v40LastSccContext(conversationHistory);
+  const localNow=trim(clientLocalDateTime).slice(0,120)||new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',dateStyle:'full',timeStyle:'medium'}).format(new Date());
+  const tz=trim(clientTimeZone).slice(0,80)||'Europe/Madrid',utcNow=trim(clientNowIso).slice(0,80)||new Date().toISOString();
+  const voice=voiceConversation?'\nMODO ORAL: responde directo y normalmente en 1-4 frases. EXCEPCIÓN OBLIGATORIA: si el usuario pide una lista/listado, «cuáles», «quiénes», «todos» o una enumeración, la brevedad NO permite omitir elementos: enumera verbalmente el conjunto solicitado completo y sin convertirlo en tabla.':'\nMODO ESCRITO CONVERSACIONAL: normalmente 1-5 frases o párrafos cortos. Si el usuario pide una lista o detalle, entrégalo completo antes de cualquier comentario accesorio.';
+  return `Eres Zuzu, asistente conversacional de ControlEvent v2.0_exp. Hablas en español natural con ${display}.${voice}
 
-SCC 2.0 — CONTRATO ESTABLE
-- Si el turno necesita datos de ControlEvent, el PRIMER paso es exactamente una llamada scc_execute_plan. CE ejecuta las fuentes del plan y devuelve los resultados en la MISMA Interaction; después redactas y no vuelves a pedir herramientas.
-- ControlEvent es la única fuente factual de negocio. No inventes cifras, tickets, personas, productos, documentos, tareas, movimientos, causas ni relaciones.
-- Una pregunta autosuficiente sobre otro asunto es new_topic. Una elipsis («estos», «ordénalos», «¿y las donaciones?», «sí, hazlo») es continue solo si el contexto reciente la resuelve inequívocamente. reset solo si el usuario pide reiniciar/olvidar.
-- El evento visible es contexto ambiental. «este evento» puede usarlo; una consulta global no debe encerrarse en él.
-- Si el usuario nombra un EVENTO de forma aproximada, ese texto es candidato a evento. No conviertas palabras del nombre en PERSONAS por gramática. Primero intenta resolver la entidad evento mediante CE.
-- Mantén 4/5 aclaraciones del mismo foco sin mezclar sujetos antiguos. Si pasa de una persona al evento general, elimina la persona del foco.
-- Conserva dataset para seguimientos, pero no uses memoria narrativa como sustituto de una fuente actual cuando haya que comprobar/materializar datos.
+USUARIO ACTUAL (ce_acceso, solo el usuario autenticado): ${userIdentity}.
+- Puedes usar la Identificación/apodo con naturalidad en charla informal y el Nombre en contextos formales, pero NO lo repitas como muletilla en cada respuesta.
+- Nunca reveles claves, credenciales ni datos de otros usuarios de acceso.
+- Ajusta el registro al interlocutor: si te habla con humor o de forma cachonda, puedes seguirle el tono con simpatía y sin forzar chistes. Si el tema exige precisión/solemnidad (incidencias, dinero delicado, errores), prioriza claridad. Si no es apropiado seguir una broma concreta, dilo en una frase y continúa con la ayuda útil.
 
-SELECCIÓN DE FUENTES
-- Pregunta amplia de evento: event_dossier. ce_eventos.descripcion es dato de primera clase para resúmenes, explicación, balance y valoración.
-- Contexto narrativo/documental (qué pasó, organización, acuerdos, incidencias, programa, antecedentes): event_dossier + event_documentation si procede. Los DOC incluyen su texto/Descripción.
-- Persona concreta: person_dossier; presencia/ausencia en evento puede complementar con event_people y canonical_socios solo si la condición de socio importa.
-- Donaciones/donantes/productos donados: event_donation_lines. No mezcles compras salvo petición explícita.
-- Compras/productos/tickets: event_purchase_lines; si nombra producto/familia pasa product y no cargues todo sin necesidad.
-- Banco: event_bank standard; full solo para movimientos exhaustivos. El cuadre no se reconstruye con histórico general.
-- Pide fuentes independientes juntas. Máximo 1-2 complementos útiles; evita módulos ajenos.
-- Ingreso=Pendiente es ingreso registrado aún no recibido; nunca Pte.Compra.
-- Persona individual y pareja/entidad no son intercambiables en compras, Hitos o LG.
+SCC 2.1 — REGLA PRINCIPAL:
+En el PRIMER paso de CADA turno debes llamar exactamente una vez a scc_execute_plan. Esa llamada decide relación contextual, foco y fuentes. ControlEvent ejecutará las fuentes y te devolverá su resultado en la MISMA Interaction del turno antes de que redactes.
 
-DESCUBRIMIENTO Y RESPUESTA
-- El usuario no debe conocer la pregunta mágica. En «háblame de X», «qué pasó», «por qué no aparece», «qué sabes de X», pide una fuente suficientemente amplia y añade 1-2 hechos salientes relacionados si cambian la interpretación.
-- Primera frase: contesta. No expliques lo que vas a revisar ni des rodeos.
-- LISTA/ENUMERACIÓN: lista, todos, cuáles, quiénes, enumera, ordénalos o equivalente = TODOS los elementos canónicos en el orden solicitado. CE aplica ordenación/materialización física. No sustituyas la lista por muestra/resumen.
-- show_table=false salvo petición de tabla/listado amplio o utilidad clara. No expongas IDs, tool_id/table_key ni columnas técnicas.
-- Sin Markdown visible por defecto. No cierres siempre con «¿quieres algo más?».
-- Importes agregados: euros enteros salvo exactitud solicitada, precio unitario/producto, ticket o movimiento concreto.
-- Si la fuente actual contradice una impresión anterior, corrige de frente.
-- Nunca menciones SCC, herramientas, datasets ni arquitectura al usuario.
+Cómo decidir el contexto:
+- Recibes una cápsula local compacta de los turnos recientes y sus planes SCC. relation=new_topic/reset es frontera para HEREDAR por inercia, pero un asunto anterior puede recuperarse si el usuario lo nombra o dice de forma inequívoca «vuelve al anterior», «retoma el cuadre», etc.
+- Una pregunta autosuficiente sobre otro evento/persona/ámbito es new_topic. Una elipsis humana («esos ingresos», «ordénalos», «¿y las donaciones?», «ese hombre», «los de antes», «sí, hazlo») es continue si la cápsula permite resolverla.
+- Mantén hasta 4/5 aclaraciones sobre el mismo asunto sin perder evento, persona, dominio ni dataset. Si después el usuario cambia a otro evento, adopta el nuevo foco; si luego recupera un foco anterior explícitamente, recupéralo desde la cápsula en vez de mezclar ambos.
+- Si pasa de una persona a una consulta general del evento, descarta la persona. Si pide todos los eventos, scope=all_events/global y no encierres la respuesta en el evento de pantalla.
+- El evento visible es AMBIENTAL, no obligatorio: ${activeText}. «este evento», «evento activo» y equivalentes lo convierten en foco explícito y deben materializar su fuente canónica.
+- Nombrar una persona NO borra por sí solo el evento conversacional vigente. Si venís hablando de un evento y el usuario pregunta por una persona, producto, compra o donación sin decir «todos los eventos», conserva ese evento. Solo pasa a all_events/global cuando el usuario lo pida o el mensaje sea inequívocamente transversal.
+- Distingue domain de requested_object. Ejemplo conceptual: dominio donations + requested_object=products significa que el usuario quiere PRODUCTOS, no una tabla de eventos ni un resumen de donantes. Conserva requested_object en seguimientos como «solo los suyos», «ordénalos», «¿y cuánto suman?».
+- Aclara solo si quedan dos interpretaciones plausibles después de usar el LIBRO DE CONTEXTO, dataset y evento ambiental.
+- Mantén dataset.id/description para conjuntos que puedan recibir seguimientos («estos», «los cinco primeros», «el más caro», «esas compras»).
+- JERARQUÍA DE VERDAD: (1) mensaje actual, (2) datos canónicos extraídos por CE en este turno, (3) estado SCC actual/libro de contexto, (4) últimos turnos literales, (5) índice histórico. Un texto antiguo de Zuzu nunca prevalece sobre datos CE recién leídos.
 
-FUENTES CANÓNICAS
+Datos y eficiencia:
+- ControlEvent es la única fuente factual de negocio. Si hacen falta cifras, personas, productos, movimientos, tickets, documentos, tareas, eventos o listas, inclúyelos en data_requests; pide varias fuentes independientes en EL MISMO plan.
+- Herramientas de un evento (event_dossier, event_breakdowns, event_purchase_lines, event_donation_lines, event_people, event_documentation, event_management, event_bank, event_bank_timeline, event_weather): scope=active_event o named_event. Para global usa herramientas globales. Si el plan ya fija scope/event/persona de forma inequívoca, ControlEvent puede completar esos argumentos omitidos sin reinterpretar tu intención.
+- person_dossier y store_purchases admiten all_events. Para una persona concreta usa person_dossier; si hay varias personas, una petición por cada persona en el mismo plan.
+- PRINCIPIO DE DESCUBRIMIENTO: el usuario no tiene que conocer el nombre exacto del dato para obtener una respuesta útil. En preguntas humanas amplias o explicativas («háblame de X», «qué fue de X», «qué sabes de X», «por qué no aparece», «qué pasó con...») pide una fuente suficientemente amplia para descubrir el contexto relevante, no solo la comprobación mínima. Para persona, prefiere person_dossier; si además pregunta por su presencia o ausencia en un evento, combina person_dossier con event_people y, cuando la condición de socio sea material, canonical_socios. Para evento, una pregunta global debe incluir event_dossier.
+- TEXTO DEL EVENTO ES DATO DE PRIMERA CLASE: event_dossier contiene ce_eventos.descripcion. En resúmenes, valoraciones, explicaciones, balance o preguntas amplias del evento debes pedir event_dossier y usar esa Descripción junto con los números: programa, comidas, actividades, condicionantes, alergias, intención organizativa, acuerdos o cualquier texto relevante. No la relegues por no ser numérica.
+- DOCUMENTOS TAMBIÉN DAN CONTEXTO: event_documentation conserva el texto/Descripción de los DOC. Cuando el usuario pregunte de forma narrativa por qué pasó, cómo se organizó, acuerdos, incidencias, programa, antecedentes o detalles que puedan constar en documentos, pide event_documentation además de event_dossier. Para una cifra puntual no cargues documentación sin motivo.
+- Si una consulta pide EXPLICAR una ausencia, diferencia o anomalía, no te limites a confirmar sí/no cuando otra fuente canónica del mismo turno puede explicar el contexto. Pide esa fuente complementaria en el mismo plan; máximo 1-2 complementos relevantes, sin cargar módulos ajenos.
+- Si eliges event_purchase_lines y el mensaje nombra un producto/familia, informa product. En un seguimiento («cada uno», «ordénalos», «ahora el precio») conserva también el filtro de producto/familia del dataset anterior. No cargues todas las compras para contestar por Coca-Cola, cerveza u otro producto.
+- Para un resumen bancario usa event_bank con detail=standard; pide detail=full solo si el usuario solicita movimientos concretos/exhaustivos. El Cuadre nunca se reconstruye con histórico general.
+- Aunque recuerdes datos anteriores, vuelve a pedir una fuente si hace falta materializar una tabla/gráfica nueva o comprobar hechos actuales.
+- Ingreso=Pendiente es ingreso registrado todavía no recibido; no es Pte.Compra.
+- No inventes causas, relaciones ni atribuciones. Persona individual y pareja no son intercambiables en compras/Hitos/LG.
+
+Estilo humano de respuesta:
+- La respuesta principal debe transmitir primero lo importante. Evita informes enciclopédicos en una charla normal.
+- RESPUESTA CONTUNDENTE: la primera frase debe contestar de frente. No expliques durante varias frases lo que vas a revisar ni des rodeos.
+- LISTAS PEDIDAS SON OBLIGATORIAS: si el usuario pide «lista», «listado», «dime cuáles/quiénes», «todos/todas», «enumera», «ordénalos» o equivalente, entrega TODOS los elementos. No recortes «para visualizar mejor». ControlEvent materializará y ordenará físicamente la lista; tú no debes escoger una muestra. La lista debe ser legible y numerada, también en conversación hablada. Primero la lista; después, como máximo, una observación útil.
+- PROACTIVIDAD ÚTIL: después de contestar lo preguntado, revisa los datos canónicos devueltos y añade de forma natural 1-2 hechos SALIENTES directamente relacionados que una persona razonable necesitaría saber aunque no conozca el campo exacto que debe preguntar. Prioriza excepciones, pendientes, ausencia/presencia relevante, exenciones/ajustes, responsabilidades reales de compra, donaciones, correcciones, tareas pendientes o vínculos bancarios/documentales que cambien la interpretación. No metas curiosidades irrelevantes ni conviertas la respuesta en un informe.
+- Si un dato saliente contradice una impresión inicial o explica por qué algo «no aparece», dilo en la PRIMERA respuesta en la que ese dato ya esté disponible. No obligues al usuario a descubrir la pregunta mágica para sacarlo.
+- Si una fuente devuelve varios bloques útiles, no ocultes silenciosamente el bloque que cambia materialmente la historia del sujeto. Resume ese bloque aunque no muestres tabla.
+- Por defecto NO uses Markdown visible: nada de **asteriscos**, encabezados con # ni listas con guiones. Si hay varios datos, intégralos en prosa corta o líneas limpias.
+- NO dupliques la misma cifra en un resumen y luego en una lista.
+- Tablas: show_table=false por defecto. Úsalas cuando el usuario pida expresamente tabla/listado exhaustivo, o cuando una lista amplia sea realmente el objeto de la petición. Nunca adjuntes una tabla técnica completa por haber consultado una fuente. En una respuesta normal basta la síntesis.
+- Si se muestra tabla, debe ser la tabla relevante y filtrada. No expongas IDs internos, timestamps técnicos, tool_id/table_key ni columnas de implementación salvo petición técnica explícita.
+- Importes en conversación: salvo que el usuario pida exactitud, un precio unitario/producto, ticket o movimiento concreto, habla SIEMPRE en euros enteros. No recites céntimos en saldos, ingresos, gastos, compras, donaciones, totales o comparaciones.
+- No cierres cada turno con «¿quieres algo más?» ni coletillas automáticas. Ofrece detalle solo cuando aporte valor o el usuario lo pida.
+
+FUENTES CANÓNICAS DISPONIBLES:
 ${v40SccToolCatalogText()}
 
-CONTEXTO DINÁMICO DEL TURNO (al final para conservar un prefijo estable/cacheable)
-Modo=${mode}
-Usuario=${userIdentity}
-Evento visible=${activeText}
-SCC reciente=${JSON.stringify(v40CompactSccContext(lastScc||{}))}
-Hora=${localNow} · zona=${tz} · UTC=${utcNow}
+ESTADO SCC ESTRUCTURADO MÁS RECIENTE:
+${JSON.stringify(v40CompactSccContext(lastScc||{}))}
 
-JERARQUÍA DE VERDAD: 1) mensaje/corrección explícita ACTUAL del usuario; 2) resultados canónicos de herramientas de ESTE turno; 3) ESTADO_ACTUAL_SCC; 4) últimos turnos literales; 5) índice histórico. Una capa inferior nunca contradice a una superior.
-Tras function_result: responde solo con los datos devueltos y el contexto del usuario; no pidas otra herramienta.`;
+TIEMPO: ${localNow} · zona ${tz} · UTC ${utcNow}.
+
+Tras recibir function_result de scc_execute_plan, NO vuelvas a llamar herramientas: redacta la respuesta final solo con los datos devueltos y el contexto aportado por el usuario. No menciones SCC, herramientas, datasets, arquitectura ni la compactación.`;
 }
-function v40SccInitialInput(userPrompt,conversationHistory=[],conversationDigest=''){
+function v40SccInitialInput(userPrompt,conversationHistory=[],conversationDigest='',contextBook=null){
   const recovery=v40RelevantLocalRecovery(conversationHistory);
-  const snapshot=v40CurrentStateSnapshot(conversationHistory);
-  const digest=trim(conversationDigest).replace(/\s+$/g,'').slice(-1400);
-  if(!recovery.length&&!digest)return userPrompt;
-  return `MEMORIA SCC LOCAL DE DOBLE CAPA. NO es fuente factual de negocio.
-ESTADO_ACTUAL_SCC (foto estructurada del foco vigente):
-${JSON.stringify(snapshot)}
-
-ÚLTIMOS TURNOS LITERALES (máximo 5, para elipsis/correcciones):
-${JSON.stringify(recovery)}${digest?`
-
-ÍNDICE HISTÓRICO COMPRIMIDO (solo localizar temas previos, nunca cifras):
-${digest}`:''}
-
-PRIORIDAD: MENSAJE ACTUAL > herramientas actuales > ESTADO_ACTUAL_SCC > turnos recientes > índice histórico. Si el mensaje actual corrige algo, sustituye lo anterior.
-
-MENSAJE ACTUAL DEL USUARIO:
-${userPrompt}`;
+  const digest=trim(conversationDigest).replace(/\s+$/g,'').slice(-2200);
+  const book=contextBook&&typeof contextBook==='object'?contextBook:null;
+  if(!recovery.length&&!digest&&!book)return userPrompt;
+  return `LIBRO DE CONTEXTO SCC 2.1 (estado, no hechos de negocio):\n${JSON.stringify(book||{})}\n\nMEMORIA CORTA: últimos 5 turnos literales para lenguaje, pronombres y correcciones. No uses sus cifras como verdad si CE devuelve datos actuales.\n${JSON.stringify(recovery)}${digest?`\nÍNDICE HISTÓRICO MUY COMPACTO (solo para reconocer asuntos anteriores; no uses sus cifras como fuente actual):\n${digest}`:''}\n\nMENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
 }
 function v40SccSanitizePlan(raw={},state,selectedEventId){
   const rel=['continue','new_topic','clarify','reset'].includes(trim(raw?.relation))?trim(raw.relation):'continue';
@@ -9991,7 +9907,9 @@ function v40SccSanitizePlan(raw={},state,selectedEventId){
   const pr=raw?.presentation&&typeof raw.presentation==='object'?raw.presentation:{};
   const presentation={show_table:pr.show_table===true,show_chart:pr.show_chart===true,table_hint:trim(pr.table_hint).slice(0,120),sort_field:trim(pr.sort_field).slice(0,120),sort_direction:['asc','desc','none'].includes(trim(pr.sort_direction))?trim(pr.sort_direction):'none',limit:Math.max(0,Math.min(500,Number(pr.limit)||0))};
   const allowed=new Set(V40_SCC_DATA_TOOLS),data_requests=arr(raw?.data_requests).filter(r=>allowed.has(trim(r?.tool))).slice(0,6).map((r,i)=>({tool:trim(r.tool),purpose:trim(r?.purpose).slice(0,400),arguments:(r?.arguments&&typeof r.arguments==='object')?{...r.arguments}:{},index:i+1}));
-  return{relation:rel,reason:trim(raw?.reason).slice(0,800),confidence:conf,scope,event:trim(raw?.event).slice(0,180),events,subjects,domain:trim(raw?.domain).slice(0,80)||'general',operation:trim(raw?.operation).slice(0,80)||'answer',dataset,presentation,data_requests};
+  const allowedObjects=new Set(['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']);
+  const rawObject=trim(raw?.requested_object),requested_object=allowedObjects.has(rawObject)?rawObject:v41InferRequestedObject('',rawObject||'none');
+  return{relation:rel,reason:trim(raw?.reason).slice(0,800),confidence:conf,scope,event:trim(raw?.event).slice(0,180),events,subjects,domain:trim(raw?.domain).slice(0,80)||'general',operation:trim(raw?.operation).slice(0,80)||'answer',requested_object,dataset,presentation,data_requests};
 }
 function v40SccArgsForRequest(request,plan){
   const args={...(request?.arguments||{})};
@@ -10023,6 +9941,94 @@ function v40ExplicitNamedEventForRequest(args,plan,state,selectedEventId,toolNam
   if(norm(rr.nombre)!==norm(active?.titulo))return{...args,scope:'named_event',event:rr.nombre};
   return args;
 }
+
+function v41CanonicalizePlanEvent(plan,state,selectedEventId){
+  const out={...plan};
+  if(out.scope==='active_event'){
+    const active=v26EventById(state,selectedEventId);if(active)out.event=trim(active.titulo);
+    return out;
+  }
+  if(out.scope==='named_event'&&trim(out.event)){
+    const rr=v26ResolveEvent(state,selectedEventId,out.event,'named_event');if(rr?.ok)out.event=trim(rr.nombre);
+  }
+  return out;
+}
+function v41RequestKey(r={}){return `${trim(r.tool)}:${JSON.stringify(r.arguments||{})}`;}
+function v41AddOrMergeRequest(plan,tool,purpose,args={}){
+  const reqs=arr(plan?.data_requests).map(r=>({...r,arguments:{...(r?.arguments||{})}}));
+  const existing=reqs.find(r=>trim(r.tool)===tool);
+  if(existing){const oldDetail=trim(existing.arguments?.detail);existing.purpose=existing.purpose||purpose;existing.arguments={...existing.arguments,...args};if(oldDetail==='full'&&trim(args?.detail)!=='full')existing.arguments.detail='full';}
+  else if(reqs.length<6)reqs.push({tool,purpose,arguments:{...args},index:reqs.length+1});
+  return{...plan,data_requests:reqs.map((r,i)=>({...r,index:i+1}))};
+}
+function v41ApplyContextContract(plan,contextBook,userPrompt='',state,selectedEventId,flowTrace=[]){
+  const book=contextBook||{},prev=book.conversation||{},msg=book.current_message||{};let out={...plan,data_requests:arr(plan?.data_requests).map((r,i)=>({...r,index:i+1,arguments:{...(r?.arguments||{})}}))};
+  const explicitAll=!!msg.explicit_all_events,explicitActive=!!msg.explicit_active_event;
+  const plannedObject=trim(out.requested_object),fallbackObject=(plannedObject&&plannedObject!=='none')?plannedObject:((trim(msg.requested_object)&&trim(msg.requested_object)!=='none')?trim(msg.requested_object):(trim(prev.requested_object)||'none'));
+  out.requested_object=v41InferRequestedObject(userPrompt,fallbackObject);
+  if(!out.subjects.length&&['continue','clarify'].includes(out.relation)&&arr(prev.subjects).length)out.subjects=arr(prev.subjects).slice(0,4);
+  if((!trim(out.domain)||out.domain==='general')&&['continue','clarify'].includes(out.relation)&&trim(prev.domain))out.domain=trim(prev.domain);
+  const currentText=norm(userPrompt);
+  if(/\b(?:donaci[oó]n|donaciones|donado|donados|donada|donadas|don[oó]|donar|donaron|donaba)\b/.test(currentText))out.domain='donations';
+  else if(/\b(?:compra|compras|comprado|comprados|compr[oó]|comprar)\b/.test(currentText))out.domain='purchases';
+  else if(/\b(?:cuadre|conciliaci[oó]n|movimientos?\s+bancarios?|saldo\s+bancario)\b/.test(currentText))out.domain='bank';
+  if((!out.dataset?.id)&&['continue','clarify'].includes(out.relation)&&prev.dataset?.id)out.dataset={...prev.dataset};
+  if(['continue','clarify'].includes(out.relation)&&/^(?:list|sort|order|enumerate|ranking)$/.test(norm(prev.operation))&&/\b(?:solo|solamente|unicamente|únicamente|los\s+de|las\s+de|me\s+refiero|te\s+pregunt[eé]|esos|esas)\b/.test(norm(userPrompt))){out.operation=/^(?:sort|order)$/.test(norm(prev.operation))?'sort':'list';out.presentation={...(out.presentation||{}),show_table:true};}
+  if(explicitAll){out.scope='all_events';out.event='';}
+  else if(explicitActive){out.scope='active_event';out.event=trim(book?.visible_event?.name);}
+  else{
+    // Una persona/objeto nuevo no expulsa del evento conversacional. El usuario puede romper
+    // explícitamente este vínculo diciendo «todos los eventos» o nombrando otro evento.
+    const prevEvent=trim(prev.event),hasNamedEvent=out.scope==='named_event'&&trim(out.event);
+    if(prevEvent&&!hasNamedEvent&&arr(out.subjects).length&&['all_events','global','none'].includes(out.scope)){
+      out.scope='named_event';out.event=prevEvent;
+    }else if(prevEvent&&!trim(out.event)&&['continue','clarify'].includes(out.relation)&&['active_event','named_event','none'].includes(out.scope)){
+      out.scope='named_event';out.event=prevEvent;
+    }
+  }
+  out=v41CanonicalizePlanEvent(out,state,selectedEventId);
+  const eventScoped=['active_event','named_event'].includes(out.scope),eventArgs=eventScoped?{scope:out.scope,...(trim(out.event)?{event:trim(out.event)}:{})}:{};
+  const subject=out.subjects.length===1?trim(out.subjects[0]):'';
+
+  // Completa argumentos ya decididos por el plan. CE no inventa nombres: solo propaga el
+  // scope/evento/sujeto que ya están resueltos en el libro o en el plan.
+  out.data_requests=out.data_requests.map((r,i)=>{
+    let a={...(r.arguments||{})};
+    if(new Set(['event_dossier','event_breakdowns','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']).has(r.tool)&&eventScoped){a={...a,...eventArgs};}
+    if(r.tool==='person_dossier'&&subject){a={...a,person:subject,...(eventScoped?eventArgs:{scope:'all_events'})};}
+    if(r.tool==='event_donation_lines'&&subject&&!trim(a.donor)&&['products','donations','donors'].includes(out.requested_object))a.donor=subject;
+    return{...r,index:i+1,arguments:a};
+  });
+
+  // Repara incompatibilidades de contrato: una herramienta de un solo evento no puede ejecutar
+  // all_events sin evento. Se sustituye por la fuente global adecuada cuando el sujeto ya existe.
+  if(['all_events','global'].includes(out.scope)){
+    const single=new Set(['event_dossier','event_breakdowns','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']);
+    const removed=out.data_requests.filter(r=>single.has(r.tool)&&!trim(r.arguments?.event));
+    out.data_requests=out.data_requests.filter(r=>!single.has(r.tool)||trim(r.arguments?.event));
+    if(removed.length&&subject&&['person','donations','purchases'].includes(norm(out.domain)))out=v41AddOrMergeRequest(out,'person_dossier','Ámbito transversal de la persona resuelta',{person:subject,scope:'all_events',detail:'full'});
+    else if(removed.length&&out.requested_object==='events')out=v41AddOrMergeRequest(out,'events_catalog','Catálogo transversal de eventos',{detail:'full'});
+  }
+
+  // Garantías mínimas por objeto solicitado. No son rutas por nombres concretos, sino contratos
+  // semánticos entre objeto -> fuente canónica.
+  if(eventScoped&&out.requested_object==='summary'&&['event','general'].includes(norm(out.domain)))out=v41AddOrMergeRequest(out,'event_dossier','Ficha del evento solicitado',{...eventArgs,detail:'standard'});
+  if(subject&&norm(out.domain)==='person'&&['summary','people','events','incomes','purchases','donations','products','tasks'].includes(out.requested_object))out=v41AddOrMergeRequest(out,'person_dossier','Ficha canónica de la persona dentro del ámbito conversacional',{person:subject,...(eventScoped?eventArgs:{scope:'all_events'}),detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+  if(eventScoped&&['products','donations','donors'].includes(out.requested_object)&&norm(out.domain)==='donations')out=v41AddOrMergeRequest(out,'event_donation_lines','Donaciones del evento con detalle del objeto solicitado',{...eventArgs,...(subject?{donor:subject}:{}),detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+  if(eventScoped&&['products','purchases','tickets','stores'].includes(out.requested_object)&&norm(out.domain)==='purchases')out=v41AddOrMergeRequest(out,'event_purchase_lines','Compras del evento con detalle del objeto solicitado',{...eventArgs,purchase_status:'all',detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+  if(['all_events','global'].includes(out.scope)&&subject&&['products','donations','donors','purchases','events','summary'].includes(out.requested_object))out=v41AddOrMergeRequest(out,'person_dossier','Dossier transversal de la persona para el objeto solicitado',{person:subject,scope:'all_events',detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+  if(eventScoped&&out.requested_object==='people')out=v41AddOrMergeRequest(out,'event_people','Personas/asistencia del evento',{...eventArgs,detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+  if(eventScoped&&out.requested_object==='documents')out=v41AddOrMergeRequest(out,'event_documentation','Documentos/contexto textual del evento',{...eventArgs,detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+  if(eventScoped&&['movements','bank'].includes(out.requested_object))out=v41AddOrMergeRequest(out,'event_bank','Cuadre/movimientos del evento',{...eventArgs,detail:out.requested_object==='movements'?'full':'standard'});
+  if(eventScoped&&out.requested_object==='tasks')out=v41AddOrMergeRequest(out,'event_management','Hitos y tareas del evento',{...eventArgs,detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+  if(out.requested_object==='events'&&!subject&&!out.data_requests.some(r=>r.tool==='events_catalog'))out=v41AddOrMergeRequest(out,'events_catalog','Catálogo de eventos',{detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+
+  // Deduplicación exacta manteniendo el orden decidido por Gemini/CE.
+  const seen=new Set();out.data_requests=out.data_requests.filter(r=>{const k=v41RequestKey(r);if(seen.has(k))return false;seen.add(k);return true;}).slice(0,6).map((r,i)=>({...r,index:i+1}));
+  if(explicitActive||explicitAll||trim(prev.event)||trim(out.requested_object)!=='none')zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.1 · Libro de contexto','OK',`evento=${out.event||'—'} · ámbito=${out.scope} · sujetos=${out.subjects.join(' / ')||'—'} · objeto=${out.requested_object||'none'} · dominio=${out.domain}.`);
+  return out;
+}
+
 function v40MaybeNumber(v){
   if(typeof v==='number'&&Number.isFinite(v))return v;
   const raw=trim(v);if(!raw)return null;
@@ -10091,23 +10097,14 @@ function v40CompactSccFacts(name,facts={},detail='standard'){
   const limits=detail==='full'?{array:24,keys:60,string:520}:detail==='brief'?{array:5,keys:28,string:280}:{array:10,keys:40,string:360};
   return v40CompactFactValue(f,0,limits)||{};
 }
-function v40CompactSccResult(result,detail='standard',userPrompt=''){
-  // CE conserva SIEMPRE fullResults para tabla/lista/PDF. Gemini recibe solo las tablas
-  // semánticamente necesarias para redactar; detail=full no significa reinyectar 11 tablas.
+function v40CompactSccResult(result,detail='standard'){
+  // Las tablas completas siguen en CE para renderizado; Gemini recibe solo una muestra acotada
+  // y hechos compactos. Así facts no reinyecta por detrás cientos de filas antiguas.
   let compact=v261CompactToolResult(result,detail);
   compact={...compact,facts:v40CompactSccFacts(trim(result?.name),result?.facts||{},detail)};
-  if(trim(result?.name)==='person_dossier'){
-    const p=norm(userPrompt), keep=new Set(['summary_by_event']);
-    if(/\b(?:donacion|donación|donaciones|donad|donante)\b/.test(p))keep.add('donations_by_event');
-    if(/\b(?:compra|compras|ticket|tk\s*\d+|responsab)\b/.test(p))keep.add('purchase_by_event');
-    if(/\b(?:ingreso|ingresos|cuota|cuotas|pago|pagos)\b/.test(p))keep.add('income_by_event');
-    if(/\b(?:hito|hitos|tarea|tareas|\blg\b|gestion|gestión)\b/.test(p))keep.add('management_by_event');
-    if(/\b(?:asist|particip|presencia|aparece|evento|eventos)\b/.test(p))keep.add('participation_by_event');
-    // Ficha amplia sin dimensión explícita: resumen + las señales esenciales, nunca todo el detalle.
-    if(keep.size===1&&!/\b(?:lista|listado|todos?|eventos?)\b/.test(p)){
-      keep.add('participation_by_event');keep.add('income_by_event');keep.add('purchase_by_event');keep.add('donations_by_event');keep.add('management_by_event');
-    }
-    compact={...compact,tables:arr(compact?.tables).filter(t=>keep.has(trim(t?.key))).slice(0,6).map(t=>({...t,rows:arr(t?.rows).slice(0,detail==='full'?18:10)}))};
+  if(trim(result?.name)==='person_dossier'&&detail!=='full'){
+    const keep=new Set(['summary_by_event','participation_by_event','income_by_event','purchase_by_event','donations_by_event','management_by_event']);
+    compact={...compact,tables:arr(compact?.tables).filter(t=>keep.has(trim(t?.key))).slice(0,6)};
   }
   return compact;
 }
@@ -10130,7 +10127,7 @@ async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPro
       let full=await pending;
       full={...full,id:call.id,name:req.tool};
       full=v40ApplyPhysicalPresentation(full,plan.presentation,flowTrace);
-      const compact=v40CompactSccResult(full,trim(args.detail)||'standard',userPrompt);
+      const compact=v40CompactSccResult(full,trim(args.detail)||'standard');
       return{req,full,compact,error:null};
     }catch(error){return{req,full:null,compact:null,error:cleanGeminiError(error),call};}
   });
@@ -10146,13 +10143,8 @@ async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPro
   return{fullResults,compactResults,errors};
 }
 function v40SccResultContext(plan,results=[]){
-  const uniq=xs=>[...new Set(arr(xs).map(trim).filter(Boolean))];
-  const canonicalEvents=uniq(arr(results).map(r=>trim(r?.facts?.event)).filter(Boolean));
-  const event=canonicalEvents[0]||trim(plan.event)||'';
-  const args=arr(plan?.data_requests).map(r=>r?.arguments||{}),argValues=keys=>uniq(args.flatMap(a=>keys.flatMap(k=>Array.isArray(a?.[k])?a[k]:[a?.[k]])));
-  const entities={EVENTOS:canonicalEvents.length?canonicalEvents:uniq([event,...arr(plan.events),...argValues(['event','events'])]),PERSONAS:uniq([...arr(plan.subjects),...argValues(['person','people','responsable','donor','donante'])]),PRODUCTOS:argValues(['product','products','producto','productos']),TIENDAS:argValues(['store','stores','tienda','tiendas'])};
-  const resolvedEvents=canonicalEvents.length?canonicalEvents:plan.events;
-  return{domain:trim(plan.domain)||'general',event,subject:plan.subjects[0]||'',subjects:plan.subjects,eventNames:resolvedEvents,focus:trim(plan.operation),scope:plan.scope,entities,scc:{relation:plan.relation,reason:plan.reason,confidence:plan.confidence,scope:plan.scope,event,events:resolvedEvents,subjects:plan.subjects,domain:plan.domain,operation:plan.operation,dataset:plan.dataset,presentation:plan.presentation,tools:plan.data_requests.map(r=>r.tool)}};
+  const event=trim(plan.event)||arr(results).map(r=>trim(r?.facts?.event)).find(Boolean)||'';
+  return{domain:trim(plan.domain)||'general',event,subject:plan.subjects[0]||'',subjects:plan.subjects,eventNames:plan.events,focus:trim(plan.operation),requested_object:trim(plan.requested_object)||'none',scope:plan.scope,scc:{relation:plan.relation,reason:plan.reason,confidence:plan.confidence,scope:plan.scope,event,events:plan.events,subjects:plan.subjects,domain:plan.domain,operation:plan.operation,requested_object:trim(plan.requested_object)||'none',dataset:plan.dataset,presentation:plan.presentation,tools:plan.data_requests.map(r=>r.tool)}};
 }
 function v40DefaultShowTable(results=[],plan={}){
   if(!plan?.presentation?.show_table)return[];
@@ -10186,8 +10178,6 @@ function v40HumanPresentationPlan(plan,userPrompt='',voiceConversation=false){
 }
 function v40ExplicitEnumerationRequest(prompt=''){
   const p=norm(prompt);
-  // «deja/olvida/quita esta lista» es una salida de modo lista, no una nueva enumeración.
-  if(/\b(?:dejate|deja|olvida|quita|abandona|sal\s+de|no\s+quiero|no\s+me\s+des)\b[^.!?]{0,36}\b(?:lista|listado|relacion)\b/.test(p))return false;
   return /\b(?:lista|listado|relacion|relación|enumera|enumerame|enumérame|nombra|nombrame|nómbrame|uno\s+por\s+uno|dime\s+(?:todos|todas|cuales|cuáles|quienes|quiénes)|cuales\s+son|cuáles\s+son|quienes\s+son|quiénes\s+son|todos\s+los|todas\s+las)\b/.test(p);
 }
 function v40PlanEnumerationRequest(plan={}){
@@ -10230,12 +10220,8 @@ function v40StrengthenPlanCoverage(plan,userPrompt='',voiceConversation=false,fl
     const listable=new Set(['master_catalog','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','person_dossier','participation_events','people_activity','store_purchases','canonical_socios','events_catalog','events_overview']);
     out.data_requests=out.data_requests.map((r,i)=>listable.has(trim(r?.tool))?{...r,index:i+1,arguments:{...(r?.arguments||{}),detail:'full'}}:{...r,index:i+1});
     const p=norm(userPrompt),scope=['active_event','named_event'].includes(out.scope)?out.scope:(trim(out.event)?'named_event':'active_event'),ea={scope,...(trim(out.event)?{event:trim(out.event)}:{}),detail:'full'};
-    // Una lista de PRODUCTOS DONADOS no puede contaminarse con compras solo porque contenga la palabra "productos".
-    // Si el usuario habla inequívocamente de donaciones, la fuente de compras solo permanece si también la pidió explícitamente.
-    const donationOnly=/\b(?:donacion(?:es)?|donad[oa]s?|donantes?|dono|donaron|donar|donaba(?:n)?|donan?|donaste(?:is)?|donamos)\b/.test(p)&&!/\b(?:compra|compras|comprado|comprados|ticket|tickets|tk\s*\d+)\b/.test(p);
-    if(donationOnly)out={...out,data_requests:arr(out.data_requests).filter(r=>trim(r?.tool)!=='event_purchase_lines').map((r,i)=>({...r,index:i+1}))};
     if(/\b(?:document|doc\b|docs\b|justificant|fototicket|evidenc)\b/.test(p))out=v40EnsurePlanRequest(out,'event_documentation','Enumeración documental explícita solicitada por el usuario',ea);
-    else if(/\b(?:donacion|donación|donaciones|donado|donados|donada|donadas|donantes?)\b/.test(p))out=v40EnsurePlanRequest(out,'event_donation_lines','Lista de donaciones/donantes solicitada explícitamente',ea);
+    else if(/\b(?:donacion|donación|donaciones|donantes?)\b/.test(p))out=v40EnsurePlanRequest(out,'event_donation_lines','Lista de donaciones/donantes solicitada explícitamente',ea);
     else if(/\b(?:compra|compras|producto|productos|tickets?|tk\s*\d*)\b/.test(p))out=v40EnsurePlanRequest(out,'event_purchase_lines','Lista de compras/productos/tickets solicitada explícitamente',{...ea,purchase_status:'all'});
     else if(/\b(?:asistent|personas?|socios?)\b/.test(p)&&['active_event','named_event'].includes(scope))out=v40EnsurePlanRequest(out,'event_people','Lista de personas/asistencia solicitada explícitamente',ea);
     else if(/\b(?:hitos?|tareas?|\blg\b|gestion|gestión)\b/.test(p))out=v40EnsurePlanRequest(out,'event_management','Lista de gestión solicitada explícitamente',ea);
@@ -10259,48 +10245,10 @@ function v40StrengthenPlanCoverage(plan,userPrompt='',voiceConversation=false,fl
   out.data_requests=arr(out.data_requests).slice(0,6).map((r,i)=>({...r,index:i+1}));
   return out;
 }
-function v40SccSanityRepair(plan,userPrompt='',state={},selectedEventId='',flowTrace=[]){
-  let out={...plan,subjects:arr(plan?.subjects).map(trim).filter(Boolean),events:arr(plan?.events).map(trim).filter(Boolean),data_requests:arr(plan?.data_requests).map(r=>({...r,arguments:{...(r?.arguments||{})}}))};
-  const p=norm(userPrompt),domain=norm(out.domain),purchaseIntent=/\b(?:compra|compras|comprad[oa]s?|ticket|tickets|tk\s*\d+)\b/.test(p),donationIntent=/\b(?:donacion|donación|donaciones|donad[oa]s?|donantes?|donar|donaron|dono)\b/.test(p);
-  const explicitPeople=v26PersonHintsFromPrompt(userPrompt,state);
-  const explicitPersonIntent=explicitPeople.length>0&&/\b(?:info|informacion|información|hablame|háblame|cuentame|cuéntame|dime|sabes|sobre|de|persona|socio|socia|donante|responsable|todos\s+los\s+eventos|eventos\s+registrados)\b/.test(p);
-  if(explicitPersonIntent){
-    const eventBoundExplicit=/\b(?:en\s+este\s+evento|de\s+este\s+evento|en\s+el\s+evento|durante\s+el\s+evento|aqui|aquí)\b/.test(p);
-    out.domain='person';out.subjects=explicitPeople.slice(0,4);
-    if(!eventBoundExplicit){out.scope='all_events';out.event='';out.events=[];}
-    let pd=out.data_requests.filter(r=>trim(r?.tool)==='person_dossier');
-    if(!pd.length)pd=out.subjects.map((person,i)=>({tool:'person_dossier',purpose:'Ficha canónica de la persona nombrada por el usuario',arguments:{person,scope:eventBoundExplicit?'active_event':'all_events',detail:'standard'},index:i+1}));
-    pd=pd.map((r,i)=>{const person=out.subjects[Math.min(i,out.subjects.length-1)]||out.subjects[0],a={...(r.arguments||{}),person,scope:eventBoundExplicit?(trim(r?.arguments?.scope)||'active_event'):'all_events'};if(!eventBoundExplicit)delete a.event;return{...r,arguments:a};});
-    const complements=out.data_requests.filter(r=>['event_people','canonical_socios'].includes(trim(r?.tool))&&eventBoundExplicit);
-    out.data_requests=[...pd,...complements];
-    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Foco personal canónico','OK',`Persona nombrada en el mensaje actual: ${out.subjects.join(', ')}. ${eventBoundExplicit?'Se conserva el evento pedido.':'Ámbito global; no se hereda el evento visible/anterior.'}`);
-  }
-  if(norm(out.domain)==='event'||(/\bevento\b/.test(p)&&!explicitPeople.length&&!/(?:persona|socio|quien|quién|asistent)/.test(p)))out.subjects=[];
-  const candidate=trim(out.event);
-  if(candidate&&!/^(?:este\s+evento|el\s+evento|evento\s+actual|actual|activo|evento\s+activo)$/i.test(norm(candidate))){
-    const rr=v26ResolveEvent(state,selectedEventId,candidate,'named_event');
-    if(rr?.ok&&trim(rr.nombre)&&norm(rr.nombre)!==norm(candidate)){
-      const before=candidate;out.event=trim(rr.nombre);out.events=out.events.map(x=>norm(x)===norm(before)?out.event:x);
-      out.data_requests=out.data_requests.map(r=>({...r,arguments:{...(r.arguments||{}),...(trim(r?.arguments?.event)&&norm(r.arguments.event)===norm(before)?{event:out.event}:{})}}));
-      zuzuTracePush(flowTrace,'v2.0_exp · SCC · Entidad canónica','OK',`Evento aproximado «${before}» resuelto como «${out.event}» antes de ejecutar fuentes.`);
-    }
-  }
-  // Una pregunta nueva y explícita sobre una PERSONA no hereda por accidente el evento anterior.
-  // Si el usuario sí dice «en este evento» o nombra el evento en el propio mensaje, se conserva el ámbito de evento.
-  const personFresh=/\b(?:info(?:rmacion)?|informacion|hablame|cuentame|dime|que\s+sabes|qué\s+sabes)\s+(?:de|sobre)\s+/i.test(p),eventBound=/\b(?:en\s+este\s+evento|de\s+este\s+evento|en\s+el\s+evento|durante\s+el\s+evento|aqui|aquí)\b/i.test(p),mentionsPlanEvent=!!(trim(out.event)&&p.includes(norm(out.event)));
-  if(norm(out.domain)==='person'&&personFresh&&!eventBound&&!mentionsPlanEvent){
-    const before=trim(out.event);out.scope='all_events';out.event='';out.events=[];
-    out.data_requests=out.data_requests.map(r=>{if(trim(r?.tool)!=='person_dossier')return r;const a={...(r.arguments||{}),scope:'all_events'};delete a.event;return{...r,arguments:a};});
-    if(before)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Foco personal','OK',`Consulta nueva sobre persona: no se hereda el evento «${before}» al no haber sido solicitado en este mensaje.`);
-  }
-  if(donationIntent&&!purchaseIntent)out.data_requests=out.data_requests.filter(r=>trim(r?.tool)!=='event_purchase_lines');
-  if(purchaseIntent&&!donationIntent)out.data_requests=out.data_requests.filter(r=>trim(r?.tool)!=='event_donation_lines');
-  out.data_requests=out.data_requests.slice(0,5).map((r,i)=>({...r,index:i+1}));
-  return out;
-}
-
-function v40ListPrimaryColumn(prompt='',row={}){
+function v40ListPrimaryColumn(prompt='',row={},requestedObject='none'){
   const p=norm(prompt),keys=Object.keys(row||{}),find=(re)=>keys.find(k=>re.test(norm(k))),tryPick=(promptRe,colRe)=>{if(!promptRe.test(p))return'';return find(colRe)||'';};
+  const objectMap={products:/^producto$|producto/,donors:/^donante$|donante/,events:/^evento$|evento/,people:/^(?:asistente|persona|entidad|socio)/,documents:/^(?:documento|codigo|código)$|document/,stores:/^tienda$|tienda/,tickets:/^(?:tkxx|ticket)$|ticket/,tasks:/^(?:tarea|hito|lg|descripcion)$|tarea|hito|descripcion/,movements:/^(?:concepto|movimiento)$|concepto|movimiento/};
+  if(objectMap[requestedObject]){const k=find(objectMap[requestedObject]);if(k)return k;}
   const ordered=[
     [/\b(?:document\w*|docs?)\b/,/^(?:documento|codigo|código)$|document/],
     [/\b(?:tickets?|tkxx|tk\s*\d*)\b/,/^(?:tkxx|ticket)$|ticket/],
@@ -10316,8 +10264,10 @@ function v40ListPrimaryColumn(prompt='',row={}){
   for(const pair of ordered){const k=tryPick(pair[0],pair[1]);if(k)return k;}
   return find(/^(?:producto|persona|asistente|evento|documento|tkxx|ticket|donante|tienda|hito|tarea|descripcion)$/)||keys.find(k=>!/^id\b|creado|actualizado|timestamp/i.test(norm(k))&&typeof row[k]!=='object');
 }
-function v40EnumerationTableScore(prompt='',toolName='',table={}){
-  const p=norm(prompt),txt=norm(`${toolName} ${table?.key||''} ${table?.title||''}`);let score=0;
+function v40EnumerationTableScore(prompt='',toolName='',table={},requestedObject='none'){
+  const p=norm(prompt),sample=arr(table?.rows)[0]||{},columns=Object.keys(sample).join(' '),txt=norm(`${toolName} ${table?.key||''} ${table?.title||''} ${columns}`);let score=0;
+  const objectTokens={products:'product',donors:'donant',events:'event',people:'person',documents:'document',stores:'tienda',tickets:'ticket',tasks:'tarea',movements:'movimiento'};
+  const ot=objectTokens[requestedObject];if(ot&&txt.includes(ot))score+=45;
   const pairs=[[/\bproductos?\b/,'product'],[/\b(?:personas?|socios?|asistent\w*)\b/,'person'],[/\b(?:document\w*|docs?)\b/,'document'],[/\b(?:tickets?|tkxx)\b/,'ticket'],[/\bdonantes?\b/,'donor'],[/\bdonaciones?\b/,'donat'],[/\beventos?\b/,'event'],[/\btiendas?\b/,'store'],[/\b(?:hitos?|tareas?|\blg\b)\b/,'management'],[/\bmovimientos?\b/,'movement']];
   for(const [re,token] of pairs)if(re.test(p)&&txt.includes(token))score+=20;
   if(/purchase_lines|donation_lines|attendance|documents|events|people|management|movements|timeline/.test(txt))score+=6;
@@ -10327,13 +10277,10 @@ function v40EnumerationTableScore(prompt='',toolName='',table={}){
 }
 function v40CanonicalEnumerationAnswer(userPrompt='',plan={},results=[],existingAnswer=''){
   const explicit=v40ExplicitEnumerationRequest(userPrompt)||v40PlanEnumerationRequest(plan);if(!explicit)return'';
-  const candidates=[];for(const r of arr(results)){for(const t of arr(r?.tables)){if(arr(t?.rows).length)candidates.push({r,t,score:v40EnumerationTableScore(userPrompt,trim(r?.name),t)});}}
-  if(!candidates.length)return'';
-  const personAllEvents=/\beventos?\b/.test(norm(userPrompt))&&(trim(plan?.scope)==='all_events'||/\b(?:todos|registrados|cualquiera)\b/.test(norm(userPrompt)));
-  let best=personAllEvents?candidates.find(x=>trim(x?.r?.name)==='person_dossier'&&trim(x?.t?.key)==='summary_by_event'):null;
-  if(!best){candidates.sort((a,b)=>b.score-a.score||arr(b.t?.rows).length-arr(a.t?.rows).length);best=candidates[0];}
-  let rows=arr(best.t?.rows).map(r=>({...r}));if(!rows.length)return'';
-  const p=norm(userPrompt),primary=v40ListPrimaryColumn(userPrompt,rows[0]);if(!primary)return'';
+  const requestedObject=trim(plan?.requested_object)||'none';
+  const candidates=[];for(const r of arr(results)){for(const t of arr(r?.tables)){if(arr(t?.rows).length)candidates.push({r,t,score:v40EnumerationTableScore(userPrompt,trim(r?.name),t,requestedObject)});}}
+  if(!candidates.length)return'';candidates.sort((a,b)=>b.score-a.score||arr(b.t?.rows).length-arr(a.t?.rows).length);const best=candidates[0];let rows=arr(best.t?.rows).map(r=>({...r}));if(!rows.length)return'';
+  const p=norm(userPrompt),primary=v40ListPrimaryColumn(userPrompt,rows[0],requestedObject);if(!primary)return'';
   const keys=Object.keys(rows[0]||{}),find=(re)=>keys.find(k=>re.test(norm(k))),sort=v40PromptSortDirective(userPrompt,plan);let sortKey='';
   if(sort.field){const target=norm(sort.field).replace(/[^a-z0-9]+/g,'');sortKey=keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'')===target)||keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'').includes(target)||target.includes(norm(k).replace(/[^a-z0-9]+/g,'')))||'';}
   const isEvents=trim(best.r?.name)==='events_catalog'||/\beventos?\b/.test(p);if(!sortKey&&isEvents&&sort.direction!=='none')sortKey=find(/^fecha\s+inicio$|fecha.*inicio/);
@@ -10392,27 +10339,25 @@ function v40ChoosePlanCall(calls=[],state,selectedEventId){
   return scored.sort((a,b)=>b.score-a.score||a.index-b.index)[0]||null;
 }
 async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
-  const turnStarted=Date.now();
   userPrompt=v336NormalizeStructuredPromptRefs(userPrompt);
   const modelPolicy=v332InteractionPolicy(userPrompt);let model=modelPolicy.model;
   const planTool=v40SccPlanTool();
   const systemInstruction=v40SccSystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,voiceConversation,conversationHistory});
-  zuzuTracePush(flowTrace,'v2.0_exp · SCC · Prompt compacto','OK',`Instrucción SCC=${systemInstruction.length} caracteres; prefijo estático primero y contexto dinámico al final.`);
+  const contextBook=v41BuildContextBook(state,selectedEventId,conversationHistory,userPrompt);
   // ECONOMÍA SCC: la Interaction nativa vive solo durante ESTE turno (plan -> datos -> respuesta).
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 VOZ ESTABLE + SCC MEMORIA','OK','Build 20260818-FIX34: transporte híbrido iOS restaurado, TTS auto/stream corregido, Android sin duplicación de dictado, charla simple en una llamada y SCC saneado; se mantienen listas canónicas y contexto textual.');
-  zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.0 ACTIVO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 BASE HÍBRIDA + SCC 2.1','OK','Build 20260819-SCC21: se conserva íntegra la voz híbrida de la base elegida; cambios actuales limitados al libro de contexto, contrato semántico y selección canónica de datos/listas.');
+  zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.1 CONTEXTO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini dirige contexto + selección de datos en un plan obligatorio. Memoria entre turnos= cápsula local acotada; Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
-  const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest);
-  const planStarted=Date.now();
+  const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest,contextBook);
   try{
     payload=await v261CallInteraction({input:initialInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini planifica turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
   }catch(planError){
     const invalidJson=Number(planError?.status)===400&&/invalid\s+json|could\s+not\s+be\s+parsed|json\s+syntax/i.test(cleanGeminiError(planError));
     if(!invalidJson)throw planError;
-    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Reintento de plan','RETRY','Gemini devolvió argumentos JSON inválidos en el plan. Se reintenta UNA sola vez con la misma petición y una instrucción explícita de JSON válido; no se arrastra la Interaction rota.');
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Reintento de plan','WARN','Gemini devolvió argumentos JSON inválidos en el plan. Se reintenta UNA sola vez con la misma petición y una instrucción explícita de JSON válido; no se arrastra la Interaction rota.');
     const retryInput=`${initialInput}\n\nREINTENTO TÉCNICO ÚNICO: la salida anterior no pudo parsearse. Emite exactamente una llamada scc_execute_plan con argumentos JSON válidos que cumplan el schema; sin texto adicional.`;
     payload=await v261CallInteraction({input:retryInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v2.0_exp · SCC · Gemini reintenta plan válido',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
   }
@@ -10422,24 +10367,19 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   const chosen=v40ChoosePlanCall(calls,state,selectedEventId);if(!chosen){const e=new Error('SCC no devolvió un plan utilizable.');e.status=502;throw e;}
   let plan=v40HumanPresentationPlan(chosen.plan,userPrompt,voiceConversation);
   plan=v40StrengthenPlanCoverage(plan,userPrompt,voiceConversation,flowTrace);
-  plan=v40SccSanityRepair(plan,userPrompt,state,selectedEventId,flowTrace);
-  const planMs=Date.now()-planStarted;
+  plan=v41ApplyContextContract(plan,contextBook,userPrompt,state,selectedEventId,flowTrace);
   const explicitEnumeration=v40ExplicitEnumerationRequest(userPrompt)||v40PlanEnumerationRequest(plan);
-  if(calls.length>1)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Plan duplicado','INFO',`Gemini emitió ${calls.length} llamadas scc_execute_plan. Se ejecuta una sola decisión canónica y se responden las duplicadas como ignoradas para cerrar correctamente la Interaction.`);
-  zuzuTracePush(flowTrace,'v2.0_exp · SCC · Decisión de contexto','OK',`${plan.relation.toUpperCase()} · ámbito=${plan.scope} · evento=${plan.event||'—'} · sujetos=${plan.subjects.join(' / ')||'—'} · dominio=${plan.domain} · operación=${plan.operation} · dataset=${plan.dataset.id||'—'} · confianza=${Math.round(plan.confidence*100)}%. ${plan.reason}`);
-  const toolsStarted=Date.now();
+  if(calls.length>1)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Plan duplicado','WARN',`Gemini emitió ${calls.length} llamadas scc_execute_plan. Se ejecuta una sola decisión canónica y se responden las duplicadas como ignoradas para cerrar correctamente la Interaction.`);
+  zuzuTracePush(flowTrace,'v2.0_exp · SCC · Decisión de contexto','OK',`${plan.relation.toUpperCase()} · ámbito=${plan.scope} · evento=${plan.event||'—'} · sujetos=${plan.subjects.join(' / ')||'—'} · dominio=${plan.domain} · objeto=${plan.requested_object||'none'} · operación=${plan.operation} · dataset=${plan.dataset.id||'—'} · confianza=${Math.round(plan.confidence*100)}%. ${plan.reason}`);
   const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace,userPrompt);
-  const toolsMs=Date.now()-toolsStarted;
   const realInstruction=explicitEnumeration?'El usuario ha pedido una LISTA/ENUMERACIÓN. Debes devolverla ahora, completa con los elementos canónicos disponibles y sin sustituirla por un resumen. No pidas otra herramienta. Da primero la lista y, después, como máximo una observación contextual útil.':'Responde ahora al usuario con estos datos. No pidas otra herramienta. Contesta de frente en la primera frase y añade como máximo 1-2 hechos salientes que cambien o completen de forma útil la interpretación. Usa ce_eventos.descripcion y el texto de Documentos si están presentes y son pertinentes. Evita rodeos.';
   const realResult={ok:executed.errors.length===0,scc_plan:plan,canonical_results:executed.compactResults,errors:executed.errors,instruction:realInstruction};
   const functionResults=calls.map(call=>trim(call.id)===trim(chosen.call.id)
     ?{type:'function_result',name:'scc_execute_plan',call_id:trim(call.id),result:realResult}
     :{type:'function_result',name:'scc_execute_plan',call_id:trim(call.id),result:{ok:true,ignored_duplicate:true,instruction:'Esta llamada fue un duplicado accidental. Usa exclusivamente el resultado canónico de la otra llamada scc_execute_plan de este turno.'}});
-  const responseStarted=Date.now();
   try{
     payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools:[],flowTrace,stage:'v2.0_exp · SCC · Gemini responde con datos CE',toolChoice:'none',externalSignal,maxOutputTokens:explicitEnumeration?2600:0});
   }catch(error){error.canonicalResults=[...executed.fullResults];error.sccPlan=plan;throw error;}
-  const responseMs=Date.now()-responseStarted;
   let final=v261ParseFinal(payload);
   if(!trim(final.answer)){const e=new Error('Gemini terminó el turno SCC sin respuesta final legible.');e.status=502;e.canonicalResults=[...executed.fullResults];e.sccPlan=plan;throw e;}
   final=v307BankAvailabilityRepair(final,executed.fullResults,userPrompt,flowTrace);
@@ -10456,14 +10396,13 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   presentation=v40HumanizeRenderedTables(presentation,userPrompt);
   const files=[];for(const t of (voiceConversation?[]:presentation.tables.slice(0,6))){const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));files.push({filename:fileSafe(`${t.title}_v2.0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});}
   const answer=v304EnsurePersonalOpening(final.answer,{usuarioLogado,user,authUser,ce_acceso_usuario_logado:usuarioLogado});
-  const resultContext=v40SccResultContext(plan,executed.fullResults),usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-turnStarted;
-  zuzuTracePush(flowTrace,'v2.0_exp · Latencia SCC','OK',`Plan ${planMs} ms · Datos ${toolsMs} ms · Redacción ${responseMs} ms · total ${totalMs} ms · caché ${num(usage.cachedTokens)} tokens.`);
+  const resultContext=v40SccResultContext(plan,executed.fullResults),usage=summarizeGeminiUsageFromTrace(flowTrace);
   zuzuTracePush(flowTrace,'v2.0_exp · SCC · Datos y presentación','OK',`Fuentes=${executed.fullResults.map(r=>trim(r?.name)).join(', ')||'ninguna'}; tablas renderizadas=${presentation.tables.length}; gráficas=${presentation.charts.length}. Los datos pedidos por el plan se devolvieron a Gemini antes de redactar.`);
   zuzuTracePush(flowTrace,'v2.0_exp · SCC · Memoria','OK',`Contexto SCC guardado localmente: ${plan.relation} · ${plan.domain} · ${resultContext.event||'sin evento'} · dataset=${plan.dataset.id||'—'}. El predecessor nativo NO se conserva entre turnos.`);
   // La memoria persistente entre turnos es el historial local del navegador; devolver siempre vacío
   // hace que una sesión antigua quede saneada desde la primera respuesta con este parche.
   resetInteractionId=true;
-  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-scc2-v2-0-exp',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.0: Gemini decide contexto + plan; CE ejecuta fuentes canónicas; memoria interturno compacta para limitar coste/latencia',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId,pendingAction:null,resultContext,tools:[...new Set(executed.fullResults.map(r=>trim(r?.name)).filter(Boolean))],scc:resultContext.scc,timings:{planMs,toolsMs,responseMs,totalMs,cachedTokens:num(usage.cachedTokens)},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-scc2-v2-0-exp',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.1: Gemini decide contexto + plan; CE mantiene libro de contexto, completa contratos inequívocos y ejecuta fuentes canónicas',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId,pendingAction:null,resultContext,tools:[...new Set(executed.fullResults.map(r=>trim(r?.name)).filter(Boolean))],scc:resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
@@ -10862,7 +10801,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
   zuzuTracePush(flowTrace,'V27.1.5 · Presentación','OK',`Gemini se usó para interpretación/redacción. Herramientas ejecutadas=${allResults.length}; intención gráfica=${chartIntent?'sí':'no'}.`);
   const pendingAction=v284PendingActionFromAnswer(answer);
   const turnUsage=summarizeGeminiUsageFromTrace(flowTrace),turnCost=num(turnUsage?.costEurApprox);
-  zuzuTracePush(flowTrace,'v30 · Control de coste',turnCost>0.030?'INFO':turnCost>0.015?'INFO':'OK',`Turno: ${num(turnUsage?.calls)} llamada(s), ${num(turnUsage?.totalTokens)} tokens, coste estimado ${turnCost.toFixed(6)} €. La continuidad y la finalización de herramientas tienen prioridad; normalmente máximo 2 llamadas exitosas por turno (hasta 3 solo cuando una gráfica bancaria exige una segunda ronda de herramienta).`);
+  zuzuTracePush(flowTrace,'v30 · Control de coste',turnCost>0.030?'WARN':turnCost>0.015?'WARN':'OK',`Turno: ${num(turnUsage?.calls)} llamada(s), ${num(turnUsage?.totalTokens)} tokens, coste estimado ${turnCost.toFixed(6)} €. La continuidad y la finalización de herramientas tienen prioridad; normalmente máximo 2 llamadas exitosas por turno (hasta 3 solo cuando una gráfica bancaria exige una segunda ronda de herramienta).`);
   const finalStatus=trim(payload?.status)||'completed';
   const persistNativeThread=modelPolicy.tier==='lite'&&!escalatedToFlash;
   if(!persistNativeThread)resetInteractionId=true;
@@ -10875,7 +10814,7 @@ async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,fl
 
 async function runZuzuSemanticAgent({userPrompt,state,selectedEventId,flowTrace=[]}){
   let plan;
-  try{plan=await callGeminiSemanticPlanner(userPrompt,state,selectedEventId,flowTrace);}catch(error){return{ok:true,rejected:true,title:'No puedo interpretar la consulta con garantías',answer:`Gemini no ha podido construir un plan semántico fiable. ${friendlyZuzuErrorMessage(error)}`,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-semantic-agent-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
+  try{plan=await callGeminiSemanticPlanner(userPrompt,state,selectedEventId,flowTrace);}catch(error){return{ok:true,rejected:true,title:'No puedo interpretar la consulta con garantías',answer:`Gemini no ha podido construir un plan semántico fiable. ${friendlyZuzuErrorMessage(error)}`,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-semantic-agent-planner-error',model:'',debugTrace:flowTrace,showDebugTrace:true};}
   if(plan.action==='clarify')return{ok:true,rejected:false,title:'Necesito concretar una cosa',answer:plan.clarification,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-semantic-agent-clarification',model:plan.model||'',debugTrace:flowTrace,showDebugTrace:true};
   const allResults=[]; const allQueries=[]; let currentQueries=plan.queries; let roundsExecuted=0;
   for(let round=1;round<=3;round++){
@@ -11184,7 +11123,7 @@ async function v2853RunPrefetchedAnalyst({userPrompt,state,selectedEventId,conve
   }
   const result=v281LocalResponse({title,answer,results:prefetch.results,chartSpecs:specs,flowTrace,previousInteractionId:'',traceDirect:false});
   const usage=summarizeGeminiUsageFromTrace(flowTrace),cost=num(usage?.costEurApprox);
-  zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'INFO':'OK',`Turno analítico: ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €. Objetivo: 0 € para consultas estructuradas; <=0,004 € si requiere redacción/razonamiento; 0,010 € es referencia interna, nunca un bloqueo visible.`);
+  zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'WARN':'OK',`Turno analítico: ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €. Objetivo: 0 € para consultas estructuradas; <=0,004 € si requiere redacción/razonamiento; 0,010 € es referencia interna, nunca un bloqueo visible.`);
   result.provider='gemini-plain-analyst-v29';result.model=model||'fallback-control-event';
   result.meta={...(result.meta||{}),version:'v2.0_exp',architecture:'CE preconsulta hechos -> 1 Gemini texto plano -> CE presenta; fallback local si Gemini falla',geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)};
   result.debugTrace=arr(flowTrace).slice(0,120);return result;
@@ -11828,7 +11767,7 @@ async function v29DirectCompoundEventQuery({userPrompt,state,selectedEventId,con
     const f=by.dossier?.facts||{};const bits=[];if(plan.purchases)bits.push(`compras ${v26FormatEuro(f.purchases_realized||0)}`);if(plan.donations)bits.push(`donaciones ${v26FormatEuro(f.donations_value||0)}`);if(plan.incomes)bits.push(`ingresos ${v26FormatEuro(f.income_total||0)}`);if(plan.attendance)bits.push(`asistencia ${num(f.attendees_canonical||0)} personas`);answer=`${rr.nombre}: ${bits.join('; ')}. Se han materializado en una sola respuesta todas las gráficas solicitadas con datos canónicos de ControlEvent.`;
   }
   const result=v281LocalResponse({title:plan.wantsOpinion?`Análisis y gráficas · ${rr.nombre}`:`Gráficas · ${rr.nombre}`,answer,results,chartSpecs:specs,flowTrace,previousInteractionId,traceDirect:!plan.wantsOpinion});
-  if(plan.wantsOpinion){const usage=summarizeGeminiUsageFromTrace(flowTrace),cost=num(usage?.costEurApprox);zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'INFO':'OK',`Petición compuesta: datos/gráficas resueltos localmente; solo la opinión usa Gemini. ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €.`);result.provider='control-event-v29-compound+gemini';result.model=model||'fallback-control-event';result.meta={...(result.meta||{}),geminiUsageEstimate:usage,architecture:'Planificador transaccional compuesto: CE ejecuta módulos/gráficas; Gemini solo redacta la parte analítica',debugTrace:arr(flowTrace).slice(0,120)};result.debugTrace=arr(flowTrace).slice(0,120);}
+  if(plan.wantsOpinion){const usage=summarizeGeminiUsageFromTrace(flowTrace),cost=num(usage?.costEurApprox);zuzuTracePush(flowTrace,'v29 · Disciplina de coste',cost>0.010?'WARN':'OK',`Petición compuesta: datos/gráficas resueltos localmente; solo la opinión usa Gemini. ${num(usage.calls)} llamada(s), ${num(usage.totalTokens)} tokens, coste estimado ${cost.toFixed(6)} €.`);result.provider='control-event-v29-compound+gemini';result.model=model||'fallback-control-event';result.meta={...(result.meta||{}),geminiUsageEstimate:usage,architecture:'Planificador transaccional compuesto: CE ejecuta módulos/gráficas; Gemini solo redacta la parte analítica',debugTrace:arr(flowTrace).slice(0,120)};result.debugTrace=arr(flowTrace).slice(0,120);}
   return result;
 }
 
@@ -12553,46 +12492,10 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
 }
 
 
-function v34PureConversationTurn(prompt='',conversationHistory=[]){
-  const p=norm(prompt).replace(/\s+/g,' ').trim();if(!p)return false;
-  const business=/\b(?:evento|eventos|sisa|sysa|compra|compras|producto|productos|donacion|donación|donaciones|donante|ingreso|ingresos|banco|saldo|ticket|tk\d*|document|hito|\blg\b|socio|socios|persona|personas|tienda|tiendas|presupuesto|grafica|gráfica|lista|listado|ordena|tabla|responsable|asistencia|cuota|gasto|gastos|20\d{2})\b/.test(p);
-  if(business)return false;
-  const follow=/^(?:si|sí|vale|ok|o k|hazlo|adelante|eso|correcto|continua|continúa|sigue)$/i.test(p);if(follow&&arr(conversationHistory).length)return false;
-  const stop=/^(?:callate|cállate|para|parate|párate|silencio|deja ya|basta)[.!?]*$/i.test(p);if(stop)return true;
-  const greeting=/^(?:hola(?:\s+zuzu)?|buen[oa]s?)(?:[,.! ]+|$)/i;
-  if(greeting.test(p)){
-    const rest=p.replace(greeting,'').trim();if(!rest)return true;
-    if(/^(?:que tal|qué tal|como estas|cómo estás|vamos a (?:hablar|charlar|jugar)(?: un poco)?|vamos a jugar|jaj+a|jeje+)[.!?]*$/i.test(rest))return true;
-    // «Hola Zuzu, dame info de Pocholo» es una consulta de negocio aunque Pocholo no sea
-    // una palabra genérica del dominio. No la mandamos a charla directa.
-    if(/\b(?:dame|dime|cuentame|cuéntame|hablame|háblame|busca|mira|revisa|info|informacion|información|datos|lista|quiero|saca|compara|ordena|quien|quién|cual|cuál|cuanto|cuánto)\b/.test(rest))return false;
-    return rest.split(/\s+/).length<=5;
-  }
-  return /^(?:gracias|muchas gracias|adios|adiós|hasta luego|nos vemos|que tal|qué tal|como estas|cómo estás|vamos a jugar|jaj+a|jeje+)[.!?]*$/i.test(p)||/\b(?:gracias zuzu|muy buena conversación|muy buena conversacion)\b/i.test(p);
-}
-function v34PureChatFallback(prompt=''){const p=norm(prompt);if(/^(?:callate|cállate|para|parate|párate|silencio|deja ya|basta)/.test(p))return'Vale.';if(/gracias/.test(p))return'De nada.';if(/(?:adios|hasta luego|nos vemos)/.test(p))return'Nos vemos.';if(/jugar/.test(p))return'Claro. Dime a qué jugamos.';return'Aquí estoy.';}
-async function v34DirectConversationResponse({userPrompt,state,flowTrace=[],conversationHistory=[],usuarioLogado,user,authUser,ce_acceso,externalSignal=null}={}){
-  const started=Date.now(),apiKey=geminiKey(),model='gemini-2.5-flash-lite';
-  const profile=zuzuLoggedUserProfile({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
-  const hist=arr(conversationHistory).slice(-2).map(t=>`Usuario: ${trim(t?.user).slice(0,220)}\nZuzu: ${trim(t?.assistant).slice(0,260)}`).join('\n');
-  const baseMeta={version:'v2.0_exp',resetInteractionId:true,resultContext:{domain:'general',scc:{relation:'new_topic',reason:'Charla pura sin datos CE',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'general',operation:'chat',dataset:{},presentation:{},tools:[]}}};
-  if(!apiKey)return{ok:true,rejected:false,title:'',answer:v34PureChatFallback(userPrompt),warnings:[],charts:[],tables:[],files:[],provider:'control-event-direct-chat',model:'',interactionId:'',meta:{...baseMeta,timings:{totalMs:Date.now()-started},debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};
-  const system='Eres Zuzu, asistente conversacional de ControlEvent. Español natural, adulto y directo. Este turno es charla sin datos de negocio: no inventes datos de eventos ni menciones herramientas o arquitectura. Responde en 1-3 frases, sin Markdown, sin muletillas y sin terminar siempre preguntando si quiere algo más.';
-  const input=`${hist?`Contexto reciente:\n${hist}\n\n`:''}Usuario actual: ${profile.identificacion||profile.nombre||'usuario'}\nMensaje: ${userPrompt}`;
-  try{
-    const {res,payload}=await geminiFetchJsonWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,{systemInstruction:{parts:[{text:system}]},contents:[{role:'user',parts:[{text:input}]}],generationConfig:{temperature:.45,maxOutputTokens:220}},apiKey,Number(process.env.CONTROLEVENT_ZUZU_DIRECT_CHAT_TIMEOUT_MS||10000),externalSignal);
-    if(!res.ok)throw new Error(payload?.error?.message||`Gemini HTTP ${res.status}`);
-    const answer=trim(geminiOutText(payload))||v34PureChatFallback(userPrompt),elapsed=Date.now()-started,usage=usageSmall(payload?.usageMetadata||{},model);
-    zuzuTracePush(flowTrace,'v2.0_exp · Charla directa','OK',`Turno sin datos CE: 1 llamada · ${elapsed} ms.`,{model,usage,elapsedMs:elapsed});
-    return{ok:true,rejected:false,title:'',answer,warnings:[],charts:[],tables:[],files:[],provider:'gemini-direct-chat-v2-0-exp',model,interactionId:'',meta:{...baseMeta,timings:{totalMs:elapsed},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
-  }catch(error){const elapsed=Date.now()-started;zuzuTracePush(flowTrace,'v2.0_exp · Charla directa','INFO',`Respaldo local tras ${elapsed} ms: ${cleanGeminiError(error)}`);return{ok:true,rejected:false,title:'',answer:v34PureChatFallback(userPrompt),warnings:[],charts:[],tables:[],files:[],provider:'control-event-direct-chat-fallback',model:'',interactionId:'',meta:{...baseMeta,timings:{totalMs:elapsed},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};}
-}
-
-export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, voiceEntities, voiceTranscript, clientNowIso, clientLocalDateTime, clientTimeZone, externalSignal } = {}) {
+export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, clientNowIso, clientLocalDateTime, clientTimeZone, externalSignal } = {}) {
   const flowTrace = [];
-  const rawUserPrompt = trim(prompt);
-  let userPrompt = rawUserPrompt;
-  zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${rawUserPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
+  const userPrompt = trim(prompt);
+  zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
   if (!userPrompt) {
     const err = new Error('Escribe una pregunta o petición para Zuzu.');
     err.status = 400;
@@ -12621,25 +12524,18 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
     user:trim(x?.user).slice(0,650),assistant:trim(x?.assistant).slice(0,800),assistantTail:trim(x?.assistantTail).slice(-700),title:trim(x?.title).slice(0,160),provider:trim(x?.provider).slice(0,80),selectedEventId:trim(x?.selectedEventId).slice(0,100),pendingAction:(x?.pendingAction&&typeof x.pendingAction==='object')?x.pendingAction:null,resultContext:(x?.resultContext&&typeof x.resultContext==='object')?x.resultContext:null
   }));
 
-  if(v337FullResetRequest(rawUserPrompt))return v337LocalConversationResetResponse(flowTrace);
-  if(v34PureConversationTurn(rawUserPrompt,safeHistory))return v34DirectConversationResponse({userPrompt:rawUserPrompt,state,flowTrace,conversationHistory:safeHistory,usuarioLogado,user,authUser,ce_acceso,externalSignal});
+  // SCC 2.0 · los únicos comandos interceptados fuera de Gemini son acciones locales reales
+  // sobre la propia conversación (escobita/reset). Las preguntas de ayuda/capacidades vuelven a
+  // pasar por Gemini como cualquier otra conversación.
+  if(v337FullResetRequest(userPrompt))return v337LocalConversationResetResponse(flowTrace);
 
-  const learnedNorm=await zuzuApplyLearnedNormalizations(rawUserPrompt,state);
-  userPrompt=learnedNorm.prompt;
-  if(learnedNorm.applied.length)zuzuTracePush(flowTrace,'v2.0_exp · Normalización aprendida','OK',learnedNorm.applied.map(x=>`${x.datos}: «${x.texto}» → «${x.dato_bueno}»`).join(' · '));
-
-  zuzuTracePush(flowTrace,'v2.0_exp · ARQUITECTURA SCC 2.0','OK',`Gemini decide relación contextual + fuentes de datos; ControlEvent ejecuta esas fuentes y devuelve SIEMPRE sus resultados a la misma Interaction antes de la respuesta. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
+  zuzuTracePush(flowTrace,'v2.0_exp · ARQUITECTURA SCC 2.1','OK',`Gemini decide relación contextual + fuentes de datos; ControlEvent ejecuta esas fuentes y devuelve SIEMPRE sus resultados a la misma Interaction antes de la respuesta. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo contexto ambiental).`);
   try{
-    const result=await runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(-5000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
-    if(voiceConversation===true){const rc=result?.meta?.resultContext||result?.resultContext||{};void zuzuLearnFromVoiceTurn({rawPrompt:trim(voiceTranscript)||rawUserPrompt,voiceEntities:arr(voiceEntities),resultContext:rc});}
-    return result;
+    return await runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace,previousInteractionId:trim(previousInteractionId),conversationHistory:safeHistory,conversationDigest:trim(conversationDigest).slice(-5000),conversationTurnNumber:Number(conversationTurnNumber)||0,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,clientNowIso:trim(clientNowIso).slice(0,80),clientLocalDateTime:trim(clientLocalDateTime).slice(0,120),clientTimeZone:trim(clientTimeZone).slice(0,80),externalSignal});
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
-    const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null,planNoTools=!!(plan&&!arr(plan?.data_requests).length);
-    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Respaldo por fallo real',currentTurnResults.length||planNoTools?'INFO':'WARN',`Gemini no completó el turno SCC: ${cleanGeminiError(error)}. ${currentTurnResults.length?`CE conserva ${currentTurnResults.length} fuente(s) canónica(s) y cierra localmente el turno sin perder los datos.`:planNoTools?'El plan no necesitaba datos CE; se rescata como conversación directa sin romper el hilo.':'No llegaron a ejecutarse fuentes canónicas.'}`);
-    if(!currentTurnResults.length&&planNoTools){
-      return v34DirectConversationResponse({userPrompt:rawUserPrompt,state,flowTrace,conversationHistory:safeHistory,usuarioLogado,user,authUser,ce_acceso,externalSignal});
-    }
+    const currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),plan=error?.sccPlan&&typeof error.sccPlan==='object'?error.sccPlan:null;
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC · Respaldo por fallo real','WARN',`Gemini no completó el turno SCC: ${cleanGeminiError(error)}. ${currentTurnResults.length?`CE conserva ${currentTurnResults.length} fuente(s) que Gemini había pedido, pero se corta la Interaction para no dejar un contexto que Gemini no haya visto completo.`:'No llegaron a ejecutarse fuentes canónicas.'}`);
     if(!currentTurnResults.length){
       // FIX34 · última red de seguridad SOLO tras fallo real del planner. Una petición inequívoca
       // de catálogo/ordenación de eventos no puede quedar inútil porque Gemini haya emitido JSON
@@ -12650,7 +12546,7 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
         const recovered=await v26ToolEventsCatalog({id:'scc_recovery_events',name:'events_catalog',detail:'full'},state);
         const sd=v40PromptSortDirective(userPrompt,{}),recoveryPlan={relation:'continue',reason:'Recuperación determinista tras fallo técnico del planner',confidence:1,scope:'global',event:'',events:[],subjects:[],domain:'events',operation:sd.direction!=='none'?'sort':'list',dataset:{id:'events_catalog',description:'Catálogo completo de eventos',carry_forward:true},presentation:{show_table:true,show_chart:false,table_hint:'events',sort_field:sd.field||'',sort_direction:sd.direction,limit:0},data_requests:[{tool:'events_catalog',purpose:'Recuperación canónica tras fallo de planner',arguments:{detail:'full'},index:1}]};
         const sorted=v40ApplyPhysicalPresentation(recovered,recoveryPlan.presentation,flowTrace),answer=v40CanonicalEnumerationAnswer(userPrompt,recoveryPlan,[sorted],'');
-        const fallbackFinal={title:'Eventos registrados',answer:answer||`Eventos registrados: ${num(sorted?.facts?.event_count)}.`,warnings:[],showTables:[{tool_id:sorted.id,table_key:'events'}],chartSpecs:[]};
+        const fallbackFinal={title:'Eventos registrados',answer:answer||`Eventos registrados: ${num(sorted?.facts?.event_count)}.`,warnings:['Gemini no pudo construir el plan técnico; ControlEvent resolvió esta lista inequívoca directamente desde el catálogo canónico de eventos.'],showTables:[{tool_id:sorted.id,table_key:'events'}],chartSpecs:[]};
         const presentation=v26BuildPresentation(fallbackFinal,[sorted],userPrompt,{wantsCharts:false,bankContext:false,staticPointLabels:false});
         const resultContext=v40SccResultContext(recoveryPlan,[sorted]);
         zuzuTracePush(flowTrace,'v2.0_exp · SCC · Recuperación de lista','OK','Fallo real del planner: events_catalog se ejecutó localmente y CE devolvió la lista completa/ordenada sin pedir al usuario que repita.');
@@ -12661,12 +12557,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
       const listAnswer=v40CanonicalEnumerationAnswer(userPrompt,plan||{},currentTurnResults,'');
       const localClosure=!listAnswer?v305CanonicalClosureFromResults(userPrompt,currentTurnResults,safeHistory):null;
       const fallbackAnswer=listAnswer||trim(localClosure?.answer)||'ControlEvent ha recuperado los datos canónicos de este turno, aunque Gemini no haya podido cerrar la redacción. Se muestran los datos disponibles sin inventar conclusiones.';
-      const fallbackFinal={title:trim(localClosure?.title)||'Datos canónicos del turno',answer:fallbackAnswer,warnings:[],showTables:voiceConversation?[]:(arr(localClosure?.showTables).length?arr(localClosure.showTables):v40DefaultShowTable(currentTurnResults,plan||{presentation:{show_table:true}})),chartSpecs:[]};
+      const fallbackFinal={title:trim(localClosure?.title)||'Datos canónicos del turno',answer:fallbackAnswer,warnings:['La redacción Gemini no terminó correctamente; la respuesta anterior se ha cerrado directamente con los datos canónicos ya recuperados por ControlEvent.'],showTables:voiceConversation?[]:(arr(localClosure?.showTables).length?arr(localClosure.showTables):v40DefaultShowTable(currentTurnResults,plan||{presentation:{show_table:true}})),chartSpecs:[]};
       const presentation=voiceConversation?{tables:[],charts:[],stats:{}}:v26BuildPresentation(fallbackFinal,currentTurnResults,userPrompt,{wantsCharts:false,bankContext:false,staticPointLabels:false});
       const resultContext=plan?v40SccResultContext(plan,currentTurnResults):{domain:'scc_error',scc:{relation:'reset',reason:'fallo técnico de cierre',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'scc_error',operation:'retry',dataset:{id:'',description:'',carry_forward:false},presentation:{},tools:currentTurnResults.map(r=>trim(r?.name)).filter(Boolean)}};
       return{ok:true,rejected:false,title:fallbackFinal.title,answer:fallbackFinal.answer,warnings:fallbackFinal.warnings,charts:presentation.charts||[],tables:presentation.tables||[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',architecture:'SCC 2.0 fallback: solo fuentes pedidas por Gemini en este turno; cadena nativa reiniciada por cierre incompleto',interactionId:'',resetInteractionId:true,resultContext,tools:currentTurnResults.map(r=>trim(r?.name)).filter(Boolean),geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
     }
-    return{ok:true,rejected:false,title:'',answer:'No he podido cerrar bien esta consulta. Repíteme solo esta última pregunta y mantengo el hilo anterior.',warnings:[],charts:[],tables:[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{version:'v2.0_exp',interactionId:'',resetInteractionId:true,resultContext:{domain:'general',scc:{relation:'continue',reason:'Fallo técnico del turno actual; conservar el hilo previo',confidence:1,scope:'none',event:'',events:[],subjects:[],domain:'general',operation:'retry',dataset:{},presentation:{},tools:[]}},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'Zuzu no pudo completar el turno',answer:'La conversación no ha podido completar este turno. He descartado la Interaction técnica incompleta para que la siguiente pregunta empiece limpia y no arrastre un contexto defectuoso.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'control-event-scc2-fallback',model:'',interactionId:'',meta:{version:'v2.0_exp',interactionId:'',resetInteractionId:true,resultContext:{domain:'scc_error',scc:{relation:'reset',reason:'fallo técnico antes de disponer de datos',confidence:1}},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }
 
   /* Código histórico conservado temporalmente para Planificación y trazabilidad de versiones previas.
@@ -15938,10 +15834,6 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
 
 // Exportaciones de prueba estructural. No se usan por la interfaz ni exponen datos por HTTP.
 export const __zuzuStructuralTesting = Object.freeze({
-  v34PureConversationTurn,
-  v40SccSanityRepair,
-  v40SccSystemInstruction,
-  v40SccPlanTool,
   buildLocalEventReport: directEventReportIfApplicable,
   attachWeatherVisualsIfNeeded,
   finalizeResult: finalizeZuzuResult,
@@ -15985,10 +15877,11 @@ export const __zuzuStructuralTesting = Object.freeze({
   v40SccPlanTool,
   v40SccSanitizePlan,
   v40SccArgsForRequest,
+  v41InferRequestedObject,
+  v41BuildContextBook,
+  v41ApplyContextContract,
   v40ApplyPhysicalPresentation,
   v40RelevantLocalRecovery,
-  v40CurrentStateSnapshot,
-  v40CompactSccResult,
   v40CanonicalEnumerationAnswer,
   v40SccResultContext,
   v337ContextIsolationPolicy,
