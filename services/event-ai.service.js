@@ -9817,11 +9817,29 @@ function v46CompactWorkingTarget(raw=null){
   const aggregate=raw.aggregate&&typeof raw.aggregate==='object'?{total_amount:raw.aggregate.total_amount==null?null:(Number.isFinite(Number(raw.aggregate.total_amount))?Number(raw.aggregate.total_amount):null),total_units:raw.aggregate.total_units==null?null:(Number.isFinite(Number(raw.aggregate.total_units))?Number(raw.aggregate.total_units):null)}:null;
   return{target:{type:'event',id:id.slice(0,120),name:name.slice(0,180)},kind:trim(raw.kind).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{})};
 }
+function v50CompactWorkingRowCache(raw=null){
+  if(!raw||typeof raw!=='object')return null;
+  const srcRows=arr(raw.rows);if(!srcRows.length||srcRows.length>220)return null;
+  const columns=arr(raw.columns).map(x=>trim(x)).filter(Boolean).slice(0,16);if(!columns.length)return null;
+  const cleanRows=[];
+  for(const row of srcRows){
+    if(!row||typeof row!=='object'||Array.isArray(row))continue;
+    const clean={};for(const c of columns){let v=row?.[c];if(v==null)continue;if(typeof v==='string')v=trim(v).slice(0,240);else if(typeof v!=='number'&&typeof v!=='boolean')v=trim(String(v)).slice(0,240);clean[c]=v;}
+    cleanRows.push(clean);if(cleanRows.length>=220)break;
+  }
+  if(!cleanRows.length)return null;
+  const visible=arr(raw.visible_fields).map(x=>trim(x)).filter(x=>columns.includes(x)).slice(0,10);
+  return{table_key:trim(raw.table_key).slice(0,100),title:trim(raw.title).slice(0,180),source_tool:trim(raw.source_tool).slice(0,70),primary_field:trim(raw.primary_field).slice(0,80),visible_fields:visible,sort_field:trim(raw.sort_field).slice(0,80),sort_direction:['asc','desc','none'].includes(trim(raw.sort_direction))?trim(raw.sort_direction):'none',columns,rows:cleanRows,complete:raw.complete!==false};
+}
+function v50WorkingSetWithoutRowCache(raw=null){
+  const c=v42CompactWorkingSet(raw);if(!c)return null;const out={...c};delete out.row_cache;return out;
+}
 function v42CompactWorkingSet(raw=null){
   if(!raw||typeof raw!=='object')return null;
   const aggregate=raw.aggregate&&typeof raw.aggregate==='object'?{total_amount:raw.aggregate.total_amount==null?null:(Number.isFinite(Number(raw.aggregate.total_amount))?Number(raw.aggregate.total_amount):null),total_units:raw.aggregate.total_units==null?null:(Number.isFinite(Number(raw.aggregate.total_units))?Number(raw.aggregate.total_units):null)}:null;
   const targets=[];const seen=new Set();for(const item of arr(raw.targets)){const c=v46CompactWorkingTarget(item);if(!c)continue;const key=trim(c.target.id)||norm(c.target.name);if(seen.has(key))continue;seen.add(key);targets.push(c);if(targets.length>=6)break;}
-  return{kind:trim(raw.kind).slice(0,40)||'none',event:trim(raw.event).slice(0,140),scope:trim(raw.scope).slice(0,30)||'none',subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50)||'general',requested_object:trim(raw.requested_object).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(targets.length?{partitioned:true,target_count:targets.length,targets}:{})};
+  const rowCache=v50CompactWorkingRowCache(raw.row_cache||null),recordCount=raw.record_count==null?null:Math.max(0,Math.min(100000,Number(raw.record_count)||0));
+  return{kind:trim(raw.kind).slice(0,40)||'none',event:trim(raw.event).slice(0,140),scope:trim(raw.scope).slice(0,30)||'none',subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50)||'general',requested_object:trim(raw.requested_object).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),...(recordCount!=null?{record_count:recordCount}:{}),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(rowCache?{row_cache:rowCache}:{}),...(targets.length?{partitioned:true,target_count:targets.length,targets}:{})};
 }
 function v46WorkingTargetNames(working=null){return arr(v42CompactWorkingSet(working)?.targets).map(x=>trim(x?.target?.name)).filter(Boolean);}
 // SCC 2.2.6 · TARGET_SET representa varios objetivos canónicos simultáneos sin aplastarlos
@@ -9900,7 +9918,7 @@ function v45ValidatePhysicalTarget(result={},request={},state={},selectedEventId
 }
 function v42CompactMultidim(raw=null){
   if(!raw||typeof raw!=='object')return null;
-  const general=v42CompactGeneral(raw.general),specific=v42CompactSpecific(raw.specific),working_set=v42CompactWorkingSet(raw.working_set),target_set=v45CompactTargetSet(raw.target_set),stack=arr(raw.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v42CompactWorkingSet(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
+  const general=v42CompactGeneral(raw.general),specific=v42CompactSpecific(raw.specific),working_set=v42CompactWorkingSet(raw.working_set),target_set=v45CompactTargetSet(raw.target_set),stack=arr(raw.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v50WorkingSetWithoutRowCache(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
   return{general,specific,working_set,target_set,stack};
 }
 function v42LegacyMultidim(last={},visibleEvent={}){
@@ -9919,11 +9937,11 @@ function v42SpecificKey(raw={}){
   const s=v42CompactSpecific(raw);return JSON.stringify([s.event,s.scope,s.subjects.map(norm),s.domain,s.requested_object,s.dataset?.id||'']);
 }
 function v42BookmarkFrom(specific,workingSet,targetSet=null){
-  const s=v42CompactSpecific(specific);if(!s.active)return null;return{specific:s,working_set:v42CompactWorkingSet(workingSet),target_set:v45CompactTargetSet(targetSet)};
+  const s=v42CompactSpecific(specific);if(!s.active)return null;return{specific:s,working_set:v50WorkingSetWithoutRowCache(workingSet),target_set:v45CompactTargetSet(targetSet)};
 }
 function v42PushStack(stack=[],bookmark=null){
   if(!bookmark)return arr(stack).slice(0,4);
-  const key=v42SpecificKey(bookmark.specific),out=[bookmark];for(const item of arr(stack)){if(v42SpecificKey(item?.specific||item)===key)continue;out.push({specific:v42CompactSpecific(item?.specific||item),working_set:v42CompactWorkingSet(item?.working_set||null),target_set:v45CompactTargetSet(item?.target_set||null)});if(out.length>=4)break;}return out;
+  const key=v42SpecificKey(bookmark.specific),out=[bookmark];for(const item of arr(stack)){if(v42SpecificKey(item?.specific||item)===key)continue;out.push({specific:v42CompactSpecific(item?.specific||item),working_set:v50WorkingSetWithoutRowCache(item?.working_set||null),target_set:v45CompactTargetSet(item?.target_set||null)});if(out.length>=4)break;}return out;
 }
 function v42ExplicitScreenEventReference(prompt=''){
   return /\b(?:evento\s+(?:activo|de\s+pantalla|seleccionado)|evento\s+que\s+tengo\s+(?:abierto|seleccionado)|el\s+activo)\b/.test(norm(prompt));
@@ -10125,6 +10143,20 @@ function v41ExplicitActiveEventReference(prompt=''){
 function v41ExplicitAllEventsReference(prompt=''){
   return /\b(?:en\s+)?todos\s+los\s+eventos\b|\btodas\s+las\s+ediciones\b|\bglobalmente\b|\bhist[oó]rico\s+(?:completo|global)\b/.test(norm(prompt));
 }
+// SCC 2.2.6 FIX2 · EVENT AUTHORITY LOCK.
+// Una coincidencia semántica difusa NO basta para cambiar el evento conversacional. Solo se
+// considera mención explícita cuando el propio texto tiene evidencia de evento (nombre literal,
+// año/ordinal, comparación o verbo de navegación/información). Los nombres reales siguen
+// resolviéndose contra el catálogo CE: no hay hard-code de negocio.
+function v50TrustedExplicitEventMention(state,userPrompt=''){
+  const raw=trim(userPrompt),p=norm(raw);if(!raw)return'';
+  const literal=arr(state?.eventos).map(e=>trim(e?.titulo)).filter(Boolean).find(name=>p.includes(norm(name)));
+  if(literal)return literal;
+  const comparison=v26ComparisonEventNamesFromPrompt(userPrompt,state);if(comparison.length===1)return trim(comparison[0]);
+  const eventCue=v314LooksLikeCurrentEventMention(userPrompt)||/\b(?:19|20)\d{2}\b/.test(p)||/\b(?:evento|edici[oó]n)\b/.test(p);
+  if(!eventCue)return'';
+  return trim(v314ResolveEventMention(state,userPrompt,[]));
+}
 function v41BuildContextBook(state,selectedEventId,conversationHistory=[],userPrompt=''){
   const active=v26EventById(state,selectedEventId),visible={id:trim(active?.id),name:trim(active?.titulo),status:trim(active?.situacion)};
   const last=v40LastSccContext(conversationHistory)||{},multidim=v42LastMultidim(conversationHistory,visible)||v42LegacyMultidim(last,visible);
@@ -10145,7 +10177,7 @@ function v41BuildContextBook(state,selectedEventId,conversationHistory=[],userPr
     // Compatibilidad con reglas SCC 2.1 que todavía esperan una vista plana: siempre refleja
     // el foco ESPECÍFICO, no destruye el GENERAL.
     conversation:{event:trim(specific.event),events:arr(last?.events).map(trim).filter(Boolean),subjects:arr(specific.subjects).map(trim).filter(Boolean),scope:trim(specific.scope),domain:trim(specific.domain),operation:trim(specific.operation),requested_object:trim(specific.requested_object)||fallbackObject,dataset:specific.dataset||last?.dataset||null},
-    current_message:{requested_object:currentObject,projection_object:v43ProjectionObject(userPrompt),generalize_event:v43GeneralizeEventIntent(userPrompt),narrative_collection:v43NarrativeCollectionIntent(userPrompt,currentObject),explicit_named_event:v314ResolveEventMention(state,userPrompt,[]),explicit_active_event:v41ExplicitActiveEventReference(userPrompt),explicit_screen_event:v42ExplicitScreenEventReference(userPrompt),explicit_deictic_event:v42ExplicitDeicticEventReference(userPrompt),explicit_all_events:v41ExplicitAllEventsReference(userPrompt),scope_only_all_events:v42ScopeOnlyAllEventsFollowup(userPrompt),navigation_back:v42NavigationBackIntent(userPrompt),references_working_set:v42ReferencesWorkingSet(userPrompt),references_target_set:v45ReferencesTargetSet(userPrompt)},
+    current_message:{requested_object:currentObject,projection_object:v43ProjectionObject(userPrompt),generalize_event:v43GeneralizeEventIntent(userPrompt),narrative_collection:v43NarrativeCollectionIntent(userPrompt,currentObject),explicit_named_event:v50TrustedExplicitEventMention(state,userPrompt),explicit_active_event:v41ExplicitActiveEventReference(userPrompt),explicit_screen_event:v42ExplicitScreenEventReference(userPrompt),explicit_deictic_event:v42ExplicitDeicticEventReference(userPrompt),explicit_all_events:v41ExplicitAllEventsReference(userPrompt),scope_only_all_events:v42ScopeOnlyAllEventsFollowup(userPrompt),navigation_back:v42NavigationBackIntent(userPrompt),references_working_set:v42ReferencesWorkingSet(userPrompt),references_target_set:v45ReferencesTargetSet(userPrompt)},
     recent_focus:recent
   };
 }
@@ -10228,12 +10260,19 @@ TIEMPO: ${localNow} · zona ${tz} · UTC ${utcNow}.
 
 Tras recibir function_result de scc_execute_plan, NO vuelvas a llamar herramientas: redacta la respuesta final solo con los datos devueltos y el contexto aportado por el usuario. No menciones SCC, herramientas, datasets, arquitectura ni la compactación.`;
 }
+function v50ContextBookForModel(contextBook=null){
+  if(!contextBook||typeof contextBook!=='object')return null;
+  const out={...contextBook,multidim:contextBook.multidim?{...contextBook.multidim}:contextBook.multidim};
+  if(out.multidim?.working_set)out.multidim.working_set=v50WorkingSetWithoutRowCache(out.multidim.working_set);
+  if(Array.isArray(out.multidim?.stack))out.multidim.stack=out.multidim.stack.map(x=>({...x,working_set:v50WorkingSetWithoutRowCache(x?.working_set||null)}));
+  return out;
+}
 function v40SccInitialInput(userPrompt,conversationHistory=[],conversationDigest='',contextBook=null){
   const recovery=v40RelevantLocalRecovery(conversationHistory);
   const digest=trim(conversationDigest).replace(/\s+$/g,'').slice(-700);
-  const book=contextBook&&typeof contextBook==='object'?contextBook:null;
+  const book=contextBook&&typeof contextBook==='object'?contextBook:null,modelBook=v50ContextBookForModel(book);
   if(!recovery.length&&!digest&&!book)return userPrompt;
-  return `LIBRO DE CONTEXTO SCC 2.2.6 (GENERAL + ESPECÍFICO + WORKING_SET REUTILIZABLE/PARTITIONED + TARGET_SET + STACK; estado vigente, no histórico bruto):\n${JSON.stringify(book||{})}\n\nMEMORIA CORTA COMPACTA: últimos 4 turnos solo para lenguaje, pronombres y correcciones. Las listas/tablas antiguas NO se reinyectan; su identidad vive en WORKING_SET.\n${JSON.stringify(recovery)}${digest?`\nÍNDICE HISTÓRICO MÍNIMO (solo para reconocer asuntos anteriores; nunca como fuente factual):\n${digest}`:''}\n\nMENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
+  return `LIBRO DE CONTEXTO SCC 2.2.6 (GENERAL + ESPECÍFICO + WORKING_SET REUTILIZABLE/PARTITIONED + TARGET_SET + STACK; estado vigente, no histórico bruto):\n${JSON.stringify(modelBook||{})}\n\nMEMORIA CORTA COMPACTA: últimos 4 turnos solo para lenguaje, pronombres y correcciones. Las listas/tablas antiguas NO se reinyectan; su identidad vive en WORKING_SET.\n${JSON.stringify(recovery)}${digest?`\nÍNDICE HISTÓRICO MÍNIMO (solo para reconocer asuntos anteriores; nunca como fuente factual):\n${digest}`:''}\n\nMENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
 }
 function v40SccSanitizePlan(raw={},state,selectedEventId){
   const rel=['continue','new_topic','clarify','reset'].includes(trim(raw?.relation))?trim(raw.relation):'continue';
@@ -10370,17 +10409,22 @@ function v41ApplyContextContract(plan,contextBook,userPrompt='',state,selectedEv
       const e=prevEvent||generalEvent||visibleEvent;if(e){out.scope=(visibleEvent&&norm(e)===norm(visibleEvent)&&!prevEvent&&!generalEvent)?'active_event':'named_event';out.event=e;}
     }
     else{
-      const plannerEvent=trim(out.event),plannerPointsToScreen=out.scope==='active_event'||(visibleEvent&&plannerEvent&&norm(plannerEvent)===norm(visibleEvent));
-      const continuationLock=!!prevEvent&&(carrySpecific||msg.references_working_set||msg.references_target_set||['continue','clarify'].includes(out.relation)||v44UserEnumerationIntent(userPrompt,out));
-      // CONTEXT LOCK: una continuación sin evento nuevo NO puede ser secuestrada por el evento
-      // visible. Si el planner ha caído en active_event/visible, prevalece ESPECÍFICO y después GENERAL.
-      if(continuationLock&&(plannerPointsToScreen||!plannerEvent)){out.scope='named_event';out.event=prevEvent;out._contextEventLocked=true;}
+      const plannerEvent=trim(out.event),continuation=carrySpecific||msg.references_working_set||msg.references_target_set||['continue','clarify'].includes(out.relation)||v44UserEnumerationIntent(userPrompt,out);
+      // EVENT AUTHORITY LOCK: si el usuario NO ha nombrado/navegado a otro evento en ESTE mensaje,
+      // el planner carece de autoridad para sustituir el evento confirmado. Esto bloquea tanto el
+      // evento visible como cualquier evento espurio propuesto por similitud semántica.
+      if(continuation&&prevEvent){
+        if(plannerEvent&&norm(plannerEvent)!==norm(prevEvent))out._rejectedPlannerEvent=plannerEvent;
+        out.scope='named_event';out.event=prevEvent;out._contextEventLocked=true;
+      }
+      else if(continuation&&generalEvent){
+        if(plannerEvent&&norm(plannerEvent)!==norm(generalEvent))out._rejectedPlannerEvent=plannerEvent;
+        out.scope='named_event';out.event=generalEvent;out._contextEventLocked=true;
+      }
       else if(prevEvent&&!plannerEvent&&arr(out.subjects).length&&['all_events','global','none'].includes(out.scope)){out.scope='named_event';out.event=prevEvent;}
-      else if(prevEvent&&!plannerEvent&&carrySpecific&&['active_event','named_event','none'].includes(out.scope)){out.scope='named_event';out.event=prevEvent;}
-      else if(!plannerEvent&&carrySpecific&&generalEvent&&['active_event','named_event','none'].includes(out.scope)){out.scope='named_event';out.event=generalEvent;}
     }
   }
-  if(out._contextEventLocked)zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 FIX · Context Lock','OK',`La continuación conserva el evento conversacional «${trim(out.event)}»; el evento de pantalla no sustituye el foco sin una referencia explícita del usuario.`);
+  if(out._contextEventLocked)zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 FIX2 · Event Authority Lock','OK',`La continuación conserva el evento conversacional «${trim(out.event)}»${trim(out._rejectedPlannerEvent)?`; se descarta el evento propuesto por planner «${trim(out._rejectedPlannerEvent)}»`:''}. Solo una referencia explícita del usuario puede cambiarlo.`);
 
   out=v41CanonicalizePlanEvent(out,state,selectedEventId);
   const targetSet=v45ResolveEventTargetSet(state,selectedEventId,userPrompt,out,previousTargetSet);
@@ -10460,16 +10504,16 @@ function v40MaybeNumber(v){
   const n=v26ParseLocalizedDisplayNumber(raw);return Number.isFinite(n)?n:null;
 }
 function v40ApplyPhysicalPresentation(result,presentation={},flowTrace=[]){
-  const field=trim(presentation.sort_field),direction=trim(presentation.sort_direction),limit=num(presentation.limit),hint=norm(presentation.table_hint);
+  const semanticField=trim(presentation.sort_field),field=v49CanonicalPresentationField(semanticField),direction=trim(presentation.sort_direction),limit=num(presentation.limit),hint=norm(presentation.table_hint);
   if(!result||(!field&&limit<=0))return result;
-  const target=norm(field).replace(/[^a-z0-9]+/g,'');let sortedAny=false,limitedAny=false;
+  let sortedAny=false,limitedAny=false;
   const tables=arr(result.tables).map(t=>{
     let rows=arr(t.rows).map(r=>({...r}));if(!rows.length)return{...t,rows};
     const tableMatches=!hint||norm(t?.key)===hint||norm(t?.key).includes(hint)||norm(t?.title).includes(hint);
     if(!tableMatches)return{...t,rows};
     let key='';
     if(field){
-      const keys=Object.keys(rows[0]||{});key=keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'')===target)||keys.find(k=>norm(k).replace(/[^a-z0-9]+/g,'').includes(target)||target.includes(norm(k).replace(/[^a-z0-9]+/g,'')))||'';
+      key=v48ColumnKey(rows[0]||{},field);
       if(key&&['asc','desc'].includes(direction)){
         const mult=direction==='desc'?-1:1;rows.sort((a,b)=>{const av=a?.[key],bv=b?.[key];if(/fecha/.test(norm(key))){const ad=v40ParseDateMillis(av),bd=v40ParseDateMillis(bv);if(ad!=null&&bd!=null)return mult*(ad-bd);}const an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});sortedAny=true;
       }
@@ -10479,7 +10523,7 @@ function v40ApplyPhysicalPresentation(result,presentation={},flowTrace=[]){
     if(limit>0&&(!field||key)&&rows.length>limit){rows=rows.slice(0,limit);limitedAny=true;}
     return{...t,rows};
   });
-  if(sortedAny||limitedAny)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Presentación física','OK',`${sortedAny?`Orden aplicado por «${field}» ${direction.toUpperCase()}. `:''}${limitedAny?`Límite físico ${limit} filas.`:''}`.trim());
+  if(sortedAny||limitedAny)zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 FIX2 · Presentación física','OK',`${sortedAny?`Orden físico aplicado por «${field}» ${direction.toUpperCase()}${semanticField&&norm(semanticField)!==norm(field)?` (métrica semántica «${semanticField}»).`:'.'} `:''}${limitedAny?`Límite físico ${limit} filas.`:''}`.trim());
   return{...result,tables};
 }
 function v40CompactFactValue(value,depth=0,limits={array:10,keys:36,string:360}){
@@ -10628,19 +10672,34 @@ function v42WorkingSetTableScore(plan={},result={},table={},userPrompt=''){
   if(requestedObject==='documents'&&/^documents$/.test(key))score+=140;
   return score;
 }
+function v50WorkingSetRecordCount(results=[],domain='general'){
+  const d=norm(domain),keys=d==='purchases'?['purchase_line_count','purchase_records']:d==='donations'?['donation_record_count','donation_records','donation_lines']:d==='documentation'?['document_count','documents']:d==='bank'?['movement_count','movements_count']:['record_count','count'];
+  let best=null;for(const r of arr(results)){for(const k of keys){const n=Number(r?.facts?.[k]);if(Number.isFinite(n))best=best==null?n:Math.max(best,n);}}return best==null?null:Math.max(0,best);
+}
+function v50BuildWorkingRowCache(best=null,userPrompt='',plan={}){
+  if(!best||!arr(best?.t?.rows).length||arr(best.t.rows).length>220)return null;
+  const rows=arr(best.t.rows).map(r=>({...r})),columns=[];for(const row of rows)for(const k of Object.keys(row||{}))if(!columns.includes(k)&&columns.length<16)columns.push(k);
+  if(!columns.length)return null;const primary=v40ListPrimaryColumn(userPrompt,rows[0],trim(plan.requested_object)||'none')||columns[0],visible=[primary];
+  const requested=v48PresentationFieldSpecs(userPrompt,plan);for(const f of requested){const k=v48ColumnKey(rows[0],f);if(k&&!visible.includes(k))visible.push(k);}
+  if(visible.length===1&&trim(plan.requested_object)==='products')for(const f of ['Destino','Unidades','Precio','Importe']){const k=v48ColumnKey(rows[0],f);if(k&&!visible.includes(k))visible.push(k);}
+  const sort=v40PromptSortDirective(userPrompt,plan);
+  return v50CompactWorkingRowCache({table_key:trim(best.t.key),title:trim(best.t.title),source_tool:trim(best.r?.name),primary_field:primary,visible_fields:visible,sort_field:sort.field,sort_direction:sort.direction,columns,rows,complete:true});
+}
 function v42BuildWorkingSet(plan={},results=[],userPrompt=''){
   const candidates=[];for(const r of arr(results)){for(const t of arr(r?.tables)){if(arr(t?.rows).length)candidates.push({r,t,score:v42WorkingSetTableScore(plan,r,t,userPrompt)});}}
   candidates.sort((a,b)=>b.score-a.score||arr(b.t?.rows).length-arr(a.t?.rows).length);
-  const best=candidates[0]||null,requestedObject=trim(plan.requested_object)||'none';
+  const presentationBest=(v44UserEnumerationIntent(userPrompt,plan)||/^(?:list|sort|order|enumerate|ranking)$/.test(norm(plan?.operation)))?v48BestEnumerationCandidate(userPrompt,plan,results):null;
+  const best=presentationBest||candidates[0]||null,requestedObject=trim(plan.requested_object)||'none';
   let rowCount=best?arr(best.t?.rows).length:0,tool=trim(best?.r?.name),tableKey=trim(best?.t?.key),rows=best?arr(best.t?.rows):[];
   let factCount=null;for(const r of arr(results)){const c=v42WorkingSetFactCount(r,requestedObject,plan.domain);if(c!=null)factCount=factCount==null?c:Math.max(factCount,c);}
   if(factCount!=null)rowCount=factCount;
   if(rows.length&&['events','tickets','products','donors','stores','people','documents'].includes(requestedObject)){
     const primary=v40ListPrimaryColumn(userPrompt,rows[0],requestedObject);if(primary){const unique=new Set(rows.map(r=>norm(r?.[primary])).filter(Boolean)).size;if(unique>0&&(factCount==null||requestedObject!=='products'||trim(best?.r?.name)==='event_purchase_lines'||trim(best?.r?.name)==='event_donation_lines'))rowCount=unique;}
   }
-  const amountKey=rows.length?Object.keys(rows[0]||{}).find(k=>/^(?:importe|valor|total)$/i.test(norm(k))):'',unitsKey=rows.length?Object.keys(rows[0]||{}).find(k=>/unidades|cantidad/i.test(norm(k))):'';
+  const amountKey=rows.length?v48ColumnKey(rows[0],'Importe'):'',unitsKey=rows.length?v48ColumnKey(rows[0],'Unidades'):'';
   const totalAmount=amountKey?rows.reduce((a,r)=>{const n=v40MaybeNumber(r?.[amountKey]);return a+(n==null?0:n);},0):null,totalUnits=unitsKey?rows.reduce((a,r)=>{const n=v40MaybeNumber(r?.[unitsKey]);return a+(n==null?0:n);},0):null;
-  return v42CompactWorkingSet({kind:requestedObject,event:trim(plan.event),scope:trim(plan.scope),subjects:arr(plan.subjects),domain:trim(plan.domain),requested_object:requestedObject,tool,table_key:tableKey,row_count:rowCount,empty:rowCount===0,aggregate:{total_amount:Number.isFinite(Number(totalAmount))?Number(totalAmount):null,total_units:Number.isFinite(Number(totalUnits))?Number(totalUnits):null},filter_summary:[trim(plan.event),arr(plan.subjects).join(' / '),trim(plan.domain),requestedObject].filter(Boolean).join(' · ')});
+  const recordCount=v50WorkingSetRecordCount(results,plan.domain),rowCache=v50BuildWorkingRowCache(best,userPrompt,plan);
+  return v42CompactWorkingSet({kind:requestedObject,event:trim(plan.event),scope:trim(plan.scope),subjects:arr(plan.subjects),domain:trim(plan.domain),requested_object:requestedObject,tool,table_key:tableKey,row_count:rowCount,...(recordCount!=null?{record_count:recordCount}:{}),empty:rowCount===0,aggregate:{total_amount:Number.isFinite(Number(totalAmount))?Number(totalAmount):null,total_units:Number.isFinite(Number(totalUnits))?Number(totalUnits):null},filter_summary:[trim(plan.event),arr(plan.subjects).join(' / '),trim(plan.domain),requestedObject].filter(Boolean).join(' · '),...(rowCache?{row_cache:rowCache}:{})});
 }
 
 function v46ResultMatchesTarget(result={},target={}){
@@ -10862,7 +10921,7 @@ function v40PlanEnumerationRequest(plan={}){
 }
 function v49CanonicalPresentationField(field=''){
   const raw=trim(field),f=norm(raw).replace(/[^a-z0-9]+/g,'');
-  const map={destination:'Destino',destino:'Destino',segment:'Segmento',segmento:'Segmento',product:'Producto',producto:'Producto',price:'Precio',precio:'Precio',amount:'Importe',importe:'Importe',value:'Valor',valor:'Valor',units:'Unidades',unidades:'Unidades',quantity:'Unidades',cantidad:'Unidades',store:'Tienda',tienda:'Tienda',responsible:'Responsable',responsable:'Responsable',donor:'Donante',donante:'Donante',event:'Evento',evento:'Evento',date:'Fecha',fecha:'Fecha',startdate:'Fecha inicio',fechainicio:'Fecha inicio',status:'Estado',estado:'Estado',situation:'Estado',situacion:'Estado',ticket:'Ticket'};
+  const map={destination:'Destino',destino:'Destino',segment:'Segmento',segmento:'Segmento',product:'Producto',producto:'Producto',price:'Precio',unitprice:'Precio',precio:'Precio',amount:'Importe',totalamount:'Importe',importe:'Importe',value:'Valor',totalvalue:'Importe',valor:'Valor',units:'Unidades',totalunits:'Unidades',unidades:'Unidades',quantity:'Unidades',cantidad:'Unidades',store:'Tienda',tienda:'Tienda',responsible:'Responsable',responsable:'Responsable',donor:'Donante',donante:'Donante',event:'Evento',evento:'Evento',date:'Fecha',fecha:'Fecha',startdate:'Fecha inicio',fechainicio:'Fecha inicio',status:'Estado',estado:'Estado',situation:'Estado',situacion:'Estado',ticket:'Ticket'};
   return map[f]||raw;
 }
 function v40PromptSortDirective(prompt='',plan={}){
@@ -11151,6 +11210,63 @@ function v40HumanizeRenderedTables(presentation,userPrompt=''){
   });
   return{...presentation,tables};
 }
+function v50LocalPresentationCompatible(userPrompt='',state={},selectedEventId='',contextBook={}){
+  const md=contextBook?.multidim||{},ws=v42CompactWorkingSet(md.working_set||null),msg=contextBook?.current_message||{};if(!ws||ws.empty)return null;
+  const p=norm(userPrompt),references=!!msg.references_working_set||/\b(?:ord[eé]nalos|ord[eé]nalas|reordena|vuelve\s+a\s+(?:listar|mostrar)|esa\s+lista|ese\s+listado|esas\s+compras|esos\s+productos|de\s+esas|de\s+esos)\b/.test(p);
+  const summary=v49ExplicitSummaryIntent(userPrompt)&&references,sort=/\b(?:ordena|ord[eé]nalos|ord[eé]nalas|ordenad[oa]|reordena|clasifica|ranking)\b/.test(p)&&references,list=v40ExplicitEnumerationRequest(userPrompt)&&references;
+  if(!summary&&!sort&&!list)return null;
+  // Un cambio explícito de evento/ámbito/entidad obliga a rematerializar. El cache local solo
+  // transforma exactamente el conjunto ya confirmado.
+  if(trim(msg.explicit_named_event)||msg.explicit_screen_event||msg.explicit_all_events||msg.navigation_back)return null;
+  const domain=v44PromptDomain(userPrompt,ws.domain||md?.specific?.domain||'general');if(domain&&norm(domain)!==norm(ws.domain||domain))return null;
+  const people=v26PersonHintsFromPrompt(userPrompt,state).map(trim).filter(Boolean),known=arr(ws.subjects).map(norm);if(people.some(x=>!known.includes(norm(x))))return null;
+  if(v29ProductSearchTerm(state,userPrompt))return null;
+  if((sort||list)&&!ws.row_cache?.complete)return null;
+  return{md,ws,mode:summary?'summary':sort?'sort':'list'};
+}
+function v50LocalPresentationSummary(ws={}){
+  const event=trim(ws.event),domain=norm(ws.domain),kind=trim(ws.kind),rows=Math.max(0,Number(ws.row_count)||0),records=ws.record_count==null?null:Math.max(0,Number(ws.record_count)||0),amount=ws?.aggregate?.total_amount,units=ws?.aggregate?.total_units;
+  const parts=[];
+  if(domain==='purchases'){
+    if(records!=null)parts.push(`${records} ${records===1?'registro de compra':'registros de compra'}`);
+    if(kind==='products')parts.push(`${rows} ${rows===1?'producto distinto':'productos distintos'}`);else if(records==null)parts.push(`${rows} ${rows===1?'registro':'registros'}`);
+  }else if(domain==='donations'){
+    if(records!=null)parts.push(`${records} ${records===1?'registro de donación':'registros de donación'}`);
+    if(kind==='products')parts.push(`${rows} ${rows===1?'producto distinto':'productos distintos'}`);else if(records==null)parts.push(`${rows} ${rows===1?'registro':'registros'}`);
+  }else parts.push(`${rows} ${rows===1?'elemento':'elementos'}`);
+  if(Number.isFinite(Number(amount)))parts.push(`un importe total de ${v40WholeEuro(amount)}`);
+  if(Number.isFinite(Number(units))&&/\b(?:unidad|unidades|cantidad)\b/.test(norm(kind)))parts.push(`${v26FormatPlainNumber(units,2)} unidades`);
+  return `${event?`${event}: `:''}${parts.join(', ').replace(/, ([^,]+)$/,' y $1')}.`;
+}
+function v50LocalPresentationTable(cache={},rows=[],visibleFields=[]){
+  const sample=rows[0]||{},actual=[];for(const f of visibleFields){const k=v48ColumnKey(sample,f)||trim(f);if(k&&Object.prototype.hasOwnProperty.call(sample,k)&&!actual.includes(k))actual.push(k);}
+  if(!actual.length)for(const c of arr(cache.columns).slice(0,8))if(Object.prototype.hasOwnProperty.call(sample,c))actual.push(c);
+  const fmt=(k,v)=>{if(v==null)return'';const n=v40MaybeNumber(v),nk=norm(k);if(n!=null&&/precio|importe|valor|coste|costo|total/.test(nk))return v26FormatEuro(n);if(n!=null&&/unidades|cantidad/.test(nk))return `${v26FormatPlainNumber(n,3)} uds`;return trim(v);};
+  return{title:trim(cache.title)||'Datos del contexto',columns:actual,rows:rows.map(r=>actual.map(k=>fmt(k,r?.[k])))};
+}
+function v50BuildLocalPresentation(userPrompt='',state={},selectedEventId='',contextBook={},flowTrace=[]){
+  const c=v50LocalPresentationCompatible(userPrompt,state,selectedEventId,contextBook);if(!c)return null;
+  const {md,ws,mode}=c,cache=v50CompactWorkingRowCache(ws.row_cache||null),event=trim(ws.event)||trim(md?.specific?.event)||trim(md?.general?.event),specific=v42CompactSpecific({...md.specific,active:true,event,scope:trim(ws.scope)||trim(md?.specific?.scope)||'named_event',domain:trim(ws.domain)||trim(md?.specific?.domain)||'general',requested_object:trim(ws.requested_object)||trim(ws.kind)||'none',operation:mode});
+  let working=v42CompactWorkingSet(ws),answer='',tables=[],files=[],sort={field:'',direction:'none'};
+  const plan={relation:'continue',reason:'Presentación local sobre WORKING_SET canónico ya materializado',confidence:1,scope:specific.scope,event,events:[],subjects:arr(specific.subjects),domain:specific.domain,operation:mode,transition:'CONTINUE',requested_object:specific.requested_object,dataset:specific.dataset||{id:'',description:'',carry_forward:true},presentation:{show_table:mode!=='summary',show_chart:false,table_hint:trim(cache?.table_key),sort_field:'',sort_direction:'none',limit:0},data_requests:[]};
+  if(mode==='summary'){
+    answer=v50LocalPresentationSummary(ws);
+  }else{
+    if(!cache)return null;let rows=arr(cache.rows).map(r=>({...r}));sort=v40PromptSortDirective(userPrompt,plan);
+    if(mode==='sort'&&!sort.field)return null;
+    if(sort.field){const physical=v49CanonicalPresentationField(sort.field),key=v48ColumnKey(rows[0]||{},physical);if(!key)return null;const direction=sort.direction==='none'?'asc':sort.direction,mult=direction==='desc'?-1:1;rows.sort((a,b)=>{const av=a?.[key],bv=b?.[key],an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});sort={field:physical,direction};plan.presentation.sort_field=physical;plan.presentation.sort_direction=direction;}
+    const requestedNow=v48PresentationFieldSpecs(userPrompt,plan),visible=requestedNow.length>1?requestedNow:arr(cache.visible_fields).length?arr(cache.visible_fields):[trim(cache.primary_field)].filter(Boolean);
+    const syntheticPrompt=`${userPrompt}\nCampos de la lista vigente: ${visible.join(', ')}`;
+    const fake={id:'scc_local_working_set',name:trim(cache.source_tool)||trim(ws.tool)||'working_set',ok:true,tables:[{key:trim(cache.table_key)||'working_set',title:trim(cache.title)||'Datos del contexto',rows}]};
+    answer=v40CanonicalEnumerationAnswer(syntheticPrompt,{...plan,presentation:{...plan.presentation,show_table:true}},[fake],'')||'';
+    if(!answer)return null;
+    const table=v50LocalPresentationTable(cache,rows,visible);tables=[table];const objs=rows.map(r=>Object.fromEntries(table.columns.map(c=>[c,r?.[c]??''])));files=[{filename:fileSafe(`${table.title}_v2.0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(table.columns,objs)}];
+    working=v42CompactWorkingSet({...ws,row_cache:{...cache,rows,visible_fields:table.columns,sort_field:sort.field||cache.sort_field,sort_direction:sort.direction||cache.sort_direction}});
+  }
+  const committed=v42CompactMultidim({...md,specific,working_set:working,target_set:md.target_set,stack:md.stack}),resultContext=v40SccResultContext(plan,[],committed);
+  const label=mode==='summary'?'SUMMARY':mode==='sort'?'SORT':'LIST';zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 FIX2 · Local Presentation','OK',`${label} resuelto sobre WORKING_SET ya materializado${sort.field?` · orden=${sort.field} ${sort.direction.toUpperCase()}`:''} · 0 planner · 0 BBDD · 0 redacción IA.`);
+  return{mode,answer,title:mode==='summary'?(specific.domain==='purchases'?'Compras':specific.domain==='donations'?'Donaciones':'Resumen'):(v48EnumerationHeader(specific.requested_object,working.row_count,sort.field||'').replace(/\s*\(\d+\)$/,'')),tables,files,resultContext,committed};
+}
 function v40ChoosePlanCall(calls=[],state,selectedEventId){
   const scored=arr(calls).map((call,index)=>{const plan=v40SccSanitizePlan(call?.arguments||{},state,selectedEventId);const score=(plan.confidence*100)+(plan.data_requests.length*2)+(plan.event?1:0)+(plan.subjects.length?1:0);return{call,plan,index,score};});
   return scored.sort((a,b)=>b.score-a.score||a.index-b.index)[0]||null;
@@ -11165,8 +11281,8 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 BASE HÍBRIDA + SCC 2.2.6 FIX','OK','Build 20260819-SCC226-LOCKS: voz híbrida intacta; CONTEXT LOCK + SCHEMA LOCK + PRESENTATION MODE LOCK + DERIVED TRUTH LOCK corrigen el contrato sin tocar TARGET_SET/WORKING_SET.');
-  zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 FIX CONTEXTO',modelPolicy.tier==='lite'?'OK':'INFO',`CE resuelve primero transiciones estructurales inequívocas; Gemini decide el resto. GENERAL/ESPECÍFICO/WORKING_SET/TARGET_SET/STACK siguen siendo la memoria vigente. Interaction nativa=solo turno actual. Modelo=${model}.`);
+  zuzuTracePush(flowTrace,'v2.0_exp · FIX34 BASE HÍBRIDA + SCC 2.2.6 FIX2','OK','Build 20260819-SCC226-FIX2: voz híbrida intacta; EVENT AUTHORITY LOCK + PHYSICAL SORT LOCK + LOCAL PRESENTATION cierran las regresiones de contexto/orden sin tocar TARGET_SET ni la lógica de voz.');
+  zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 FIX2 CONTEXTO',modelPolicy.tier==='lite'?'OK':'INFO',`CE resuelve primero transiciones estructurales inequívocas; Gemini decide el resto. GENERAL/ESPECÍFICO/WORKING_SET/TARGET_SET/STACK siguen siendo la memoria vigente. Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v2.0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
 
   // SCC 2.2.6: si WORKING_SET ya contiene exactamente los metadatos solicitados, CE responde
@@ -11176,7 +11292,17 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
     const resultContext=v40SccResultContext(derived.plan,[],derived.committed),md=resultContext?.scc?.multidim||{},ws=md?.working_set,names=arr(derived.scope).map(x=>trim(x?.target?.name)).filter(Boolean);
     zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · WORKING_SET reutilizado','OK',`Operación=${derived.operation} · métrica=${derived.metric} · objetivos=${names.join(' / ')||trim(ws?.event)||'contexto vigente'} · 0 planner · 0 herramientas · 0 redacción IA.`);
     zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Conjunto reutilizado sin rematerializar datos.`);
-    return{ok:true,rejected:false,title:v48DerivedTitle(derived.operation,derived.metric,ws?.kind),answer:v40ConversationalPolish(derived.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:[],files:[],provider:'control-event-scc226-working-set',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 FIX: WORKING_SET reutilizable + locks de contexto/presentación/verdad derivada; GENERAL/ESPECÍFICO/TARGET_SET/STACK permanecen intactos',modelTier:'local-derived',interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:[],scc:resultContext.scc,geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    return{ok:true,rejected:false,title:v48DerivedTitle(derived.operation,derived.metric,ws?.kind),answer:v40ConversationalPolish(derived.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:[],files:[],provider:'control-event-scc226-working-set',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 FIX2: WORKING_SET reutilizable + autoridad de evento + orden físico + presentación local; GENERAL/ESPECÍFICO/TARGET_SET/STACK permanecen intactos',modelTier:'local-derived',interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:[],scc:resultContext.scc,geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
+
+  // SCC 2.2.6 FIX2: LIST/SORT/SUMMARY sobre el conjunto vigente son transformaciones de
+  // presentación, no nuevas preguntas a Gemini. Si las filas canónicas están cacheadas en el
+  // WORKING_SET, CE responde sin planner, sin BBDD y sin redacción IA.
+  const localPresentation=v50BuildLocalPresentation(userPrompt,state,selectedEventId,contextBook,flowTrace);
+  if(localPresentation){
+    const md=localPresentation.resultContext?.scc?.multidim||{},ws=md?.working_set;
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 FIX2 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Presentación local reutilizada.`);
+    return{ok:true,rejected:false,title:localPresentation.title,answer:v40ConversationalPolish(localPresentation.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:voiceConversation?[]:localPresentation.tables,files:voiceConversation?[]:localPresentation.files,provider:'control-event-scc226-fix2-local-presentation',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 FIX2: EVENT AUTHORITY LOCK + PHYSICAL SORT LOCK + LOCAL LIST/SORT/SUMMARY sobre WORKING_SET',modelTier:'local-presentation',interactionId:'',resetInteractionId:true,pendingAction:null,resultContext:localPresentation.resultContext,tools:[],scc:localPresentation.resultContext.scc,geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }
 
   // Un cambio puro de foco no necesita gastar una llamada ni depender de JSON generativo.
@@ -11287,7 +11413,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // La memoria persistente entre turnos es el historial local del navegador; devolver siempre vacío
   // hace que una sesión antigua quede saneada desde la primera respuesta con este parche.
   resetInteractionId=true;
-  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-scc2-v2-0-exp',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 FIX: CE bloquea contexto conversacional frente al evento visible, exige schema físico de presentación, separa summary/list/sort y prioriza verdades derivadas canónicas; memoria multidimensional intacta',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId,pendingAction:null,resultContext,tools:[...new Set(executed.fullResults.map(r=>trim(r?.name)).filter(Boolean))],scc:resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer,warnings:arr(final.warnings),charts:presentation.charts,tables:presentation.tables,files,provider:'gemini-scc2-v2-0-exp',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 FIX2: CE conserva autoridad del evento conversacional, ordena por columna física y reutiliza LIST/SORT/SUMMARY localmente; memoria multidimensional intacta',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId,pendingAction:null,resultContext,tools:[...new Set(executed.fullResults.map(r=>trim(r?.name)).filter(Boolean))],scc:resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuV261InteractionsAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],conversationDigest='',conversationTurnNumber=0,voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
@@ -16792,6 +16918,10 @@ export const __zuzuStructuralTesting = Object.freeze({
   v49ExplicitSummaryIntent,
   v49DerivedTruthBlock,
   v49RepairDerivedTruthContradictions,
+  v50TrustedExplicitEventMention,
+  v50BuildLocalPresentation,
+  v50LocalPresentationCompatible,
+  v50CompactWorkingRowCache,
   v40ExecuteSccPlan,
   v42CommitMultidimContext,
   v43CompactSccResultForPlan,
