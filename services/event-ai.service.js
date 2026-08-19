@@ -10775,7 +10775,12 @@ function v47DerivedMetric(prompt='',operation='sum'){
 function v47MetricValue(part={},metric='total_amount'){
   if(metric==='row_count')return Number.isFinite(Number(part?.row_count))?Number(part.row_count):null;
   const direct=part?.metrics?.[metric];if(direct!=null&&Number.isFinite(Number(direct)))return Number(direct);
-  const raw=part?.aggregate?.[metric];if(raw==null&&part?.empty===true)return 0;return raw==null||!Number.isFinite(Number(raw))?null:Number(raw);
+  // Las particiones materializadas por herramientas de dominio (p. ej. event_purchase_lines)
+  // guardan su total canónico en aggregate.total_amount. Una continuación que pregunta por
+  // «importe de compras/ingresos/donaciones» debe poder reutilizar ese total sin rematerializar.
+  let raw=part?.aggregate?.[metric];
+  if(raw==null&&/(?:purchases|income|donations)_amount$/.test(metric))raw=part?.aggregate?.total_amount;
+  if(raw==null&&part?.empty===true)return 0;return raw==null||!Number.isFinite(Number(raw))?null:Number(raw);
 }
 function v47MetricLabel(metric='total_amount',kind='none',prompt=''){
   if(metric==='total_amount')return'importe';
@@ -11251,7 +11256,7 @@ function v40HumanizeRenderedTables(presentation,userPrompt=''){
 }
 function v50LocalPresentationCompatible(userPrompt='',state={},selectedEventId='',contextBook={}){
   const md=contextBook?.multidim||{},ws=v42CompactWorkingSet(md.working_set||null),msg=contextBook?.current_message||{};if(!ws||ws.empty)return null;
-  const p=norm(userPrompt),references=!!msg.references_working_set||/\b(?:ord[eé]nalos|ord[eé]nalas|reordena|vuelve\s+a\s+(?:listar|mostrar)|esa\s+lista|ese\s+listado|esas\s+compras|esos\s+productos|de\s+esas|de\s+esos)\b/.test(p);
+  const p=norm(userPrompt),references=!!msg.references_working_set||/\b(?:ord[eé]nalos|ord[eé]nalas|reordena|vuelve\s+a\s+(?:listar|mostrar)|(?:esa|la|esta)\s+lista|(?:ese|el|este)\s+listado|esas\s+compras|esos\s+productos|de\s+esas|de\s+esos)\b/.test(p);
   const summary=v49ExplicitSummaryIntent(userPrompt)&&references,sort=/\b(?:ordena|ord[eé]nalos|ord[eé]nalas|ordenad[oa]|reordena|clasifica|ranking)\b/.test(p)&&references,list=v40ExplicitEnumerationRequest(userPrompt)&&references;
   if(!summary&&!sort&&!list)return null;
   // Un cambio explícito de evento/ámbito/entidad obliga a rematerializar. El cache local solo
