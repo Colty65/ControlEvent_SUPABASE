@@ -12992,9 +12992,17 @@ function v29ProductSearchTerm(state,prompt){
   const citedEvent=v314ResolveEventMention(state,prompt,[]);
   const eventNames=citedEvent?[citedEvent]:arr(state?.eventos).map(ev=>trim(ev?.titulo||ev?.nombre)).filter(n=>n&&v29WordBoundaryContains(p,n));
   eventNames.forEach(name=>norm(name).split(/[^a-z0-9ñ]+/).filter(Boolean).forEach(tok=>stop.add(tok)));
-  const tokens=[...new Set(p.split(/[^a-z0-9ñ]+/).map(trim).filter(x=>x.length>=4&&!stop.has(x)&&!/^(?:19|20)\d{2}$/.test(x)))],scores=[];
-  for(const token of tokens){let hits=0;for(const prod of arr(state?.productos)){const name=norm(prod?.nombre);if(name&&v29WordBoundaryContains(name,token))hits++;}if(hits)scores.push({token,hits,len:token.length});}
-  return scores.sort((a,b)=>a.hits-b.hits||b.len-a.len)[0]?.token||'';
+  // SCC 2.2.6 micropunto filtros: un término corto o flexionado puede ser una categoría
+  // humana válida del catálogo (RON, PAN, cervezas...). Se acepta desde 3 caracteres SOLO si
+  // alguna de sus formas léxicas aparece realmente en nombres de producto. No se inventan aliases.
+  const tokens=[...new Set(p.split(/[^a-z0-9ñ]+/).map(trim).filter(x=>x.length>=3&&!stop.has(x)&&!/^(?:19|20)\d{2}$/.test(x)))],scores=[];
+  const forms=token=>{const out=[token];if(token.length>=5&&token.endsWith('es'))out.push(token.slice(0,-2));if(token.length>=4&&token.endsWith('s'))out.push(token.slice(0,-1));return[...new Set(out.filter(x=>x.length>=3))];};
+  for(const token of tokens){
+    for(const form of forms(token)){let hits=0;for(const prod of arr(state?.productos)){const name=norm(prod?.nombre);if(name&&v29WordBoundaryContains(name,form))hits++;}
+      if(hits)scores.push({token:form,hits,len:form.length,sourceLen:token.length});
+    }
+  }
+  return scores.sort((a,b)=>a.hits-b.hits||b.len-a.len||b.sourceLen-a.sourceLen)[0]?.token||'';
 }
 function v29PreferredProductMention(mentions,dims,prompt){
   const p=norm(prompt),explicit=/\b(producto|productos|articulo|articulos)\b/.test(p),blocked=new Set([...arr(dims?.segments),...arr(dims?.destinations)].map(norm));
