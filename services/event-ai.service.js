@@ -10719,14 +10719,29 @@ function v46ComparisonMetricsFromRow(row={}){
   const metrics={purchases_amount:get('Compras realizadas'),pending_purchases_amount:get('Compras pendientes'),income_amount:get('Ingresos'),donations_amount:get('Donaciones valoradas'),operating_balance:get('Saldo operativo'),valuation_amount:get('Valoración del evento'),attendance_count:get('Asistentes canónicos')};
   return Object.fromEntries(Object.entries(metrics).filter(([,v])=>v!=null));
 }
+function v46CanonicalMetricsFromResults(results=[]){
+  const out={},set=(key,value)=>{const n=Number(value);if(out[key]==null&&Number.isFinite(n))out[key]=n;};
+  for(const r of arr(results)){
+    const f=r?.facts||{};
+    set('purchases_amount',f.purchases_realized);
+    set('pending_purchases_amount',f.purchases_pending);
+    set('income_amount',f.income_total);
+    set('donations_amount',f.donations_value);
+    set('operating_balance',f.operating_balance);
+    set('valuation_amount',f.event_valuation);
+    set('attendance_count',f.attendees_canonical);
+  }
+  return out;
+}
 function v46BuildPartitionedWorkingSet(plan={},results=[],targetSet=null,userPrompt=''){
   const ts=v45CompactTargetSet(targetSet);if(!ts)return v42BuildWorkingSet(plan,results,userPrompt);
   const compare=arr(results).find(r=>r?.ok&&trim(r?.name)==='compare_events'),compareTable=arr(compare?.tables).find(t=>trim(t?.key)==='comparison'),compareRows=arr(compareTable?.rows);
   const partitions=[];for(const target of arr(ts.items)){
     const group=arr(results).filter(r=>v46ResultMatchesTarget(r,target));
+    const canonicalMetrics=v46CanonicalMetricsFromResults(group);
     const subPlan={...plan,event:trim(target.name),events:[trim(target.name)]},ws=v42BuildWorkingSet(subPlan,group,userPrompt);
     if(ws&&!(ws.empty&&group.length===0)){
-      partitions.push({target:{type:'event',id:trim(target.id),name:trim(target.name)},kind:ws.kind,tool:ws.tool,table_key:ws.table_key,row_count:ws.row_count,...(ws.record_count!=null?{record_count:ws.record_count}:{}),empty:ws.empty,filter_summary:ws.filter_summary,aggregate:ws.aggregate||null,...(ws.row_cache?{row_cache:ws.row_cache}:{})});
+      partitions.push({target:{type:'event',id:trim(target.id),name:trim(target.name)},kind:ws.kind,tool:ws.tool,table_key:ws.table_key,row_count:ws.row_count,...(ws.record_count!=null?{record_count:ws.record_count}:{}),empty:ws.empty,filter_summary:ws.filter_summary,aggregate:ws.aggregate||null,...(Object.keys(canonicalMetrics).length?{metrics:canonicalMetrics}:{}),...(ws.row_cache?{row_cache:ws.row_cache}:{})});
       continue;
     }
     const row=compareRows.find(x=>norm(x?.Evento)===norm(target.name));
@@ -10775,11 +10790,16 @@ function v47DerivedMetric(prompt='',operation='sum'){
 function v47MetricValue(part={},metric='total_amount'){
   if(metric==='row_count')return Number.isFinite(Number(part?.row_count))?Number(part.row_count):null;
   const direct=part?.metrics?.[metric];if(direct!=null&&Number.isFinite(Number(direct)))return Number(direct);
-  // Las particiones materializadas por herramientas de dominio (p. ej. event_purchase_lines)
-  // guardan su total canónico en aggregate.total_amount. Una continuación que pregunta por
-  // «importe de compras/ingresos/donaciones» debe poder reutilizar ese total sin rematerializar.
+  // aggregate.total_amount solo tiene autoridad para la métrica del propio conjunto.
+  // No se proyecta un total genérico de un dossier/summary como compras, ingresos o donaciones:
+  // esas métricas deben venir de facts/metrics canónicos. Así evitamos confundir, por ejemplo,
+  // los 3.190 € de ingresos de un dossier con el importe de compras.
   let raw=part?.aggregate?.[metric];
-  if(raw==null&&/(?:purchases|income|donations)_amount$/.test(metric))raw=part?.aggregate?.total_amount;
+  const kind=norm(part?.kind),tool=norm(part?.tool);
+  const domainAggregate=(metric==='purchases_amount'&&(kind==='purchases'||tool==='event_purchase_lines'||tool==='event_breakdowns'))||
+    (metric==='income_amount'&&(kind==='incomes'||kind==='income'))||
+    (metric==='donations_amount'&&(kind==='donations'||tool==='event_donation_lines'));
+  if(raw==null&&domainAggregate)raw=part?.aggregate?.total_amount;
   if(raw==null&&part?.empty===true)return 0;return raw==null||!Number.isFinite(Number(raw))?null:Number(raw);
 }
 function v47MetricLabel(metric='total_amount',kind='none',prompt=''){
