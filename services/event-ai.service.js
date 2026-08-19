@@ -9815,7 +9815,9 @@ function v46CompactWorkingTarget(raw=null){
   const targetRaw=raw.target&&typeof raw.target==='object'?raw.target:{},type=trim(targetRaw.type)||'event',id=trim(targetRaw.id),name=trim(targetRaw.name);
   if(type!=='event'||(!id&&!name))return null;
   const aggregate=raw.aggregate&&typeof raw.aggregate==='object'?{total_amount:raw.aggregate.total_amount==null?null:(Number.isFinite(Number(raw.aggregate.total_amount))?Number(raw.aggregate.total_amount):null),total_units:raw.aggregate.total_units==null?null:(Number.isFinite(Number(raw.aggregate.total_units))?Number(raw.aggregate.total_units):null)}:null;
-  return{target:{type:'event',id:id.slice(0,120),name:name.slice(0,180)},kind:trim(raw.kind).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{})};
+  const metrics={};for(const [k,v] of Object.entries(raw.metrics&&typeof raw.metrics==='object'?raw.metrics:{})){const n=Number(v);if(Number.isFinite(n))metrics[trim(k).slice(0,60)]=n;}
+  const recordCount=raw.record_count==null?null:Math.max(0,Math.min(100000,Number(raw.record_count)||0)),rowCache=v50CompactWorkingRowCache(raw.row_cache||null);
+  return{target:{type:'event',id:id.slice(0,120),name:name.slice(0,180)},kind:trim(raw.kind).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),...(recordCount!=null?{record_count:recordCount}:{}),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(Object.keys(metrics).length?{metrics}:{}),...(rowCache?{row_cache:rowCache}:{})};
 }
 function v50CompactWorkingRowCache(raw=null){
   if(!raw||typeof raw!=='object')return null;
@@ -9837,9 +9839,10 @@ function v50WorkingSetWithoutRowCache(raw=null){
 function v42CompactWorkingSet(raw=null){
   if(!raw||typeof raw!=='object')return null;
   const aggregate=raw.aggregate&&typeof raw.aggregate==='object'?{total_amount:raw.aggregate.total_amount==null?null:(Number.isFinite(Number(raw.aggregate.total_amount))?Number(raw.aggregate.total_amount):null),total_units:raw.aggregate.total_units==null?null:(Number.isFinite(Number(raw.aggregate.total_units))?Number(raw.aggregate.total_units):null)}:null;
+  const metrics={};for(const [k,v] of Object.entries(raw.metrics&&typeof raw.metrics==='object'?raw.metrics:{})){const n=Number(v);if(Number.isFinite(n))metrics[trim(k).slice(0,60)]=n;}
   const targets=[];const seen=new Set();for(const item of arr(raw.targets)){const c=v46CompactWorkingTarget(item);if(!c)continue;const key=trim(c.target.id)||norm(c.target.name);if(seen.has(key))continue;seen.add(key);targets.push(c);if(targets.length>=6)break;}
   const rowCache=v50CompactWorkingRowCache(raw.row_cache||null),recordCount=raw.record_count==null?null:Math.max(0,Math.min(100000,Number(raw.record_count)||0));
-  return{kind:trim(raw.kind).slice(0,40)||'none',event:trim(raw.event).slice(0,140),scope:trim(raw.scope).slice(0,30)||'none',subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50)||'general',requested_object:trim(raw.requested_object).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),...(recordCount!=null?{record_count:recordCount}:{}),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(rowCache?{row_cache:rowCache}:{}),...(targets.length?{partitioned:true,target_count:targets.length,targets}:{})};
+  return{kind:trim(raw.kind).slice(0,40)||'none',event:trim(raw.event).slice(0,140),scope:trim(raw.scope).slice(0,30)||'none',subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50)||'general',requested_object:trim(raw.requested_object).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),...(recordCount!=null?{record_count:recordCount}:{}),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(Object.keys(metrics).length?{metrics}:{}),...(rowCache?{row_cache:rowCache}:{}),...(targets.length?{partitioned:true,target_count:targets.length,targets}:{})};
 }
 function v46WorkingTargetNames(working=null){return arr(v42CompactWorkingSet(working)?.targets).map(x=>trim(x?.target?.name)).filter(Boolean);}
 // SCC 2.2.6 · TARGET_SET representa varios objetivos canónicos simultáneos sin aplastarlos
@@ -10603,10 +10606,11 @@ async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPro
   const jobs=plan.data_requests.map(async req=>{
     let args=v40SccArgsForRequest(req,plan);
     args=v40ExplicitNamedEventForRequest(args,plan,state,selectedEventId,req.tool);
+    args=v51SanitizeSccRequestFilters(args,req,plan,state,userPrompt,flowTrace);
     // Gemini decide la fuente. CE solo completa el filtro de producto inequívoco presente
     // en el MENSAJE ACTUAL para que la propia fuente no cargue filas ajenas.
     if(req.tool==='event_purchase_lines'&&!trim(args.product)){
-      const product=v29ProductSearchTerm(state,`${userPrompt} ${plan.subjects.join(' ')} ${plan.dataset?.description||''}`);
+      const product=v29ProductSearchTerm(state,userPrompt);
       if(product){args={...args,product};zuzuTracePush(flowTrace,'v2.0_exp · SCC · Filtro canónico de producto','OK',`event_purchase_lines filtrará «${product}» antes de agregar/compactar.`);}
     }
     const call={id:`scc_${req.index}_${Date.now().toString(36)}`,name:req.tool,arguments:args};
@@ -10710,13 +10714,23 @@ function v46ResultMatchesTarget(result={},target={}){
   if(expectedName&&trim(result?.facts?.event)&&norm(result.facts.event)===norm(expectedName))return true;
   return false;
 }
+function v46ComparisonMetricsFromRow(row={}){
+  const get=(...names)=>{for(const name of names){const key=v48ColumnKey(row,name)||name;if(Object.prototype.hasOwnProperty.call(row,key)){const n=v40MaybeNumber(row?.[key]);if(n!=null)return n;}}return null;};
+  const metrics={purchases_amount:get('Compras realizadas'),pending_purchases_amount:get('Compras pendientes'),income_amount:get('Ingresos'),donations_amount:get('Donaciones valoradas'),operating_balance:get('Saldo operativo'),valuation_amount:get('Valoración del evento'),attendance_count:get('Asistentes canónicos')};
+  return Object.fromEntries(Object.entries(metrics).filter(([,v])=>v!=null));
+}
 function v46BuildPartitionedWorkingSet(plan={},results=[],targetSet=null,userPrompt=''){
   const ts=v45CompactTargetSet(targetSet);if(!ts)return v42BuildWorkingSet(plan,results,userPrompt);
+  const compare=arr(results).find(r=>r?.ok&&trim(r?.name)==='compare_events'),compareTable=arr(compare?.tables).find(t=>trim(t?.key)==='comparison'),compareRows=arr(compareTable?.rows);
   const partitions=[];for(const target of arr(ts.items)){
     const group=arr(results).filter(r=>v46ResultMatchesTarget(r,target));
     const subPlan={...plan,event:trim(target.name),events:[trim(target.name)]},ws=v42BuildWorkingSet(subPlan,group,userPrompt);
-    if(!ws)continue;
-    partitions.push({target:{type:'event',id:trim(target.id),name:trim(target.name)},kind:ws.kind,tool:ws.tool,table_key:ws.table_key,row_count:ws.row_count,empty:ws.empty,filter_summary:ws.filter_summary,aggregate:ws.aggregate||null});
+    if(ws&&!(ws.empty&&group.length===0)){
+      partitions.push({target:{type:'event',id:trim(target.id),name:trim(target.name)},kind:ws.kind,tool:ws.tool,table_key:ws.table_key,row_count:ws.row_count,...(ws.record_count!=null?{record_count:ws.record_count}:{}),empty:ws.empty,filter_summary:ws.filter_summary,aggregate:ws.aggregate||null,...(ws.row_cache?{row_cache:ws.row_cache}:{})});
+      continue;
+    }
+    const row=compareRows.find(x=>norm(x?.Evento)===norm(target.name));
+    if(row){const metrics=v46ComparisonMetricsFromRow(row);partitions.push({target:{type:'event',id:trim(target.id),name:trim(target.name)},kind:'comparison',tool:'compare_events',table_key:'comparison',row_count:1,empty:false,filter_summary:`${trim(target.name)} · comparación`,metrics,row_cache:{table_key:'comparison',title:`Comparativa · ${trim(target.name)}`,source_tool:'compare_events',primary_field:'Evento',visible_fields:Object.keys(row).slice(0,10),columns:Object.keys(row).slice(0,16),rows:[row],complete:true}});}
   }
   if(partitions.length<2)return v42BuildWorkingSet(plan,results,userPrompt);
   const sumNullable=(key)=>{const vals=partitions.map(x=>x?.aggregate?.[key]);return vals.every(v=>v==null)?null:vals.reduce((a,v)=>a+(v==null?0:Number(v)||0),0);};
@@ -10743,20 +10757,34 @@ function v47DerivedOperation(prompt=''){
   if(/\b(?:cu[aá]ntas?|n[uú]mero\s+de)\s+(?:l[ií]neas?|registros?|elementos?)\b/.test(p))return{op:'count'};
   if(/\bcu[aá]ntas?\s+unidades\b/.test(p))return{op:'units'};
   if(/\b(?:cu[aá]nto\s+suman|cu[aá]nto\s+sumaban|suma(?:n|ban)?\s+en\s+total|importe\s+total|valor\s+total|total\s+(?:de|entre))\b/.test(p))return{op:'sum'};
+  if(/\bimporte\b[^.\n]{0,70}\b(?:compras?|ingresos?|donaciones?|saldo|valoraci[oó]n)\b|\b(?:compras?|ingresos?|donaciones?|saldo|valoraci[oó]n)\b[^.\n]{0,70}\bimporte\b/.test(p))return{op:'sum'};
   return null;
 }
 function v47DerivedMetric(prompt='',operation='sum'){
   const p=norm(prompt);
   if(operation==='count'||/\b(?:l[ií]neas?|registros?|elementos?)\b/.test(p))return'row_count';
   if(operation==='units'||/\bunidades?\b/.test(p))return'total_units';
+  if(/\bcompras?\b/.test(p))return'purchases_amount';
+  if(/\bingresos?\b/.test(p))return'income_amount';
+  if(/\bdonaciones?\b/.test(p))return'donations_amount';
+  if(/\bsaldo\b/.test(p))return'operating_balance';
+  if(/\bvaloraci[oó]n\b/.test(p))return'valuation_amount';
+  if(/\basistent\w*\b/.test(p))return'attendance_count';
   return'total_amount';
 }
 function v47MetricValue(part={},metric='total_amount'){
   if(metric==='row_count')return Number.isFinite(Number(part?.row_count))?Number(part.row_count):null;
+  const direct=part?.metrics?.[metric];if(direct!=null&&Number.isFinite(Number(direct)))return Number(direct);
   const raw=part?.aggregate?.[metric];if(raw==null&&part?.empty===true)return 0;return raw==null||!Number.isFinite(Number(raw))?null:Number(raw);
 }
 function v47MetricLabel(metric='total_amount',kind='none',prompt=''){
   if(metric==='total_amount')return'importe';
+  if(metric==='purchases_amount')return'importe de compras';
+  if(metric==='income_amount')return'ingresos';
+  if(metric==='donations_amount')return'valor de donaciones';
+  if(metric==='operating_balance')return'saldo operativo';
+  if(metric==='valuation_amount')return'valoración';
+  if(metric==='attendance_count')return'asistentes';
   if(metric==='total_units')return'unidades';
   const k=norm(kind),p=norm(prompt);
   if(/l[ií]neas?/.test(p)||k==='purchases')return'líneas de compra';
@@ -10769,14 +10797,14 @@ function v47MetricLabel(metric='total_amount',kind='none',prompt=''){
 }
 function v47FormatDerivedValue(value,metric='total_amount'){
   if(!Number.isFinite(Number(value)))return'';
-  return metric==='total_amount'?v40WholeEuro(Number(value)):v26FormatPlainNumber(Number(value),3);
+  return /(?:amount|balance|valuation)$/.test(metric)||metric==='total_amount'?v40WholeEuro(Number(value)):v26FormatPlainNumber(Number(value),3);
 }
 function v47WorkingPartitions(contextBook={}){
   const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null);if(!ws)return{md:null,ws:null,parts:[]};
   let parts=arr(ws.targets).map(x=>v46CompactWorkingTarget(x)).filter(Boolean);
   if(!parts.length){
     const name=trim(ws.event)||trim(md?.specific?.event)||trim(md?.general?.event),id='';
-    if(name)parts=[{target:{type:'event',id,name},kind:ws.kind,tool:ws.tool,table_key:ws.table_key,row_count:ws.row_count,empty:ws.empty,filter_summary:ws.filter_summary,aggregate:ws.aggregate||null}];
+    if(name)parts=[{target:{type:'event',id,name},kind:ws.kind,tool:ws.tool,table_key:ws.table_key,row_count:ws.row_count,empty:ws.empty,filter_summary:ws.filter_summary,aggregate:ws.aggregate||null,metrics:ws.metrics||null}];
   }
   return{md,ws,parts};
 }
@@ -10794,15 +10822,16 @@ function v47ExplicitPartitionSelection(prompt='',parts=[]){
 function v47ReferencesAllPartitions(prompt=''){
   const p=norm(prompt);return v45ReferencesTargetSet(prompt)||/\b(?:cada\s+uno|cada\s+una|por\s+evento|respectivamente|entre\s+ambos|entre\s+los\s+dos|de\s+los\s+dos|de\s+ambos)\b/.test(p);
 }
-function v47DerivedCompatibility(prompt='',state={},selectedEventId='',contextBook={},operation=null){
+function v47DerivedCompatibility(prompt='',state={},selectedEventId='',contextBook={},operation=null,metric='total_amount'){
   const {md,ws,parts}=v47WorkingPartitions(contextBook);if(!md||!ws||!parts.length||!operation)return null;
   const p=norm(prompt);
   if(v40ExplicitEnumerationRequest(prompt)||/\b(?:detalle|detalla|lista|listado|ordena|ordenad[oa]|tabla|csv|gr[aá]fica)\b/.test(p))return null;
+  const metricProjection=parts.every(part=>v47MetricValue(part,metric)!=null);
   const explicitDomain=v44PromptDomain(prompt,ws.domain||md?.specific?.domain||'general');
-  if(explicitDomain&&norm(explicitDomain)!==norm(ws.domain||md?.specific?.domain||explicitDomain))return null;
+  if(explicitDomain&&norm(explicitDomain)!==norm(ws.domain||md?.specific?.domain||explicitDomain)&&!metricProjection)return null;
   const requested=v42InferRequestedObject(prompt,trim(ws.requested_object)||trim(md?.specific?.requested_object)||'none');
-  if(requested&&requested!=='none'&&trim(ws.requested_object)&&norm(requested)!==norm(ws.requested_object))return null;
-  const product=v29ProductSearchTerm(state,prompt);if(product)return null; // un producto nuevo exige rematerializar el conjunto filtrado.
+  if(requested&&requested!=='none'&&trim(ws.requested_object)&&norm(requested)!==norm(ws.requested_object)&&!metricProjection)return null;
+  const product=v29ProductSearchTerm(state,prompt);if(product)return null;
   const people=v26PersonHintsFromPrompt(prompt,state).map(trim).filter(Boolean),knownSubjects=arr(ws.subjects).map(norm);
   if(people.some(x=>!knownSubjects.includes(norm(x))))return null;
   const eventMention=v314ResolveEventMention(state,prompt,[]);if(eventMention&&!parts.some(x=>norm(x?.target?.name)===norm(eventMention)))return null;
@@ -10810,8 +10839,8 @@ function v47DerivedCompatibility(prompt='',state={},selectedEventId='',contextBo
 }
 function v47BuildDerivedAnswer(prompt='',state={},selectedEventId='',contextBook={}){
   const operation=v47DerivedOperation(prompt);if(!operation)return null;
-  const compatible=v47DerivedCompatibility(prompt,state,selectedEventId,contextBook,operation);if(!compatible)return null;
-  const {md,ws,parts}=compatible,metric=v47DerivedMetric(prompt,operation.op),selected=v47ExplicitPartitionSelection(prompt,parts),allRef=v47ReferencesAllPartitions(prompt);
+  const metric=v47DerivedMetric(prompt,operation.op),compatible=v47DerivedCompatibility(prompt,state,selectedEventId,contextBook,operation,metric);if(!compatible)return null;
+  const {md,ws,parts}=compatible,selected=v47ExplicitPartitionSelection(prompt,parts),allRef=v47ReferencesAllPartitions(prompt);
   let scope=selected.length?selected:parts;
   if(parts.length>1&&!selected.length&&!allRef&&!['max','min','difference'].includes(operation.op))return null;
   if(operation.op==='percentage'&&parts.length>1&&!selected.length&&!allRef)return null;
@@ -10823,10 +10852,10 @@ function v47BuildDerivedAnswer(prompt='',state={},selectedEventId='',contextBook
   }else if(operation.op==='sum'){
     const combined=parts.length>1&&!selected.length&&/\b(?:entre\s+ambos|entre\s+los\s+dos|sumados?|en\s+conjunto|total\s+entre)\b/.test(p);
     if(combined){const total=rows.reduce((a,x)=>a+x.value,0);answer=`Entre ${rows.map(x=>x.name).join(' y ')} suman ${fmt(total)}.`;}
-    else answer=rows.map(x=>`${x.name}: ${fmt(x.value)} de ${label}.`).join(' ');
+    else answer=rows.map(x=>`${x.name}: ${fmt(x.value)}${metric==='total_amount'?' de importe':metric==='attendance_count'?' asistentes':` de ${label}`}.`).join(' ');
   }else if(operation.op==='max'||operation.op==='min'){
     if(rows.length<2)return null;const sorted=[...rows].sort((a,b)=>operation.op==='max'?b.value-a.value:a.value-b.value),winner=sorted[0],runner=sorted[1],diff=Math.abs(winner.value-runner.value);
-    const comparative=metric==='total_amount'?(operation.op==='max'?'mayor importe':'menor importe'):(operation.op==='max'?`más ${label}`:`menos ${label}`);
+    const comparative=/amount|balance|valuation/.test(metric)||metric==='total_amount'?(operation.op==='max'?`mayor ${label}`:`menor ${label}`):(operation.op==='max'?`más ${label}`:`menos ${label}`);
     answer=`${winner.name} tuvo ${comparative}: ${fmt(winner.value)}, frente a ${fmt(runner.value)} de ${runner.name}. La diferencia es ${fmt(diff)}.`;
   }else if(operation.op==='difference'){
     if(rows.length!==2)return null;const diff=Math.abs(rows[0].value-rows[1].value);answer=`La diferencia entre ${rows[0].name} y ${rows[1].name} es ${fmt(diff)} (${fmt(rows[0].value)} frente a ${fmt(rows[1].value)}).`;
@@ -10867,7 +10896,14 @@ function v42CommitMultidimContext(contextBook={},plan={},results=[],userPrompt='
     if(['event','general'].includes(norm(plan.domain))&&!arr(plan.subjects).length)general={...general,domain:trim(plan.domain)||general.domain};
     if(plan._workingSetEmptyReference){
       workingSet=v42CompactWorkingSet({...prevWorking,kind:trim(plan.requested_object)||prevWorking?.kind,requested_object:trim(plan.requested_object)||prevWorking?.requested_object,event:trim(plan.event)||prevWorking?.event,scope:trim(plan.scope)||prevWorking?.scope,subjects:arr(plan.subjects).length?arr(plan.subjects):prevWorking?.subjects,domain:trim(plan.domain)||prevWorking?.domain,row_count:0,empty:true});
-    }else workingSet=targetSet?v46BuildPartitionedWorkingSet(plan,results,targetSet,userPrompt):v42BuildWorkingSet(plan,results,userPrompt);
+    }else{
+      const built=targetSet?v46BuildPartitionedWorkingSet(plan,results,targetSet,userPrompt):v42BuildWorkingSet(plan,results,userPrompt);
+      // Un filtro sin coincidencias es una vista vacía, no una orden de borrar la memoria base.
+      // Preservamos el conjunto anterior para que «ordénalos», «resume esas compras», etc. sigan
+      // refiriéndose al listado materializado antes del filtro fallido.
+      const emptyFilteredPurchase=!!(built?.empty&&prevWorking&&!prevWorking.empty&&v42WorkingSetCompatible(prevWorking,plan)&&arr(results).some(r=>r?.ok&&trim(r?.name)==='event_purchase_lines'&&trim(r?.facts?.product)&&Number(r?.facts?.purchase_line_count)===0));
+      workingSet=emptyFilteredPurchase?prevWorking:built;
+    }
   }
   // El foco recién confirmado queda fuera del STACK para evitar volver a sí mismo.
   const currentKey=v42SpecificKey(specific);stack=stack.filter(x=>v42SpecificKey(x?.specific||x)!==currentKey).slice(0,4);
@@ -11197,6 +11233,9 @@ function v40ConversationalPolish(answer,userPrompt='',voiceConversation=false){
   // Incluso si el modelo deja restos Markdown, la salida hablada/escrita se presenta limpia.
   out=out.replace(/\*\*/g,'').replace(/^\s*#{1,6}\s*/gm,'').replace(/^\s*[-*•]+\s+/gm,'').replace(/`{1,3}/g,'');
   out=out.replace(/^(?:respuesta|contestaci[oó]n|informe)\s+(?:de\s+)?zuzu\s*[:.\-–—]*\s*/i,'').replace(/^zuzu\s+(?:responde|contesta)\s*[:.\-–—]*\s*/i,'').trim();
+  // La voz debe entrar directamente en el dato; eliminamos muletillas de cortesía que añaden
+  // longitud sin información (p. ej. «Por supuesto, Colty» o «Lamento informarte que»).
+  out=out.replace(/^por\s+supuesto(?:,\s*[^.!?\n]{1,32})?[.!]?\s*/i,'').replace(/^lamento\s+informarte\s+que\s+/i,'').trim();
   if(voiceConversation&&!/\n\s*\d+[.)]\s/.test(out))out=out.replace(/\n+/g,' ').replace(/\s{2,}/g,' ').trim();
   return trim(out);
 }
@@ -11267,6 +11306,46 @@ function v50BuildLocalPresentation(userPrompt='',state={},selectedEventId='',con
   const label=mode==='summary'?'SUMMARY':mode==='sort'?'SORT':'LIST';zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 FIX2 · Local Presentation','OK',`${label} resuelto sobre WORKING_SET ya materializado${sort.field?` · orden=${sort.field} ${sort.direction.toUpperCase()}`:''} · 0 planner · 0 BBDD · 0 redacción IA.`);
   return{mode,answer,title:mode==='summary'?(specific.domain==='purchases'?'Compras':specific.domain==='donations'?'Donaciones':'Resumen'):(v48EnumerationHeader(specific.requested_object,working.row_count,sort.field||'').replace(/\s*\(\d+\)$/,'')),tables,files,resultContext,committed};
 }
+
+function v51MoneyMetric(metric=''){return /(?:amount|balance|valuation)$/.test(trim(metric))||trim(metric)==='total_amount';}
+function v51BuildLocalPartitionFocus(userPrompt='',state={},selectedEventId='',contextBook={},flowTrace=[]){
+  const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null),parts=arr(ws?.targets).map(v46CompactWorkingTarget).filter(Boolean);if(parts.length<2)return null;
+  const explicit=v50TrustedExplicitEventMention(state,userPrompt);if(!explicit)return null;
+  const chosen=parts.find(x=>norm(x?.target?.name)===norm(explicit));if(!chosen)return null;
+  const p=norm(userPrompt);if(!/\b(?:solo|solamente|unicamente|únicamente|ahora|centr|qued|dime|dame|sus|su)\b/.test(p))return null;
+  const metric=v47DerivedMetric(userPrompt,'sum'),value=v47MetricValue(chosen,metric);if(value==null)return null;
+  const requested=v42InferRequestedObject(userPrompt,trim(md?.specific?.requested_object)||'summary'),domain=v44PromptDomain(userPrompt,trim(md?.specific?.domain)||'general')||trim(md?.specific?.domain)||'general',event=trim(chosen?.target?.name);
+  const aggregate=v51MoneyMetric(metric)?{total_amount:Number(value),total_units:null}:null;
+  const nextWs=v42CompactWorkingSet({kind:requested||'summary',event,scope:'named_event',subjects:arr(md?.specific?.subjects),domain,requested_object:requested||'summary',tool:'compare_events',table_key:'comparison',row_count:0,empty:false,metrics:chosen.metrics||{},...(aggregate?{aggregate}:{})});
+  const nextSpecific=v42CompactSpecific({...md.specific,active:true,event,scope:'named_event',domain,requested_object:requested||trim(md?.specific?.requested_object)||'summary',operation:'summary'}),bookmark=v42BookmarkFrom(md?.specific,ws,md?.target_set),stack=bookmark?v42PushStack(md?.stack,bookmark):arr(md?.stack);
+  const committed=v42CompactMultidim({...md,general:{...md.general,event,scope:'named_event'},specific:nextSpecific,working_set:nextWs,target_set:null,stack}),plan={relation:'continue',reason:'Selección local de una partición ya materializada',confidence:1,scope:'named_event',event,events:[event],subjects:arr(nextSpecific.subjects),domain,operation:'summary',transition:'CONTINUE',requested_object:nextSpecific.requested_object,dataset:nextSpecific.dataset||{id:'',description:'',carry_forward:true},presentation:{show_table:false,show_chart:false,table_hint:'',sort_field:'',sort_direction:'none',limit:0},data_requests:[]};
+  let answer='';if(metric==='purchases_amount')answer=`Las compras realizadas de ${event} suman ${v40WholeEuro(value)}.`;else if(metric==='income_amount')answer=`Los ingresos de ${event} suman ${v40WholeEuro(value)}.`;else if(metric==='donations_amount')answer=`Las donaciones valoradas de ${event} suman ${v40WholeEuro(value)}.`;else if(metric==='operating_balance')answer=`El saldo operativo de ${event} es ${v40WholeEuro(value)}.`;else if(metric==='valuation_amount')answer=`La valoración de ${event} es ${v40WholeEuro(value)}.`;else if(metric==='attendance_count')answer=`${event} tiene ${v26FormatPlainNumber(value,3)} asistentes canónicos.`;else answer=`${event}: ${v47FormatDerivedValue(value,metric)} de ${v47MetricLabel(metric,requested,userPrompt)}.`;
+  const resultContext=v40SccResultContext(plan,[],committed);zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Selección local de objetivo','OK',`${event} se extrae del TARGET_SET/WORKING_SET ya materializado · métrica=${metric} · 0 planner · 0 BBDD · 0 redacción IA.`);
+  return{answer,title:requested==='purchases'?'Compras':'Resumen',resultContext,committed};
+}
+function v51BuildLocalProductFilter(userPrompt='',state={},selectedEventId='',contextBook={},flowTrace=[]){
+  const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null),cache=v50CompactWorkingRowCache(ws?.row_cache||null);if(!ws||ws.empty||!cache||norm(ws.domain)!=='purchases')return null;
+  const p=norm(userPrompt),follow=!!contextBook?.current_message?.references_working_set||/\b(?:solo|solamente|unicamente|únicamente|me\s+refiero|las?|los?|esas?|esos?)\b/.test(p);if(!follow)return null;
+  const term=v29ProductSearchTerm(state,userPrompt);if(!term)return null;
+  const sample=cache.rows[0]||{},productKey=v48ColumnKey(sample,'Producto');if(!productKey)return null;
+  const matched=arr(cache.rows).filter(r=>norm(r?.[productKey]).includes(norm(term))||nameMatches(r?.[productKey],term));
+  const event=trim(ws.event)||trim(md?.specific?.event)||trim(md?.general?.event),plan={relation:'continue',reason:'Filtro local sobre WORKING_SET canónico',confidence:1,scope:trim(ws.scope)||'named_event',event,events:[],subjects:arr(ws.subjects),domain:'purchases',operation:'filter',transition:'CONTINUE',requested_object:'products',dataset:md?.specific?.dataset||{id:'',description:'',carry_forward:true},presentation:{show_table:matched.length>0,show_chart:false,table_hint:cache.table_key,sort_field:'',sort_direction:'none',limit:0},data_requests:[]};
+  if(!matched.length){const specific=v42CompactSpecific({...md.specific,operation:'filter_empty'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack}),resultContext=v40SccResultContext(plan,[],committed);zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Empty Filter Guard','OK',`El filtro «${term}» no tiene coincidencias en el WORKING_SET. Se responde vacío sin destruir el conjunto base · 0 planner · 0 BBDD.`);return{answer:`No se encontraron compras de ${term}${event?` en ${event}`:''}.`,title:'Compras',tables:[],files:[],resultContext,committed};}
+  const amountKey=v48ColumnKey(sample,'Importe'),unitsKey=v48ColumnKey(sample,'Unidades'),recordsKey=v48ColumnKey(sample,'Nº registros');
+  const amount=amountKey?matched.reduce((a,r)=>a+(v40MaybeNumber(r?.[amountKey])||0),0):null,units=unitsKey?matched.reduce((a,r)=>a+(v40MaybeNumber(r?.[unitsKey])||0),0):null,records=recordsKey?matched.reduce((a,r)=>a+(v40MaybeNumber(r?.[recordsKey])||0),0):matched.length;
+  const nextCache=v50CompactWorkingRowCache({...cache,rows:matched,complete:true}),nextWs=v42CompactWorkingSet({...ws,kind:'products',requested_object:'products',row_count:matched.length,record_count:records,empty:false,filter_summary:`${event} · purchases · products · ${term}`,aggregate:{total_amount:amount,total_units:units},row_cache:nextCache}),specific=v42CompactSpecific({...md.specific,domain:'purchases',requested_object:'products',operation:'filter'}),committed=v42CompactMultidim({...md,specific,working_set:nextWs,target_set:null,stack:md.stack}),resultContext=v40SccResultContext(plan,[],committed);
+  const fake={id:'scc_local_filter',name:trim(cache.source_tool)||'working_set',ok:true,tables:[{key:cache.table_key,title:cache.title,rows:matched}]},answer=v40CanonicalEnumerationAnswer(`${userPrompt}\nCampos: Producto, Destino, Unidades, Precio, Importe`,{...plan,operation:'list',presentation:{...plan.presentation,show_table:true}},[fake],'')||`${matched.length} coincidencia${matched.length===1?'':'s'} para ${term}.`,visible=arr(cache.visible_fields).length?arr(cache.visible_fields):['Producto','Destino','Unidades','Precio','Importe'],table=v50LocalPresentationTable(nextCache,matched,visible),files=[{filename:fileSafe(`${table.title}_v2.0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(table.columns,matched)}];
+  zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Filtro local','OK',`Filtro «${term}» aplicado a ${cache.rows.length} filas cacheadas → ${matched.length} · 0 planner · 0 BBDD · 0 redacción IA.`);return{answer,title:'Productos',tables:[table],files,resultContext,committed};
+}
+function v51CanonicalCurrentProductFilter(state={},userPrompt=''){return trim(v29ProductSearchTerm(state,userPrompt));}
+function v51SanitizeSccRequestFilters(args={},req={},plan={},state={},userPrompt='',flowTrace=[]){
+  const out={...args};if(trim(req?.tool)!=='event_purchase_lines')return out;
+  const canonical=v51CanonicalCurrentProductFilter(state,userPrompt),planned=trim(out.product);
+  if(planned&&!canonical){delete out.product;zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Filter Authority Lock','OK',`Se descarta el filtro de producto propuesto por planner «${planned}»: el mensaje actual no nombra ningún producto canónico.`);}
+  else if(canonical&&norm(planned)!==norm(canonical)){out.product=canonical;zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Filter Authority Lock','OK',`El filtro físico de producto queda ligado a la mención canónica del usuario «${canonical}».`);}
+  return out;
+}
+
 function v40ChoosePlanCall(calls=[],state,selectedEventId){
   const scored=arr(calls).map((call,index)=>{const plan=v40SccSanitizePlan(call?.arguments||{},state,selectedEventId);const score=(plan.confidence*100)+(plan.data_requests.length*2)+(plan.event?1:0)+(plan.subjects.length?1:0);return{call,plan,index,score};});
   return scored.sort((a,b)=>b.score-a.score||a.index-b.index)[0]||null;
@@ -11293,6 +11372,24 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
     zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · WORKING_SET reutilizado','OK',`Operación=${derived.operation} · métrica=${derived.metric} · objetivos=${names.join(' / ')||trim(ws?.event)||'contexto vigente'} · 0 planner · 0 herramientas · 0 redacción IA.`);
     zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Conjunto reutilizado sin rematerializar datos.`);
     return{ok:true,rejected:false,title:v48DerivedTitle(derived.operation,derived.metric,ws?.kind),answer:v40ConversationalPolish(derived.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:[],files:[],provider:'control-event-scc226-working-set',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 FIX2: WORKING_SET reutilizable + autoridad de evento + orden físico + presentación local; GENERAL/ESPECÍFICO/TARGET_SET/STACK permanecen intactos',modelTier:'local-derived',interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:[],scc:resultContext.scc,geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
+
+  // Si el usuario reduce una comparación a uno de los eventos ya materializados, reutilizamos
+  // la partición canónica y sus métricas en vez de volver a consultar compras/ingresos/etc.
+  const localPartitionFocus=v51BuildLocalPartitionFocus(userPrompt,state,selectedEventId,contextBook,flowTrace);
+  if(localPartitionFocus){
+    const md=localPartitionFocus.resultContext?.scc?.multidim||{},ws=md?.working_set;
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Objetivo seleccionado localmente.`);
+    return{ok:true,rejected:false,title:localPartitionFocus.title,answer:v40ConversationalPolish(localPartitionFocus.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:[],files:[],provider:'control-event-scc226-local-target',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6: selección local de TARGET_SET + métricas canónicas',modelTier:'local-target',interactionId:'',resetInteractionId:true,pendingAction:null,resultContext:localPartitionFocus.resultContext,tools:[],scc:localPartitionFocus.resultContext.scc,geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
+
+  // Los filtros de producto que refinan una lista vigente se aplican al cache local. Un filtro
+  // sin coincidencias NO sustituye el conjunto base por un WORKING_SET vacío.
+  const localFilter=v51BuildLocalProductFilter(userPrompt,state,selectedEventId,contextBook,flowTrace);
+  if(localFilter){
+    const md=localFilter.resultContext?.scc?.multidim||{},ws=md?.working_set;
+    zuzuTracePush(flowTrace,'v2.0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Filtro local aplicado sin perder la base.`);
+    return{ok:true,rejected:false,title:localFilter.title,answer:v40ConversationalPolish(localFilter.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:voiceConversation?[]:arr(localFilter.tables),files:voiceConversation?[]:arr(localFilter.files),provider:'control-event-scc226-local-filter',model:'',interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v2.0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6: filtro local + Empty Filter Guard',modelTier:'local-filter',interactionId:'',resetInteractionId:true,pendingAction:null,resultContext:localFilter.resultContext,tools:[],scc:localFilter.resultContext.scc,geminiUsageEstimate:{calls:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,totalTokens:0,costUsdApprox:0,costEurApprox:0},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }
 
   // SCC 2.2.6 FIX2: LIST/SORT/SUMMARY sobre el conjunto vigente son transformaciones de
@@ -16922,6 +17019,9 @@ export const __zuzuStructuralTesting = Object.freeze({
   v50BuildLocalPresentation,
   v50LocalPresentationCompatible,
   v50CompactWorkingRowCache,
+  v51BuildLocalPartitionFocus,
+  v51BuildLocalProductFilter,
+  v51SanitizeSccRequestFilters,
   v40ExecuteSccPlan,
   v42CommitMultidimContext,
   v43CompactSccResultForPlan,
