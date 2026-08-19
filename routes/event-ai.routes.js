@@ -9,7 +9,7 @@ router.post('/event-ai/analyze', asyncHandler(async (req, res) => {
   res.json(await analyzeEventPrompt(req.body || {}));
 }));
 
-// v2.0_exp · nueva arquitectura en SOMBRA: clasifica la misma pregunta, pero NO interviene
+// v3_0_exp · nueva arquitectura en SOMBRA: clasifica la misma pregunta, pero NO interviene
 // en la respuesta actual ni consulta/modifica datos de ControlEvent. La UI la ejecuta después
 // de recibir la respuesta principal para no añadir latencia ni riesgo al Zuzu vigente.
 router.post('/event-ai/router-shadow', asyncHandler(async (req, res) => {

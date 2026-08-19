@@ -6,8 +6,8 @@ import { getSupabaseAdmin } from '../lib/supabase.js';
 import { exportBankData } from '../services/bank-reconciliation.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v2.0_exp';
-const BACKUP_VERSION_FILE = 'ControlEvent_v2.0_exp';
+const BACKUP_VERSION = 'ControlEvent v3_0_exp';
+const BACKUP_VERSION_FILE = 'ControlEvent_v3_0_exp';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -700,7 +700,7 @@ async function buildBackupWorkbook(fullState, scope){
       row.key||'',jsonCell(row.value),row.updated_at||''
     ]));
   }catch(globalError){
-    console.warn('[ControlEvent v2.0_exp] No se pudieron añadir ACCESOS/META al BACKUP.',globalError?.message||globalError);
+    console.warn('[ControlEvent v3_0_exp] No se pudieron añadir ACCESOS/META al BACKUP.',globalError?.message||globalError);
     addRows('ACCESOS',['AVISO'],[[globalError?.message||String(globalError)]]);
     addRows('META_BBDD',['AVISO'],[[globalError?.message||String(globalError)]]);
   }
@@ -713,7 +713,7 @@ async function buildBackupWorkbook(fullState, scope){
       row.id||'',row.event_id||'',row.hito_id||'',row.descripcion||'',row.fecha_minima||'',row.fecha_maxima||'',row.notas||'',row.dependencia_tipo||'',jsonCell(row.dependencias_previas),jsonCell(row.dependencias_posteriores),row.responsable_id||'',row.responsable_nombre||'',row.cumplida===true?'SI':'NO',row.cumplida_at||'',row.orden??'',row.created_at||'',row.updated_at||''
     ]));
   }catch(operationalError){
-    console.warn('[ControlEvent v2.0_exp] No se pudieron añadir HITOS/LG al BACKUP.',operationalError?.message||operationalError);
+    console.warn('[ControlEvent v3_0_exp] No se pudieron añadir HITOS/LG al BACKUP.',operationalError?.message||operationalError);
     addRows('HITOS',['AVISO'],[[operationalError?.message||String(operationalError)]]);
     addRows('LG',['AVISO'],[[operationalError?.message||String(operationalError)]]);
   }
@@ -743,7 +743,7 @@ async function buildBackupWorkbook(fullState, scope){
       row.eventId||'',row.movementId||'',row.included===false?'NO':'SI',row.updatedBy||'',row.createdAt||'',row.updatedAt||''
     ]));
   }catch(bankError){
-    console.warn('[ControlEvent v2.0_exp] No se pudo añadir Cuadre Banco al BACKUP de servidor.',bankError?.message||bankError);
+    console.warn('[ControlEvent v3_0_exp] No se pudo añadir Cuadre Banco al BACKUP de servidor.',bankError?.message||bankError);
     ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_INGRESOS_LINKS','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));
   }
   await protectWorkbook(wb);

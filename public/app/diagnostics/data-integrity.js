@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp - Diagnostico de integridad de datos sin tocar operativa */
+/* ControlEvent v3_0_exp - Diagnostico de integridad de datos sin tocar operativa */
 const VERSION = 'v30.7';
 
 function app(){ return window.ControlEventApp || null; }

@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp · Zuzu Voice · FIX34 transporte híbrido restaurado desde base funcional FIX32
+/* ControlEvent v3_0_exp · Zuzu Voice · FIX34 transporte híbrido restaurado desde base funcional FIX32
    Objetivo: recuperar la escucha ambiental que sí funcionó y mantener conversación oral humana.
    Flujo deliberadamente simple:
    AMBIENTE -> "Hola Zuzu" -> USUARIO -> ESPERA IA -> ZUZU HABLA -> USUARIO.
@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v2.0_exp-FIX34-VOICE-HYBRID-RESTORED-LISTS';
+  var BUILD='v3_0_exp-FIX34-VOICE-HYBRID-RESTORED-LISTS';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={

@@ -1,10 +1,10 @@
-/* ControlEvent v2.0_exp - justificantes de INGRESOS y marca negrita post-modificación.
+/* ControlEvent v3_0_exp - justificantes de INGRESOS y marca negrita post-modificación.
    Carga antes del parche final para poder capturar el click de Modificar antes de que los manejadores legacy lo intercepten.
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v2.0_exp';
-  const VERSION_FILE = 'ControlEvent_v2.0_exp';
+  const VERSION = 'ControlEvent v3_0_exp';
+  const VERSION_FILE = 'ControlEvent_v3_0_exp';
   const INSTALLED = '__ceV464JustificantesNegrita';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

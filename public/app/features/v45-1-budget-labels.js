@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp - Etiquetas definitivas de RESUMEN PRESUPUESTARIO.
+/* ControlEvent v3_0_exp - Etiquetas definitivas de RESUMEN PRESUPUESTARIO.
    Parche ligero, cargado al final, sin tocar el flujo de cambio de evento v44.7.x/v45.0.
    Objetivo:
    - RESUMEN PRESUPUESTARIO / OPERATIVA: PRESUPUESTO => INGRESO TOTAL.
@@ -7,8 +7,8 @@
 (function(){
   'use strict';
 
-  const VERSION = 'ControlEvent v2.0_exp';
-  const VERSION_FILE = 'ControlEvent_v2.0_exp';
+  const VERSION = 'ControlEvent v3_0_exp';
+  const VERSION_FILE = 'ControlEvent_v3_0_exp';
   const TARGET_SELECTOR = '#budgetLayout';
   let pending = false;
 

@@ -538,7 +538,7 @@ function buildIncomeCatalog(event,collaborators,persons,images,snapshots=[]){
     return {
       id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName,
       paymentMethod:text(row.situacion),amount,imageUrl:incomeImageUrl(images,event.id,text(row.id)),createdAt:text(row.created_at),updatedAt:text(row.updated_at),
-      // v2.0_exp · La aportación interna de Peña El Arrastre puede no corresponder a un
+      // v3_0_exp · La aportación interna de Peña El Arrastre puede no corresponder a un
       // abono bancario justificable. Se conserva visible, pero NO condiciona el estado
       // completo/incompleto del Cuadre Banco ni su porcentaje de ingresos conciliados.
       ignoredForReconciliation:isPenaElArrastre(personName)
@@ -637,7 +637,7 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
   const movementReconciled=positiveRequired.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
   const allCatalogLinked=total===0||reconciled===total;
   const allMovementsReconciled=positiveRequired.length===0||movementReconciled===positiveRequired.length;
-  // v2.0_exp · Si el evento no tiene NINGÚN ingreso computable, no existe nada que
+  // v3_0_exp · Si el evento no tiene NINGÚN ingreso computable, no existe nada que
   // conciliar en este bloque. Ese 0/0 es funcionalmente un requisito cumplido, no un
   // pendiente. Las aportaciones internas de Peña El Arrastre ya están fuera del catálogo
   // computable y tampoco deben impedir el cierre del Cuadre.
@@ -701,7 +701,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     }
     const eventLinkedMovements=all.filter(row=>arr(displayLinksByMovement.get(row.id)).some(link=>link.isActiveEvent));
     const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
-    // v2.0_exp FIX10 · Estado REAL del Cuadre Banco.
+    // v3_0_exp FIX10 · Estado REAL del Cuadre Banco.
     // Una fecha/periodo guardado NO significa que el cuadre haya empezado. Para considerar
     // iniciado el mantenimiento tiene que existir al menos un movimiento con una fila/evidencia
     // persistida para ESTE evento: estado En saldo/excluido, vínculo TKxx o vínculo manual de ingreso.
@@ -846,7 +846,7 @@ async function persistAppliedPeriodMovementSnapshot(eventId,accountId='',actor={
   const actorName=text(actor.identificacion||actor.nombre)||'SISTEMA';
   const snapshotTag=`PERIODO_APLICADO:${actorName}`;
 
-  // v2.0_exp FIX2 · Aplicar fechas debe congelar también la selección En saldo/excluido
+  // v3_0_exp FIX2 · Aplicar fechas debe congelar también la selección En saldo/excluido
   // del periodo. En curso la UI puede reconstruir candidatos desde el histórico, pero al
   // Finalizar solo se permite leer la foto persistida. Sin esta instantánea desaparecían
   // precisamente los cargos todavía sin TKxx, aunque el usuario los hubiera dejado En saldo.

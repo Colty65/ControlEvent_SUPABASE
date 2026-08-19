@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp - Diagnóstico de carga móvil/rendimiento.
+/* ControlEvent v3_0_exp - Diagnóstico de carga móvil/rendimiento.
    Sólo lectura: no modifica estado, no toca INFOEVENTO/BACKUP ni guardado. */
 import { VERSION } from '../version.js';
 

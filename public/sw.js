@@ -1,4 +1,4 @@
-// ControlEvent v2.0_exp
+// ControlEvent v3_0_exp
 // Service Worker neutralizado: no cachea y elimina caches anteriores para evitar servir JS viejo.
 self.addEventListener('install', event => { self.skipWaiting(); });
 self.addEventListener('activate', event => {

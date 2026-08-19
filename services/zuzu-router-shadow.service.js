@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp · Router Gemini en modo SOMBRA.
+/* ControlEvent v3_0_exp · Router Gemini en modo SOMBRA.
    Esta capa SOLO clasifica la petición y NO consulta/modifica datos de ControlEvent.
    Su decisión se usa únicamente para diagnóstico hasta que se active expresamente la nueva arquitectura. */
 

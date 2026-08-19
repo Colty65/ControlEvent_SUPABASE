@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp · Laboratorio/ITV de Zuzu.
+/* ControlEvent v3_0_exp · Laboratorio/ITV de Zuzu.
    SOLO LECTURA. Genera pruebas desde los datos REALES de ControlEvent.
    FAST no llama a Gemini. AI-SMOKE y FULL-CERT tienen presupuesto duro configurable. */
 import { getState } from './state.service.js';

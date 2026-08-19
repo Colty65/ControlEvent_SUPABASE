@@ -1,4 +1,4 @@
-/* ControlEvent v2.0_exp - HOTFIX52: estabilidad desplegable principal + avance efímero/colores. */
+/* ControlEvent v3_0_exp - HOTFIX52: estabilidad desplegable principal + avance efímero/colores. */
 (function(){
   'use strict';
   const INSTALLED='__ceV15Hotfix26EstabilidadDropdownSaldoAvance52';
