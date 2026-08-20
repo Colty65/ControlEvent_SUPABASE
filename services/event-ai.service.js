@@ -7947,7 +7947,7 @@ function v261FinalSchema(){
     answer:{type:'string'},
     warnings:{type:'array',items:{type:'string'}},
     show_tables:{type:'array',items:{type:'object',properties:{tool_id:{type:'string'},table_key:{type:'string'}},required:['tool_id','table_key']}},
-    charts:{type:'array',items:{type:'object',properties:{title:{type:'string'},type:{type:'string',enum:['bar','horizontalBar','pie','donut','line','stackedBar']},tool_id:{type:'string'},table_key:{type:'string'},label_field:{type:'string'},value_field:{type:'string'},series_fields:{type:'array',items:{type:'string'}},marker_field:{type:'string',description:'Campo categórico opcional para colorear marcadores en gráficas de línea, p. ej. Tipo=INGRESO/CARGO.'},point_label_fields:{type:'array',items:{type:'string'},description:'Campos opcionales que deben quedar rotulados de forma estática junto a cada punto, especialmente para PDF.'},unit:{type:'string'}},required:['title','type','tool_id','table_key','label_field']}}
+    charts:{type:'array',items:{type:'object',properties:{title:{type:'string'},type:{type:'string',enum:['bar','horizontalBar','pie','donut','line','stackedBar']},tool_id:{type:'string'},table_key:{type:'string'},label_field:{type:'string',description:'Campo canónico. Para comparaciones multi usa row_count (elementos distintos), record_count (registros), total_amount (importe) o total_units (unidades).'},value_field:{type:'string',description:'Campo canónico. Para comparaciones multi usa row_count (elementos distintos), record_count (registros), total_amount (importe) o total_units (unidades).'},series_fields:{type:'array',items:{type:'string'}},marker_field:{type:'string',description:'Campo categórico opcional para colorear marcadores en gráficas de línea, p. ej. Tipo=INGRESO/CARGO.'},point_label_fields:{type:'array',items:{type:'string'},description:'Campos opcionales que deben quedar rotulados de forma estática junto a cada punto, especialmente para PDF.'},unit:{type:'string'}},required:['title','type','tool_id','table_key','label_field']}}
   },required:['title','answer','warnings','show_tables','charts']};
 }
 
@@ -9760,23 +9760,23 @@ function v40SccPlanTool(){
     scope:{type:'string',enum:['active_event','named_event','all_events','global','none']},
     event:{type:'string'},
     events:{type:'array',items:{type:'string'}},
-    subjects:{type:'array',items:{type:'string'}},
+    subjects:{type:'array',items:{type:'string'},description:'Solo identidades reales de personas/entidades nombradas por el usuario. Nunca uses dimensiones, objetos, dominios ni símbolos SCC como products, events, WORKING_SET o TARGET_SET.'},
     domain:{type:'string'},
     requested_object:{type:'string',enum:['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']},
     intent:{type:'object',properties:{
       operation:{type:'string',enum:['NONE','LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART','INSPECT_CONTEXT']},
       target:{type:'string',enum:['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']},
-      field:{type:'string'},
+      field:{type:'string',description:'Campo canónico. Para comparaciones multi usa row_count (elementos distintos), record_count (registros), total_amount (importe) o total_units (unidades).'},
       fields:{type:'array',items:{type:'string'},maxItems:12},
       direction:{type:'string',enum:['asc','desc','none']},
-      filter_field:{type:'string'},
+      filter_field:{type:'string',description:'Campo canónico. Para comparaciones multi usa row_count (elementos distintos), record_count (registros), total_amount (importe) o total_units (unidades).'},
       filter_value:{type:'string'},
       match_mode:{type:'string',enum:['none','exact','word','contains','semantic']},
       requires_data:{type:'boolean'},
       confidence:{type:'number'}
     },required:['operation','target','requires_data','confidence']},
     context_delta:{type:'object',properties:{focus_mode:{type:'string',enum:['KEEP','REPLACE','MULTI','CLEAR'],description:'KEEP conserva exactamente los objetivos vivos del ACTIVE_CONTEXT para continuaciones/elipsis. REPLACE solo cuando el mensaje actual establece un nuevo foco único. MULTI cuando el mensaje actual mantiene/crea varios objetivos simultáneos. CLEAR cuando abandona el foco. Nunca uses REPLACE para caer por defecto al evento visible.'},working_set_mode:{type:'string',enum:['KEEP','REMATERIALIZE','TRANSFORM','RESET'],description:'KEEP conserva conjunto; REMATERIALIZE cambia entidad/granularidad y requiere datos; TRANSFORM opera sobre el conjunto vigente; RESET recupera el padre.'}},required:['focus_mode','working_set_mode']},
-    presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},sort_field:{type:'string'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}}},
+    presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},sort_field:{type:'string',description:'Campo canónico. Para comparaciones multi usa row_count (elementos distintos), record_count (registros), total_amount (importe) o total_units (unidades).'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}}},
     data_requests:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:V40_SCC_DATA_TOOLS},arguments:v40SccDataArgumentSchema()},required:['tool']}}
   },required:['relation','confidence','scope','event','events','subjects','domain','requested_object','intent','context_delta','presentation','data_requests']}};
 }
@@ -10320,9 +10320,15 @@ NORMALIZADOR SEMÁNTICO OBLIGATORIO EN intent:
 - Usa intent.operation=LIST/SORT/FILTER/RESET_FILTER/SUMMARY/BACK cuando esa sea la acción real, independientemente de que el usuario diga «ordénala», «ponlas de mayor a menor», «solo...», «quita ese filtro», «vuelve a la lista completa» o cualquier formulación equivalente.\n- PROYECCIÓN DE CAMPOS: si el usuario mantiene el mismo conjunto y solo pide añadir, quitar, cambiar o reordenar datos/columnas visibles, usa intent.operation=PROJECT, target=WORKING_SET y rellena intent.fields con los campos semánticos solicitados. PROJECT jamás filtra filas ni cambia evento, sujeto u objeto.\n- DELTA DE FOCO: context_delta.focus_mode expresa TU conclusión lingüística, no una regla de CE. KEEP conserva el foco vigente; REPLACE sustituye el foco por el evento/sujeto actual (p. ej. cuando el usuario se queda con uno); MULTI conserva/crea varios objetivos simultáneos; CLEAR abandona el foco de evento. context_delta.working_set_mode indica KEEP, REMATERIALIZE si cambia entidad/granularidad y hacen falta datos, TRANSFORM para ordenar/filtrar/proyectar el conjunto actual, o RESET para recuperar su padre. No arrastres events antiguos cuando focus_mode=REPLACE.
 - intent.target=WORKING_SET cuando el usuario actúa sobre el conjunto vigente; PARENT_WORKING_SET cuando quiere quitar un filtro/recuperar la base; TARGET_SET cuando opera sobre una comparación múltiple.
 - INSPECCIÓN DEL CONTEXTO: si el usuario pregunta dónde estamos, de qué evento/lista/asunto hablamos o cuál es el foco vigente, usa intent.operation=INSPECT_CONTEXT, target=GENERAL y requires_data=false. No listes el catálogo ni consultes BBDD: CE responderá desde ACTIVE_CONTEXT/WORKING_SET.
+- LISTAR EL FOCO NO ES LISTAR LOS DATOS: si el usuario pregunta qué objetivos/eventos componen el contexto vigente, también usa INSPECT_CONTEXT. LIST sobre TARGET_SET solo procede si el usuario pide materializar datos de esos objetivos.
+- REFERENCIAS POSICIONALES EN TARGET_SET: cuando el usuario elige uno de varios objetivos vigentes mediante orden, posición o referencia anafórica inequívoca (primero/segundo/último/el otro/equivalente), resuelve tú cuál es usando el orden de ACTIVE_CONTEXT/TARGET_SET, fija event a ese objetivo, usa focus_mode=REPLACE y no mantengas el TARGET_SET múltiple. Si la referencia no es inequívoca, relation=clarify.
+- SUBJECTS SOLO SON IDENTIDADES: no pongas nombres de dimensiones, objetos o símbolos SCC (products, purchases, events, summary, etc.) dentro de subjects. requested_object/domain ya expresan esas dimensiones.
+- PETICIÓN COMPUESTA CON CONSULTA LATERAL: si el usuario pide mantener/transformar una lista y además consultar una persona u otra fuente, conserva focus_mode=KEEP y el WORKING_SET como acción principal; añade la consulta lateral en data_requests. La consulta lateral no reemplaza el conjunto salvo que el usuario diga explícitamente que abandona/cambia de asunto.
+- RELACIÓN DE UNA PERSONA CON EL FOCO: una pregunta sobre qué relación tiene una persona con el evento/contexto pide person_dossier acotado al foco cuando sea único; no conviertas esa pregunta en una lista de productos salvo que el usuario pida explícitamente sus productos/compras. Si ACTIVE_CONTEXT contiene varios eventos y «este evento» no identifica uno, aclara antes de elegir.
 - LINEAGE DEL WORKING_SET: un WORKING_SET pertenece al ACTIVE_CONTEXT que lo creó. Si focus_mode=REPLACE/CLEAR cambia la identidad del foco, NO uses RESET_FILTER/SORT/FILTER/PROJECT/COUNT sobre el conjunto anterior. Si el nuevo turno solo cambia foco, deja intent.operation=NONE. Si además pide datos del nuevo foco, usa working_set_mode=REMATERIALIZE y las fuentes del nuevo foco.
 - Para SORT devuelve field canónico y direction. Si el usuario solo cambia ascendente/descendente o dice que lo quiere al contrario, conserva como field el campo de orden vigente que aparece en WORKING_SET.view_state y devuelve la dirección opuesta a view_state.sort_direction.
 - MAX/MIN/COUNT sobre un TARGET_SET o WORKING_SET ya materializado son operaciones sobre esos hechos canónicos: si las métricas necesarias están presentes en WORKING_SET.targets/aggregate/metrics, usa requires_data=false y no solicites de nuevo líneas de detalle.
+  Para MAX/MIN en varios objetivos, usa intent.field canónico: row_count para número de elementos distintos, record_count para registros/líneas, total_amount para importe y total_units para unidades. CE ejecutará la comparación determinista sobre esas métricas; no recalcules aritmética en prosa.
 - Para FILTER devuelve filter_field canónico y filter_value normalizado semánticamente. No inventes productos ni filas. Si el usuario dice una familia en plural, normaliza el concepto (p. ej. plural→singular) y deja que CE lo confronte con las filas reales.
 - match_mode=word es la opción normal para nombres/familias; exact solo si el usuario exige identidad exacta; contains únicamente cuando pide expresamente contener texto; semantic si el concepto requiere equivalencia semántica y no una coincidencia textual directa.
 - Si WORKING_SET o PARENT_WORKING_SET ya contiene las filas necesarias, requires_data=false y data_requests=[]: CE ejecutará localmente la intención y NO debes pedir de nuevo la fuente.
@@ -10438,11 +10444,26 @@ function v40SccInitialInput(userPrompt,conversationHistory=[],conversationDigest
   if(!recovery.length&&!digest&&!book)return userPrompt;
   return `LIBRO DE CONTEXTO SCC 2.2.6 (GENERAL + ESPECÍFICO + WORKING_SET REUTILIZABLE/PARTITIONED + TARGET_SET + STACK; estado vigente, no histórico bruto):\n${JSON.stringify(modelBook||{})}\n\nMEMORIA CORTA COMPACTA: últimos 4 turnos solo para lenguaje, pronombres y correcciones. Las listas/tablas antiguas NO se reinyectan; su identidad vive en WORKING_SET.\n${JSON.stringify(recovery)}${digest?`\nÍNDICE HISTÓRICO MÍNIMO (solo para reconocer asuntos anteriores; nunca como fuente factual):\n${digest}`:''}\n\nMENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
 }
+function v60CanonicalSubjects(values=[]){
+  // NHC: subjects contiene identidades humanas/entidades reales, nunca símbolos del álgebra SCC.
+  // La lista se deriva del propio vocabulario canónico de objetos/dominios, no del castellano del usuario.
+  const reserved=new Set([
+    'none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics',
+    'general','event','product','purchase','donation','person','working_set','parent_working_set','target_set','active_context','ambient_context','stack'
+  ]);
+  const out=[];
+  for(const value of arr(values)){
+    const t=trim(value);if(!t||reserved.has(norm(t)))continue;
+    if(!out.some(x=>norm(x)===norm(t)))out.push(t);
+    if(out.length>=6)break;
+  }
+  return out;
+}
 function v40SccSanitizePlan(raw={},state,selectedEventId){
   const rel=['continue','new_topic','clarify','reset'].includes(trim(raw?.relation))?trim(raw.relation):'continue';
   const scope=['active_event','named_event','all_events','global','none'].includes(trim(raw?.scope))?trim(raw.scope):'none';
   const conf=Math.max(0,Math.min(1,Number(raw?.confidence)||0));
-  const subjects=arr(raw?.subjects).map(x=>trim(x)).filter(Boolean).slice(0,6),events=arr(raw?.events).map(x=>trim(x)).filter(Boolean).slice(0,8);
+  const subjects=v60CanonicalSubjects(raw?.subjects),events=arr(raw?.events).map(x=>trim(x)).filter(Boolean).slice(0,8);
   const dataset=raw?.dataset&&typeof raw.dataset==='object'?{id:trim(raw.dataset.id).slice(0,120),description:trim(raw.dataset.description).slice(0,500),carry_forward:raw.dataset.carry_forward!==false}:{id:'',description:'',carry_forward:true};
   const pr=raw?.presentation&&typeof raw.presentation==='object'?raw.presentation:{};
   const presentation={show_table:pr.show_table===true,show_chart:pr.show_chart===true,table_hint:trim(pr.table_hint).slice(0,120),sort_field:trim(pr.sort_field).slice(0,120),sort_direction:['asc','desc','none'].includes(trim(pr.sort_direction))?trim(pr.sort_direction):'none',limit:Math.max(0,Math.min(500,Number(pr.limit)||0))};
@@ -10798,6 +10819,8 @@ function v56CanonicalMaterializationTool(domain='general',requestedObject='none'
 function v56EnsureCanonicalPlanIntegrity(plan={},contextBook={},state={},selectedEventId='',flowTrace=[]){
   let out={...plan,data_requests:arr(plan?.data_requests).map((r,i)=>({...r,index:i+1,arguments:{...(r?.arguments||{})}}))};
   const md=v42CompactMultidim(contextBook?.multidim||null),previousTs=v45CompactTargetSet(md?.target_set||null),previousActive=v57CompactActiveContext(md?.active_context||null,md?.specific||null,previousTs),ambient=v57CompactAmbientContext(md?.ambient_context||contextBook?.visible_event||null),focusMode=trim(out?.context_delta?.focus_mode).toUpperCase()||'KEEP';
+  out.subjects=v60CanonicalSubjects(out.subjects);
+  out.data_requests=arr(out.data_requests).filter(r=>{if(!['person_dossier','participation_events'].includes(trim(r?.tool)))return true;const p=trim(r?.arguments?.person);return p?!!v60CanonicalSubjects([p]).length:out.subjects.length===1;});
   const activeNames=arr(previousActive?.events).map(trim).filter(Boolean),visibleName=trim(ambient?.visible_event?.name)||trim(contextBook?.visible_event?.name);
   const addUnique=(base=[],value='')=>{const outArr=[...base],t=trim(value);if(t&&!outArr.some(x=>norm(x)===norm(t)))outArr.push(t);return outArr;};
   // NHC · LEASE DE FOCO: el delta tipado de Gemini gobierna qué objetivos están vivos. KEEP no
@@ -10836,7 +10859,7 @@ function v56EnsureCanonicalPlanIntegrity(plan={},contextBook={},state={},selecte
     else{out.context_delta={...(out.context_delta||{}),working_set_mode:'KEEP'};out.intent={...intent,operation:'NONE',target:'NONE',requires_data:false};out.operation='answer';out.data_requests=[];out._contextOnlyFocusReplace=true;}
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Working Set Lineage','OK',`Cambio de foco ${activeNames.join(' / ')||'—'} → ${arr(out.events).join(' / ')||'—'}: se invalida la genealogía del WORKING_SET anterior; no se ejecuta ${op||'operación'} sobre el contexto muerto.`);
   }
-  const effectiveIntent=out?.intent||intent,needsCanonicalSource=wsMode==='REMATERIALIZE'||(localOp&&objectChanged)||newSubject||effectiveIntent.requires_data===true;
+  const effectiveIntent=out?.intent||intent,lateralLocalAction=localOp&&trim(effectiveIntent?.target).toUpperCase()==='WORKING_SET'&&ws&&!ws.empty,effectiveNewSubject=newSubject&&!lateralLocalAction,needsCanonicalSource=wsMode==='REMATERIALIZE'||(localOp&&objectChanged)||effectiveNewSubject||effectiveIntent.requires_data===true;
   if(needsCanonicalSource){
     const tool=v56CanonicalMaterializationTool(out.domain,desired,subjects);
     if(tool&&!out.data_requests.some(r=>trim(r?.tool)===tool)){
@@ -11739,7 +11762,25 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Intent Normalizer','OK','INSPECT_CONTEXT resuelto desde ACTIVE_CONTEXT/WORKING_SET · 1 planificación IA · 0 BBDD · 0 redacción IA.');
     return{title:'Contexto actual',answer,tables:[],files:[],committed,resultContext};
   }
-  if(!['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','COUNT'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
+  // TARGET_SET es una colección de objetivos, no una lista de filas. Una LIST canónica de
+  // sus identidades se resuelve como introspección local, sin rematerializar 85+98 filas.
+  if(op==='LIST'&&target==='TARGET_SET'&&['events','summary','none'].includes(trim(plan?.requested_object)||'none')){
+    const ts=v45CompactTargetSet(md?.target_set||null),names=v45TargetSetNames(ts);if(!names.length)return null;
+    const localPlan={...plan,operation:'inspect_context',presentation:{...(plan.presentation||{}),show_table:false,show_chart:false,limit:0},data_requests:[]},specific=v42CompactSpecific({...md.specific,operation:'inspect_context'}),committed=v42CompactMultidim({...md,specific,target_set:ts,stack:md.stack}),resultContext=v40SccResultContext(localPlan,[],committed);
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Intent Normalizer','OK','LIST de TARGET_SET resuelto como identidad de objetivos · 1 planificación IA · 0 BBDD · 0 redacción IA.');
+    return{title:'Contexto actual',answer:`Estamos trabajando con ${names.length===1?names[0]:names.join(' y ')}.`,tables:[],files:[],committed,resultContext};
+  }
+  if(['MAX','MIN'].includes(op)&&['WORKING_SET','TARGET_SET'].includes(target)){
+    const ws=v42CompactWorkingSet(md?.working_set||null),parts=arr(ws?.targets);if(parts.length<2)return null;
+    const metric=trim(intent.field)||'row_count',allowed=new Set(['row_count','record_count','total_amount','total_units']);if(!allowed.has(metric))return null;
+    const valueOf=part=>{if(metric==='row_count')return Number(part?.row_count);if(metric==='record_count')return Number(part?.record_count ?? part?.row_count);return Number(part?.aggregate?.[metric]);};
+    const rows=parts.map(part=>({name:trim(part?.target?.name)||'Objetivo',value:valueOf(part)})).filter(x=>Number.isFinite(x.value));if(rows.length<2)return null;
+    rows.sort((a,b)=>op==='MAX'?b.value-a.value:a.value-b.value);const a=rows[0],b=rows[1],unit=metric==='total_amount'?' €':metric==='total_units'?' unidades':'',label=metric==='row_count'?'elementos diferentes':metric==='record_count'?'registros':metric==='total_amount'?'importe':'unidades';
+    const localPlan={...plan,operation:op.toLowerCase(),presentation:{...(plan.presentation||{}),show_table:false,show_chart:false,limit:0},data_requests:[]},specific=v42CompactSpecific({...md.specific,operation:op.toLowerCase()}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack}),resultContext=v40SccResultContext(localPlan,[],committed);
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Intent Normalizer','OK',`${op} ${metric} resuelto determinísticamente sobre WORKING_SET.targets · 1 planificación IA · 0 BBDD · 0 redacción IA.`);
+    return{title:'Comparación',answer:`${a.name} tiene ${op==='MAX'?'más':'menos'} ${label}: ${v26FormatPlainNumber(a.value,2)}${unit}, frente a ${v26FormatPlainNumber(b.value,2)}${unit} de ${b.name}.`,tables:[],files:[],committed,resultContext};
+  }
+  if(!['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','COUNT','MAX','MIN'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
   const ws=v42CompactWorkingSet(md?.working_set||null);if(!ws||ws.empty)return null;
   const desiredObject=trim(plan?.requested_object)||'none',currentObject=trim(ws?.requested_object)||trim(ws?.kind)||'none';
   if(desiredObject!=='none'&&norm(desiredObject)!==norm(currentObject))return null;
@@ -11974,7 +12015,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace,userPrompt);
   if(localSidecar){const localResult=v56LocalSidecarResult(localSidecar);if(localResult){executed.fullResults.push(localResult);executed.compactResults.push(v43CompactSccResultForPlan(localResult,'standard',plan,userPrompt));}}
   let committedMultidim=v42CommitMultidimContext(contextBook,plan,executed.memoryResults||executed.fullResults,userPrompt);
-  if(localSidecar?.committed){const localMd=v42CompactMultidim(localSidecar.committed),externalMd=v42CompactMultidim(committedMultidim);committedMultidim=v42CompactMultidim({...externalMd,working_set:localMd?.working_set||externalMd?.working_set,target_set:externalMd?.target_set||localMd?.target_set,stack:externalMd?.stack});}
+  if(localSidecar?.committed){const localMd=v42CompactMultidim(localSidecar.committed),externalMd=v42CompactMultidim(committedMultidim);committedMultidim=v42CompactMultidim({...externalMd,general:localMd?.general||externalMd?.general,specific:localMd?.specific||externalMd?.specific,active_context:localMd?.active_context||externalMd?.active_context,working_set:localMd?.working_set||externalMd?.working_set,target_set:localMd?.target_set||externalMd?.target_set,stack:externalMd?.stack});zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Compound Working Set Guard','OK','La consulta lateral no sustituye el WORKING_SET ni el foco de la transformación principal.');}
   if(plan._contextOnlyFocusReplace){
     const resultContext=v40SccResultContext(plan,executed.fullResults,committedMultidim),md=resultContext?.scc?.multidim||{},ac=v57CompactActiveContext(md?.active_context||null,md?.specific||null,md?.target_set||null),events=arr(ac.events).filter(Boolean),usage=summarizeGeminiUsageFromTrace(flowTrace),answer=events.length===1?`Contexto actualizado: ahora estamos en ${events[0]}.`:(events.length?`Contexto actualizado: ahora trabajamos con ${events.join(' y ')}.`:'Contexto actualizado: no hay un evento fijado.');
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Working Set Lineage','OK','Cambio puro de foco cerrado localmente: 1 planificación IA · 0 BBDD · 0 redacción IA.');
