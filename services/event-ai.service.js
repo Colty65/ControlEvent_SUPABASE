@@ -10284,6 +10284,8 @@ Cómo decidir el contexto:
 - Si un asunto específico cambia sustancialmente, el anterior puede quedar suspendido en STACK. Recuperarlo no autoriza a mezclar sus datos con el foco nuevo.
 - relation=new_topic/reset es frontera para herencia automática, pero un foco suspendido puede recuperarse si el usuario lo pide de forma inequívoca.
 - Aclara solo si quedan dos interpretaciones plausibles después de GENERAL + ESPECÍFICO + WORKING_SET + TARGET_SET + STACK y el evento visible.
+- PETICIONES COMPUESTAS: no sacrifiques una cláusula para ejecutar otra. Si el turno pide a la vez una transformación del WORKING_SET y consultar otra entidad/fuente, expresa la transformación en intent, conserva requested_object como el objeto del WORKING_SET que se transforma y añade en data_requests todas las fuentes adicionales necesarias. El plan puede tener una acción local y una o varias consultas en el mismo turno.
+- ENTIDADES EXPLÍCITAS: el evento visible es solo contexto ambiental. Si el mensaje actual identifica uno o varios objetivos canónicos, represéntalos en event/events y usa esos objetivos para las fuentes; no sustituyas lo nombrado por el evento visible.
 - JERARQUÍA DE VERDAD: (1) mensaje actual, (2) datos canónicos CE de este turno, (3) WORKING_SET.targets cuando hay varios objetivos, (4) TARGET_SET, (5) WORKING_SET común confirmado, (6) ESPECÍFICO, (7) GENERAL, (8) memoria corta compacta, (9) índice histórico. Un texto viejo de Zuzu nunca prevalece sobre un dato CE actual.
 - TRANSICIONES: CONTINUE mantiene el foco; PROJECT cambia solo el objeto/granularidad (p.ej. de productos a eventos); BROADEN cambia solo el ámbito; GENERALIZE conserva el evento GENERAL y suspende el foco específico; NAVIGATE recupera un foco suspendido; NEW_TOPIC abre otro asunto. No reconstruyas campos que el usuario no ha cambiado.
 - TRANSICIONES DETERMINISTAS: órdenes estructurales inequívocas como cambiar a un evento canónico o volver al contexto anterior pueden venir ya resueltas por CE. Respeta ese delta; no lo contradigas ni vuelvas a reinterpretarlo.
@@ -10680,6 +10682,80 @@ function v43CompactSccResultForPlan(result,detail='standard',plan={},userPrompt=
   return compact;
 }
 
+
+// v3_0_exp · NHC: integridad del plan canónico. Estas funciones NO leen el texto del usuario.
+// Solo consumen los campos tipados que Gemini ya decidió y los resuelven contra datos/estado CE.
+function v56TargetSetFromCanonicalPlan(plan={},state={},selectedEventId=''){
+  const names=[];const add=v=>{const t=trim(v);if(t&&!names.some(x=>norm(x)===norm(t)))names.push(t);};
+  arr(plan?.events).forEach(add);
+  for(const req of arr(plan?.data_requests)){
+    arr(req?.arguments?.events).forEach(add);
+    if(trim(req?.tool)==='compare_events')arr(req?.arguments?.events).forEach(add);
+  }
+  if(names.length<2)return null;
+  const items=[];const seen=new Set();
+  for(const name of names){const rr=v26ResolveEvent(state,selectedEventId,name,'named_event');if(!rr?.ok)continue;const key=trim(rr.id)||norm(rr.nombre);if(seen.has(key))continue;seen.add(key);items.push({type:'event',id:trim(rr.id),name:trim(rr.nombre)});if(items.length>=6)break;}
+  if(items.length<2)return null;
+  return v45CompactTargetSet({kind:'events',items,source:'gemini_plan',domain:trim(plan?.domain)||'general',requested_object:trim(plan?.requested_object)||'none'});
+}
+function v56CanonicalMaterializationTool(domain='general',requestedObject='none',subjects=[]){
+  const d=norm(domain),o=norm(requestedObject);
+  if(arr(subjects).length===1)return'person_dossier';
+  if(d==='purchases'&&['products','purchases','tickets','stores'].includes(o))return'event_purchase_lines';
+  if(d==='donations'&&['products','donations','donors'].includes(o))return'event_donation_lines';
+  if(['people','incomes'].includes(o))return'event_people';
+  if(['documents'].includes(o))return'event_documentation';
+  if(['tasks'].includes(o))return'event_management';
+  if(['bank','movements'].includes(o)||d==='bank')return'event_bank';
+  if(o==='events'&&['all_events','global'].includes(d))return'events_catalog';
+  return'';
+}
+function v56EnsureCanonicalPlanIntegrity(plan={},contextBook={},state={},selectedEventId='',flowTrace=[]){
+  let out={...plan,data_requests:arr(plan?.data_requests).map((r,i)=>({...r,index:i+1,arguments:{...(r?.arguments||{})}}))};
+  const ts=v56TargetSetFromCanonicalPlan(out,state,selectedEventId);
+  if(ts){out._targetSet=ts;out.events=v45TargetSetNames(ts);if(!trim(out.event)||!out.events.some(x=>norm(x)===norm(out.event)))out.event=out.events[0]||trim(out.event);if(!['all_events','global'].includes(out.scope))out.scope='named_event';out.data_requests=v45ExpandRequestsForTargetSet(out.data_requests,ts,flowTrace);}
+  const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null),desired=trim(out.requested_object)||'none',current=trim(ws?.requested_object)||trim(ws?.kind)||'none',intent=out?.intent||{},op=trim(intent.operation).toUpperCase(),localOp=['LIST','SORT','FILTER','RESET_FILTER','SUMMARY'].includes(op),subjects=arr(out.subjects).map(trim).filter(Boolean),previousSubjects=arr(md?.specific?.subjects).map(norm);
+  const objectChanged=desired!=='none'&&norm(desired)!==norm(current),newSubject=subjects.some(x=>!previousSubjects.includes(norm(x)));
+  const needsCanonicalSource=(localOp&&objectChanged)||newSubject||intent.requires_data===true;
+  if(needsCanonicalSource){
+    const tool=v56CanonicalMaterializationTool(out.domain,desired,subjects);
+    if(tool&&!out.data_requests.some(r=>trim(r?.tool)===tool)){
+      const args={detail:'full'};if(tool==='person_dossier'&&subjects.length===1)args.person=subjects[0];
+      out={...out,data_requests:[...out.data_requests,{tool,purpose:'Materializar la entidad/objeto que Gemini ya fijó en el plan canónico.',arguments:args,index:out.data_requests.length+1}]};
+      zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Canonical Materialization','OK',`Se añade ${tool} porque el plan canónico cambia de objeto/sujeto o declara requires_data. CE no interpreta el texto; solo materializa la decisión tipada de Gemini.`);
+    }
+  }
+  // Un COMPARE dirigido a TARGET_SET necesita una fuente comparativa aunque el modelo haya
+  // expresado bien los objetivos pero haya omitido físicamente la herramienta.
+  if(trim(intent.target).toUpperCase()==='TARGET_SET'&&op==='COMPARE'&&arr(out.events).length>=2&&!out.data_requests.some(r=>trim(r?.tool)==='compare_events')){
+    out={...out,data_requests:[...out.data_requests,{tool:'compare_events',purpose:'Comparar los objetivos canónicos vigentes.',arguments:{events:out.events,scope:'named_event',detail:'standard'},index:out.data_requests.length+1}]};
+  }
+  if(ts)out.data_requests=v45ExpandRequestsForTargetSet(out.data_requests,ts,flowTrace);
+  out.data_requests=out.data_requests.map((r,i)=>({...r,index:i+1}));
+  return out;
+}
+function v56MorphToken(token=''){
+  let t=norm(token).replace(/[^a-z0-9ñ]/g,'');if(!t)return'';
+  // Reducción morfológica genérica y conservadora: no contiene vocabulario de negocio.
+  if(t.length>5&&t.endsWith('es'))t=t.slice(0,-2);
+  else if(t.length>4&&t.endsWith('s'))t=t.slice(0,-1);
+  return t;
+}
+function v56SemanticTokenSet(value=''){
+  return new Set(norm(value).split(/[^a-z0-9ñ]+/).map(v56MorphToken).filter(Boolean));
+}
+function v56SemanticTextMatch(candidate='',query='',mode='word'){
+  const c=norm(candidate),q=norm(query),m=trim(mode)||'word';if(!q)return false;
+  if(m==='exact')return c===q;
+  if(m==='contains')return c.includes(q);
+  const ct=v56SemanticTokenSet(c),qt=[...v56SemanticTokenSet(q)];if(!qt.length)return false;
+  return qt.every(t=>ct.has(t));
+}
+function v56LocalSidecarResult(local=null){
+  if(!local)return null;const tables=arr(local.tables).map((t,i)=>({key:trim(t?.key)||`working_set_${i+1}`,title:trim(t?.title)||'WORKING_SET',rows:arr(t?.rows)}));
+  return{id:'scc_local_sidecar',name:'working_set_action',ok:true,title:trim(local.title)||'WORKING_SET',facts:{local_action:true},tables};
+}
+
 async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPrompt=''){
   const cache=new Map();
   const jobs=plan.data_requests.map(async req=>{
@@ -10976,7 +11052,8 @@ function v42PlanSpecific(plan={}){
 }
 function v42CommitMultidimContext(contextBook={},plan={},results=[],userPrompt=''){
   const prev=contextBook?.multidim||{},prevGeneral=v42CompactGeneral(prev.general||{}),prevSpecific=v42CompactSpecific(prev.specific||{}),prevWorking=v42CompactWorkingSet(prev.working_set||null),prevTargetSet=v45CompactTargetSet(prev.target_set||null);let stack=arr(prev.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v42CompactWorkingSet(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
-  let general={...prevGeneral},specific=v42PlanSpecific(plan),workingSet=null,targetSet=v45CompactTargetSet(plan?._targetSet||null);
+  const canonicalTarget=trim(plan?.intent?.target).toUpperCase();
+  let general={...prevGeneral},specific=v42PlanSpecific(plan),workingSet=null,targetSet=v45CompactTargetSet(plan?._targetSet||(canonicalTarget==='TARGET_SET'?prevTargetSet:null));
   const planEvent=trim(plan.event),eventChanged=!!(planEvent&&norm(planEvent)!==norm(prevGeneral.event));
   const subjectChanged=JSON.stringify(arr(prevSpecific.subjects).map(norm))!==JSON.stringify(arr(specific.subjects).map(norm));
   const domainChanged=norm(prevSpecific.domain)!==norm(specific.domain)&&specific.domain!=='general';
@@ -11475,6 +11552,8 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
   const op=trim(intent.operation).toUpperCase(),target=trim(intent.target).toUpperCase();
   if(!['LIST','SORT','FILTER','RESET_FILTER','SUMMARY'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
   const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null);if(!ws||ws.empty)return null;
+  const desiredObject=trim(plan?.requested_object)||'none',currentObject=trim(ws?.requested_object)||trim(ws?.kind)||'none';
+  if(desiredObject!=='none'&&norm(desiredObject)!==norm(currentObject))return null;
   const cache=v50CompactWorkingRowCache(ws?.row_cache||null),parent=v50CompactWorkingRowCache(ws?.parent_cache||null),event=trim(ws.event)||trim(md?.specific?.event)||trim(md?.general?.event);
   const makePlan=(operation,workingCache,showTable=true)=>({...plan,relation:'continue',transition:'CONTINUE',event:event||trim(plan.event),scope:trim(ws.scope)||trim(plan.scope)||'named_event',domain:trim(ws.domain)||trim(plan.domain)||'general',operation,requested_object:trim(ws.requested_object)||trim(plan.requested_object)||trim(ws.kind)||'none',presentation:{...(plan.presentation||{}),show_table:showTable,show_chart:false,table_hint:trim(workingCache?.table_key),limit:0},data_requests:[]});
   const response=(title,answer,tables,files,committed,localPlan,tag)=>{const resultContext=v40SccResultContext(localPlan,[],committed);zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Intent Normalizer','OK',`${tag} interpretado por Gemini y ejecutado por CE sobre memoria canónica · 1 planificación IA · 0 BBDD · 0 redacción IA.`);return{title,answer,tables,files,committed,resultContext};};
@@ -11492,9 +11571,8 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
   let rows=arr(cache.rows).map(r=>({...r}));if(!rows.length)return null;let nextCache=cache,nextWs=ws,operation=op.toLowerCase();
   const localPlan=makePlan(operation,cache,true);
   if(op==='FILTER'){
-    const field=trim(intent.filter_field)||trim(intent.field)||'Producto',key=v48ColumnKey(rows[0]||{},field),value=norm(intent.filter_value),mode=trim(intent.match_mode)||'word';if(!key||!value)return null;
-    const hit=v=>{const n=norm(v);if(mode==='exact')return n===value;if(mode==='contains')return n.includes(value);return v29WordBoundaryContains(n,value);};
-    const matched=rows.filter(r=>hit(r?.[key]));
+    const field=trim(intent.filter_field)||trim(intent.field)||'Producto',key=v48ColumnKey(rows[0]||{},field),value=trim(intent.filter_value),mode=trim(intent.match_mode)||'word';if(!key||!value)return null;
+    const matched=rows.filter(r=>v56SemanticTextMatch(r?.[key],value,mode));
     if(!matched.length){const specific=v42CompactSpecific({...md.specific,operation:'filter_empty'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack}),emptyPlan={...localPlan,operation:'filter',presentation:{...localPlan.presentation,show_table:false}};return response('Datos',`No se encontraron coincidencias para ${trim(intent.filter_value)}${event?` en ${event}`:''}.`,[],[],committed,emptyPlan,`FILTER ${field}=${trim(intent.filter_value)} → 0 (base preservada)`);}
     rows=matched;
     const sample=rows[0]||{},amountKey=v48ColumnKey(sample,'Importe'),unitsKey=v48ColumnKey(sample,'Unidades'),recordsKey=v48ColumnKey(sample,'Nº registros'),amount=amountKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[amountKey])||0),0):null,units=unitsKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[unitsKey])||0),0):null,records=recordsKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[recordsKey])||0),0):rows.length;
@@ -11659,12 +11737,15 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // reinterpreta con v41ApplyContextContract/v55ApplyCanonicalIntentAuthority. Únicamente
   // canonizamos el nombre de evento contra ce_eventos; la ejecución validará objetivos y datos.
   plan=v41CanonicalizePlanEvent(plan,state,selectedEventId);
+  plan=v56EnsureCanonicalPlanIntegrity(plan,contextBook,state,selectedEventId,flowTrace);
   zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Gemini Plan Authority','OK',`Plan de Gemini aceptado sin reinterpretación lingüística posterior de CE · intent=${trim(plan?.intent?.operation)||'NONE'} · target=${trim(plan?.intent?.target)||'NONE'}.`);
   const canonicalLocal=v53CanonicalLocalIntent(plan,contextBook,flowTrace);
-  if(canonicalLocal){
+  let localSidecar=null;
+  if(canonicalLocal&&arr(plan.data_requests).length){localSidecar=canonicalLocal;zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Compound Plan','OK','Gemini pidió una transformación local del WORKING_SET y además fuentes canónicas. CE conserva ambas acciones en el mismo turno, sin reinterpretar el lenguaje.');}
+  if(canonicalLocal&&!localSidecar){
     const md=canonicalLocal.resultContext?.scc?.multidim||{},ws=md?.working_set,usage=summarizeGeminiUsageFromTrace(flowTrace);
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Intención lingüística normalizada por Gemini; ejecución local CE.`);
-    return{ok:true,rejected:false,title:canonicalLocal.title,answer:v40ConversationalPolish(canonicalLocal.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:voiceConversation?[]:arr(canonicalLocal.tables),files:voiceConversation?[]:arr(canonicalLocal.files),provider:'gemini-scc226-intent-normalizer',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6: Gemini Intent Normalizer + CE canonical executor; sin regex lingüístico en el camino principal de LIST/SORT/FILTER/RESET_FILTER/SUMMARY',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext:canonicalLocal.resultContext,tools:[],scc:canonicalLocal.resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    return{ok:true,rejected:false,title:canonicalLocal.title,answer:v40ConversationalPolish(canonicalLocal.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:voiceConversation?[]:arr(canonicalLocal.tables),files:voiceConversation?[]:arr(canonicalLocal.files),provider:'gemini-scc226-intent-normalizer',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 NHC: Gemini decide intención; CE materializa/valida el plan canónico y ejecuta LIST/SORT/FILTER/RESET_FILTER/SUMMARY sin reinterpretar el texto',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext:canonicalLocal.resultContext,tools:[],scc:canonicalLocal.resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }
   // No reforzamos ni reescribimos semánticamente el plan después de Gemini. La presentación
   // y las fuentes pedidas quedan como las decidió el planner para poder medir su potencia real.
@@ -11677,7 +11758,9 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   if(calls.length>1)zuzuTracePush(flowTrace,'v3_0_exp · SCC · Plan duplicado','INFO',`Gemini emitió ${calls.length} llamadas scc_execute_plan. Se ejecuta una sola decisión canónica y se responden las duplicadas como ignoradas para cerrar correctamente la Interaction.`);
   zuzuTracePush(flowTrace,'v3_0_exp · SCC · Decisión de contexto','OK',`${plan.transition||'CONTINUE'} · ${plan.relation.toUpperCase()} · ámbito=${plan.scope} · evento=${plan.event||'—'} · sujetos=${plan.subjects.join(' / ')||'—'} · dominio=${plan.domain} · objeto=${plan.requested_object||'none'} · operación=${plan.operation} · dataset=${plan.dataset.id||'—'} · confianza=${Math.round(plan.confidence*100)}%. ${plan.reason}`);
   const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace,userPrompt);
-  const committedMultidim=v42CommitMultidimContext(contextBook,plan,executed.fullResults,userPrompt);
+  if(localSidecar){const localResult=v56LocalSidecarResult(localSidecar);if(localResult){executed.fullResults.push(localResult);executed.compactResults.push(v43CompactSccResultForPlan(localResult,'standard',plan,userPrompt));}}
+  let committedMultidim=v42CommitMultidimContext(contextBook,plan,executed.fullResults,userPrompt);
+  if(localSidecar?.committed){const localMd=v42CompactMultidim(localSidecar.committed),externalMd=v42CompactMultidim(committedMultidim);committedMultidim=v42CompactMultidim({...externalMd,working_set:localMd?.working_set||externalMd?.working_set,target_set:externalMd?.target_set||localMd?.target_set,stack:externalMd?.stack});}
   let realInstruction;
   if(plan._contextNavigationOnly)realInstruction=`Es una navegación de contexto, no una petición de lista. Confirma brevemente el foco recuperado: evento ${trim(plan.event)||'—'}. No amplíes ni mezcles datos de otro foco.`;
   else if(plan._workingSetEmptyReference)realInstruction='El usuario está refiriéndose al WORKING_SET anterior y ese conjunto está confirmado canónicamente como vacío. Responde de forma directa que no hay elementos de ese conjunto; NO amplíes al evento entero, NO inventes coincidencias y NO pidas otra herramienta.';
