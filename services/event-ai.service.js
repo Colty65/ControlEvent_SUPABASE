@@ -9105,6 +9105,37 @@ function v261ObjectiveIssues(final,results,conversationHistory=[]){
   if(!hasBenchmark&&/\b(supera(?:ndo)?\s+(?:las\s+)?expectativas|por\s+encima\s+de\s+lo\s+esperado|rentabilidad\s+(?:excelente|sobresaliente))\b/.test(normalizedAnswer))issues.push('No hay benchmark/objetivo canónico que permita afirmar que el resultado supera expectativas o tiene rentabilidad excelente. Mantén el tono ejecutivo sin inventar una referencia comparativa.');
   return issues;
 }
+
+// v3_0_exp · Intent Normalizer FIX2 · autoridad final de TARGET_SET.
+// Si la operación canónica es COMPARE y compare_events ya devolvió las filas de todos los
+// objetivos, la presentación no puede colapsar a un solo evento ni desaparecer por una
+// validación generativa excesiva. CE redacta únicamente la conclusión aritmética respaldada.
+function v54ComparisonAuthorityRepair(final={},plan={},results=[],committedMultidim=null,flowTrace=[]){
+  const intentOp=trim(plan?.intent?.operation).toUpperCase(),op=trim(plan?.operation).toUpperCase();
+  if(intentOp!=='COMPARE'&&op!=='COMPARE')return final;
+  const cmp=arr(results).find(r=>r?.ok!==false&&trim(r?.name)==='compare_events');if(!cmp)return final;
+  const table=arr(cmp?.tables).find(t=>trim(t?.key)==='comparison'),rows=arr(table?.rows);if(rows.length<2)return final;
+  const targetNames=v45TargetSetNames(committedMultidim?.target_set||null),rowNames=rows.map(r=>trim(r?.Evento)).filter(Boolean);
+  if(targetNames.length>=2&&!targetNames.every(n=>rowNames.some(r=>norm(r)===norm(n))))return final;
+  const object=trim(plan?.requested_object),domain=trim(plan?.domain),field=object==='purchases'||domain==='purchases'?'Compras realizadas':object==='incomes'||domain==='incomes'?'Ingresos':object==='donations'||domain==='donations'?'Donaciones valoradas':'';
+  let answer='';
+  if(field){
+    const ranked=rows.map(r=>({name:trim(r?.Evento),value:Number(r?.[field])})).filter(x=>x.name&&Number.isFinite(x.value)).sort((a,b)=>b.value-a.value||a.name.localeCompare(b.name,'es'));
+    if(ranked.length>=2){
+      const values=ranked.map(x=>`${x.name}: ${v40WholeEuro(x.value)}`).join('; '),diff=Math.abs(ranked[0].value-ranked[1].value);
+      answer=`${values}. ${ranked[0].value===ranked[1].value?'Ambos tienen el mismo importe.':`${ranked[0].name} registra el mayor importe, con ${v40WholeEuro(diff)} más que ${ranked[1].name}.`}`;
+    }
+  }
+  if(!answer){const closure=v305CanonicalClosureFromResults('',[cmp],[]);answer=trim(closure?.answer);}
+  if(!answer)return final;
+  const current=trim(final?.answer),hasAll=rowNames.every(n=>norm(current).includes(norm(n))),generic=/control\s*event\s+ha\s+conservado|interpretaci[oó]n\s+no\s+suficientemente\s+respaldada/i.test(current);
+  if(!hasAll||generic||field){
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · TARGET_SET Authority','OK',`COMPARE respaldado por compare_events con ${rowNames.length} objetivos. La conclusión final se fija desde datos canónicos y no puede reducirse a un solo evento.`);
+    return{...final,answer};
+  }
+  return final;
+}
+
 function v307BankAvailabilityRepair(final,results,userPrompt='',flowTrace=[]){
   const bankResult=arr(results).slice().reverse().find(r=>r?.ok&&['event_bank','event_bank_timeline'].includes(trim(r?.name))&&trim(r?.facts?.lifecycle_message));
   if(!bankResult)return final;
@@ -9713,33 +9744,33 @@ function v40SccDataArgumentSchema(){
   }};
 }
 function v40SccPlanTool(){
-  return {type:'function',name:'scc_execute_plan',description:'OBLIGATORIA en el primer paso de cada turno. Decide la relación del mensaje con la conversación, el foco vigente y las fuentes canónicas de ControlEvent que deben ejecutarse. No responde al usuario: devuelve el plan para que ControlEvent ejecute exactamente las fuentes pedidas y te devuelva sus resultados antes de redactar.',parameters:{type:'object',properties:{
-    relation:{type:'string',enum:['continue','new_topic','clarify','reset'],description:'continue si el mensaje depende realmente del hilo actual; new_topic si es autosuficiente/cambia de tema; clarify solo si ni el hilo ni el contexto ambiental permiten resolverlo; reset solo si el usuario pide explícitamente olvidar/reiniciar.'},
-    reason:{type:'string'},
+  // v3_0_exp · Intent Normalizer FIX2.
+  // Contrato deliberadamente pequeño: Gemini normaliza lenguaje; CE deriva transición,
+  // dataset y operación efectiva desde intent + memoria SCC. Reducir campos duplicados evita
+  // que el modelo tenga que fabricar un JSON grande y frágil para decir una intención simple.
+  return {type:'function',name:'scc_execute_plan',description:'Normaliza el mensaje actual a una intención canónica y pide solo las fuentes que falten. ControlEvent valida contexto, TARGET_SET y WORKING_SET antes de ejecutar.',parameters:{type:'object',properties:{
+    relation:{type:'string',enum:['continue','new_topic','clarify','reset']},
     confidence:{type:'number'},
     scope:{type:'string',enum:['active_event','named_event','all_events','global','none']},
-    event:{type:'string',description:'Evento canónico o aproximado que debe gobernar el turno. Vacío si no procede.'},
-    events:{type:'array',items:{type:'string'},description:'Conjunto de eventos cuando la consulta es comparativa/múltiple.'},
-    subjects:{type:'array',items:{type:'string'},description:'Personas/entidades principales del turno, sin arrastrar sujetos anteriores irrelevantes.'},
-    domain:{type:'string',description:'Dominio conversacional principal: event, incomes, purchases, donations, attendance, management, documentation, bank, person, comparison, catalog, metrics, meta, general u otro nombre breve.'},
-    operation:{type:'string',description:'Operación conversacional canónica resumida. Debe ser coherente con intent.operation.'},
-    intent:{type:'object',description:'NORMALIZADOR SEMÁNTICO: traduce cualquier formulación humana a una orden canónica que CE pueda validar y ejecutar sin conocer las palabras concretas usadas por el usuario.',properties:{
+    event:{type:'string'},
+    events:{type:'array',items:{type:'string'}},
+    subjects:{type:'array',items:{type:'string'}},
+    domain:{type:'string'},
+    requested_object:{type:'string',enum:['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']},
+    intent:{type:'object',properties:{
       operation:{type:'string',enum:['NONE','LIST','SORT','FILTER','RESET_FILTER','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']},
       target:{type:'string',enum:['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']},
-      field:{type:'string',description:'Campo canónico afectado, por ejemplo Importe, Producto, Fecha. Vacío si no aplica.'},
+      field:{type:'string'},
       direction:{type:'string',enum:['asc','desc','none']},
-      filter_field:{type:'string',description:'Campo canónico del filtro. Vacío si no aplica.'},
-      filter_value:{type:'string',description:'Valor lingüísticamente normalizado por Gemini, no una fila inventada. Ej.: cervezas -> cerveza.'},
+      filter_field:{type:'string'},
+      filter_value:{type:'string'},
       match_mode:{type:'string',enum:['none','exact','word','contains','semantic']},
-      requires_data:{type:'boolean',description:'false cuando el WORKING_SET/PARENT_WORKING_SET ya contiene lo necesario; en ese caso data_requests debe ir vacío.'},
+      requires_data:{type:'boolean'},
       confidence:{type:'number'}
-    },required:['operation','target','field','direction','filter_field','filter_value','match_mode','requires_data','confidence']},
-    transition:{type:'string',enum:['CONTINUE','PROJECT','BROADEN','GENERALIZE','NAVIGATE','NEW_TOPIC'],description:'Transición conceptual propuesta. CE la valida por delta: CONTINUE mantiene foco; PROJECT cambia el objeto/granularidad; BROADEN cambia el ámbito; GENERALIZE vuelve al nivel general sin borrar el foco suspendido; NAVIGATE recupera un foco; NEW_TOPIC abre asunto nuevo.'},
-    requested_object:{type:'string',enum:['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics'],description:'Objeto concreto que el usuario espera recibir. Conserva este objeto en seguimientos elípticos; no lo sustituyas por el nombre de una tabla o por el dominio general.'},
-    dataset:{type:'object',properties:{id:{type:'string'},description:{type:'string'},carry_forward:{type:'boolean'}},description:'Identidad lógica del conjunto activo que permitirá entender después «estos», «ordénalos», «el más caro», «esas donaciones», etc.'},
-    presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},table_hint:{type:'string'},sort_field:{type:'string'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}},description:'Transformación/presentación que CE debe aplicar físicamente. Para Z-A usa sort_direction=desc; A-Z=asc.'},
-    data_requests:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:V40_SCC_DATA_TOOLS},purpose:{type:'string'},arguments:v40SccDataArgumentSchema()},required:['tool']},description:'Fuentes canónicas que ControlEvent debe ejecutar EN ESTE TURNO. Puede estar vacío solo si la respuesta no necesita datos o si se pide una aclaración puramente conversacional.'}
-  },required:['relation','reason','confidence','scope','event','events','subjects','domain','operation','intent','dataset','presentation','data_requests']}};
+    },required:['operation','target','requires_data','confidence']},
+    presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},sort_field:{type:'string'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}}},
+    data_requests:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:V40_SCC_DATA_TOOLS},arguments:v40SccDataArgumentSchema()},required:['tool']}}
+  },required:['relation','confidence','scope','event','events','subjects','domain','requested_object','intent','presentation','data_requests']}};
 }
 
 function v40SccToolCatalogText(){
@@ -10077,7 +10108,8 @@ function v44DeterministicContextOnlyPlan(prompt='',state={},selectedEventId='',c
 }
 function v44DeterministicFallbackPlan(prompt='',state={},selectedEventId='',contextBook={},flowTrace=[]){
   const md=contextBook?.multidim||{},prev=v42CompactSpecific(md.specific||{}),general=v42CompactGeneral(md.general||{}),msg=contextBook?.current_message||{};
-  const multiEvents=v26ComparisonEventNamesFromPrompt(prompt,state),named=v314ResolveEventMention(state,prompt,[])||multiEvents[0]||'',people=v26PersonHintsFromPrompt(prompt,state).map(trim).filter(Boolean).slice(0,4);
+  const explicitMulti=v26ComparisonEventNamesFromPrompt(prompt,state),carriedTargets=v45TargetSetNames(md.target_set||null),useCarried=explicitMulti.length<2&&msg.references_target_set&&carriedTargets.length>=2;
+  const multiEvents=explicitMulti.length>=2?explicitMulti:(useCarried?carriedTargets:[]),named=v314ResolveEventMention(state,prompt,[])||multiEvents[0]||'',people=v26PersonHintsFromPrompt(prompt,state).map(trim).filter(Boolean).slice(0,4);
   const projected=v43ProjectionObject(prompt),fallbackObject=trim(prev.requested_object)||'none',requestedObject=projected||v42InferRequestedObject(prompt,fallbackObject);
   let domain=v44PromptDomain(prompt,prev.domain||general.domain||'general');
   if(people.length&&!/^(?:donations|purchases|bank|documentation|management|incomes)$/.test(norm(domain)))domain='person';
@@ -10086,15 +10118,25 @@ function v44DeterministicFallbackPlan(prompt='',state={},selectedEventId='',cont
   else if(msg.explicit_all_events){scope='all_events';event='';}
   else if(msg.explicit_screen_event){scope='active_event';event=trim(contextBook?.visible_event?.name);}
   else if(msg.explicit_deictic_event){event=trim(general.event)||trim(contextBook?.visible_event?.name);scope=event?(norm(event)===norm(contextBook?.visible_event?.name)?'active_event':'named_event'):'none';}
-  if(v43GeneralizeEventIntent(prompt)){domain='event';operation='summary';}
+
+  // Fallback estructural, no lingüístico: si SCC ya sabe que hay varios TARGET y el objeto
+  // solicitado es una magnitud comparable, conserva COMPARE en lugar de degradar a «answer».
+  const comparableMulti=multiEvents.length>=2&&['purchases','incomes','donations','metrics','summary','events'].includes(trim(requestedObject));
+  if(comparableMulti){
+    operation='compare';
+    if(requestedObject==='purchases')domain='purchases';
+  }else if(v43GeneralizeEventIntent(prompt)){domain='event';operation='summary';}
   else if(v44UserEnumerationIntent(prompt,{requested_object:requestedObject})){operation=/\bord[eé]na/.test(norm(prompt))?'sort':'list';}
   else if(/\b(?:resumen|info|informaci[oó]n|h[aá]blame|hablame|cu[eé]ntame|cuentame|cu[aá]nto|cu[aá]ntas?\s+unidades)\b/.test(norm(prompt)))operation='summary';
-  const subjects=people.length?people:arr(prev.subjects);
-  const seed={relation,reason:'Plan local seguro construido por ControlEvent tras fallo sintáctico del planner',confidence:.88,scope,event,events:multiEvents.length>=2?multiEvents:(named?[named]:[]),subjects,domain,operation,transition:'',requested_object:requestedObject,dataset:prev.dataset||{id:'',description:'',carry_forward:true},presentation:{show_table:v44UserEnumerationIntent(prompt,{requested_object:requestedObject}),show_chart:false,table_hint:'',sort_field:'',sort_direction:'none',limit:0},data_requests:[]};
+
+  const subjects=people.length?people:arr(prev.subjects),intentOp=operation==='compare'?'COMPARE':operation==='sort'?'SORT':operation==='list'?'LIST':operation==='summary'?'SUMMARY':'NONE';
+  const data_requests=operation==='compare'?[{tool:'compare_events',purpose:'Comparar canónicamente los objetivos vigentes sin perder ninguna partición.',arguments:{events:multiEvents,scope:'named_event',detail:'standard'}}]:[];
+  const seed={relation,reason:'Plan local seguro construido por ControlEvent tras fallo sintáctico del planner',confidence:.92,scope,event,events:multiEvents.length>=2?multiEvents:(named?[named]:[]),subjects,domain,operation,intent:{operation:intentOp,target:operation==='compare'?'TARGET_SET':'NONE',field:requestedObject==='purchases'?'Importe':'',direction:'none',filter_field:'',filter_value:'',match_mode:'none',requires_data:data_requests.length>0,confidence:.92},transition:'',requested_object:requestedObject,dataset:prev.dataset||{id:'',description:'',carry_forward:true},presentation:{show_table:operation==='compare'||v44UserEnumerationIntent(prompt,{requested_object:requestedObject}),show_chart:false,table_hint:'',sort_field:'',sort_direction:'none',limit:0},data_requests};
   let out=v40HumanPresentationPlan(seed,prompt,false);out=v40StrengthenPlanCoverage(out,prompt,false,flowTrace);out=v41ApplyContextContract(out,contextBook,prompt,state,selectedEventId,flowTrace);out._deterministicFallback=true;
-  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Fallback de plan','INFO',`Planner inválido: CE reconstruye un plan mínimo desde GENERAL/ESPECÍFICO/WORKING_SET y catálogos. transición=${out.transition||'CONTINUE'} · evento=${out.event||'—'} · sujeto=${arr(out.subjects).join(' / ')||'—'} · objeto=${out.requested_object||'none'}.`);
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Fallback de plan','INFO',`Planner inválido: CE conserva la intención canónica mínima. transición=${out.transition||'CONTINUE'} · operación=${out.operation||'answer'} · objetivos=${arr(out.events).join(' / ')||out.event||'—'} · objeto=${out.requested_object||'none'}.`);
   return out;
 }
+
 function v44StableRequestValue(value){
   if(Array.isArray(value))return value.map(v44StableRequestValue);
   if(value&&typeof value==='object'){const out={};for(const k of Object.keys(value).sort()){if(k==='detail')continue;let v=value[k];if(k==='purchase_status'&&value.status!=null)continue;if(k==='scope'&&trim(value.event))continue;if(v!==undefined&&v!==null&&trim(v)!=='')out[k]=v44StableRequestValue(v);}return out;}
@@ -11548,9 +11590,12 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
     const invalidJson=Number(planError?.status)===400&&/invalid\s+json|could\s+not\s+be\s+parsed|json\s+syntax/i.test(cleanGeminiError(planError));
     if(!invalidJson)throw planError;
     zuzuTracePush(flowTrace,'v3_0_exp · SCC · Reintento de plan','INFO','Gemini devolvió argumentos JSON inválidos. Se hace un único reintento; si vuelve a fallar, CE construirá un plan mínimo desde el contexto canónico en vez de perder el turno.');
-    const retryInput=`${initialInput}\n\nREINTENTO TÉCNICO ÚNICO: la salida anterior no pudo parsearse. Emite exactamente una llamada scc_execute_plan con argumentos JSON válidos que cumplan el schema; sin texto adicional.`;
+    const retryInput=`${initialInput}\n\nREINTENTO TÉCNICO ÚNICO: normaliza el mensaje con el contrato compacto. Emite exactamente una llamada scc_execute_plan; sin texto adicional ni campos que no estén en el schema.`;
+    const retryModel=modelPolicy.tier==='lite'?modelPolicy.flashModel:model;
+    if(retryModel!==model)zuzuTracePush(flowTrace,'v3_0_exp · SCC · Escalado técnico de plan','INFO',`El JSON de ${model} fue inválido; el único reintento usa ${retryModel} con el contrato compacto. No se repite BBDD ni redacción.`);
     try{
-      payload=await v261CallInteraction({input:retryInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v3_0_exp · SCC · Gemini reintenta plan válido',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+      payload=await v261CallInteraction({input:retryInput,previousInteractionId:'',model:retryModel,systemInstruction,tools:[planTool],flowTrace,stage:'v3_0_exp · SCC · Gemini reintenta plan válido',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+      model=retryModel;
     }catch(retryError){
       const invalidAgain=Number(retryError?.status)===400&&/invalid\s+json|could\s+not\s+be\s+parsed|json\s+syntax/i.test(cleanGeminiError(retryError));
       if(!invalidAgain)throw retryError;
@@ -11627,6 +11672,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   final=v307BankAvailabilityRepair(final,executed.fullResults,userPrompt,flowTrace);
   final=v283DeterministicSafetyRepair(final,executed.fullResults,conversationHistory);
   final={...final,answer:v49RepairDerivedTruthContradictions(final.answer,userPrompt,executed.fullResults,flowTrace)};
+  final=v54ComparisonAuthorityRepair(final,plan,executed.fullResults,committedMultidim,flowTrace);
   final={...final,answer:v40ConversationalPolish(final.answer,userPrompt,voiceConversation)};
   if(explicitEnumeration){const guaranteed=v40CanonicalEnumerationAnswer(userPrompt,plan,executed.fullResults,final.answer);if(guaranteed)final={...final,answer:v40ConversationalPolish(guaranteed,userPrompt,voiceConversation)};}
   let showTables=arr(final.showTables);
