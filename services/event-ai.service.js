@@ -9876,7 +9876,11 @@ function v50CompactWorkingRowCache(raw=null){
   return{table_key:trim(raw.table_key).slice(0,100),title:trim(raw.title).slice(0,180),source_tool:trim(raw.source_tool).slice(0,70),primary_field:trim(raw.primary_field).slice(0,80),visible_fields:visible,sort_field:trim(raw.sort_field).slice(0,80),sort_direction:['asc','desc','none'].includes(trim(raw.sort_direction))?trim(raw.sort_direction):'none',columns,rows:cleanRows,complete:raw.complete!==false};
 }
 function v50WorkingSetWithoutRowCache(raw=null){
-  const c=v42CompactWorkingSet(raw);if(!c)return null;const out={...c};delete out.row_cache;return out;
+  const c=v42CompactWorkingSet(raw);if(!c)return null;
+  const out={...c},view=c.row_cache?{table_key:trim(c.row_cache.table_key),title:trim(c.row_cache.title),primary_field:trim(c.row_cache.primary_field),visible_fields:arr(c.row_cache.visible_fields).slice(0,8),sort_field:trim(c.row_cache.sort_field),sort_direction:trim(c.row_cache.sort_direction)||'none',row_count:arr(c.row_cache.rows).length,complete:c.row_cache.complete===true}:null,parentView=c.parent_cache?{table_key:trim(c.parent_cache.table_key),title:trim(c.parent_cache.title),primary_field:trim(c.parent_cache.primary_field),visible_fields:arr(c.parent_cache.visible_fields).slice(0,8),sort_field:trim(c.parent_cache.sort_field),sort_direction:trim(c.parent_cache.sort_direction)||'none',row_count:arr(c.parent_cache.rows).length,complete:c.parent_cache.complete===true}:null;
+  delete out.row_cache;delete out.parent_cache;
+  if(view)out.view_state=view;if(parentView)out.parent_view_state=parentView;
+  return out;
 }
 function v42CompactWorkingSet(raw=null){
   if(!raw||typeof raw!=='object')return null;
@@ -10288,7 +10292,8 @@ NORMALIZADOR SEMÁNTICO OBLIGATORIO EN intent:
 - Tu trabajo NO es repetir las palabras del usuario sino traducirlas a una intención canónica estable. Variantes de género, número, conjugación, sinónimos o elipsis deben desembocar en la misma operación.
 - Usa intent.operation=LIST/SORT/FILTER/RESET_FILTER/SUMMARY/BACK cuando esa sea la acción real, independientemente de que el usuario diga «ordénala», «ponlas de mayor a menor», «solo...», «quita ese filtro», «vuelve a la lista completa» o cualquier formulación equivalente.
 - intent.target=WORKING_SET cuando el usuario actúa sobre el conjunto vigente; PARENT_WORKING_SET cuando quiere quitar un filtro/recuperar la base; TARGET_SET cuando opera sobre una comparación múltiple.
-- Para SORT devuelve field canónico y direction. Si el usuario solo cambia ascendente/descendente, conserva como field el campo de orden vigente que aparece en WORKING_SET.
+- Para SORT devuelve field canónico y direction. Si el usuario solo cambia ascendente/descendente o dice que lo quiere al contrario, conserva como field el campo de orden vigente que aparece en WORKING_SET.view_state y devuelve la dirección opuesta a view_state.sort_direction.
+- MAX/MIN/COUNT sobre un TARGET_SET o WORKING_SET ya materializado son operaciones sobre esos hechos canónicos: si las métricas necesarias están presentes en WORKING_SET.targets/aggregate/metrics, usa requires_data=false y no solicites de nuevo líneas de detalle.
 - Para FILTER devuelve filter_field canónico y filter_value normalizado semánticamente. No inventes productos ni filas. Si el usuario dice una familia en plural, normaliza el concepto (p. ej. plural→singular) y deja que CE lo confronte con las filas reales.
 - match_mode=word es la opción normal para nombres/familias; exact solo si el usuario exige identidad exacta; contains únicamente cuando pide expresamente contener texto; semantic si el concepto requiere equivalencia semántica y no una coincidencia textual directa.
 - Si WORKING_SET o PARENT_WORKING_SET ya contiene las filas necesarias, requires_data=false y data_requests=[]: CE ejecutará localmente la intención y NO debes pedir de nuevo la fuente.
@@ -10681,12 +10686,8 @@ async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPro
     let args=v40SccArgsForRequest(req,plan);
     args=v40ExplicitNamedEventForRequest(args,plan,state,selectedEventId,req.tool);
     args=v51SanitizeSccRequestFilters(args,req,plan,state,userPrompt,flowTrace);
-    // Gemini decide la fuente. CE solo completa el filtro de producto inequívoco presente
-    // en el MENSAJE ACTUAL para que la propia fuente no cargue filas ajenas.
-    if(req.tool==='event_purchase_lines'&&!trim(args.product)){
-      const product=v29ProductSearchTerm(state,userPrompt);
-      if(product){args={...args,product};zuzuTracePush(flowTrace,'v3_0_exp · SCC · Filtro canónico de producto','OK',`event_purchase_lines filtrará «${product}» antes de agregar/compactar.`);}
-    }
+    // GEMINI AUTHORITY: CE no añade filtros deducidos del texto después del planner.
+    // En particular, jamás convierte palabras funcionales como «más» o «con» en product.
     const call={id:`scc_${req.index}_${Date.now().toString(36)}`,name:req.tool,arguments:args};
     const cacheKey=`${req.tool}:${JSON.stringify(args)}`;
     try{
@@ -11510,26 +11511,11 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
 }
 function v51CanonicalCurrentProductFilter(state={},userPrompt=''){return trim(v29ProductSearchTerm(state,userPrompt));}
 function v51SanitizeSccRequestFilters(args={},req={},plan={},state={},userPrompt='',flowTrace=[]){
-  const out={...args};if(trim(req?.tool)!=='event_purchase_lines')return out;
-  const intent=plan?.intent&&typeof plan.intent==='object'?plan.intent:null,op=trim(intent?.operation).toUpperCase();
-  // v3_0_exp · INTENT CANÓNICO = AUTORIDAD LINGÜÍSTICA. Una vez Gemini ha normalizado el
-  // turno, CE NO vuelve a releer el castellano con v29ProductSearchTerm. Así palabras como
-  // «más», «con», pronombres o preposiciones nunca pueden reaparecer como filtros físicos.
-  if(intent&&op!=='NONE') {
-    if(op==='FILTER'&&/^(?:producto|product)$/i.test(trim(intent.filter_field)||trim(intent.field)||'Producto')&&trim(intent.filter_value)) {
-      out.product=trim(intent.filter_value);
-      zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Canonical Filter Authority','OK',`Filtro físico de producto tomado exclusivamente de intent.filter_value=«${trim(intent.filter_value)}».`);
-    } else if('product' in out) {
-      delete out.product;
-      zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Canonical Filter Authority','OK',`Se elimina el filtro físico de producto porque intent.operation=${op} no es FILTER de Producto.`);
-    }
-    return out;
-  }
-  // Compatibilidad temporal para rutas legacy que aún no llegan con intent canónico.
-  const canonical=v51CanonicalCurrentProductFilter(state,userPrompt),planned=trim(out.product);
-  if(planned&&!canonical){delete out.product;zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Filter Authority Lock','OK',`Se descarta el filtro de producto propuesto por planner «${planned}»: el mensaje actual no nombra ningún producto canónico.`);}
-  else if(canonical&&norm(planned)!==norm(canonical)){out.product=canonical;zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Filter Authority Lock','OK',`El filtro físico de producto queda ligado a la mención canónica del usuario «${canonical}».`);}
-  return out;
+  // GEMINI AUTHORITY: los argumentos lingüísticos de la petición son exactamente los que
+  // Gemini ha incluido en data_requests. CE no vuelve a extraer producto/familia desde el
+  // texto, ni corrige el planner con una segunda interpretación. Solo las capas de herramienta
+  // validarán que el dato y el objetivo existan realmente.
+  return {...args};
 }
 
 function v55ApplyCanonicalIntentAuthority(plan={},contextBook={},userPrompt='',state={},selectedEventId='',flowTrace=[]){
@@ -11576,13 +11562,16 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v3_0_exp · FIX34 BASE HÍBRIDA + SCC 2.2.6 FIX2','OK','Build 20260820-SCC226-INTENT: Gemini normaliza intención lingüística; CE valida SCC y ejecuta LIST/SORT/FILTER/RESET_FILTER/SUMMARY sobre memoria canónica. Voz híbrida intacta.');
+  zuzuTracePush(flowTrace,'v3_0_exp · FIX34 BASE HÍBRIDA + SCC 2.2.6 FIX2','OK','Build 20260820-SCC226-GEMINI-AUTHORITY: Gemini decide intención, foco, fuentes, filtros y presentación; CE valida objetivos/datos y ejecuta sin reinterpretar lingüísticamente el turno. Voz híbrida intacta.');
   zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 FIX2 CONTEXTO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini normaliza la intención del turno y propone fuentes; CE valida el delta y ejecuta sobre GENERAL/ESPECÍFICO/WORKING_SET/TARGET_SET/STACK. Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v3_0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
 
   // SCC 2.2.6: si WORKING_SET ya contiene exactamente los metadatos solicitados, CE responde
   // localmente. No se repite planner, BBDD ni redacción IA para una aritmética determinista.
-  const derived=v47BuildDerivedAnswer(userPrompt,state,selectedEventId,contextBook);
+  // EXPERIMENTO GEMINI AUTHORITY: ninguna interpretación lingüística de CE se ejecuta
+  // antes del planner. Queremos observar la decisión real de Gemini y después limitar CE a
+  // validar/ejecutar datos, no a competir con otra lectura del castellano.
+  const derived=null;
   if(derived){
     const resultContext=v40SccResultContext(derived.plan,[],derived.committed),md=resultContext?.scc?.multidim||{},ws=md?.working_set,names=arr(derived.scope).map(x=>trim(x?.target?.name)).filter(Boolean);
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · WORKING_SET reutilizado','OK',`Operación=${derived.operation} · métrica=${derived.metric} · objetivos=${names.join(' / ')||trim(ws?.event)||'contexto vigente'} · 0 planner · 0 herramientas · 0 redacción IA.`);
@@ -11592,7 +11581,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
 
   // Si el usuario reduce una comparación a uno de los eventos ya materializados, reutilizamos
   // la partición canónica y sus métricas en vez de volver a consultar compras/ingresos/etc.
-  const localPartitionFocus=v51BuildLocalPartitionFocus(userPrompt,state,selectedEventId,contextBook,flowTrace);
+  const localPartitionFocus=null; // Gemini decide también los cambios de foco entre objetivos vigentes.
   if(localPartitionFocus){
     const md=localPartitionFocus.resultContext?.scc?.multidim||{},ws=md?.working_set;
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Objetivo seleccionado localmente.`);
@@ -11628,7 +11617,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   }
 
   // Un cambio puro de foco no necesita gastar una llamada ni depender de JSON generativo.
-  const deterministicContextPlan=v44DeterministicContextOnlyPlan(userPrompt,state,selectedEventId,contextBook,flowTrace);
+  const deterministicContextPlan=null; // El lenguaje de navegación pasa primero por Gemini.
   if(deterministicContextPlan){
     const committed=v42CommitMultidimContext(contextBook,deterministicContextPlan,[],userPrompt),resultContext=v40SccResultContext(deterministicContextPlan,[],committed),target=trim(deterministicContextPlan.event)||trim(committed?.general?.event);
     const answer=v42NavigationBackIntent(userPrompt)?`Volvemos al evento ${target}.`:`Hemos cambiado al evento ${target}.`;
@@ -11666,19 +11655,19 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
     if(!calls.length){deterministicFallbackPlan=v44DeterministicFallbackPlan(userPrompt,state,selectedEventId,contextBook,flowTrace);if(!deterministicFallbackPlan){const e=new Error('SCC no devolvió el plan obligatorio.');e.status=502;throw e;}plan=deterministicFallbackPlan;}
     else{chosen=v40ChoosePlanCall(calls,state,selectedEventId);if(!chosen){deterministicFallbackPlan=v44DeterministicFallbackPlan(userPrompt,state,selectedEventId,contextBook,flowTrace);if(!deterministicFallbackPlan){const e=new Error('SCC no devolvió un plan utilizable.');e.status=502;throw e;}plan=deterministicFallbackPlan;}else plan=v40HumanPresentationPlan(chosen.plan,userPrompt,voiceConversation);}
   }
-  // Primero valida el delta de contexto. Después, si Gemini ha normalizado una operación pura
-  // sobre WORKING_SET, CE la ejecuta directamente y NO rematerializa datos ni pide una segunda
-  // redacción IA. Las reglas regex antiguas quedan fuera del camino principal.
-  plan=v41ApplyContextContract(plan,contextBook,userPrompt,state,selectedEventId,flowTrace);
-  plan=v55ApplyCanonicalIntentAuthority(plan,contextBook,userPrompt,state,selectedEventId,flowTrace);
+  // GEMINI AUTHORITY: desde aquí el plan lingüístico de Gemini es la autoridad. CE no lo
+  // reinterpreta con v41ApplyContextContract/v55ApplyCanonicalIntentAuthority. Únicamente
+  // canonizamos el nombre de evento contra ce_eventos; la ejecución validará objetivos y datos.
+  plan=v41CanonicalizePlanEvent(plan,state,selectedEventId);
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Gemini Plan Authority','OK',`Plan de Gemini aceptado sin reinterpretación lingüística posterior de CE · intent=${trim(plan?.intent?.operation)||'NONE'} · target=${trim(plan?.intent?.target)||'NONE'}.`);
   const canonicalLocal=v53CanonicalLocalIntent(plan,contextBook,flowTrace);
   if(canonicalLocal){
     const md=canonicalLocal.resultContext?.scc?.multidim||{},ws=md?.working_set,usage=summarizeGeminiUsageFromTrace(flowTrace);
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Intención lingüística normalizada por Gemini; ejecución local CE.`);
     return{ok:true,rejected:false,title:canonicalLocal.title,answer:v40ConversationalPolish(canonicalLocal.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:voiceConversation?[]:arr(canonicalLocal.tables),files:voiceConversation?[]:arr(canonicalLocal.files),provider:'gemini-scc226-intent-normalizer',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6: Gemini Intent Normalizer + CE canonical executor; sin regex lingüístico en el camino principal de LIST/SORT/FILTER/RESET_FILTER/SUMMARY',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext:canonicalLocal.resultContext,tools:[],scc:canonicalLocal.resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }
-  plan=v40StrengthenPlanCoverage(plan,userPrompt,voiceConversation,flowTrace);
-  plan=v48ApplyPresentationContractToPlan(plan,userPrompt,flowTrace);
+  // No reforzamos ni reescribimos semánticamente el plan después de Gemini. La presentación
+  // y las fuentes pedidas quedan como las decidió el planner para poder medir su potencia real.
   if(plan._presentationSummaryOnly){
     const before=arr(plan.data_requests).length,explicitNarrative=/\b(?:contexto|descripci[oó]n|documentos?|por\s+qu[eé]|explica|historia|programa|acuerdos?|incidencias?)\b/.test(norm(userPrompt));
     if(!explicitNarrative&&!['event','general','documentation'].includes(norm(plan.domain))){plan={...plan,data_requests:arr(plan.data_requests).filter(r=>!['event_dossier','event_documentation'].includes(trim(r?.tool))).map((r,i)=>({...r,index:i+1}))};}
