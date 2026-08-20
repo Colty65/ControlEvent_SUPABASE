@@ -7245,7 +7245,7 @@ function v26BuildPresentation(final,results,userPrompt,options={}){
   const asksTablesWithCharts=/\b(tabla|tablas|listado|listados|datos en tabla|detalle tabular)\b/i.test(text(userPrompt));
   for(const ref of (chartIntent&&!asksTablesWithCharts?[]:arr(final?.showTables).slice(0,6))){
     const r=byId.get(trim(ref?.tool_id)),t=arr(r?.tables).find(x=>trim(x?.key)===trim(ref?.table_key)); if(!t||!arr(t.rows).length)continue; stats.tableCandidates++; const sig=`${r.id}:${t.key}`;if(seenT.has(sig)){stats.tableDuplicates++;continue;}seenT.add(sig);
-    const exhaustiveTool=['master_catalog','event_purchase_lines','event_donation_lines'].includes(trim(r?.name));
+    const exhaustiveTool=['master_catalog','event_products','event_purchase_lines','event_donation_lines'].includes(trim(r?.name));
     // NHC · MEMORIA/PRESENTACIÓN: el límite de 24 filas solo protege una tabla incidental.
     // Si el propio plan/turno pide una enumeración o tabla exhaustiva, la presentación física
     // debe conservar TODAS las filas canónicas (hasta el límite técnico general de la fuente),
@@ -7889,6 +7889,52 @@ async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
     v26Table('totals_by_segment_destination',`Totales por Segmento/Destino · ${rr.nombre}`,totalsBySegmentDestination,{Segmento:v26TextSchema(),Destino:v26TextSchema(),'Productos distintos':v26CountSchema('productos'),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Nº registros':v26CountSchema('registros'),Importe:v26MoneySchema('Importe total')})
   ].filter(t=>t.rows.length)};
 }
+
+// v3_0_exp · SCC3 · Herramienta canónica PRODUCT_SET.
+// Una fila = un producto lógico. Texto, tabla, memoria y PDF deben derivar de ESTA misma
+// granularidad; nunca de una muestra de purchase_lines. Añadir campos (PROJECT) no puede
+// multiplicar productos: Segmento/Destino/Tienda/Responsable/Ticket se compactan como valores
+// distintos del mismo producto. Gemini decide QUÉ consulta; CE garantiza la verdad y la forma.
+async function v61ToolEventProducts(tool,state,selectedEventId=''){
+  const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
+  const sr=v274ResolveOptionalStore(state,tool?.store),status=trim(tool?.status||tool?.purchase_status)||'realized';
+  const ticketFilter=trim(tool?.ticket),productFilter=trim(tool?.product),responsibleFilter=trim(tool?.responsible);
+  const allRows=v274PurchaseRowsForEvent(state,rr.id,{storeId:sr.id,status,detail:'full'});
+  let rows=ticketFilter?allRows.filter(r=>v281TicketEqual(r?.['Ticket u otros gastos'],ticketFilter)):allRows;
+  if(productFilter){const q=norm(productFilter);rows=rows.filter(r=>norm(r?.Producto).includes(q)||nameMatches(r?.Producto,productFilter));}
+  if(responsibleFilter)rows=rows.filter(r=>nameMatches(r?.Responsable,responsibleFilter));
+  const groups=new Map(),add=(set,v)=>{const t=trim(v);if(t)set.add(t);};
+  for(const r of rows){
+    const key=norm(r?.Producto);if(!key)continue;
+    const g=groups.get(key)||{Producto:trim(r?.Producto),Unidades:0,Importe:0,'Nº registros':0,Precios:new Set(),Segmentos:new Set(),Destinos:new Set(),Tiendas:new Set(),Responsables:new Set(),Tickets:new Set(),Tipos:new Set()};
+    g.Unidades+=num(r?.Unidades);g.Importe+=num(r?.Importe);g['Nº registros']+=1;
+    if(Number.isFinite(Number(r?.Precio)))g.Precios.add(round(r.Precio,4));
+    add(g.Segmentos,r?.Segmento);add(g.Destinos,r?.Destino);add(g.Tiendas,r?.Tienda);add(g.Responsables,r?.Responsable);add(g.Tickets,r?.['Ticket u otros gastos']);add(g.Tipos,r?.Tipo);
+    groups.set(key,g);
+  }
+  const join=set=>[...set].sort((a,b)=>a.localeCompare(b,'es',{numeric:true,sensitivity:'base'})).join(' | ');
+  const products=[...groups.values()].map(g=>({
+    Producto:g.Producto,
+    Segmento:join(g.Segmentos),
+    Destino:join(g.Destinos),
+    Unidades:round(g.Unidades,3),
+    'Precios registrados':[...g.Precios].sort((a,b)=>a-b).map(v=>v26FormatEuro(v)).join(' | '),
+    Importe:v26Money(g.Importe),
+    'Nº registros':g['Nº registros'],
+    Tiendas:join(g.Tiendas),
+    Responsables:join(g.Responsables),
+    Tickets:join(g.Tickets),
+    Tipo:join(g.Tipos)
+  })).sort((a,b)=>trim(a.Producto).localeCompare(trim(b.Producto),'es',{numeric:true,sensitivity:'base'}));
+  const totalAmount=v26Money(rows.reduce((a,r)=>a+num(r?.Importe),0)),totalUnits=round(rows.reduce((a,r)=>a+num(r?.Unidades),0),3);
+  return{id:tool.id,name:'event_products',ok:true,title:`Productos comprados · ${rr.nombre}`,
+    facts:{event:rr.nombre,status,store:sr.nombre||'',ticket:ticketFilter,product:productFilter,responsible:responsibleFilter,granularity:'PRODUCT_SET',product_count:products.length,row_count:products.length,purchase_line_count:rows.length,total_amount:totalAmount,total_units:totalUnits,presentation_contract:'Una fila por producto lógico. La tabla products, el WORKING_SET y el recuento comparten exactamente la misma identidad.'},
+    facts_schema:{product_count:v26CountSchema('productos','Productos distintos del conjunto canónico'),row_count:v26CountSchema('productos','Filas canónicas, una por producto'),purchase_line_count:v26CountSchema('registros','Registros físicos de compra que sustentan el conjunto'),total_amount:v26MoneySchema('Importe total del conjunto'),total_units:v26SchemaField('quantity','uds','Unidades acumuladas del conjunto')},
+    provenance:'ControlEvent · PRODUCT_SET canónico derivado de ce_compras',
+    tables:[v26Table('products',`Productos comprados · ${rr.nombre}`,products,{Producto:v26TextSchema(),Segmento:v26TextSchema('Segmentos distintos del producto'),Destino:v26TextSchema('Destinos distintos del producto'),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Precios registrados':v26TextSchema('Precios unitarios distintos'),Importe:v26MoneySchema('Importe acumulado'),'Nº registros':v26CountSchema('registros'),Tiendas:v26TextSchema(),Responsables:v26TextSchema(),Tickets:v26TextSchema(),Tipo:v26StatusSchema()})]
+  };
+}
+
 function v274DataAccessRequirement(prompt='',history=[]){
   const p=norm(prompt),hist=norm(arr(history).slice(-4).map(x=>`${x?.user||''} ${x?.assistant||''}`).join(' ')),blob=`${hist} ${p}`;
   const productWord=value=>/\b(prod(?:uct|cut)o?s?|art[ií]culos?)\b/.test(value);
@@ -7922,7 +7968,8 @@ function v261AgentTools(){
     {type:'function',name:'event_dossier',description:'Obtiene el panorama canónico agregado de un evento: fechas, estado, ingresos, compras realizadas y pendientes, producto donado, saldo, valoración, asistencia y conteos de gestión. Es un buen punto de partida, pero no sustituye el detalle cuando necesites investigar anomalías, causas o matices.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'event_breakdowns',description:'Desglosa un evento por tienda, destino, segmento, producto y forma de pago. Separa comprado, donado y pendiente. Úsala para explicar en qué se gastó el dinero o qué recursos hubo.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'master_catalog',description:'Lee catálogos generales NO restringidos de ControlEvent: products, stores, people o events. Para products puede superponer, sin eliminar productos del catálogo, las compras de un evento y/o tienda. Nunca expone ACCESO/usuarios/credenciales.',parameters:{type:'object',properties:{entity:{type:'string',enum:['products','stores','people','events']},query:{type:'string',description:'Filtro textual opcional sobre el catálogo.'},event:eventArg,scope:{type:'string',enum:['active_event','named_event']},store:{type:'string',description:'Filtro opcional de tienda solo para superponer compras sobre products.'},purchase_status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['entity']}},
-    {type:'function',name:'event_purchase_lines',description:'Detalle exhaustivo de compras de un evento producto a producto. Devuelve cada registro con unidades, precio, importe, ticket/otros gastos, tienda, responsable, segmento/destino y una tabla agrupada por producto. Puede filtrar producto/familia, TKxx, tienda y responsable ANTES de agregar/compactar, evitando cargar todo el evento. Úsala cuando el usuario pida productos comprados, importe/unidades de un producto o detalle por producto; store_purchases es solo agregado y NO sustituye esta herramienta.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,store:{type:'string',description:'Tienda opcional para filtrar el detalle.'},product:{type:'string',description:'Producto o familia textual opcional tal como la pide el usuario; el filtrado se aplica antes de agregar y compactar.'},ticket:{type:'string',description:'TKxx u otro identificador exacto de ticket/gasto opcional. Si se informa, el filtrado se aplica antes de entregar las filas.'},responsible:{type:'string',description:'Persona responsable opcional. Si se informa, ControlEvent filtra físicamente por Responsable antes de agregar/compactar.'},status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['scope']}},
+    {type:'function',name:'event_products',description:'PRODUCT_SET canónico de un evento. Devuelve exactamente una fila por producto distinto; Segmento, Destino, tiendas, responsables, tickets, unidades, precios e importe se agregan sin multiplicar productos. Úsala para listas, filtros, ordenaciones y proyecciones cuyo objeto lógico sea productos.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,store:{type:'string'},product:{type:'string'},ticket:{type:'string'},responsible:{type:'string'},status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['scope']}},
+    {type:'function',name:'event_purchase_lines',description:'PURCHASE_LINE_SET físico: una fila por registro real de compra. Úsala solo cuando el usuario pida líneas/registros/tickets/compras individuales o necesite granularidad de registro; para productos lógicos usa event_products.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,store:{type:'string',description:'Tienda opcional para filtrar el detalle.'},product:{type:'string',description:'Producto o familia textual opcional.'},ticket:{type:'string',description:'TKxx u otro identificador exacto de ticket/gasto opcional.'},responsible:{type:'string',description:'Persona responsable opcional.'},status:{type:'string',enum:['realized','pending','all']},detail:detailArg},required:['scope']}},
     {type:'function',name:'event_donation_lines',description:'Detalle exhaustivo de donaciones de producto de un evento. Devuelve cada registro DONADO con donante humanizado (persona, tienda u otra entidad), producto, unidades, precio, valor, tipo de donación, responsable, segmento y destino; además agrega por donante y por donante/producto. Úsala SIEMPRE para listas, rankings, gráficas o detalle de donantes y para preguntas del tipo «qué donó EL PESCA». event_breakdowns es agregado y no sustituye este detalle.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,donor:{type:'string',description:'Donante opcional: persona, tienda u otra entidad tal como la nombra el usuario.'},detail:detailArg},required:['scope']}},
     {type:'function',name:'event_people',description:'Obtiene participantes/colaboradores e ingresos de un evento con criterio de asistencia canónica. Incluye número, forma/estado, importe obligatorio, voluntario y total por registro; úsala cuando necesites inspeccionar matices, ajustes o posibles anomalías de ingresos.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
     {type:'function',name:'event_documentation',description:'Comprueba evidencias documentales de un evento: justificantes de ingresos, fototickets de compra y documentos/adjuntos. No equivale a conciliación bancaria.',parameters:{type:'object',properties:{event:eventArg,scope:scopeArg,detail:detailArg},required:['scope']}},
@@ -8046,7 +8093,7 @@ function v261ParseFinal(payload){
 }
 
 function v261CompactToolResult(result,detail='standard'){
-  const name=trim(result?.name),largeStructured=['master_catalog','event_purchase_lines','event_donation_lines'].includes(name);
+  const name=trim(result?.name),largeStructured=['master_catalog','event_products','event_purchase_lines','event_donation_lines'].includes(name);
   const genericLimit=largeStructured?(detail==='full'?24:detail==='brief'?4:8):(detail==='full'?40:detail==='brief'?4:12);
   const tableLimit=t=>{
     const key=trim(t?.key);
@@ -8077,6 +8124,9 @@ function v261CompactToolResult(result,detail='standard'){
     // IA varias muestras solapadas del mismo centenar de registros. Los hechos agregados y
     // los totales por Segmento/Destino bastan para razonar; el detalle completo permanece en
     // ControlEvent y solo viaja cuando detail=full es realmente necesario.
+    if(name==='event_products'){
+      if(key==='products')return detail==='brief'?24:600;
+    }
     if(name==='event_purchase_lines'&&detail!=='full'){
       if(key==='purchase_lines'||key==='by_store_segment_destination_product')return 0;
       if(key==='by_product')return detail==='brief'?3:6;
@@ -8247,10 +8297,11 @@ async function v261ExecuteAgentTool(call,state,selectedEventId,flowTrace=[]){
   const args=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{};
   const tool={id:trim(call?.id),name:trim(call?.name),...args};
   if(!tool.scope && tool.event)tool.scope='named_event';
-  if(['event_dossier','event_breakdowns','event_people','person_dossier','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','store_purchases','event_purchase_lines','event_donation_lines'].includes(tool.name) && !tool.scope){
+  if(['event_dossier','event_breakdowns','event_people','person_dossier','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','store_purchases','event_products','event_purchase_lines','event_donation_lines'].includes(tool.name) && !tool.scope){
     throw new Error('Falta el scope de la herramienta. Gemini debe decidir si el ámbito es active_event, named_event o all_events; ControlEvent no elegirá por defecto el evento de pantalla.');
   }
   if(tool.name==='master_catalog')return v274ToolMasterCatalog(tool,state,selectedEventId);
+  if(tool.name==='event_products')return v61ToolEventProducts(tool,state,selectedEventId);
   if(tool.name==='event_purchase_lines')return v274ToolEventPurchaseLines(tool,state,selectedEventId);
   if(tool.name==='event_donation_lines')return v29ToolEventDonationLines(tool,state,selectedEventId);
   if(tool.name==='event_management')return v261EventManagementTool(tool,state,selectedEventId);
@@ -9724,7 +9775,7 @@ function v330ShouldEarlyCanonicalClose(userPrompt='',results=[]){
 // la decisión contextual y las fuentes canónicas que Gemini quiere consultar. CE ejecuta esas
 // fuentes y devuelve SIEMPRE sus function_result a la misma Interaction antes de la respuesta.
 const V40_SCC_DATA_TOOLS=Object.freeze([
-  'event_dossier','event_breakdowns','master_catalog','event_purchase_lines','event_donation_lines',
+  'event_dossier','event_breakdowns','master_catalog','event_products','event_purchase_lines','event_donation_lines',
   'event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather',
   'person_dossier','participation_events','people_activity','store_purchases','canonical_socios',
   'events_catalog','events_overview','compare_events'
@@ -9797,7 +9848,8 @@ function v40SccToolCatalogText(){
     event_dossier:'Ficha global del evento: incluye SIEMPRE ce_eventos.descripcion como contexto narrativo, además de estado, fechas, ingresos, compras, donaciones, saldo, valoración, asistencia y gestión.',
     event_breakdowns:'Agregados de un evento por tienda, donante, segmento, destino, producto y método de ingreso.',
     master_catalog:'Catálogos maestros; en productos puede cruzar compras de un evento.',
-    event_purchase_lines:'Compras de un evento, con filtro previo por producto/familia, tienda, ticket, responsable y estado; incluye agregados por producto.',
+    event_products:'PRODUCT_SET canónico de un evento: exactamente una fila por producto distinto. Usa esta herramienta cuando el objeto pedido sea productos; filtros/orden/proyección conservan esa granularidad.',
+    event_purchase_lines:'PURCHASE_LINE_SET físico: una fila por registro real de compra. Úsala solo si el usuario pide líneas/registros/tickets/compras individuales, no para una lista lógica de productos.',
     event_donation_lines:'Donaciones de un evento y detalle por donante/producto.',
     event_people:'Asistencia y personas de un evento, con señales relevantes.',
     event_documentation:'Documentos DOC del evento con su Descripción/texto (contexto narrativo) y, además, justificantes de ingreso, tickets/fototickets y evidencias pendientes.',
@@ -9958,7 +10010,7 @@ function v45ResolveEventTargetSet(state={},selectedEventId='',prompt='',plan={},
   return v45CompactTargetSet({kind:'events',items,source,domain:trim(plan?.domain)||'general',requested_object:trim(plan?.requested_object)||'none'});
 }
 function v45TargetCapableTool(name=''){
-  return new Set(['event_dossier','event_breakdowns','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','person_dossier','store_purchases']).has(trim(name));
+  return new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','person_dossier','store_purchases']).has(trim(name));
 }
 function v45ExpandRequestsForTargetSet(requests=[],targetSet=null,flowTrace=[]){
   const ts=v45CompactTargetSet(targetSet);if(!ts)return arr(requests);
@@ -10420,6 +10472,8 @@ INTENCIONES CANÓNICAS:
 - LIST enumera el conjunto/objeto pedido. SORT solo cambia orden. FILTER reduce filas y conserva padre. RESET_FILTER recupera padre. PROJECT cambia campos visibles SIN cambiar filas. COUNT/MAX/MIN/SUMMARY no destruyen el conjunto. BACK vuelve al contexto anterior. COMPARE trabaja con varios objetivos. INSPECT_CONTEXT responde dónde/qué estamos tratando desde el estado SCC, sin catálogo ni BBDD.
 - Una petición puede contener varias acciones. No sacrifiques una cláusula por otra: combina transformación local + data_requests cuando corresponda.
 - presentation.limit limita SOLO lo mostrado; nunca redefine la cardinalidad del WORKING_SET.
+- GRANULARIDAD CANÓNICA DE TOOL CALLING: si el objeto lógico es products usa event_products. Esa herramienta devuelve exactamente una fila por producto y es la única fuente para texto+tabla+memoria+PDF de ese PRODUCT_SET. Usa event_purchase_lines solo si el usuario pide registros/líneas/tickets/compras individuales. PROJECT/DETAIL/PRESENT sobre PRODUCT_SET no cambian cardinalidad; para cambiar a líneas debes cambiar explícitamente requested_object a purchases.
+- MULTITAREA: una pregunta puede requerir varias tareas/herramientas independientes. Una consulta lateral (p. ej. persona) no sustituye el dataset principal salvo que el plan cambie explícitamente el foco/objeto.
 
 DATOS:
 - requires_data=false cuando la intención puede resolverse con WORKING_SET/TARGET_SET/ACTIVE_CONTEXT ya materializados.
@@ -10495,6 +10549,16 @@ function v40SccSanitizePlan(raw={},state,selectedEventId){
   data_requests=[...data_requests,...taskRequests].filter((r,i,a)=>a.findIndex(x=>trim(x.tool)===trim(r.tool)&&JSON.stringify(x.arguments||{})===JSON.stringify(r.arguments||{}))===i).slice(0,12).map((r,i)=>({...r,index:i+1}));
   const allowedObjects=new Set(['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']);
   const rawObject=trim(raw?.requested_object),requested_object=allowedObjects.has(rawObject)?rawObject:v41InferRequestedObject('',rawObject||'none');
+  // SCC3 · Tool Calling canónico: PRODUCT_SET y PURCHASE_LINE_SET son herramientas distintas.
+  // Si Gemini pidió el objeto lógico products pero eligió la fuente física de líneas, CE no
+  // reinterpreta el lenguaje: corrige únicamente la granularidad tipada del propio plan.
+  if(requested_object==='products'){
+    const toProducts=r=>trim(r?.tool)==='event_purchase_lines'?{...r,tool:'event_products'}:r;
+    data_requests=data_requests.map(toProducts);
+    for(const t of tasks)t.data_requests=arr(t.data_requests).map(toProducts);
+  }
+
+  if(requested_object==='products')data_requests=data_requests.map(r=>trim(r?.tool)==='event_purchase_lines'?{...r,tool:'event_products'}:r);
   const allowedTransitions=new Set(['CONTINUE','PROJECT','BROADEN','GENERALIZE','NAVIGATE','NEW_TOPIC']),transition=allowedTransitions.has(trim(raw?.transition).toUpperCase())?trim(raw.transition).toUpperCase():'';
   const ri=raw?.intent&&typeof raw.intent==='object'?raw.intent:{},allowedIntentOps=new Set(['NONE','LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART','INSPECT_CONTEXT']),allowedIntentTargets=new Set(['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']),allowedMatch=new Set(['none','exact','word','contains','semantic']);
   const intent={operation:allowedIntentOps.has(trim(ri.operation).toUpperCase())?trim(ri.operation).toUpperCase():'NONE',target:allowedIntentTargets.has(trim(ri.target).toUpperCase())?trim(ri.target).toUpperCase():'NONE',field:trim(ri.field).slice(0,120),fields:arr(ri.fields).map(x=>trim(x)).filter(Boolean).slice(0,12),direction:['asc','desc','none'].includes(trim(ri.direction))?trim(ri.direction):'none',filter_field:trim(ri.filter_field).slice(0,120),filter_value:trim(ri.filter_value).slice(0,180),match_mode:allowedMatch.has(trim(ri.match_mode))?trim(ri.match_mode):'none',requires_data:ri.requires_data===true,confidence:Math.max(0,Math.min(1,Number(ri.confidence)||0))};
@@ -10504,7 +10568,7 @@ function v40SccSanitizePlan(raw={},state,selectedEventId){
 }
 function v40SccArgsForRequest(request,plan){
   const args={...(request?.arguments||{})};
-  const singleEvent=new Set(['event_dossier','event_breakdowns','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']);
+  const singleEvent=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']);
   const crossScope=new Set(['person_dossier','store_purchases']);
   if(singleEvent.has(request.tool)&&!trim(args.scope)){
     if(['active_event','named_event'].includes(plan.scope))args.scope=plan.scope;
@@ -10522,7 +10586,7 @@ function v40SccArgsForRequest(request,plan){
   return args;
 }
 function v40ExplicitNamedEventForRequest(args,plan,state,selectedEventId,toolName=''){
-  const eventTools=new Set(['event_dossier','event_breakdowns','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','person_dossier','store_purchases']);
+  const eventTools=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','person_dossier','store_purchases']);
   if(!eventTools.has(toolName)||trim(args?.scope)==='all_events')return args;
   const requested=trim(args?.event)||trim(plan?.event);if(!requested)return args;
   const generic=/^(?:este\s+evento|el\s+evento|evento\s+actual|actual|activo|evento\s+activo)$/i.test(norm(requested));
@@ -10656,7 +10720,7 @@ function v41ApplyContextContract(plan,contextBook,userPrompt='',state,selectedEv
   // Completa contratos con lo YA resuelto; no vuelve a interpretar la intención.
   out.data_requests=out.data_requests.map((r,i)=>{
     let a={...(r.arguments||{})};
-    if(new Set(['event_dossier','event_breakdowns','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']).has(r.tool)&&eventScoped)a={...a,...eventArgs};
+    if(new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']).has(r.tool)&&eventScoped)a={...a,...eventArgs};
     if(r.tool==='person_dossier'&&subject)a={...a,person:subject,...(eventScoped?eventArgs:{scope:'all_events'})};
     if(r.tool==='event_donation_lines'&&subject&&!trim(a.donor)&&['products','donations','donors'].includes(out.requested_object))a.donor=subject;
     if(r.tool==='event_purchase_lines'&&subject&&!trim(a.responsible)&&['products','purchases','tickets','stores'].includes(out.requested_object))a.responsible=subject;
@@ -10675,7 +10739,7 @@ function v41ApplyContextContract(plan,contextBook,userPrompt='',state,selectedEv
   }
 
   if(!out._contextNavigationOnly&&!out._workingSetEmptyReference&&['all_events','global'].includes(out.scope)){
-    const single=new Set(['event_dossier','event_breakdowns','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']);
+    const single=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']);
     const removed=out.data_requests.filter(r=>single.has(r.tool)&&!trim(r.arguments?.event));
     out.data_requests=out.data_requests.filter(r=>!single.has(r.tool)||trim(r.arguments?.event));
     if(removed.length&&subject&&['person','donations','purchases'].includes(norm(out.domain)))out=v41AddOrMergeRequest(out,'person_dossier','Ámbito transversal de la persona resuelta',{person:subject,scope:'all_events',detail:'full'});
@@ -10686,7 +10750,8 @@ function v41ApplyContextContract(plan,contextBook,userPrompt='',state,selectedEv
     if(eventScoped&&out.requested_object==='summary'&&['event','general'].includes(norm(out.domain)))out=v41AddOrMergeRequest(out,'event_dossier','Ficha del evento solicitado',{...eventArgs,detail:'standard'});
     if(subject&&norm(out.domain)==='person'&&['summary','people','events','incomes','purchases','donations','products','tasks'].includes(out.requested_object))out=v41AddOrMergeRequest(out,'person_dossier','Ficha canónica de la persona dentro del ámbito conversacional',{person:subject,...(eventScoped?eventArgs:{scope:'all_events'}),detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
     if(eventScoped&&['products','donations','donors'].includes(out.requested_object)&&norm(out.domain)==='donations')out=v41AddOrMergeRequest(out,'event_donation_lines','Donaciones del evento con detalle del objeto solicitado',{...eventArgs,...(subject?{donor:subject}:{}),detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
-    if(eventScoped&&['products','purchases','tickets','stores'].includes(out.requested_object)&&norm(out.domain)==='purchases')out=v41AddOrMergeRequest(out,'event_purchase_lines','Compras del evento con detalle del objeto solicitado',{...eventArgs,...(subject?{responsible:subject}:{}),status:v42PurchaseStatusFromPrompt(userPrompt),detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+    if(eventScoped&&out.requested_object==='products'&&norm(out.domain)!=='donations')out=v41AddOrMergeRequest(out,'event_products','Productos canónicos del evento, una fila por producto',{...eventArgs,...(subject?{responsible:subject}:{}),status:v42PurchaseStatusFromPrompt(userPrompt),detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
+    if(eventScoped&&['purchases','tickets','stores'].includes(out.requested_object)&&norm(out.domain)==='purchases')out=v41AddOrMergeRequest(out,'event_purchase_lines','Registros físicos de compra del evento',{...eventArgs,...(subject?{responsible:subject}:{}),status:v42PurchaseStatusFromPrompt(userPrompt),detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
     if(['all_events','global'].includes(out.scope)&&subject&&['products','donations','donors','purchases','events','summary','tickets'].includes(out.requested_object))out=v41AddOrMergeRequest(out,'person_dossier','Dossier transversal de la persona para el objeto solicitado',{person:subject,scope:'all_events',detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
     if(eventScoped&&out.requested_object==='people')out=v41AddOrMergeRequest(out,'event_people','Personas/asistencia del evento',{...eventArgs,detail:v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'});
     if(eventScoped&&out.requested_object==='documents')out=v41AddOrMergeRequest(out,'event_documentation','Documentos/contexto textual del evento',{...eventArgs,detail:(out._narrativeCollection?'standard':(v40ExplicitEnumerationRequest(userPrompt)?'full':'standard'))});
@@ -10795,7 +10860,7 @@ function v43CompactSccResultForPlan(result,detail='standard',plan={},userPrompt=
   // Las filas completas siguen en fullResults para lista/PDF/UI. Para la segunda llamada a
   // Gemini, una enumeración no necesita reinyectar el dossier completo: recibe muestras y
   // row_count; CE materializa la lista canónica después.
-  const rowHeavy=new Set(['person_dossier','event_purchase_lines','event_donation_lines','event_people','events_catalog','master_catalog','store_purchases']);
+  const rowHeavy=new Set(['person_dossier','event_products','event_purchase_lines','event_donation_lines','event_people','events_catalog','master_catalog','store_purchases']);
   const modelDetail=(detail==='full'&&name!=='event_bank'&&(enumeration||rowHeavy.has(name)))?'standard':detail;
   let compact=v40CompactSccResult(result,modelDetail);
   if(name==='person_dossier'){
@@ -10832,7 +10897,8 @@ function v56TargetSetFromCanonicalPlan(plan={},state={},selectedEventId=''){
 function v56CanonicalMaterializationTool(domain='general',requestedObject='none',subjects=[]){
   const d=norm(domain),o=norm(requestedObject);
   if(arr(subjects).length===1)return'person_dossier';
-  if(d==='purchases'&&['products','purchases','tickets','stores'].includes(o))return'event_purchase_lines';
+  if(o==='products'&&d!=='donations')return'event_products';
+  if(d==='purchases'&&['purchases','tickets','stores'].includes(o))return'event_purchase_lines';
   if(d==='donations'&&['products','donations','donors'].includes(o))return'event_donation_lines';
   if(['people','incomes'].includes(o))return'event_people';
   if(['documents'].includes(o))return'event_documentation';
@@ -10928,8 +10994,17 @@ function v58CanCloseStructuredTurnLocally(plan={},results=[]){
   const op=trim(plan?.intent?.operation).toUpperCase();
   if(!['LIST','SORT','FILTER','RESET_FILTER','PROJECT','COUNT'].includes(op))return false;
   if(arr(plan?.subjects).length)return false;
-  const allowed=new Set(['event_purchase_lines','event_donation_lines','master_catalog','event_bank','event_people','events_catalog','events_overview','working_set_action']);
+  const allowed=new Set(['event_products','event_purchase_lines','event_donation_lines','master_catalog','event_bank','event_people','events_catalog','events_overview','working_set_action']);
   return arr(results).every(r=>!r?.ok||allowed.has(trim(r?.name)));
+}
+
+function v61PresentationIdentityAudit(plan={},results=[],presentation={}){
+  const requested=trim(plan?.requested_object),wsCount=Number(plan?._committedWorkingSetCount);
+  if(requested!=='products')return{ok:true};
+  const canonical=arr(results).find(r=>r?.ok&&trim(r?.name)==='event_products');if(!canonical)return{ok:true};
+  const expected=Number(canonical?.facts?.product_count)||0,table=arr(canonical?.tables).find(t=>trim(t?.key)==='products'),actual=arr(table?.rows).length;
+  if(actual!==expected)return{ok:false,error:`PRODUCT_SET incoherente: facts=${expected}, tabla products=${actual}.`};
+  return{ok:true,expected,actual};
 }
 function v58StructuredLocalClosure(userPrompt='',plan={},results=[],committed=null){
   const op=trim(plan?.intent?.operation).toUpperCase(),md=v42CompactMultidim(committed),ws=v42CompactWorkingSet(md?.working_set||null);
@@ -10984,6 +11059,7 @@ function v42WorkingSetFactCount(result={},requestedObject='none',domain='general
   const f=result?.facts||{},name=trim(result?.name),d=norm(domain),pick=(...keys)=>{for(const k of keys){const n=Number(f?.[k]);if(Number.isFinite(n))return Math.max(0,n);}return null;};
   if(requestedObject==='products'){
     if(name==='event_donation_lines')return pick('product_count');
+    if(name==='event_products')return pick('product_count','row_count');
     if(name==='event_purchase_lines')return pick('product_count');
     if(name==='person_dossier'){const n=d==='donations'?pick('donation_records'):d==='purchases'?pick('purchase_responsibility_records'):null;return n===0?0:null;}
     return pick('product_count','products');
@@ -11006,6 +11082,7 @@ function v42WorkingSetFactCount(result={},requestedObject='none',domain='general
 function v42WorkingSetTableScore(plan={},result={},table={},userPrompt=''){
   const requestedObject=trim(plan.requested_object)||'none',key=norm(table?.key),name=trim(result?.name);let score=v40EnumerationTableScore(userPrompt,name,table,requestedObject);
   if(requestedObject==='products'&&norm(plan.domain)==='donations'&&/donor_products|^donations$/.test(key))score+=120;
+  if(requestedObject==='products'&&trim(result?.name)==='event_products'&&/^products$/.test(key))score+=500;
   if(requestedObject==='products'&&norm(plan.domain)==='purchases'&&/by_product|purchase_responsibility/.test(key))score+=120;
   if(requestedObject==='events'&&norm(plan.domain)==='donations'&&/donations_by_event/.test(key))score+=140;
   if(requestedObject==='events'&&norm(plan.domain)==='purchases'&&/purchase_by_event/.test(key))score+=140;
@@ -11396,6 +11473,7 @@ function v48EnumerationCandidateScore(userPrompt='',plan={},r={},t={}){
   const key=norm(t?.key),sf=norm(sort.field);
   // Para productos comprados, una ordenación por una dimensión necesita una tabla que conserve
   // Producto + esa dimensión. by_product pierde Destino/Segmento; las tablas multidimensionales no.
+  if(requestedObject==='products'&&trim(r?.name)==='event_products'&&/^products$/.test(key))score+=700;
   if(requestedObject==='products'&&norm(plan?.domain)==='purchases'){
     if(sf==='destino'||sf==='segmento'){
       if(/by_segment_destination/.test(key))score+=260;
@@ -11570,6 +11648,7 @@ function v40EnumerationTableScore(prompt='',toolName='',table={},requestedObject
     if(/^(?:donations|purchase_responsibility|participation)$/.test(key))score-=45;
   }
   if(requestedObject==='products'){
+    if(trim(toolName)==='event_products'&&/^products$/.test(key))score+=500;
     if(/donaci/.test(p)&&/donor_products|^donations$/.test(key))score+=105;
     if(/compr/.test(p)&&/by_product|purchase_responsibility/.test(key))score+=100;
     if(/donaci/.test(p)&&trim(toolName)==='event_purchase_lines')score-=120;
@@ -11600,7 +11679,8 @@ function v40CanonicalEnumerationAnswer(userPrompt='',plan={},results=[],existing
   if(!hasExplicitDetail){
     if(isEvents){addField('Fecha inicio');if(/\bestado\b|\ben\s+curso\b|\bfinaliz/.test(p))addField('Estado');}
     else if(isDoc){addField('Descripción');addField('Fecha');}
-    else if(requestedObject==='products'&&norm(plan?.domain)==='purchases'){addField('Unidades');addField('Precio');addField('Importe');}
+    else if(requestedObject==='products'&&trim(r?.name)==='event_products'&&/^products$/.test(key))score+=700;
+  if(requestedObject==='products'&&norm(plan?.domain)==='purchases'){addField('Unidades');addField('Precio');addField('Importe');}
     else if(requestedObject==='products'&&norm(plan?.domain)==='donations'){addField('Unidades');addField('Importe');addField('Donante');}
     else if(requestedObject==='donations'){addField('Donante');addField('Producto');addField('Unidades');addField('Importe');}
     else if(requestedObject==='purchases'){addField('Producto');addField('Unidades');addField('Importe');addField('Ticket');}
@@ -17715,6 +17795,7 @@ export const __zuzuStructuralTesting = Object.freeze({
   v51BuildLocalPartitionFocus,
   v51BuildLocalProductFilter,
   v51SanitizeSccRequestFilters,
+  v61ToolEventProducts,
   v40ExecuteSccPlan,
   v42CommitMultidimContext,
   v43CompactSccResultForPlan,
