@@ -7245,7 +7245,13 @@ function v26BuildPresentation(final,results,userPrompt,options={}){
   const asksTablesWithCharts=/\b(tabla|tablas|listado|listados|datos en tabla|detalle tabular)\b/i.test(text(userPrompt));
   for(const ref of (chartIntent&&!asksTablesWithCharts?[]:arr(final?.showTables).slice(0,6))){
     const r=byId.get(trim(ref?.tool_id)),t=arr(r?.tables).find(x=>trim(x?.key)===trim(ref?.table_key)); if(!t||!arr(t.rows).length)continue; stats.tableCandidates++; const sig=`${r.id}:${t.key}`;if(seenT.has(sig)){stats.tableDuplicates++;continue;}seenT.add(sig);
-    const exhaustiveTool=['master_catalog','event_purchase_lines','event_donation_lines'].includes(trim(r?.name));const compactCap=exhaustiveTool?24:160;const srcRows=arr(t.rows).slice(0,compactCap);const columns=[];srcRows.forEach(row=>{if(row&&typeof row==='object'&&!Array.isArray(row))Object.keys(row).forEach(k=>{if(!columns.includes(k))columns.push(k);});});const cols=columns.slice(0,24);
+    const exhaustiveTool=['master_catalog','event_purchase_lines','event_donation_lines'].includes(trim(r?.name));
+    // NHC · MEMORIA/PRESENTACIÓN: el límite de 24 filas solo protege una tabla incidental.
+    // Si el propio plan/turno pide una enumeración o tabla exhaustiva, la presentación física
+    // debe conservar TODAS las filas canónicas (hasta el límite técnico general de la fuente),
+    // sin convertir un límite visual en un recorte de datos.
+    const exhaustivePresentation=v40ExplicitEnumerationRequest(userPrompt)||v40ExplicitTableRequest(userPrompt)||v40PlanEnumerationRequest(final?._sccPlan||{});
+    const compactCap=exhaustiveTool?(exhaustivePresentation?600:24):160;const srcRows=arr(t.rows).slice(0,compactCap);const columns=[];srcRows.forEach(row=>{if(row&&typeof row==='object'&&!Array.isArray(row))Object.keys(row).forEach(k=>{if(!columns.includes(k))columns.push(k);});});const cols=columns.slice(0,24);
     const rows=srcRows.map(row=>cols.map(c=>v26FormatPresentationCell(row?.[c],v26EffectiveCellMeta(t,c,row))));if(cols.length){const contentSig=JSON.stringify([cols,rows]);if(!seenTableContent.has(contentSig)){seenTableContent.add(contentSig);tables.push({title:t.title,columns:cols,rows});stats.renderedTableRows+=rows.length;}else stats.tableDuplicates++;}
   }
   const wantsCharts=chartIntent || arr(final?.chartSpecs).length>0;
@@ -10362,6 +10368,60 @@ TIEMPO: ${localNow} · zona ${tz} · UTC ${utcNow}.
 
 Tras recibir function_result de scc_execute_plan, NO vuelvas a llamar herramientas: redacta la respuesta final solo con los datos devueltos y el contexto aportado por el usuario. No menciones SCC, herramientas, datasets, arquitectura ni la compactación.`;
 }
+// SCC 2.2.6 · NHC · instrucciones separadas por fase.
+// El planner no necesita reglas de estilo/redacción y el redactor no necesita volver a cargar
+// el manual de selección de fuentes. Separarlas reduce drásticamente el coste fijo por turno
+// sin quitar autoridad lingüística a Gemini ni introducir reglas de negocio por frase.
+function v59SccPlannerInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone}={}){
+  const active=v26EventById(state,selectedEventId),activeName=trim(active?.titulo)||'ninguno';
+  const profile=zuzuLoggedUserProfile({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
+  const localNow=trim(clientLocalDateTime).slice(0,120)||new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',dateStyle:'short',timeStyle:'short'}).format(new Date());
+  const tz=trim(clientTimeZone).slice(0,80)||'Europe/Madrid',utcNow=trim(clientNowIso).slice(0,80)||new Date().toISOString();
+  return `Eres el INTÉRPRETE LINGÜÍSTICO de Zuzu/ControlEvent v3_0_exp. Tu única salida en este paso es EXACTAMENTE una llamada scc_execute_plan. No redactes respuesta al usuario.
+
+PRINCIPIO NHC Y AUTORIDAD:
+- Tú decides qué significa el mensaje humano. ControlEvent ejecutará tu representación tipada y NO reinterpretará después las palabras del usuario.
+- Decide por significado, contexto y referentes; no por coincidencias de palabras aisladas. Admite elipsis, pronombres, singular/plural, correcciones, cambios de tema e instrucciones compuestas.
+- El evento visible (${activeName}) es AMBIENTAL. No sustituye el foco conversacional vigente salvo que el mensaje actual lo elija. Una entidad/evento nombrado explícitamente por el usuario prevalece.
+- El LIBRO DE CONTEXTO del mensaje contiene el estado canónico vigente. STACK es historial dormido: no lo reactives salvo que el usuario vuelva a él.
+
+DELTA DE CONTEXTO:
+- focus_mode=KEEP: continuación/elipsis; conserva EXACTAMENTE ACTIVE_CONTEXT.
+- REPLACE: el mensaje actual establece un nuevo foco único y abandona el anterior.
+- MULTI: el mensaje actual necesita varios objetivos simultáneos (comparación o consulta conjunta).
+- CLEAR: el usuario abandona el foco sin sustituirlo.
+- working_set_mode=KEEP: conserva el conjunto; TRANSFORM: FILTER/SORT/PROJECT/COUNT/etc. sobre él; RESET: recupera su padre; REMATERIALIZE: cambia evento/objeto/granularidad y necesita datos nuevos.
+- Un cambio de foco no debe transformar el WORKING_SET del foco abandonado: usa REMATERIALIZE si el nuevo foco requiere datos.
+
+INTENCIONES CANÓNICAS:
+- LIST enumera el conjunto/objeto pedido. SORT solo cambia orden. FILTER reduce filas y conserva padre. RESET_FILTER recupera padre. PROJECT cambia campos visibles SIN cambiar filas. COUNT/MAX/MIN/SUMMARY no destruyen el conjunto. BACK vuelve al contexto anterior. COMPARE trabaja con varios objetivos. INSPECT_CONTEXT responde dónde/qué estamos tratando desde el estado SCC, sin catálogo ni BBDD.
+- Una petición puede contener varias acciones. No sacrifiques una cláusula por otra: combina transformación local + data_requests cuando corresponda.
+- presentation.limit limita SOLO lo mostrado; nunca redefine la cardinalidad del WORKING_SET.
+
+DATOS:
+- requires_data=false cuando la intención puede resolverse con WORKING_SET/TARGET_SET/ACTIVE_CONTEXT ya materializados.
+- requires_data=true cuando faltan hechos actuales. Pide TODAS las fuentes independientes necesarias en data_requests en la misma planificación, sin exploraciones en cadena.
+- Para un evento concreto usa scope=named_event y su nombre; para varios eventos, conserva events y peticiones ligadas a cada objetivo cuando sea necesario.
+- person_dossier es la ficha de persona concreta; events_catalog solo para catálogo/exploración de eventos, nunca para sustituir una petición distinta; compare_events para comparación agregada homogénea.
+- Si el usuario pide lista/tabla exhaustiva, usa detail=full y presentation.limit=0 salvo límite pedido expresamente. Si solo pide resumen, evita detail=full.
+- No inventes datos, eventos, sujetos, filtros ni causas. Si hay ambigüedad real irresoluble, relation=clarify y evita consultas especulativas.
+
+FUENTES DISPONIBLES:
+${v40SccToolCatalogText()}
+
+Usuario=${profile.identificacion||profile.nombre||'—'} · hora local=${localNow} · zona=${tz} · UTC=${utcNow}.`;
+}
+function v59SccResponderInstruction({voiceConversation=false}={}){
+  return `Eres Zuzu. Este paso ocurre DESPUÉS de que Gemini ya interpretó el lenguaje y ControlEvent ejecutó las fuentes. Responde únicamente con el function_result recibido; NO pidas herramientas, NO recalcules ni inventes hechos.
+- Contesta de frente en la primera frase y en español natural.
+- Respeta event/object/persona y el ACTIVE_CONTEXT del resultado. No introduzcas el evento ambiental ni asuntos del STACK.
+- derived_truths y hechos canónicos prevalecen sobre cualquier cálculo propio.
+- Si el resultado ordena/filtra/proyecta/enumera, conserva exactamente esa transformación. No cambies cardinalidad ni dimensión.
+- Si el usuario pidió una lista exhaustiva, no afirmes totalidad basándote en una muestra marcada truncated; ControlEvent completará la presentación física canónica.
+- No muestres SQL, IDs internos, nombres de herramientas, SCC, function calls, datasets ni protocolo.
+- No uses Markdown visible por defecto. Evita encabezados, asteriscos y tablas redactadas en texto; ControlEvent renderiza las tablas.
+- Sé breve en charla normal; no cierres con ofertas mecánicas.${voiceConversation?' MODO ORAL: 1-4 frases naturales salvo que el resultado indique una enumeración solicitada.':''}`;
+}
 function v58MultidimEnvelopeForModel(raw=null){
   const md=v42CompactMultidim(raw||null);if(!md)return null;
   const stackSummary=arr(md.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v50WorkingSetWithoutRowCache(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)})).map(x=>({specific:x.specific,working_set:x.working_set?{kind:x.working_set.kind,event:x.working_set.event,domain:x.working_set.domain,requested_object:x.working_set.requested_object,row_count:x.working_set.row_count,empty:x.working_set.empty}:null,target_set:x.target_set}));
@@ -11776,7 +11836,8 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   userPrompt=v336NormalizeStructuredPromptRefs(userPrompt);
   const modelPolicy=v332InteractionPolicy(userPrompt);let model=modelPolicy.model;
   const planTool=v40SccPlanTool();
-  const systemInstruction=v40SccSystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,voiceConversation,conversationHistory});
+  const plannerInstruction=v59SccPlannerInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone});
+  const responderInstruction=v59SccResponderInstruction({voiceConversation});
   const contextBook=v41BuildContextBook(state,selectedEventId,conversationHistory,userPrompt);
   // ECONOMÍA SCC: la Interaction nativa vive solo durante ESTE turno (plan -> datos -> respuesta).
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
@@ -11846,24 +11907,35 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   }
 
   const initialInput=v40SccInitialInput(userPrompt,conversationHistory,conversationDigest,contextBook);
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Planner Envelope','OK',`Entrada planner=${JSON.stringify(initialInput).length} caracteres · instrucción=${plannerInstruction.length} · schema=${JSON.stringify(planTool).length}. Manual de redacción excluido de esta fase.`);
   let deterministicFallbackPlan=null;
   try{
-    payload=await v261CallInteraction({input:initialInput,previousInteractionId:'',model,systemInstruction,tools:[planTool],flowTrace,stage:'v3_0_exp · SCC · Gemini planifica turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+    payload=await v261CallInteraction({input:initialInput,previousInteractionId:'',model,systemInstruction:plannerInstruction,tools:[planTool],flowTrace,stage:'v3_0_exp · SCC · Gemini planifica turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
   }catch(planError){
     const invalidJson=Number(planError?.status)===400&&/invalid\s+json|could\s+not\s+be\s+parsed|json\s+syntax/i.test(cleanGeminiError(planError));
-    if(!invalidJson)throw planError;
-    zuzuTracePush(flowTrace,'v3_0_exp · SCC · Reintento de plan','INFO','Gemini devolvió argumentos JSON inválidos. Se hace un único reintento; si vuelve a fallar, CE construirá un plan mínimo desde el contexto canónico en vez de perder el turno.');
+    const canFlashRetry=modelPolicy.tier==='lite'&&modelPolicy.flashModel&&modelPolicy.flashModel!==model&&v332CanEscalateLiteFailure(planError);
+    if(!invalidJson&&canFlashRetry){
+      // NHC · resiliencia de proveedor: no deducimos otra intención ni ejecutamos fuentes.
+      // Repetimos EL MISMO contrato tipado una sola vez con Flash; si falla, actúa el Planner Failure Guard.
+      const retryModel=modelPolicy.flashModel;
+      zuzuTracePush(flowTrace,'v3_0_exp · SCC · Respaldo planner Lite → Flash','WARN',`Lite no pudo planificar (${cleanGeminiError(planError)}). Se reintenta una sola vez el MISMO mensaje/contrato con ${retryModel}; 0 fuentes ejecutadas hasta obtener plan.`);
+      payload=await v261CallInteraction({input:initialInput,previousInteractionId:'',model:retryModel,systemInstruction:plannerInstruction,tools:[planTool],flowTrace,stage:'v3_0_exp · SCC · Flash planifica turno',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+      model=retryModel;
+    }else{
+      if(!invalidJson)throw planError;
+      zuzuTracePush(flowTrace,'v3_0_exp · SCC · Reintento de plan','INFO','Gemini devolvió argumentos JSON inválidos. Se hace un único reintento; si vuelve a fallar, CE construirá un plan mínimo desde el contexto canónico en vez de perder el turno.');
     const retryInput=`${initialInput}\n\nREINTENTO TÉCNICO ÚNICO: normaliza el mensaje con el contrato compacto. Emite exactamente una llamada scc_execute_plan; sin texto adicional ni campos que no estén en el schema.`;
     const retryModel=modelPolicy.tier==='lite'?modelPolicy.flashModel:model;
     if(retryModel!==model)zuzuTracePush(flowTrace,'v3_0_exp · SCC · Escalado técnico de plan','INFO',`El JSON de ${model} fue inválido; el único reintento usa ${retryModel} con el contrato compacto. No se repite BBDD ni redacción.`);
     try{
-      payload=await v261CallInteraction({input:retryInput,previousInteractionId:'',model:retryModel,systemInstruction,tools:[planTool],flowTrace,stage:'v3_0_exp · SCC · Gemini reintenta plan válido',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
+      payload=await v261CallInteraction({input:retryInput,previousInteractionId:'',model:retryModel,systemInstruction:plannerInstruction,tools:[planTool],flowTrace,stage:'v3_0_exp · SCC · Gemini reintenta plan válido',toolChoice:{allowed_tools:{mode:'any',tools:['scc_execute_plan']}},externalSignal});
       model=retryModel;
     }catch(retryError){
       const invalidAgain=Number(retryError?.status)===400&&/invalid\s+json|could\s+not\s+be\s+parsed|json\s+syntax/i.test(cleanGeminiError(retryError));
       if(!invalidAgain)throw retryError;
       deterministicFallbackPlan=v44DeterministicFallbackPlan(userPrompt,state,selectedEventId,contextBook,flowTrace);
       if(!deterministicFallbackPlan)throw retryError;
+    }
     }
   }
   let calls=[],chosen=null,plan;
@@ -11945,9 +12017,20 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   const functionResults=calls.map(call=>trim(call.id)===trim(chosen.call.id)
     ?{type:'function_result',name:'scc_execute_plan',call_id:trim(call.id),result:realResult}
     :{type:'function_result',name:'scc_execute_plan',call_id:trim(call.id),result:{ok:true,ignored_duplicate:true,instruction:'Esta llamada fue un duplicado accidental. Usa exclusivamente el resultado canónico de la otra llamada scc_execute_plan de este turno.'}});
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Responder Envelope','OK',`Instrucción de redacción=${responderInstruction.length} caracteres. El manual del planner no se reinyecta en la segunda llamada.`);
   try{
-    payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools:[],flowTrace,stage:'v3_0_exp · SCC · Gemini responde con datos CE',toolChoice:'none',externalSignal,maxOutputTokens:explicitEnumeration?2600:0});
-  }catch(error){error.canonicalResults=[...executed.fullResults];error.sccPlan=plan;error.committedMultidim=committedMultidim;throw error;}
+    payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction:responderInstruction,tools:[],flowTrace,stage:'v3_0_exp · SCC · Gemini responde con datos CE',toolChoice:'none',externalSignal,maxOutputTokens:explicitEnumeration?2600:0});
+  }catch(error){
+    const canFlashRetry=modelPolicy.tier==='lite'&&modelPolicy.flashModel&&modelPolicy.flashModel!==model&&v332CanEscalateLiteFailure(error);
+    if(canFlashRetry){
+      const retryModel=modelPolicy.flashModel;
+      zuzuTracePush(flowTrace,'v3_0_exp · SCC · Respaldo redacción Lite → Flash','WARN',`Lite no pudo cerrar la respuesta (${cleanGeminiError(error)}). Flash recibe los MISMOS function_result canónicos; no se repiten BBDD ni interpretación.`);
+      try{
+        payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model:retryModel,systemInstruction:responderInstruction,tools:[],flowTrace,stage:'v3_0_exp · SCC · Flash responde con datos CE',toolChoice:'none',externalSignal,maxOutputTokens:explicitEnumeration?2600:0});
+        model=retryModel;
+      }catch(flashError){flashError.canonicalResults=[...executed.fullResults];flashError.sccPlan=plan;flashError.committedMultidim=committedMultidim;throw flashError;}
+    }else{error.canonicalResults=[...executed.fullResults];error.sccPlan=plan;error.committedMultidim=committedMultidim;throw error;}
+  }
   let final=v261ParseFinal(payload);
   if(!trim(final.answer)){const e=new Error('Gemini terminó el turno SCC sin respuesta final legible.');e.status=502;e.canonicalResults=[...executed.fullResults];e.sccPlan=plan;e.committedMultidim=committedMultidim;throw e;}
   final=v307BankAvailabilityRepair(final,executed.fullResults,userPrompt,flowTrace);
