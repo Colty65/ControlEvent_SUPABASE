@@ -10774,23 +10774,26 @@ async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPro
       const targetValidation=v45ValidatePhysicalTarget(full,req,state,selectedEventId);
       if(!targetValidation.ok)return{req,full:null,compact:null,error:targetValidation.error,call,targetValidation};
       full={...full,_sccTargetValidation:targetValidation,...(req?.target?{_sccTarget:{type:'event',id:trim(req.target.id),name:trim(req.target.name)}}:{})};
-      full=v40ApplyPhysicalPresentation(full,plan.presentation,flowTrace);
-      let compact=v43CompactSccResultForPlan(full,trim(args.detail)||'standard',plan,userPrompt);
+      // NHC · frontera memoria/presentación. El resultado canónico COMPLETO se conserva antes
+      // de aplicar orden/límite visual. presentation.limit jamás puede recortar WORKING_SET.
+      const memoryFull=full;
+      const presentedFull=v40ApplyPhysicalPresentation(full,plan.presentation,flowTrace);
+      let compact=v43CompactSccResultForPlan(presentedFull,trim(args.detail)||'standard',plan,userPrompt);
       if(req?.target)compact={...compact,target:{type:'event',id:trim(req.target.id),name:trim(req.target.name)}};
-      return{req,full,compact,error:null,targetValidation};
+      return{req,full:presentedFull,memoryFull,compact,error:null,targetValidation};
     }catch(error){return{req,full:null,compact:null,error:cleanGeminiError(error),call};}
   });
   // Las fuentes del plan son independientes por contrato SCC: ejecutarlas en paralelo reduce
   // la latencia en comparaciones/personas múltiples sin cambiar semántica ni permisos.
-  const settled=await Promise.all(jobs),fullResults=[],compactResults=[],errors=[];
+  const settled=await Promise.all(jobs),fullResults=[],memoryResults=[],compactResults=[],errors=[];
   for(const item of settled){
     const req=item.req;
     if(item.error){errors.push({tool:req.tool,error:item.error});compactResults.push({id:item?.call?.id||'',name:req.tool,ok:false,error:item.error});zuzuTracePush(flowTrace,`v3_0_exp · SCC · Tool ${req.tool}`,'WARN',item.error);continue;}
-    fullResults.push(item.full);compactResults.push(item.compact);
+    fullResults.push(item.full);memoryResults.push(item.memoryFull||item.full);compactResults.push(item.compact);
     const tv=item.targetValidation||{},targetNote=trim(tv.expected)?` · objetivo=${tv.expected} · validación=${tv.mode==='facts'?`hechos=${tv.actual||tv.expected}`:'binding canónico'}`:'';
     zuzuTracePush(flowTrace,`v3_0_exp · SCC · Tool ${req.tool}`,'OK',`${trim(item.full?.title)||req.tool}; tablas=${arr(item.full?.tables).length}; propósito=${req.purpose||'—'}.${targetNote}`);
   }
-  return{fullResults,compactResults,errors};
+  return{fullResults,memoryResults,compactResults,errors};
 }
 function v42WorkingSetFactCount(result={},requestedObject='none',domain='general'){
   const f=result?.facts||{},name=trim(result?.name),d=norm(domain),pick=(...keys)=>{for(const k of keys){const n=Number(f?.[k]);if(Number.isFinite(n))return Math.max(0,n);}return null;};
@@ -11074,12 +11077,23 @@ function v42CommitMultidimContext(contextBook={},plan={},results=[],userPrompt='
     if(plan._workingSetEmptyReference){
       workingSet=v42CompactWorkingSet({...prevWorking,kind:trim(plan.requested_object)||prevWorking?.kind,requested_object:trim(plan.requested_object)||prevWorking?.requested_object,event:trim(plan.event)||prevWorking?.event,scope:trim(plan.scope)||prevWorking?.scope,subjects:arr(plan.subjects).length?arr(plan.subjects):prevWorking?.subjects,domain:trim(plan.domain)||prevWorking?.domain,row_count:0,empty:true});
     }else{
+      // NHC · invariante de estado: operaciones de vista/cálculo sobre un WORKING_SET ya
+      // materializado no pueden cambiar su cardinalidad por el mero hecho de no pedir BBDD.
+      // Se decide por la operación CANÓNICA de Gemini, nunca por palabras del usuario.
+      const canonicalOp=trim(plan?.intent?.operation||plan?.operation).toUpperCase();
+      const canonicalTarget=trim(plan?.intent?.target).toUpperCase();
+      const nonMaterializing=new Set(['LIST','SORT','SUMMARY','COUNT','MAX','MIN']);
+      const compatiblePrev=!!(prevWorking&&!prevWorking.empty&&v42WorkingSetCompatible(prevWorking,plan));
+      if(!arr(results).length&&compatiblePrev&&nonMaterializing.has(canonicalOp)&&['WORKING_SET','PARENT_WORKING_SET','TARGET_SET',''].includes(canonicalTarget)){
+        workingSet=prevWorking;
+      }else{
       const built=targetSet?v46BuildPartitionedWorkingSet(plan,results,targetSet,userPrompt):v42BuildWorkingSet(plan,results,userPrompt);
       // Un filtro sin coincidencias es una vista vacía, no una orden de borrar la memoria base.
       // Preservamos el conjunto anterior para que «ordénalos», «resume esas compras», etc. sigan
       // refiriéndose al listado materializado antes del filtro fallido.
       const emptyFilteredPurchase=!!(built?.empty&&prevWorking&&!prevWorking.empty&&v42WorkingSetCompatible(prevWorking,plan)&&arr(results).some(r=>r?.ok&&trim(r?.name)==='event_purchase_lines'&&trim(r?.facts?.product)&&Number(r?.facts?.purchase_line_count)===0));
       workingSet=emptyFilteredPurchase?prevWorking:built;
+      }
     }
   }
   // El foco recién confirmado queda fuera del STACK para evitar volver a sí mismo.
@@ -11245,6 +11259,20 @@ function v49DerivedTruthBlock(results=[],userPrompt=''){
   const lines=[];
   for(const spec of chosen){const av=Number(a?.[spec.key]),bv=Number(b?.[spec.key]);if(!Number.isFinite(av)||!Number.isFinite(bv))continue;const diff=Math.abs(av-bv),higher=av===bv?'':av>bv?an:bn;lines.push(`${spec.key}: ${an} registra ${v40WholeEuro(av)} y ${bn} ${v40WholeEuro(bv)}; ${av===bv?'ambos tienen el mismo valor':`${higher} es mayor por ${v40WholeEuro(diff)}`}.`);}
   return lines.join(' ');
+}
+function v57StripInternalProtocolLeak(answer='',flowTrace=[]){
+  const raw=text(answer);if(!raw)return'';
+  // NHC: protocolo técnico, no vocabulario de usuario. Nunca debe mostrarse una serialización
+  // de function/tool call aunque el modelo la escriba como texto normal.
+  const lines=raw.split(/\r?\n/),kept=[],removed=[];
+  for(const line of lines){
+    const n=norm(line);
+    const protocol=/\b(?:default_api\.|scc_execute_plan\s*\(|function_call|tool_call|call_id\s*=|requires_action)\b/.test(n)||/^\s*print\s*\(/i.test(line);
+    if(protocol){removed.push(line);continue;}
+    kept.push(line);
+  }
+  if(removed.length)zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Protocol Leak Guard','OK',`Se eliminaron ${removed.length} línea(s) de serialización interna antes de presentar la respuesta.`);
+  return kept.join('\n').replace(/\n{3,}/g,'\n\n').trim();
 }
 function v49RepairDerivedTruthContradictions(answer='',userPrompt='',results=[],flowTrace=[]){
   const truth=v49DerivedTruthBlock(results,userPrompt);if(!truth)return trim(answer);
@@ -11550,7 +11578,7 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
   // aunque Gemini haya sido conservador y haya marcado requires_data=true.
   const intent=plan?.intent&&typeof plan.intent==='object'?plan.intent:null;if(!intent||Number(intent.confidence||0)<0.60)return null;
   const op=trim(intent.operation).toUpperCase(),target=trim(intent.target).toUpperCase();
-  if(!['LIST','SORT','FILTER','RESET_FILTER','SUMMARY'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
+  if(!['LIST','SORT','FILTER','RESET_FILTER','SUMMARY','COUNT'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
   const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null);if(!ws||ws.empty)return null;
   const desiredObject=trim(plan?.requested_object)||'none',currentObject=trim(ws?.requested_object)||trim(ws?.kind)||'none';
   if(desiredObject!=='none'&&norm(desiredObject)!==norm(currentObject))return null;
@@ -11567,6 +11595,11 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
   if(op==='SUMMARY'){
     const localPlan=makePlan('summary',cache,false),specific=v42CompactSpecific({...md.specific,operation:'summary'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack});
     return response('Resumen',v50LocalPresentationSummary(ws),[],[],committed,localPlan,'SUMMARY → WORKING_SET');
+  }
+  if(op==='COUNT'){
+    const count=Number.isFinite(Number(ws.row_count))?Number(ws.row_count):arr(cache?.rows).length;
+    const localPlan=makePlan('count',cache,false),specific=v42CompactSpecific({...md.specific,operation:'count'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack});
+    return response('Recuento',`${count} elemento${count===1?'':'s'} en el conjunto vigente.`,[],[],committed,localPlan,`COUNT → WORKING_SET (${count})`);
   }
   let rows=arr(cache.rows).map(r=>({...r}));if(!rows.length)return null;let nextCache=cache,nextWs=ws,operation=op.toLowerCase();
   const localPlan=makePlan(operation,cache,true);
@@ -11759,7 +11792,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   zuzuTracePush(flowTrace,'v3_0_exp · SCC · Decisión de contexto','OK',`${plan.transition||'CONTINUE'} · ${plan.relation.toUpperCase()} · ámbito=${plan.scope} · evento=${plan.event||'—'} · sujetos=${plan.subjects.join(' / ')||'—'} · dominio=${plan.domain} · objeto=${plan.requested_object||'none'} · operación=${plan.operation} · dataset=${plan.dataset.id||'—'} · confianza=${Math.round(plan.confidence*100)}%. ${plan.reason}`);
   const executed=await v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace,userPrompt);
   if(localSidecar){const localResult=v56LocalSidecarResult(localSidecar);if(localResult){executed.fullResults.push(localResult);executed.compactResults.push(v43CompactSccResultForPlan(localResult,'standard',plan,userPrompt));}}
-  let committedMultidim=v42CommitMultidimContext(contextBook,plan,executed.fullResults,userPrompt);
+  let committedMultidim=v42CommitMultidimContext(contextBook,plan,executed.memoryResults||executed.fullResults,userPrompt);
   if(localSidecar?.committed){const localMd=v42CompactMultidim(localSidecar.committed),externalMd=v42CompactMultidim(committedMultidim);committedMultidim=v42CompactMultidim({...externalMd,working_set:localMd?.working_set||externalMd?.working_set,target_set:externalMd?.target_set||localMd?.target_set,stack:externalMd?.stack});}
   let realInstruction;
   if(plan._contextNavigationOnly)realInstruction=`Es una navegación de contexto, no una petición de lista. Confirma brevemente el foco recuperado: evento ${trim(plan.event)||'—'}. No amplíes ni mezcles datos de otro foco.`;
@@ -11800,6 +11833,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   final=v283DeterministicSafetyRepair(final,executed.fullResults,conversationHistory);
   final={...final,answer:v49RepairDerivedTruthContradictions(final.answer,userPrompt,executed.fullResults,flowTrace)};
   final=v54ComparisonAuthorityRepair(final,plan,executed.fullResults,committedMultidim,flowTrace);
+  final={...final,answer:v57StripInternalProtocolLeak(final.answer,flowTrace)};
   final={...final,answer:v40ConversationalPolish(final.answer,userPrompt,voiceConversation)};
   if(explicitEnumeration){const guaranteed=v40CanonicalEnumerationAnswer(userPrompt,plan,executed.fullResults,final.answer);if(guaranteed)final={...final,answer:v40ConversationalPolish(guaranteed,userPrompt,voiceConversation)};}
   let showTables=arr(final.showTables);
