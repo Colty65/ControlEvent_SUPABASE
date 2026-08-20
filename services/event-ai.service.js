@@ -7245,7 +7245,7 @@ function v26BuildPresentation(final,results,userPrompt,options={}){
   const asksTablesWithCharts=/\b(tabla|tablas|listado|listados|datos en tabla|detalle tabular)\b/i.test(text(userPrompt));
   for(const ref of (chartIntent&&!asksTablesWithCharts?[]:arr(final?.showTables).slice(0,6))){
     const r=byId.get(trim(ref?.tool_id)),t=arr(r?.tables).find(x=>trim(x?.key)===trim(ref?.table_key)); if(!t||!arr(t.rows).length)continue; stats.tableCandidates++; const sig=`${r.id}:${t.key}`;if(seenT.has(sig)){stats.tableDuplicates++;continue;}seenT.add(sig);
-    const exhaustiveTool=['master_catalog','event_purchase_lines','event_donation_lines'].includes(trim(r?.name));const srcRows=exhaustiveTool?arr(t.rows):arr(t.rows).slice(0,160);const columns=[];srcRows.forEach(row=>{if(row&&typeof row==='object'&&!Array.isArray(row))Object.keys(row).forEach(k=>{if(!columns.includes(k))columns.push(k);});});const cols=columns.slice(0,24);
+    const exhaustiveTool=['master_catalog','event_purchase_lines','event_donation_lines'].includes(trim(r?.name));const compactCap=exhaustiveTool?24:160;const srcRows=arr(t.rows).slice(0,compactCap);const columns=[];srcRows.forEach(row=>{if(row&&typeof row==='object'&&!Array.isArray(row))Object.keys(row).forEach(k=>{if(!columns.includes(k))columns.push(k);});});const cols=columns.slice(0,24);
     const rows=srcRows.map(row=>cols.map(c=>v26FormatPresentationCell(row?.[c],v26EffectiveCellMeta(t,c,row))));if(cols.length){const contentSig=JSON.stringify([cols,rows]);if(!seenTableContent.has(contentSig)){seenTableContent.add(contentSig);tables.push({title:t.title,columns:cols,rows});stats.renderedTableRows+=rows.length;}else stats.tableDuplicates++;}
   }
   const wantsCharts=chartIntent || arr(final?.chartSpecs).length>0;
@@ -9758,9 +9758,10 @@ function v40SccPlanTool(){
     domain:{type:'string'},
     requested_object:{type:'string',enum:['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']},
     intent:{type:'object',properties:{
-      operation:{type:'string',enum:['NONE','LIST','SORT','FILTER','RESET_FILTER','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']},
+      operation:{type:'string',enum:['NONE','LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']},
       target:{type:'string',enum:['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']},
       field:{type:'string'},
+      fields:{type:'array',items:{type:'string'},maxItems:12},
       direction:{type:'string',enum:['asc','desc','none']},
       filter_field:{type:'string'},
       filter_value:{type:'string'},
@@ -9768,9 +9769,10 @@ function v40SccPlanTool(){
       requires_data:{type:'boolean'},
       confidence:{type:'number'}
     },required:['operation','target','requires_data','confidence']},
+    context_delta:{type:'object',properties:{focus_mode:{type:'string',enum:['KEEP','REPLACE','MULTI','CLEAR']},working_set_mode:{type:'string',enum:['KEEP','REMATERIALIZE','TRANSFORM','RESET']}},required:['focus_mode','working_set_mode']},
     presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},sort_field:{type:'string'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}}},
     data_requests:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:V40_SCC_DATA_TOOLS},arguments:v40SccDataArgumentSchema()},required:['tool']}}
-  },required:['relation','confidence','scope','event','events','subjects','domain','requested_object','intent','presentation','data_requests']}};
+  },required:['relation','confidence','scope','event','events','subjects','domain','requested_object','intent','context_delta','presentation','data_requests']}};
 }
 
 function v40SccToolCatalogText(){
@@ -10292,7 +10294,7 @@ Cómo decidir el contexto:
 
 NORMALIZADOR SEMÁNTICO OBLIGATORIO EN intent:
 - Tu trabajo NO es repetir las palabras del usuario sino traducirlas a una intención canónica estable. Variantes de género, número, conjugación, sinónimos o elipsis deben desembocar en la misma operación.
-- Usa intent.operation=LIST/SORT/FILTER/RESET_FILTER/SUMMARY/BACK cuando esa sea la acción real, independientemente de que el usuario diga «ordénala», «ponlas de mayor a menor», «solo...», «quita ese filtro», «vuelve a la lista completa» o cualquier formulación equivalente.
+- Usa intent.operation=LIST/SORT/FILTER/RESET_FILTER/SUMMARY/BACK cuando esa sea la acción real, independientemente de que el usuario diga «ordénala», «ponlas de mayor a menor», «solo...», «quita ese filtro», «vuelve a la lista completa» o cualquier formulación equivalente.\n- PROYECCIÓN DE CAMPOS: si el usuario mantiene el mismo conjunto y solo pide añadir, quitar, cambiar o reordenar datos/columnas visibles, usa intent.operation=PROJECT, target=WORKING_SET y rellena intent.fields con los campos semánticos solicitados. PROJECT jamás filtra filas ni cambia evento, sujeto u objeto.\n- DELTA DE FOCO: context_delta.focus_mode expresa TU conclusión lingüística, no una regla de CE. KEEP conserva el foco vigente; REPLACE sustituye el foco por el evento/sujeto actual (p. ej. cuando el usuario se queda con uno); MULTI conserva/crea varios objetivos simultáneos; CLEAR abandona el foco de evento. context_delta.working_set_mode indica KEEP, REMATERIALIZE si cambia entidad/granularidad y hacen falta datos, TRANSFORM para ordenar/filtrar/proyectar el conjunto actual, o RESET para recuperar su padre. No arrastres events antiguos cuando focus_mode=REPLACE.
 - intent.target=WORKING_SET cuando el usuario actúa sobre el conjunto vigente; PARENT_WORKING_SET cuando quiere quitar un filtro/recuperar la base; TARGET_SET cuando opera sobre una comparación múltiple.
 - Para SORT devuelve field canónico y direction. Si el usuario solo cambia ascendente/descendente o dice que lo quiere al contrario, conserva como field el campo de orden vigente que aparece en WORKING_SET.view_state y devuelve la dirección opuesta a view_state.sort_direction.
 - MAX/MIN/COUNT sobre un TARGET_SET o WORKING_SET ya materializado son operaciones sobre esos hechos canónicos: si las métricas necesarias están presentes en WORKING_SET.targets/aggregate/metrics, usa requires_data=false y no solicites de nuevo líneas de detalle.
@@ -10367,10 +10369,11 @@ function v40SccSanitizePlan(raw={},state,selectedEventId){
   const allowedObjects=new Set(['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']);
   const rawObject=trim(raw?.requested_object),requested_object=allowedObjects.has(rawObject)?rawObject:v41InferRequestedObject('',rawObject||'none');
   const allowedTransitions=new Set(['CONTINUE','PROJECT','BROADEN','GENERALIZE','NAVIGATE','NEW_TOPIC']),transition=allowedTransitions.has(trim(raw?.transition).toUpperCase())?trim(raw.transition).toUpperCase():'';
-  const ri=raw?.intent&&typeof raw.intent==='object'?raw.intent:{},allowedIntentOps=new Set(['NONE','LIST','SORT','FILTER','RESET_FILTER','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']),allowedIntentTargets=new Set(['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']),allowedMatch=new Set(['none','exact','word','contains','semantic']);
-  const intent={operation:allowedIntentOps.has(trim(ri.operation).toUpperCase())?trim(ri.operation).toUpperCase():'NONE',target:allowedIntentTargets.has(trim(ri.target).toUpperCase())?trim(ri.target).toUpperCase():'NONE',field:trim(ri.field).slice(0,120),direction:['asc','desc','none'].includes(trim(ri.direction))?trim(ri.direction):'none',filter_field:trim(ri.filter_field).slice(0,120),filter_value:trim(ri.filter_value).slice(0,180),match_mode:allowedMatch.has(trim(ri.match_mode))?trim(ri.match_mode):'none',requires_data:ri.requires_data===true,confidence:Math.max(0,Math.min(1,Number(ri.confidence)||0))};
+  const ri=raw?.intent&&typeof raw.intent==='object'?raw.intent:{},allowedIntentOps=new Set(['NONE','LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']),allowedIntentTargets=new Set(['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']),allowedMatch=new Set(['none','exact','word','contains','semantic']);
+  const intent={operation:allowedIntentOps.has(trim(ri.operation).toUpperCase())?trim(ri.operation).toUpperCase():'NONE',target:allowedIntentTargets.has(trim(ri.target).toUpperCase())?trim(ri.target).toUpperCase():'NONE',field:trim(ri.field).slice(0,120),fields:arr(ri.fields).map(x=>trim(x)).filter(Boolean).slice(0,12),direction:['asc','desc','none'].includes(trim(ri.direction))?trim(ri.direction):'none',filter_field:trim(ri.filter_field).slice(0,120),filter_value:trim(ri.filter_value).slice(0,180),match_mode:allowedMatch.has(trim(ri.match_mode))?trim(ri.match_mode):'none',requires_data:ri.requires_data===true,confidence:Math.max(0,Math.min(1,Number(ri.confidence)||0))};
+  const rd=raw?.context_delta&&typeof raw.context_delta==='object'?raw.context_delta:{},focusModes=new Set(['KEEP','REPLACE','MULTI','CLEAR']),wsModes=new Set(['KEEP','REMATERIALIZE','TRANSFORM','RESET']),context_delta={focus_mode:focusModes.has(trim(rd.focus_mode).toUpperCase())?trim(rd.focus_mode).toUpperCase():'KEEP',working_set_mode:wsModes.has(trim(rd.working_set_mode).toUpperCase())?trim(rd.working_set_mode).toUpperCase():'KEEP'};
   const canonicalOperation=intent.operation!=='NONE'?intent.operation.toLowerCase():trim(raw?.operation).slice(0,80)||'answer';
-  return{relation:rel,reason:trim(raw?.reason).slice(0,800),confidence:conf,scope,event:trim(raw?.event).slice(0,180),events,subjects,domain:trim(raw?.domain).slice(0,80)||'general',operation:canonicalOperation,intent,transition,requested_object,dataset,presentation,data_requests};
+  return{relation:rel,reason:trim(raw?.reason).slice(0,800),confidence:conf,scope,event:trim(raw?.event).slice(0,180),events,subjects,domain:trim(raw?.domain).slice(0,80)||'general',operation:canonicalOperation,intent,context_delta,transition,requested_object,dataset,presentation,data_requests};
 }
 function v40SccArgsForRequest(request,plan){
   const args={...(request?.arguments||{})};
@@ -10712,11 +10715,20 @@ function v56CanonicalMaterializationTool(domain='general',requestedObject='none'
 }
 function v56EnsureCanonicalPlanIntegrity(plan={},contextBook={},state={},selectedEventId='',flowTrace=[]){
   let out={...plan,data_requests:arr(plan?.data_requests).map((r,i)=>({...r,index:i+1,arguments:{...(r?.arguments||{})}}))};
-  const ts=v56TargetSetFromCanonicalPlan(out,state,selectedEventId);
+  const plannerEvents=[...new Set(arr(out?.events).map(trim).filter(Boolean).map(x=>norm(x)))];
+  const canonicalTarget0=trim(out?.intent?.target).toUpperCase(),focusMode=trim(out?.context_delta?.focus_mode).toUpperCase()||'KEEP';
+  const previousTs=v45CompactTargetSet(contextBook?.multidim?.target_set||null);
+  // NHC: Gemini entrega un DELTA DE FOCO tipado. CE no relee lenguaje para decidir si uno/muchos.
+  if(focusMode==='REPLACE'&&trim(out.event)){out._dropPreviousTargetSet=true;out.events=[trim(out.event)];}
+  else if(focusMode==='CLEAR'){out._dropPreviousTargetSet=true;out.events=[];}
+  else if(focusMode==='MULTI'&&plannerEvents.length<2&&previousTs)out.events=v45TargetSetNames(previousTs);
+  const ts=out._dropPreviousTargetSet?null:v56TargetSetFromCanonicalPlan(out,state,selectedEventId);
   if(ts){out._targetSet=ts;out.events=v45TargetSetNames(ts);if(!trim(out.event)||!out.events.some(x=>norm(x)===norm(out.event)))out.event=out.events[0]||trim(out.event);if(!['all_events','global'].includes(out.scope))out.scope='named_event';out.data_requests=v45ExpandRequestsForTargetSet(out.data_requests,ts,flowTrace);}
-  const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null),desired=trim(out.requested_object)||'none',current=trim(ws?.requested_object)||trim(ws?.kind)||'none',intent=out?.intent||{},op=trim(intent.operation).toUpperCase(),localOp=['LIST','SORT','FILTER','RESET_FILTER','SUMMARY'].includes(op),subjects=arr(out.subjects).map(trim).filter(Boolean),previousSubjects=arr(md?.specific?.subjects).map(norm);
+  const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null),desired=trim(out.requested_object)||'none',current=trim(ws?.requested_object)||trim(ws?.kind)||'none',intent=out?.intent||{},op=trim(intent.operation).toUpperCase(),localOp=['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY'].includes(op),subjects=arr(out.subjects).map(trim).filter(Boolean),previousSubjects=arr(md?.specific?.subjects).map(norm);
+  if(op!=='FILTER'){out.data_requests=out.data_requests.map(r=>{if(trim(r?.tool)!=='event_purchase_lines')return r;const a={...(r.arguments||{})};delete a.product;return{...r,arguments:a};});}
   const objectChanged=desired!=='none'&&norm(desired)!==norm(current),newSubject=subjects.some(x=>!previousSubjects.includes(norm(x)));
-  const needsCanonicalSource=(localOp&&objectChanged)||newSubject||intent.requires_data===true;
+  const wsMode=trim(out?.context_delta?.working_set_mode).toUpperCase()||'KEEP';
+  const needsCanonicalSource=wsMode==='REMATERIALIZE'||(localOp&&objectChanged)||newSubject||intent.requires_data===true;
   if(needsCanonicalSource){
     const tool=v56CanonicalMaterializationTool(out.domain,desired,subjects);
     if(tool&&!out.data_requests.some(r=>trim(r?.tool)===tool)){
@@ -10754,6 +10766,23 @@ function v56SemanticTextMatch(candidate='',query='',mode='word'){
 function v56LocalSidecarResult(local=null){
   if(!local)return null;const tables=arr(local.tables).map((t,i)=>({key:trim(t?.key)||`working_set_${i+1}`,title:trim(t?.title)||'WORKING_SET',rows:arr(t?.rows)}));
   return{id:'scc_local_sidecar',name:'working_set_action',ok:true,title:trim(local.title)||'WORKING_SET',facts:{local_action:true},tables};
+}
+
+function v58CanCloseStructuredTurnLocally(plan={},results=[]){
+  const op=trim(plan?.intent?.operation).toUpperCase();
+  if(!['LIST','SORT','FILTER','RESET_FILTER','PROJECT','COUNT'].includes(op))return false;
+  if(arr(plan?.subjects).length)return false;
+  const allowed=new Set(['event_purchase_lines','event_donation_lines','master_catalog','event_bank','event_people','events_catalog','events_overview','working_set_action']);
+  return arr(results).every(r=>!r?.ok||allowed.has(trim(r?.name)));
+}
+function v58StructuredLocalClosure(userPrompt='',plan={},results=[],committed=null){
+  const op=trim(plan?.intent?.operation).toUpperCase(),md=v42CompactMultidim(committed),ws=v42CompactWorkingSet(md?.working_set||null);
+  if(op==='COUNT'){const count=Number.isFinite(Number(ws?.row_count))?Number(ws.row_count):0;return{title:'Recuento',answer:`${count} elemento${count===1?'':'s'} en el conjunto vigente.`,tables:[],files:[]};}
+  const localPlan={...plan,operation:op==='PROJECT'?'list':trim(plan.operation),presentation:{...(plan.presentation||{}),show_table:true,limit:0}};
+  const answer=v40CanonicalEnumerationAnswer(userPrompt,localPlan,results,'');
+  const show=v48CanonicalShowTable(results,localPlan,userPrompt),final={answer:answer||'',showTables:show.length?show:v40DefaultShowTable(results,localPlan,userPrompt),chartSpecs:[]};
+  let presentation=v26BuildPresentation(final,results,userPrompt,{wantsCharts:false,bankContext:plan.domain==='bank',staticPointLabels:false});presentation=v40HumanizeRenderedTables(presentation,userPrompt);
+  return{title:'Datos',answer:answer||`${Number(ws?.row_count)||0} elementos.`,tables:presentation.tables||[],files:[]};
 }
 
 async function v40ExecuteSccPlan(plan,state,selectedEventId,flowTrace=[],userPrompt=''){
@@ -11056,7 +11085,7 @@ function v42PlanSpecific(plan={}){
 function v42CommitMultidimContext(contextBook={},plan={},results=[],userPrompt=''){
   const prev=contextBook?.multidim||{},prevGeneral=v42CompactGeneral(prev.general||{}),prevSpecific=v42CompactSpecific(prev.specific||{}),prevWorking=v42CompactWorkingSet(prev.working_set||null),prevTargetSet=v45CompactTargetSet(prev.target_set||null);let stack=arr(prev.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v42CompactWorkingSet(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
   const canonicalTarget=trim(plan?.intent?.target).toUpperCase();
-  let general={...prevGeneral},specific=v42PlanSpecific(plan),workingSet=null,targetSet=v45CompactTargetSet(plan?._targetSet||(canonicalTarget==='TARGET_SET'?prevTargetSet:null));
+  let general={...prevGeneral},specific=v42PlanSpecific(plan),workingSet=null,targetSet=plan?._dropPreviousTargetSet?null:v45CompactTargetSet(plan?._targetSet||(canonicalTarget==='TARGET_SET'?prevTargetSet:null));
   const planEvent=trim(plan.event),eventChanged=!!(planEvent&&norm(planEvent)!==norm(prevGeneral.event));
   const subjectChanged=JSON.stringify(arr(prevSpecific.subjects).map(norm))!==JSON.stringify(arr(specific.subjects).map(norm));
   const domainChanged=norm(prevSpecific.domain)!==norm(specific.domain)&&specific.domain!=='general';
@@ -11578,7 +11607,7 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
   // aunque Gemini haya sido conservador y haya marcado requires_data=true.
   const intent=plan?.intent&&typeof plan.intent==='object'?plan.intent:null;if(!intent||Number(intent.confidence||0)<0.60)return null;
   const op=trim(intent.operation).toUpperCase(),target=trim(intent.target).toUpperCase();
-  if(!['LIST','SORT','FILTER','RESET_FILTER','SUMMARY','COUNT'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
+  if(!['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','COUNT'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
   const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null);if(!ws||ws.empty)return null;
   const desiredObject=trim(plan?.requested_object)||'none',currentObject=trim(ws?.requested_object)||trim(ws?.kind)||'none';
   if(desiredObject!=='none'&&norm(desiredObject)!==norm(currentObject))return null;
@@ -11592,6 +11621,14 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
     return response('Datos',answer,[table],files,committed,localPlan,`RESET_FILTER → PARENT_WORKING_SET (${rows.length})`);
   }
   if(!cache||!cache.complete)return null;
+  if(op==='PROJECT'){
+    const requested=arr(intent.fields).map(f=>v49CanonicalPresentationField(f)||trim(f)).filter(Boolean);
+    if(!requested.length&&trim(intent.field))requested.push(v49CanonicalPresentationField(intent.field)||trim(intent.field));
+    const visible=[];for(const f of requested){const k=v48ColumnKey(arr(cache.rows)[0]||{},f);if(k&&!visible.includes(k))visible.push(k);}
+    if(!visible.length)return null;
+    const nextCache=v50CompactWorkingRowCache({...cache,visible_fields:visible}),nextWs=v42CompactWorkingSet({...ws,row_cache:nextCache}),localPlan=makePlan('project',nextCache,true),specific=v42CompactSpecific({...md.specific,operation:'project'}),committed=v42CompactMultidim({...md,specific,working_set:nextWs,target_set:md.target_set,stack:md.stack}),rows=arr(nextCache.rows).map(r=>({...r})),table=v50LocalPresentationTable(nextCache,rows,visible),fake={id:'scc_intent_project',name:nextCache.source_tool||'working_set',ok:true,tables:[{key:nextCache.table_key,title:nextCache.title,rows}]},synthetic=`Lista canónica. Campos: ${visible.join(', ')}`,answer=v40CanonicalEnumerationAnswer(synthetic,{...localPlan,operation:'list',presentation:{...localPlan.presentation,show_table:true}},[fake],'')||`${rows.length} elementos.`,files=[{filename:fileSafe(`${table.title}_v3_0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(table.columns,rows)}];
+    return response('Datos',answer,[table],files,committed,localPlan,`PROJECT → WORKING_SET (${rows.length})`);
+  }
   if(op==='SUMMARY'){
     const localPlan=makePlan('summary',cache,false),specific=v42CompactSpecific({...md.specific,operation:'summary'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack});
     return response('Resumen',v50LocalPresentationSummary(ws),[],[],committed,localPlan,'SUMMARY → WORKING_SET');
@@ -11771,7 +11808,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // canonizamos el nombre de evento contra ce_eventos; la ejecución validará objetivos y datos.
   plan=v41CanonicalizePlanEvent(plan,state,selectedEventId);
   plan=v56EnsureCanonicalPlanIntegrity(plan,contextBook,state,selectedEventId,flowTrace);
-  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Gemini Plan Authority','OK',`Plan de Gemini aceptado sin reinterpretación lingüística posterior de CE · intent=${trim(plan?.intent?.operation)||'NONE'} · target=${trim(plan?.intent?.target)||'NONE'}.`);
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Gemini Plan Authority','OK',`Plan de Gemini aceptado sin reinterpretación lingüística posterior de CE · intent=${trim(plan?.intent?.operation)||'NONE'} · target=${trim(plan?.intent?.target)||'NONE'} · focus=${trim(plan?.context_delta?.focus_mode)||'KEEP'} · ws=${trim(plan?.context_delta?.working_set_mode)||'KEEP'}.`);
   const canonicalLocal=v53CanonicalLocalIntent(plan,contextBook,flowTrace);
   let localSidecar=null;
   if(canonicalLocal&&arr(plan.data_requests).length){localSidecar=canonicalLocal;zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Compound Plan','OK','Gemini pidió una transformación local del WORKING_SET y además fuentes canónicas. CE conserva ambas acciones en el mismo turno, sin reinterpretar el lenguaje.');}
@@ -11794,6 +11831,11 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   if(localSidecar){const localResult=v56LocalSidecarResult(localSidecar);if(localResult){executed.fullResults.push(localResult);executed.compactResults.push(v43CompactSccResultForPlan(localResult,'standard',plan,userPrompt));}}
   let committedMultidim=v42CommitMultidimContext(contextBook,plan,executed.memoryResults||executed.fullResults,userPrompt);
   if(localSidecar?.committed){const localMd=v42CompactMultidim(localSidecar.committed),externalMd=v42CompactMultidim(committedMultidim);committedMultidim=v42CompactMultidim({...externalMd,working_set:localMd?.working_set||externalMd?.working_set,target_set:externalMd?.target_set||localMd?.target_set,stack:externalMd?.stack});}
+  if(v58CanCloseStructuredTurnLocally(plan,executed.fullResults)){
+    const closure=v58StructuredLocalClosure(userPrompt,plan,executed.fullResults,committedMultidim),resultContext=v40SccResultContext(plan,executed.fullResults,committedMultidim),usage=summarizeGeminiUsageFromTrace(flowTrace),md=resultContext?.scc?.multidim||{},ws=md?.working_set;
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Structured Local Closure','OK',`Gemini decidió ${trim(plan?.intent?.operation)||trim(plan.operation)}; CE ejecutó datos y presentación sin segunda redacción IA. WORKING_SET=${v46WorkingSetTrace(ws)}.`);
+    return{ok:true,rejected:false,title:closure.title,answer:v40ConversationalPolish(closure.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:voiceConversation?[]:arr(closure.tables),files:[],provider:'gemini-scc226-structured-local-closure',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 NHC: Gemini interpreta; CE materializa y cierra operaciones estructuradas sin reinyectar datasets masivos',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:[...new Set(executed.fullResults.map(r=>trim(r?.name)).filter(Boolean))],scc:resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
   let realInstruction;
   if(plan._contextNavigationOnly)realInstruction=`Es una navegación de contexto, no una petición de lista. Confirma brevemente el foco recuperado: evento ${trim(plan.event)||'—'}. No amplíes ni mezcles datos de otro foco.`;
   else if(plan._workingSetEmptyReference)realInstruction='El usuario está refiriéndose al WORKING_SET anterior y ese conjunto está confirmado canónicamente como vacío. Responde de forma directa que no hay elementos de ese conjunto; NO amplíes al evento entero, NO inventes coincidencias y NO pidas otra herramienta.';
