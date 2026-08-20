@@ -9758,7 +9758,7 @@ function v40SccPlanTool(){
     domain:{type:'string'},
     requested_object:{type:'string',enum:['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']},
     intent:{type:'object',properties:{
-      operation:{type:'string',enum:['NONE','LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']},
+      operation:{type:'string',enum:['NONE','LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART','INSPECT_CONTEXT']},
       target:{type:'string',enum:['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']},
       field:{type:'string'},
       fields:{type:'array',items:{type:'string'},maxItems:12},
@@ -9879,8 +9879,10 @@ function v50CompactWorkingRowCache(raw=null){
 }
 function v50WorkingSetWithoutRowCache(raw=null){
   const c=v42CompactWorkingSet(raw);if(!c)return null;
-  const out={...c},view=c.row_cache?{table_key:trim(c.row_cache.table_key),title:trim(c.row_cache.title),primary_field:trim(c.row_cache.primary_field),visible_fields:arr(c.row_cache.visible_fields).slice(0,8),sort_field:trim(c.row_cache.sort_field),sort_direction:trim(c.row_cache.sort_direction)||'none',row_count:arr(c.row_cache.rows).length,complete:c.row_cache.complete===true}:null,parentView=c.parent_cache?{table_key:trim(c.parent_cache.table_key),title:trim(c.parent_cache.title),primary_field:trim(c.parent_cache.primary_field),visible_fields:arr(c.parent_cache.visible_fields).slice(0,8),sort_field:trim(c.parent_cache.sort_field),sort_direction:trim(c.parent_cache.sort_direction)||'none',row_count:arr(c.parent_cache.rows).length,complete:c.parent_cache.complete===true}:null;
+  const stripTarget=t=>{if(!t||typeof t!=='object')return t;const x={...t};delete x.row_cache;return x;};
+  const out={...c,targets:arr(c.targets).map(stripTarget)},view=c.row_cache?{table_key:trim(c.row_cache.table_key),title:trim(c.row_cache.title),primary_field:trim(c.row_cache.primary_field),visible_fields:arr(c.row_cache.visible_fields).slice(0,8),sort_field:trim(c.row_cache.sort_field),sort_direction:trim(c.row_cache.sort_direction)||'none',row_count:arr(c.row_cache.rows).length,complete:c.row_cache.complete===true}:null,parentView=c.parent_cache?{table_key:trim(c.parent_cache.table_key),title:trim(c.parent_cache.title),primary_field:trim(c.parent_cache.primary_field),visible_fields:arr(c.parent_cache.visible_fields).slice(0,8),sort_field:trim(c.parent_cache.sort_field),sort_direction:trim(c.parent_cache.sort_direction)||'none',row_count:arr(c.parent_cache.rows).length,complete:c.parent_cache.complete===true}:null;
   delete out.row_cache;delete out.parent_cache;
+  if(!out.targets.length){delete out.targets;delete out.partitioned;delete out.target_count;}
   if(view)out.view_state=view;if(parentView)out.parent_view_state=parentView;
   return out;
 }
@@ -10278,7 +10280,7 @@ USUARIO ACTUAL (ce_acceso, solo el usuario autenticado): ${userIdentity}.
 - Nunca reveles claves, credenciales ni datos de otros usuarios de acceso.
 - Ajusta el registro al interlocutor: si te habla con humor o de forma cachonda, puedes seguirle el tono con simpatía y sin forzar chistes. Si el tema exige precisión/solemnidad (incidencias, dinero delicado, errores), prioriza claridad. Si no es apropiado seguir una broma concreta, dilo en una frase y continúa con la ayuda útil.
 
-SCC 2.2.6 — WORKING_SET REUTILIZABLE + TARGET_SET + MEMORIA MULTIDIMENSIONAL:
+SCC 2.2.6 — ACTIVE_CONTEXT + WORKING_SET LINEAGE + TARGET_SET + CONTEXT ENVELOPE:
 En el PRIMER paso de CADA turno debes llamar exactamente una vez a scc_execute_plan. Esa llamada propone relación, foco y fuentes. ControlEvent valida el plan contra su memoria multidimensional, ejecuta las fuentes y te devuelve los hechos canónicos en la MISMA Interaction antes de que redactes.
 
 La memoria tiene dimensiones separadas:
@@ -10311,6 +10313,8 @@ NORMALIZADOR SEMÁNTICO OBLIGATORIO EN intent:
 - Tu trabajo NO es repetir las palabras del usuario sino traducirlas a una intención canónica estable. Variantes de género, número, conjugación, sinónimos o elipsis deben desembocar en la misma operación.
 - Usa intent.operation=LIST/SORT/FILTER/RESET_FILTER/SUMMARY/BACK cuando esa sea la acción real, independientemente de que el usuario diga «ordénala», «ponlas de mayor a menor», «solo...», «quita ese filtro», «vuelve a la lista completa» o cualquier formulación equivalente.\n- PROYECCIÓN DE CAMPOS: si el usuario mantiene el mismo conjunto y solo pide añadir, quitar, cambiar o reordenar datos/columnas visibles, usa intent.operation=PROJECT, target=WORKING_SET y rellena intent.fields con los campos semánticos solicitados. PROJECT jamás filtra filas ni cambia evento, sujeto u objeto.\n- DELTA DE FOCO: context_delta.focus_mode expresa TU conclusión lingüística, no una regla de CE. KEEP conserva el foco vigente; REPLACE sustituye el foco por el evento/sujeto actual (p. ej. cuando el usuario se queda con uno); MULTI conserva/crea varios objetivos simultáneos; CLEAR abandona el foco de evento. context_delta.working_set_mode indica KEEP, REMATERIALIZE si cambia entidad/granularidad y hacen falta datos, TRANSFORM para ordenar/filtrar/proyectar el conjunto actual, o RESET para recuperar su padre. No arrastres events antiguos cuando focus_mode=REPLACE.
 - intent.target=WORKING_SET cuando el usuario actúa sobre el conjunto vigente; PARENT_WORKING_SET cuando quiere quitar un filtro/recuperar la base; TARGET_SET cuando opera sobre una comparación múltiple.
+- INSPECCIÓN DEL CONTEXTO: si el usuario pregunta dónde estamos, de qué evento/lista/asunto hablamos o cuál es el foco vigente, usa intent.operation=INSPECT_CONTEXT, target=GENERAL y requires_data=false. No listes el catálogo ni consultes BBDD: CE responderá desde ACTIVE_CONTEXT/WORKING_SET.
+- LINEAGE DEL WORKING_SET: un WORKING_SET pertenece al ACTIVE_CONTEXT que lo creó. Si focus_mode=REPLACE/CLEAR cambia la identidad del foco, NO uses RESET_FILTER/SORT/FILTER/PROJECT/COUNT sobre el conjunto anterior. Si el nuevo turno solo cambia foco, deja intent.operation=NONE. Si además pide datos del nuevo foco, usa working_set_mode=REMATERIALIZE y las fuentes del nuevo foco.
 - Para SORT devuelve field canónico y direction. Si el usuario solo cambia ascendente/descendente o dice que lo quiere al contrario, conserva como field el campo de orden vigente que aparece en WORKING_SET.view_state y devuelve la dirección opuesta a view_state.sort_direction.
 - MAX/MIN/COUNT sobre un TARGET_SET o WORKING_SET ya materializado son operaciones sobre esos hechos canónicos: si las métricas necesarias están presentes en WORKING_SET.targets/aggregate/metrics, usa requires_data=false y no solicites de nuevo líneas de detalle.
 - Para FILTER devuelve filter_field canónico y filter_value normalizado semánticamente. No inventes productos ni filas. Si el usuario dice una familia en plural, normaliza el concepto (p. ej. plural→singular) y deja que CE lo confronte con las filas reales.
@@ -10358,12 +10362,14 @@ TIEMPO: ${localNow} · zona ${tz} · UTC ${utcNow}.
 
 Tras recibir function_result de scc_execute_plan, NO vuelvas a llamar herramientas: redacta la respuesta final solo con los datos devueltos y el contexto aportado por el usuario. No menciones SCC, herramientas, datasets, arquitectura ni la compactación.`;
 }
+function v58MultidimEnvelopeForModel(raw=null){
+  const md=v42CompactMultidim(raw||null);if(!md)return null;
+  const stackSummary=arr(md.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v50WorkingSetWithoutRowCache(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)})).map(x=>({specific:x.specific,working_set:x.working_set?{kind:x.working_set.kind,event:x.working_set.event,domain:x.working_set.domain,requested_object:x.working_set.requested_object,row_count:x.working_set.row_count,empty:x.working_set.empty}:null,target_set:x.target_set}));
+  return{general:v42CompactGeneral(md.general),specific:v42CompactSpecific(md.specific),working_set:v50WorkingSetWithoutRowCache(md.working_set),target_set:v45CompactTargetSet(md.target_set),active_context:v57CompactActiveContext(md.active_context,md.specific,md.target_set),ambient_context:v57CompactAmbientContext(md.ambient_context),stack_summary:stackSummary,stack_depth:arr(md.stack).length};
+}
 function v50ContextBookForModel(contextBook=null){
   if(!contextBook||typeof contextBook!=='object')return null;
-  const out={...contextBook,multidim:contextBook.multidim?{...contextBook.multidim}:contextBook.multidim};
-  if(out.multidim?.working_set)out.multidim.working_set=v50WorkingSetWithoutRowCache(out.multidim.working_set);
-  if(Array.isArray(out.multidim?.stack))out.multidim.stack=out.multidim.stack.map(x=>({...x,working_set:v50WorkingSetWithoutRowCache(x?.working_set||null)}));
-  return out;
+  return{visible_event:contextBook.visible_event||null,multidim:v58MultidimEnvelopeForModel(contextBook.multidim||null),current_message:contextBook.current_message||{},recent_focus:arr(contextBook.recent_focus).slice(0,3)};
 }
 function v40SccInitialInput(userPrompt,conversationHistory=[],conversationDigest='',contextBook=null){
   const recovery=v40RelevantLocalRecovery(conversationHistory);
@@ -10384,7 +10390,7 @@ function v40SccSanitizePlan(raw={},state,selectedEventId){
   const allowedObjects=new Set(['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']);
   const rawObject=trim(raw?.requested_object),requested_object=allowedObjects.has(rawObject)?rawObject:v41InferRequestedObject('',rawObject||'none');
   const allowedTransitions=new Set(['CONTINUE','PROJECT','BROADEN','GENERALIZE','NAVIGATE','NEW_TOPIC']),transition=allowedTransitions.has(trim(raw?.transition).toUpperCase())?trim(raw.transition).toUpperCase():'';
-  const ri=raw?.intent&&typeof raw.intent==='object'?raw.intent:{},allowedIntentOps=new Set(['NONE','LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']),allowedIntentTargets=new Set(['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']),allowedMatch=new Set(['none','exact','word','contains','semantic']);
+  const ri=raw?.intent&&typeof raw.intent==='object'?raw.intent:{},allowedIntentOps=new Set(['NONE','LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART','INSPECT_CONTEXT']),allowedIntentTargets=new Set(['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']),allowedMatch=new Set(['none','exact','word','contains','semantic']);
   const intent={operation:allowedIntentOps.has(trim(ri.operation).toUpperCase())?trim(ri.operation).toUpperCase():'NONE',target:allowedIntentTargets.has(trim(ri.target).toUpperCase())?trim(ri.target).toUpperCase():'NONE',field:trim(ri.field).slice(0,120),fields:arr(ri.fields).map(x=>trim(x)).filter(Boolean).slice(0,12),direction:['asc','desc','none'].includes(trim(ri.direction))?trim(ri.direction):'none',filter_field:trim(ri.filter_field).slice(0,120),filter_value:trim(ri.filter_value).slice(0,180),match_mode:allowedMatch.has(trim(ri.match_mode))?trim(ri.match_mode):'none',requires_data:ri.requires_data===true,confidence:Math.max(0,Math.min(1,Number(ri.confidence)||0))};
   const rd=raw?.context_delta&&typeof raw.context_delta==='object'?raw.context_delta:{},focusModes=new Set(['KEEP','REPLACE','MULTI','CLEAR']),wsModes=new Set(['KEEP','REMATERIALIZE','TRANSFORM','RESET']),context_delta={focus_mode:focusModes.has(trim(rd.focus_mode).toUpperCase())?trim(rd.focus_mode).toUpperCase():'KEEP',working_set_mode:wsModes.has(trim(rd.working_set_mode).toUpperCase())?trim(rd.working_set_mode).toUpperCase():'KEEP'};
   const canonicalOperation=intent.operation!=='NONE'?intent.operation.toLowerCase():trim(raw?.operation).slice(0,80)||'answer';
@@ -10683,7 +10689,8 @@ function v43CompactSccResultForPlan(result,detail='standard',plan={},userPrompt=
   // Las filas completas siguen en fullResults para lista/PDF/UI. Para la segunda llamada a
   // Gemini, una enumeración no necesita reinyectar el dossier completo: recibe muestras y
   // row_count; CE materializa la lista canónica después.
-  const modelDetail=(enumeration&&detail==='full'&&name!=='event_bank')?'standard':detail;
+  const rowHeavy=new Set(['person_dossier','event_purchase_lines','event_donation_lines','event_people','events_catalog','master_catalog','store_purchases']);
+  const modelDetail=(detail==='full'&&name!=='event_bank'&&(enumeration||rowHeavy.has(name)))?'standard':detail;
   let compact=v40CompactSccResult(result,modelDetail);
   if(name==='person_dossier'){
     const d=norm(plan?.domain),o=trim(plan?.requested_object),wanted=[];
@@ -10741,6 +10748,7 @@ function v56EnsureCanonicalPlanIntegrity(plan={},contextBook={},state={},selecte
     if(activeNames.length>=2)out.intent={...(out.intent||{}),target:trim(out?.intent?.target)||'TARGET_SET'};
   }else if(focusMode==='REPLACE'){
     out._dropPreviousTargetSet=true;const replacement=trim(out.event)||arr(out.events).map(trim).find(Boolean)||'';out.events=replacement?[replacement]:[];if(replacement){out.event=replacement;out.scope='named_event';}
+    out._focusIdentityChanged=!!(replacement&&activeNames.length&&activeNames.some(x=>norm(x)!==norm(replacement)));
   }else if(focusMode==='MULTI'){
     let multi=[];arr(out.events).forEach(x=>{multi=addUnique(multi,x);});multi=addUnique(multi,out.event);
     if(multi.length<2)activeNames.forEach(x=>{multi=addUnique(multi,x);});
@@ -10760,8 +10768,15 @@ function v56EnsureCanonicalPlanIntegrity(plan={},contextBook={},state={},selecte
   const ws=v42CompactWorkingSet(md?.working_set||null),desired=trim(out.requested_object)||'none',current=trim(ws?.requested_object)||trim(ws?.kind)||'none',intent=out?.intent||{},op=trim(intent.operation).toUpperCase(),localOp=['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY'].includes(op),subjects=arr(out.subjects).map(trim).filter(Boolean),previousSubjects=arr(md?.specific?.subjects).map(norm);
   if(op!=='FILTER'){out.data_requests=out.data_requests.map(r=>{if(trim(r?.tool)!=='event_purchase_lines')return r;const a={...(r.arguments||{})};delete a.product;return{...r,arguments:a};});}
   const objectChanged=desired!=='none'&&norm(desired)!==norm(current),newSubject=subjects.some(x=>!previousSubjects.includes(norm(x)));
-  const wsMode=trim(out?.context_delta?.working_set_mode).toUpperCase()||'KEEP';
-  const needsCanonicalSource=wsMode==='REMATERIALIZE'||(localOp&&objectChanged)||newSubject||intent.requires_data===true;
+  let wsMode=trim(out?.context_delta?.working_set_mode).toUpperCase()||'KEEP';
+  // NHC · LINEAGE GUARD: un cambio de identidad de ACTIVE_CONTEXT invalida la genealogía del
+  // WORKING_SET anterior. No reinterpretamos texto; rechazamos combinaciones tipadas imposibles.
+  if(out._focusIdentityChanged&&['RESET','TRANSFORM'].includes(wsMode)&&['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','COUNT','MAX','MIN'].includes(op)){
+    if(intent.requires_data===true||arr(out.data_requests).length){wsMode='REMATERIALIZE';out.context_delta={...(out.context_delta||{}),working_set_mode:'REMATERIALIZE'};out.intent={...intent,target:'EVENT',requires_data:true};}
+    else{out.context_delta={...(out.context_delta||{}),working_set_mode:'KEEP'};out.intent={...intent,operation:'NONE',target:'NONE',requires_data:false};out.operation='answer';out.data_requests=[];out._contextOnlyFocusReplace=true;}
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Working Set Lineage','OK',`Cambio de foco ${activeNames.join(' / ')||'—'} → ${arr(out.events).join(' / ')||'—'}: se invalida la genealogía del WORKING_SET anterior; no se ejecuta ${op||'operación'} sobre el contexto muerto.`);
+  }
+  const effectiveIntent=out?.intent||intent,needsCanonicalSource=wsMode==='REMATERIALIZE'||(localOp&&objectChanged)||newSubject||effectiveIntent.requires_data===true;
   if(needsCanonicalSource){
     const tool=v56CanonicalMaterializationTool(out.domain,desired,subjects);
     if(tool&&!out.data_requests.some(r=>trim(r?.tool)===tool)){
@@ -11119,6 +11134,7 @@ function v42CommitMultidimContext(contextBook={},plan={},results=[],userPrompt='
   const prev=contextBook?.multidim||{},prevGeneral=v42CompactGeneral(prev.general||{}),prevSpecific=v42CompactSpecific(prev.specific||{}),prevWorking=v42CompactWorkingSet(prev.working_set||null),prevTargetSet=v45CompactTargetSet(prev.target_set||null),prevActive=v57CompactActiveContext(prev.active_context||null,prevSpecific,prevTargetSet),ambientContext=v57CompactAmbientContext({visible_event:contextBook?.visible_event||prev?.ambient_context?.visible_event||{}});let stack=arr(prev.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v42CompactWorkingSet(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
   const canonicalTarget=trim(plan?.intent?.target).toUpperCase(),focusMode=trim(plan?.context_delta?.focus_mode).toUpperCase()||'KEEP';
   let general={...prevGeneral},specific=v42PlanSpecific(plan),workingSet=null,targetSet=plan?._dropPreviousTargetSet?null:v45CompactTargetSet(plan?._targetSet||(canonicalTarget==='TARGET_SET'?prevTargetSet:null)),activeContext=prevActive;
+  const lineageReset=plan?._focusIdentityChanged===true||plan?._contextOnlyFocusReplace===true;
   const planEvent=trim(plan.event),eventChanged=!!(planEvent&&norm(planEvent)!==norm(prevGeneral.event));
   const subjectChanged=JSON.stringify(arr(prevSpecific.subjects).map(norm))!==JSON.stringify(arr(specific.subjects).map(norm));
   const domainChanged=norm(prevSpecific.domain)!==norm(specific.domain)&&specific.domain!=='general';
@@ -11146,8 +11162,10 @@ function v42CommitMultidimContext(contextBook={},plan={},results=[],userPrompt='
       const canonicalTarget=trim(plan?.intent?.target).toUpperCase();
       const nonMaterializing=new Set(['LIST','SORT','SUMMARY','COUNT','MAX','MIN']);
       const compatiblePrev=!!(prevWorking&&!prevWorking.empty&&v42WorkingSetCompatible(prevWorking,plan));
-      if(!arr(results).length&&compatiblePrev&&nonMaterializing.has(canonicalOp)&&['WORKING_SET','PARENT_WORKING_SET','TARGET_SET',''].includes(canonicalTarget)){
+      if(!lineageReset&&!arr(results).length&&compatiblePrev&&nonMaterializing.has(canonicalOp)&&['WORKING_SET','PARENT_WORKING_SET','TARGET_SET',''].includes(canonicalTarget)){
         workingSet=prevWorking;
+      }else if(lineageReset&&!arr(results).length){
+        workingSet=null;
       }else{
       const built=targetSet?v46BuildPartitionedWorkingSet(plan,results,targetSet,userPrompt):v42BuildWorkingSet(plan,results,userPrompt);
       // Un filtro sin coincidencias es una vista vacía, no una orden de borrar la memoria base.
@@ -11649,8 +11667,20 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
   // aunque Gemini haya sido conservador y haya marcado requires_data=true.
   const intent=plan?.intent&&typeof plan.intent==='object'?plan.intent:null;if(!intent||Number(intent.confidence||0)<0.60)return null;
   const op=trim(intent.operation).toUpperCase(),target=trim(intent.target).toUpperCase();
+  const md=v42CompactMultidim(contextBook?.multidim||null);
+  if(op==='INSPECT_CONTEXT'){
+    const ac=v57CompactActiveContext(md?.active_context||null,md?.specific||null,md?.target_set||null),ws=v42CompactWorkingSet(md?.working_set||null),events=arr(ac?.events).filter(Boolean),subject=arr(ac?.subjects).filter(Boolean).join(' / '),parts=[];
+    if(events.length)parts.push(`evento${events.length===1?'':'s'} ${events.join(' y ')}`);else parts.push('sin evento conversacional fijado');
+    if(subject)parts.push(`sujeto ${subject}`);
+    if(trim(ac?.requested_object)&&trim(ac.requested_object)!=='none')parts.push(`objeto ${trim(ac.requested_object)}`);
+    if(ws){parts.push(`conjunto vigente de ${Number(ws.row_count)||0} elemento${Number(ws.row_count)===1?'':'s'}${trim(ws.filter_summary)?` (filtro: ${trim(ws.filter_summary)})`:''}`);const vf=arr(ws?.row_cache?.visible_fields);if(vf.length)parts.push(`campos ${vf.join(', ')}`);}
+    const answer=`Estamos trabajando con ${parts.join(', ')}.`;
+    const localPlan={...plan,operation:'inspect_context',presentation:{...(plan.presentation||{}),show_table:false,show_chart:false,limit:0},data_requests:[]},specific=v42CompactSpecific({...md.specific,operation:'inspect_context'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack}),resultContext=v40SccResultContext(localPlan,[],committed);
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Intent Normalizer','OK','INSPECT_CONTEXT resuelto desde ACTIVE_CONTEXT/WORKING_SET · 1 planificación IA · 0 BBDD · 0 redacción IA.');
+    return{title:'Contexto actual',answer,tables:[],files:[],committed,resultContext};
+  }
   if(!['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY','COUNT'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
-  const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null);if(!ws||ws.empty)return null;
+  const ws=v42CompactWorkingSet(md?.working_set||null);if(!ws||ws.empty)return null;
   const desiredObject=trim(plan?.requested_object)||'none',currentObject=trim(ws?.requested_object)||trim(ws?.kind)||'none';
   if(desiredObject!=='none'&&norm(desiredObject)!==norm(currentObject))return null;
   const cache=v50CompactWorkingRowCache(ws?.row_cache||null),parent=v50CompactWorkingRowCache(ws?.parent_cache||null),event=trim(ws.event)||trim(md?.specific?.event)||trim(md?.general?.event);
@@ -11873,6 +11903,11 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   if(localSidecar){const localResult=v56LocalSidecarResult(localSidecar);if(localResult){executed.fullResults.push(localResult);executed.compactResults.push(v43CompactSccResultForPlan(localResult,'standard',plan,userPrompt));}}
   let committedMultidim=v42CommitMultidimContext(contextBook,plan,executed.memoryResults||executed.fullResults,userPrompt);
   if(localSidecar?.committed){const localMd=v42CompactMultidim(localSidecar.committed),externalMd=v42CompactMultidim(committedMultidim);committedMultidim=v42CompactMultidim({...externalMd,working_set:localMd?.working_set||externalMd?.working_set,target_set:externalMd?.target_set||localMd?.target_set,stack:externalMd?.stack});}
+  if(plan._contextOnlyFocusReplace){
+    const resultContext=v40SccResultContext(plan,executed.fullResults,committedMultidim),md=resultContext?.scc?.multidim||{},ac=v57CompactActiveContext(md?.active_context||null,md?.specific||null,md?.target_set||null),events=arr(ac.events).filter(Boolean),usage=summarizeGeminiUsageFromTrace(flowTrace),answer=events.length===1?`Contexto actualizado: ahora estamos en ${events[0]}.`:(events.length?`Contexto actualizado: ahora trabajamos con ${events.join(' y ')}.`:'Contexto actualizado: no hay un evento fijado.');
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Working Set Lineage','OK','Cambio puro de foco cerrado localmente: 1 planificación IA · 0 BBDD · 0 redacción IA.');
+    return{ok:true,rejected:false,title:'Contexto actualizado',answer:v40ConversationalPolish(answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:[],files:[],provider:'gemini-scc226-context-lineage',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6 NHC: cambio de foco invalida el lineage anterior y se cierra sin reinyectar datos',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:[],scc:resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
   if(v58CanCloseStructuredTurnLocally(plan,executed.fullResults)){
     const closure=v58StructuredLocalClosure(userPrompt,plan,executed.fullResults,committedMultidim),resultContext=v40SccResultContext(plan,executed.fullResults,committedMultidim),usage=summarizeGeminiUsageFromTrace(flowTrace),md=resultContext?.scc?.multidim||{},ws=md?.working_set;
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Structured Local Closure','OK',`Gemini decidió ${trim(plan?.intent?.operation)||trim(plan.operation)}; CE ejecutó datos y presentación sin segunda redacción IA. WORKING_SET=${v46WorkingSetTrace(ws)}.`);
@@ -11885,7 +11920,9 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   else if(plan._narrativeCollection)realInstruction='El usuario pregunta si una colección aporta contexto, NO ha pedido enumerarla completa. Resume de frente qué aporta y destaca solo 2-4 ejemplos representativos de los datos canónicos. No conviertas la respuesta en una lista exhaustiva ni muestres tabla salvo petición expresa.';
   else realInstruction='Responde ahora al usuario con estos datos. No pidas otra herramienta. Contesta de frente en la primera frase y añade como máximo 1-2 hechos salientes que cambien o completen de forma útil la interpretación. Respeta la dimensión semántica de cada dato: no llames producto a un Destino/Segmento, ni persona a un evento, ni cambies el objeto solicitado por otra dimensión. Usa ce_eventos.descripcion y el texto de Documentos si están presentes y son pertinentes. Evita rodeos.';
   const derivedTruthBlock=v49DerivedTruthBlock(executed.fullResults,userPrompt);if(derivedTruthBlock)realInstruction+=` DERIVED TRUTH LOCK (calculado por CE; prevalece sobre cualquier cálculo/redacción propia): ${derivedTruthBlock}`;
-  const realResult={ok:executed.errors.length===0,scc_plan:plan,canonical_results:executed.compactResults,context_commit:committedMultidim,derived_truths:derivedTruthBlock,errors:executed.errors,instruction:realInstruction};
+  const modelCommit=v58MultidimEnvelopeForModel(committedMultidim),modelResults=arr(executed.compactResults).map(r=>{const x={...r};if(Array.isArray(x.tables))x.tables=x.tables.slice(0,6).map(t=>({...t,rows:arr(t.rows).slice(0,12),row_count:Number(t.row_count)||arr(t.rows).length,truncated:(Number(t.row_count)||arr(t.rows).length)>12}));return x;});
+  const realResult={ok:executed.errors.length===0,scc_plan:{...plan,data_requests:arr(plan.data_requests).map(r=>({tool:r.tool,arguments:r.arguments,index:r.index}))},canonical_results:modelResults,context_commit:modelCommit,derived_truths:derivedTruthBlock,errors:executed.errors,instruction:realInstruction};
+  const modelPayloadChars=JSON.stringify(realResult).length;zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Context Envelope','OK',`Sobre de segunda llamada=${modelPayloadChars} caracteres; WORKING_SET completo permanece en CE y no se reinyecta a Gemini.`);
 
   // Si Gemini falló dos veces construyendo JSON, no perdemos el turno: CE ya tiene un plan
   // seguro y, si procede, datos canónicos. Se cierra localmente sin inventar hechos.
