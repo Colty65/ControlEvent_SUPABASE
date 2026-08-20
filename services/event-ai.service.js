@@ -9722,13 +9722,24 @@ function v40SccPlanTool(){
     events:{type:'array',items:{type:'string'},description:'Conjunto de eventos cuando la consulta es comparativa/múltiple.'},
     subjects:{type:'array',items:{type:'string'},description:'Personas/entidades principales del turno, sin arrastrar sujetos anteriores irrelevantes.'},
     domain:{type:'string',description:'Dominio conversacional principal: event, incomes, purchases, donations, attendance, management, documentation, bank, person, comparison, catalog, metrics, meta, general u otro nombre breve.'},
-    operation:{type:'string',description:'Qué quiere hacer el usuario con el conjunto: summary, detail, list, sort, compare, count, max, min, explain, chart, etc.'},
+    operation:{type:'string',description:'Operación conversacional canónica resumida. Debe ser coherente con intent.operation.'},
+    intent:{type:'object',description:'NORMALIZADOR SEMÁNTICO: traduce cualquier formulación humana a una orden canónica que CE pueda validar y ejecutar sin conocer las palabras concretas usadas por el usuario.',properties:{
+      operation:{type:'string',enum:['NONE','LIST','SORT','FILTER','RESET_FILTER','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']},
+      target:{type:'string',enum:['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']},
+      field:{type:'string',description:'Campo canónico afectado, por ejemplo Importe, Producto, Fecha. Vacío si no aplica.'},
+      direction:{type:'string',enum:['asc','desc','none']},
+      filter_field:{type:'string',description:'Campo canónico del filtro. Vacío si no aplica.'},
+      filter_value:{type:'string',description:'Valor lingüísticamente normalizado por Gemini, no una fila inventada. Ej.: cervezas -> cerveza.'},
+      match_mode:{type:'string',enum:['none','exact','word','contains','semantic']},
+      requires_data:{type:'boolean',description:'false cuando el WORKING_SET/PARENT_WORKING_SET ya contiene lo necesario; en ese caso data_requests debe ir vacío.'},
+      confidence:{type:'number'}
+    },required:['operation','target','field','direction','filter_field','filter_value','match_mode','requires_data','confidence']},
     transition:{type:'string',enum:['CONTINUE','PROJECT','BROADEN','GENERALIZE','NAVIGATE','NEW_TOPIC'],description:'Transición conceptual propuesta. CE la valida por delta: CONTINUE mantiene foco; PROJECT cambia el objeto/granularidad; BROADEN cambia el ámbito; GENERALIZE vuelve al nivel general sin borrar el foco suspendido; NAVIGATE recupera un foco; NEW_TOPIC abre asunto nuevo.'},
     requested_object:{type:'string',enum:['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics'],description:'Objeto concreto que el usuario espera recibir. Conserva este objeto en seguimientos elípticos; no lo sustituyas por el nombre de una tabla o por el dominio general.'},
     dataset:{type:'object',properties:{id:{type:'string'},description:{type:'string'},carry_forward:{type:'boolean'}},description:'Identidad lógica del conjunto activo que permitirá entender después «estos», «ordénalos», «el más caro», «esas donaciones», etc.'},
     presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},table_hint:{type:'string'},sort_field:{type:'string'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}},description:'Transformación/presentación que CE debe aplicar físicamente. Para Z-A usa sort_direction=desc; A-Z=asc.'},
     data_requests:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:V40_SCC_DATA_TOOLS},purpose:{type:'string'},arguments:v40SccDataArgumentSchema()},required:['tool']},description:'Fuentes canónicas que ControlEvent debe ejecutar EN ESTE TURNO. Puede estar vacío solo si la respuesta no necesita datos o si se pide una aclaración puramente conversacional.'}
-  },required:['relation','reason','confidence','scope','event','events','subjects','domain','operation','dataset','presentation','data_requests']}};
+  },required:['relation','reason','confidence','scope','event','events','subjects','domain','operation','intent','dataset','presentation','data_requests']}};
 }
 
 function v40SccToolCatalogText(){
@@ -10224,6 +10235,18 @@ Cómo decidir el contexto:
 - JERARQUÍA DE VERDAD: (1) mensaje actual, (2) datos canónicos CE de este turno, (3) WORKING_SET.targets cuando hay varios objetivos, (4) TARGET_SET, (5) WORKING_SET común confirmado, (6) ESPECÍFICO, (7) GENERAL, (8) memoria corta compacta, (9) índice histórico. Un texto viejo de Zuzu nunca prevalece sobre un dato CE actual.
 - TRANSICIONES: CONTINUE mantiene el foco; PROJECT cambia solo el objeto/granularidad (p.ej. de productos a eventos); BROADEN cambia solo el ámbito; GENERALIZE conserva el evento GENERAL y suspende el foco específico; NAVIGATE recupera un foco suspendido; NEW_TOPIC abre otro asunto. No reconstruyas campos que el usuario no ha cambiado.
 - TRANSICIONES DETERMINISTAS: órdenes estructurales inequívocas como cambiar a un evento canónico o volver al contexto anterior pueden venir ya resueltas por CE. Respeta ese delta; no lo contradigas ni vuelvas a reinterpretarlo.
+
+NORMALIZADOR SEMÁNTICO OBLIGATORIO EN intent:
+- Tu trabajo NO es repetir las palabras del usuario sino traducirlas a una intención canónica estable. Variantes de género, número, conjugación, sinónimos o elipsis deben desembocar en la misma operación.
+- Usa intent.operation=LIST/SORT/FILTER/RESET_FILTER/SUMMARY/BACK cuando esa sea la acción real, independientemente de que el usuario diga «ordénala», «ponlas de mayor a menor», «solo...», «quita ese filtro», «vuelve a la lista completa» o cualquier formulación equivalente.
+- intent.target=WORKING_SET cuando el usuario actúa sobre el conjunto vigente; PARENT_WORKING_SET cuando quiere quitar un filtro/recuperar la base; TARGET_SET cuando opera sobre una comparación múltiple.
+- Para SORT devuelve field canónico y direction. Si el usuario solo cambia ascendente/descendente, conserva como field el campo de orden vigente que aparece en WORKING_SET.
+- Para FILTER devuelve filter_field canónico y filter_value normalizado semánticamente. No inventes productos ni filas. Si el usuario dice una familia en plural, normaliza el concepto (p. ej. plural→singular) y deja que CE lo confronte con las filas reales.
+- match_mode=word es la opción normal para nombres/familias; exact solo si el usuario exige identidad exacta; contains únicamente cuando pide expresamente contener texto; semantic si el concepto requiere equivalencia semántica y no una coincidencia textual directa.
+- Si WORKING_SET o PARENT_WORKING_SET ya contiene las filas necesarias, requires_data=false y data_requests=[]: CE ejecutará localmente la intención y NO debes pedir de nuevo la fuente.
+- Si faltan datos reales, requires_data=true y pide en data_requests las fuentes necesarias en el mismo plan.
+- No uses el campo operation o presentation para esconder una interpretación distinta de intent: intent es el contrato lingüístico canónico y operation/presentation deben ser coherentes con él.
+
 Datos y eficiencia:
 - ControlEvent es la única fuente factual de negocio. Si hacen falta cifras, personas, productos, movimientos, tickets, documentos, tareas, eventos o listas, inclúyelos en data_requests; pide varias fuentes independientes en EL MISMO plan.
 - Herramientas de un evento (event_dossier, event_breakdowns, event_purchase_lines, event_donation_lines, event_people, event_documentation, event_management, event_bank, event_bank_timeline, event_weather): scope=active_event o named_event. Para global usa herramientas globales. Si el plan ya fija scope/event/persona de forma inequívoca, ControlEvent puede completar esos argumentos omitidos sin reinterpretar tu intención.
@@ -10289,7 +10312,10 @@ function v40SccSanitizePlan(raw={},state,selectedEventId){
   const allowedObjects=new Set(['none','summary','products','donations','donors','purchases','people','events','documents','movements','bank','tasks','tickets','stores','incomes','metrics']);
   const rawObject=trim(raw?.requested_object),requested_object=allowedObjects.has(rawObject)?rawObject:v41InferRequestedObject('',rawObject||'none');
   const allowedTransitions=new Set(['CONTINUE','PROJECT','BROADEN','GENERALIZE','NAVIGATE','NEW_TOPIC']),transition=allowedTransitions.has(trim(raw?.transition).toUpperCase())?trim(raw.transition).toUpperCase():'';
-  return{relation:rel,reason:trim(raw?.reason).slice(0,800),confidence:conf,scope,event:trim(raw?.event).slice(0,180),events,subjects,domain:trim(raw?.domain).slice(0,80)||'general',operation:trim(raw?.operation).slice(0,80)||'answer',transition,requested_object,dataset,presentation,data_requests};
+  const ri=raw?.intent&&typeof raw.intent==='object'?raw.intent:{},allowedIntentOps=new Set(['NONE','LIST','SORT','FILTER','RESET_FILTER','SUMMARY','BACK','COUNT','MAX','MIN','COMPARE','DETAIL','CHART']),allowedIntentTargets=new Set(['NONE','WORKING_SET','PARENT_WORKING_SET','TARGET_SET','GENERAL','EVENT']),allowedMatch=new Set(['none','exact','word','contains','semantic']);
+  const intent={operation:allowedIntentOps.has(trim(ri.operation).toUpperCase())?trim(ri.operation).toUpperCase():'NONE',target:allowedIntentTargets.has(trim(ri.target).toUpperCase())?trim(ri.target).toUpperCase():'NONE',field:trim(ri.field).slice(0,120),direction:['asc','desc','none'].includes(trim(ri.direction))?trim(ri.direction):'none',filter_field:trim(ri.filter_field).slice(0,120),filter_value:trim(ri.filter_value).slice(0,180),match_mode:allowedMatch.has(trim(ri.match_mode))?trim(ri.match_mode):'none',requires_data:ri.requires_data===true,confidence:Math.max(0,Math.min(1,Number(ri.confidence)||0))};
+  const canonicalOperation=intent.operation!=='NONE'?intent.operation.toLowerCase():trim(raw?.operation).slice(0,80)||'answer';
+  return{relation:rel,reason:trim(raw?.reason).slice(0,800),confidence:conf,scope,event:trim(raw?.event).slice(0,180),events,subjects,domain:trim(raw?.domain).slice(0,80)||'general',operation:canonicalOperation,intent,transition,requested_object,dataset,presentation,data_requests};
 }
 function v40SccArgsForRequest(request,plan){
   const args={...(request?.arguments||{})};
@@ -11276,8 +11302,8 @@ function v40HumanizeRenderedTables(presentation,userPrompt=''){
 }
 function v50LocalPresentationCompatible(userPrompt='',state={},selectedEventId='',contextBook={}){
   const md=contextBook?.multidim||{},ws=v42CompactWorkingSet(md.working_set||null),msg=contextBook?.current_message||{};if(!ws||ws.empty)return null;
-  const p=norm(userPrompt),directionOnly=/\b(?:ascendente|descendente|creciente|decreciente|mayor\s+a\s+menor|menor\s+a\s+mayor|m[aá]s\s+a\s+menos|menos\s+a\s+m[aá]s)\b/.test(p),references=!!msg.references_working_set||/\b(?:ord[eé]nalos|ord[eé]nalas|reordena|vuelve\s+a\s+(?:listar|mostrar)|(?:esa|la|esta)\s+lista|(?:ese|el|este)\s+listado|esas\s+compras|esos\s+productos|de\s+esas|de\s+esos)\b/.test(p)||(directionOnly&&!!ws?.row_cache?.sort_field);
-  const summary=v49ExplicitSummaryIntent(userPrompt)&&references,sort=(/\b(?:ordena|ord[eé]nalos|ord[eé]nalas|ordenad[oa]|reordena|clasifica|ranking)\b/.test(p)||directionOnly)&&references,list=v40ExplicitEnumerationRequest(userPrompt)&&references;
+  const p=norm(userPrompt),directionOnly=/\b(?:ascendente|descendente|creciente|decreciente|mayor\s+a\s+menor|menor\s+a\s+mayor|m[aá]s\s+a\s+menos|menos\s+a\s+m[aá]s)\b/.test(p),references=!!msg.references_working_set||/\b(?:ord[eé]nalos|ord[eé]nalas|ord[eé]nalo|ord[eé]nala|reordena|vuelve\s+a\s+(?:listar|mostrar)|(?:esa|la|esta)\s+lista|(?:ese|el|este)\s+listado|esas\s+compras|esos\s+productos|de\s+esas|de\s+esos)\b/.test(p)||(directionOnly&&!!ws?.row_cache?.sort_field);
+  const summary=v49ExplicitSummaryIntent(userPrompt)&&references,sort=(/\b(?:ordena|ord[eé]nalos|ord[eé]nalas|ord[eé]nalo|ord[eé]nala|ordenad[oa]|reordena|clasifica|ranking)\b/.test(p)||directionOnly)&&references,list=v40ExplicitEnumerationRequest(userPrompt)&&references;
   if(!summary&&!sort&&!list)return null;
   // Un cambio explícito de evento/ámbito/entidad obliga a rematerializar. El cache local solo
   // transforma exactamente el conjunto ya confirmado.
@@ -11378,9 +11404,58 @@ function v51BuildLocalProductFilter(userPrompt='',state={},selectedEventId='',co
   if(!matched.length){const specific=v42CompactSpecific({...md.specific,operation:'filter_empty'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack}),resultContext=v40SccResultContext(plan,[],committed);zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Empty Filter Guard','OK',`El filtro «${term}» no tiene coincidencias en el WORKING_SET. Se responde vacío sin destruir el conjunto base · 0 planner · 0 BBDD.`);return{answer:`No se encontraron compras de ${term}${event?` en ${event}`:''}.`,title:'Compras',tables:[],files:[],resultContext,committed};}
   const amountKey=v48ColumnKey(sample,'Importe'),unitsKey=v48ColumnKey(sample,'Unidades'),recordsKey=v48ColumnKey(sample,'Nº registros');
   const amount=amountKey?matched.reduce((a,r)=>a+(v40MaybeNumber(r?.[amountKey])||0),0):null,units=unitsKey?matched.reduce((a,r)=>a+(v40MaybeNumber(r?.[unitsKey])||0),0):null,records=recordsKey?matched.reduce((a,r)=>a+(v40MaybeNumber(r?.[recordsKey])||0),0):matched.length;
-  const nextCache=v50CompactWorkingRowCache({...cache,rows:matched,complete:true}),baseCache=v50CompactWorkingRowCache(ws?.parent_cache||null)||cache,nextWs=v42CompactWorkingSet({...ws,kind:'products',requested_object:'products',row_count:matched.length,record_count:records,empty:false,filter_summary:`${event} · purchases · products · ${term}`,aggregate:{total_amount:amount,total_units:units},row_cache:nextCache,parent_cache:baseCache}),specific=v42CompactSpecific({...md.specific,domain:'purchases',requested_object:'products',operation:'filter'}),committed=v42CompactMultidim({...md,specific,working_set:nextWs,target_set:null,stack:md.stack}),resultContext=v40SccResultContext(plan,[],committed);
-  const fake={id:'scc_local_filter',name:trim(cache.source_tool)||'working_set',ok:true,tables:[{key:cache.table_key,title:cache.title,rows:matched}]},answer=v40CanonicalEnumerationAnswer(`${userPrompt}\nCampos: Producto, Destino, Unidades, Precio, Importe`,{...plan,operation:'list',presentation:{...plan.presentation,show_table:true}},[fake],'')||`${matched.length} coincidencia${matched.length===1?'':'s'} para ${term}.`,visible=arr(cache.visible_fields).length?arr(cache.visible_fields):['Producto','Destino','Unidades','Precio','Importe'],table=v50LocalPresentationTable(nextCache,matched,visible),files=[{filename:fileSafe(`${table.title}_v3_0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(table.columns,matched)}];
-  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Filtro local','OK',`Filtro «${term}» aplicado a ${cache.rows.length} filas cacheadas → ${matched.length} · 0 planner · 0 BBDD · 0 redacción IA.`);return{answer,title:'Productos',tables:[table],files,resultContext,committed};
+  // Si el propio filtro incluye una ordenación (p. ej. «solo las cervezas descendente»),
+  // se aplica sobre el subconjunto recién creado. La vista filtrada nace ya ordenada y la
+  // siguiente continuación («ahora ascendente/descendente») conserva el mismo campo.
+  let filteredRows=[...matched],filterSort=v40PromptSortDirective(userPrompt,plan);
+  if(!filterSort.field){const dir=v29SortDirection(userPrompt);if(dir)filterSort={field:'Importe',direction:dir};}
+  if(filterSort.field){const physical=v49CanonicalPresentationField(filterSort.field),key=v48ColumnKey(filteredRows[0]||{},physical);if(key){const direction=filterSort.direction==='none'?'asc':filterSort.direction,mult=direction==='desc'?-1:1;filteredRows.sort((a,b)=>{const av=a?.[key],bv=b?.[key],an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});filterSort={field:physical,direction};plan.presentation.sort_field=physical;plan.presentation.sort_direction=direction;}else filterSort={field:'',direction:'none'};}
+  const nextCache=v50CompactWorkingRowCache({...cache,rows:filteredRows,complete:true,sort_field:filterSort.field||'',sort_direction:filterSort.direction||'none'}),baseCache=v50CompactWorkingRowCache(ws?.parent_cache||null)||cache,nextWs=v42CompactWorkingSet({...ws,kind:'products',requested_object:'products',row_count:filteredRows.length,record_count:records,empty:false,filter_summary:`${event} · purchases · products · ${term}`,aggregate:{total_amount:amount,total_units:units},row_cache:nextCache,parent_cache:baseCache}),specific=v42CompactSpecific({...md.specific,domain:'purchases',requested_object:'products',operation:'filter'}),committed=v42CompactMultidim({...md,specific,working_set:nextWs,target_set:null,stack:md.stack}),resultContext=v40SccResultContext(plan,[],committed);
+  const fake={id:'scc_local_filter',name:trim(cache.source_tool)||'working_set',ok:true,tables:[{key:cache.table_key,title:cache.title,rows:filteredRows}]},answer=v40CanonicalEnumerationAnswer(`${userPrompt}\nCampos: Producto, Destino, Unidades, Precio, Importe`,{...plan,operation:'list',presentation:{...plan.presentation,show_table:true}},[fake],'')||`${filteredRows.length} coincidencia${filteredRows.length===1?'':'s'} para ${term}.`,visible=arr(cache.visible_fields).length?arr(cache.visible_fields):['Producto','Destino','Unidades','Precio','Importe'],table=v50LocalPresentationTable(nextCache,filteredRows,visible),files=[{filename:fileSafe(`${table.title}_v3_0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(table.columns,filteredRows)}];
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Filtro local','OK',`Filtro «${term}» aplicado a ${cache.rows.length} filas cacheadas → ${filteredRows.length}${filterSort.field?` · orden=${filterSort.field} ${filterSort.direction.toUpperCase()}`:''} · 0 planner · 0 BBDD · 0 redacción IA.`);return{answer,title:'Productos',tables:[table],files,resultContext,committed};
+}
+
+// SCC 2.2.6 · INTENT NORMALIZER (Gemini -> orden canónica -> CE ejecuta).
+// Esta capa NO reconoce castellano mediante regex. Recibe exclusivamente intent ya normalizado
+// por Gemini en la MISMA llamada de planificación y opera sobre filas reales del WORKING_SET.
+function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
+  const intent=plan?.intent&&typeof plan.intent==='object'?plan.intent:null;if(!intent||Number(intent.confidence||0)<0.60||intent.requires_data===true)return null;
+  const op=trim(intent.operation).toUpperCase(),target=trim(intent.target).toUpperCase();
+  if(!['LIST','SORT','FILTER','RESET_FILTER','SUMMARY'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
+  const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null);if(!ws||ws.empty)return null;
+  const cache=v50CompactWorkingRowCache(ws?.row_cache||null),parent=v50CompactWorkingRowCache(ws?.parent_cache||null),event=trim(ws.event)||trim(md?.specific?.event)||trim(md?.general?.event);
+  const makePlan=(operation,workingCache,showTable=true)=>({...plan,relation:'continue',transition:'CONTINUE',event:event||trim(plan.event),scope:trim(ws.scope)||trim(plan.scope)||'named_event',domain:trim(ws.domain)||trim(plan.domain)||'general',operation,requested_object:trim(ws.requested_object)||trim(plan.requested_object)||trim(ws.kind)||'none',presentation:{...(plan.presentation||{}),show_table:showTable,show_chart:false,table_hint:trim(workingCache?.table_key),limit:0},data_requests:[]});
+  const response=(title,answer,tables,files,committed,localPlan,tag)=>{const resultContext=v40SccResultContext(localPlan,[],committed);zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Intent Normalizer','OK',`${tag} interpretado por Gemini y ejecutado por CE sobre memoria canónica · 1 planificación IA · 0 BBDD · 0 redacción IA.`);return{title,answer,tables,files,committed,resultContext};};
+  if(op==='RESET_FILTER'){
+    if(!parent)return null;const rows=arr(parent.rows).map(r=>({...r}));if(!rows.length)return null;
+    const sample=rows[0]||{},amountKey=v48ColumnKey(sample,'Importe'),unitsKey=v48ColumnKey(sample,'Unidades'),recordsKey=v48ColumnKey(sample,'Nº registros'),amount=amountKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[amountKey])||0),0):null,units=unitsKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[unitsKey])||0),0):null,records=recordsKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[recordsKey])||0),0):rows.length;
+    const restored=v42CompactWorkingSet({...ws,row_count:rows.length,record_count:records,empty:false,filter_summary:'',aggregate:{total_amount:amount,total_units:units},row_cache:parent,parent_cache:null}),specific=v42CompactSpecific({...md.specific,operation:'list'}),committed=v42CompactMultidim({...md,specific,working_set:restored,target_set:md.target_set,stack:md.stack}),localPlan=makePlan('list',parent,true),visible=arr(parent.visible_fields).length?arr(parent.visible_fields):arr(parent.columns).slice(0,8),table=v50LocalPresentationTable(parent,rows,visible),fake={id:'scc_intent_reset',name:parent.source_tool||'working_set',ok:true,tables:[{key:parent.table_key,title:parent.title,rows}]},answer=v40CanonicalEnumerationAnswer('lista completa del conjunto padre',{...localPlan,presentation:{...localPlan.presentation,show_table:true}},[fake],'')||`Se recupera la lista completa de ${rows.length} elementos.`,files=[{filename:fileSafe(`${table.title}_v3_0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(table.columns,rows)}];
+    return response('Datos',answer,[table],files,committed,localPlan,`RESET_FILTER → PARENT_WORKING_SET (${rows.length})`);
+  }
+  if(!cache||!cache.complete)return null;
+  if(op==='SUMMARY'){
+    const localPlan=makePlan('summary',cache,false),specific=v42CompactSpecific({...md.specific,operation:'summary'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack});
+    return response('Resumen',v50LocalPresentationSummary(ws),[],[],committed,localPlan,'SUMMARY → WORKING_SET');
+  }
+  let rows=arr(cache.rows).map(r=>({...r}));if(!rows.length)return null;let nextCache=cache,nextWs=ws,operation=op.toLowerCase();
+  const localPlan=makePlan(operation,cache,true);
+  if(op==='FILTER'){
+    const field=trim(intent.filter_field)||trim(intent.field)||'Producto',key=v48ColumnKey(rows[0]||{},field),value=norm(intent.filter_value),mode=trim(intent.match_mode)||'word';if(!key||!value)return null;
+    const hit=v=>{const n=norm(v);if(mode==='exact')return n===value;if(mode==='contains')return n.includes(value);return v29WordBoundaryContains(n,value);};
+    const matched=rows.filter(r=>hit(r?.[key]));
+    if(!matched.length){const specific=v42CompactSpecific({...md.specific,operation:'filter_empty'}),committed=v42CompactMultidim({...md,specific,working_set:ws,target_set:md.target_set,stack:md.stack}),emptyPlan={...localPlan,operation:'filter',presentation:{...localPlan.presentation,show_table:false}};return response('Datos',`No se encontraron coincidencias para ${trim(intent.filter_value)}${event?` en ${event}`:''}.`,[],[],committed,emptyPlan,`FILTER ${field}=${trim(intent.filter_value)} → 0 (base preservada)`);}
+    rows=matched;
+    const sample=rows[0]||{},amountKey=v48ColumnKey(sample,'Importe'),unitsKey=v48ColumnKey(sample,'Unidades'),recordsKey=v48ColumnKey(sample,'Nº registros'),amount=amountKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[amountKey])||0),0):null,units=unitsKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[unitsKey])||0),0):null,records=recordsKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[recordsKey])||0),0):rows.length;
+    nextCache=v50CompactWorkingRowCache({...cache,rows,complete:true}),nextWs=v42CompactWorkingSet({...ws,kind:trim(ws.kind)||'products',requested_object:trim(ws.requested_object)||'products',row_count:rows.length,record_count:records,empty:false,filter_summary:`${field}=${trim(intent.filter_value)}`,aggregate:{total_amount:amount,total_units:units},row_cache:nextCache,parent_cache:parent||cache});
+    localPlan.operation='filter';localPlan.presentation.table_hint=cache.table_key;
+  }
+  if(op==='SORT'){
+    const field=v49CanonicalPresentationField(trim(intent.field)||trim(cache.sort_field)),direction=['asc','desc'].includes(trim(intent.direction))?trim(intent.direction):(trim(cache.sort_direction)==='desc'?'desc':'asc');if(!field)return null;const key=v48ColumnKey(rows[0]||{},field);if(!key)return null;const mult=direction==='desc'?-1:1;
+    rows.sort((a,b)=>{const av=a?.[key],bv=b?.[key],an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});
+    nextCache=v50CompactWorkingRowCache({...cache,rows,complete:true,sort_field:field,sort_direction:direction}),nextWs=v42CompactWorkingSet({...ws,row_cache:nextCache}),localPlan.presentation.sort_field=field,localPlan.presentation.sort_direction=direction;
+  }
+  const specific=v42CompactSpecific({...md.specific,domain:trim(nextWs.domain)||trim(md?.specific?.domain),requested_object:trim(nextWs.requested_object)||trim(md?.specific?.requested_object),operation}),committed=v42CompactMultidim({...md,specific,working_set:nextWs,target_set:md.target_set,stack:md.stack}),visible=arr(nextCache.visible_fields).length?arr(nextCache.visible_fields):arr(nextCache.columns).slice(0,8),table=v50LocalPresentationTable(nextCache,rows,visible),fake={id:'scc_intent_local',name:nextCache.source_tool||'working_set',ok:true,tables:[{key:nextCache.table_key,title:nextCache.title,rows}]},synthetic=`Lista canónica. Campos: ${visible.join(', ')}${op==='SORT'&&localPlan.presentation.sort_field?`. Orden: ${localPlan.presentation.sort_field} ${localPlan.presentation.sort_direction}`:''}`,answer=v40CanonicalEnumerationAnswer(synthetic,{...localPlan,operation:'list',presentation:{...localPlan.presentation,show_table:true}},[fake],'')||`${rows.length} elementos.`,files=[{filename:fileSafe(`${table.title}_v3_0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(table.columns,rows)}];
+  return response('Datos',answer,[table],files,committed,localPlan,`${op} → WORKING_SET (${rows.length})`);
 }
 function v51CanonicalCurrentProductFilter(state={},userPrompt=''){return trim(v29ProductSearchTerm(state,userPrompt));}
 function v51SanitizeSccRequestFilters(args={},req={},plan={},state={},userPrompt='',flowTrace=[]){
@@ -11405,8 +11480,8 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // Entre turnos usamos una cápsula local acotada. Así el histórico de tool-results no crece de
   // 10k a cientos de miles de tokens, pero las 4/5 aclaraciones recientes siguen disponibles.
   const incomingId=trim(previousInteractionId);let currentId='',resetInteractionId=!!incomingId,payload;
-  zuzuTracePush(flowTrace,'v3_0_exp · FIX34 BASE HÍBRIDA + SCC 2.2.6 FIX2','OK','Build 20260819-SCC226-FIX2: voz híbrida intacta; EVENT AUTHORITY LOCK + PHYSICAL SORT LOCK + LOCAL PRESENTATION cierran las regresiones de contexto/orden sin tocar TARGET_SET ni la lógica de voz.');
-  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 FIX2 CONTEXTO',modelPolicy.tier==='lite'?'OK':'INFO',`CE resuelve primero transiciones estructurales inequívocas; Gemini decide el resto. GENERAL/ESPECÍFICO/WORKING_SET/TARGET_SET/STACK siguen siendo la memoria vigente. Interaction nativa=solo turno actual. Modelo=${model}.`);
+  zuzuTracePush(flowTrace,'v3_0_exp · FIX34 BASE HÍBRIDA + SCC 2.2.6 FIX2','OK','Build 20260820-SCC226-INTENT: Gemini normaliza intención lingüística; CE valida SCC y ejecuta LIST/SORT/FILTER/RESET_FILTER/SUMMARY sobre memoria canónica. Voz híbrida intacta.');
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 FIX2 CONTEXTO',modelPolicy.tier==='lite'?'OK':'INFO',`Gemini normaliza la intención del turno y propone fuentes; CE valida el delta y ejecuta sobre GENERAL/ESPECÍFICO/WORKING_SET/TARGET_SET/STACK. Interaction nativa=solo turno actual. Modelo=${model}.`);
   if(incomingId)zuzuTracePush(flowTrace,'v3_0_exp · SCC · Compactación de memoria','OK','Se descarta el predecessor nativo del turno anterior para no reinyectar antiguos tool-results; se conserva el hilo humano mediante la cápsula SCC local.');
 
   // SCC 2.2.6: si WORKING_SET ya contiene exactamente los metadatos solicitados, CE responde
@@ -11430,7 +11505,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
 
   // Una vista filtrada conserva una copia compacta de su conjunto padre. Peticiones como
   // «quita el filtro», «todos los productos» o «lista completa» restauran esa base sin IA/BBDD.
-  const localFilterReset=v52BuildLocalFilterReset(userPrompt,state,selectedEventId,contextBook,flowTrace);
+  const localFilterReset=null; // v53: la frase la normaliza Gemini; CE ya no decide RESET_FILTER por regex.
   if(localFilterReset){
     const md=localFilterReset.resultContext?.scc?.multidim||{},ws=md?.working_set;
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Conjunto padre restaurado.`);
@@ -11439,7 +11514,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
 
   // Los filtros de producto que refinan una lista vigente se aplican al cache local. Un filtro
   // sin coincidencias NO sustituye el conjunto base por un WORKING_SET vacío.
-  const localFilter=v51BuildLocalProductFilter(userPrompt,state,selectedEventId,contextBook,flowTrace);
+  const localFilter=null; // v53: Gemini entrega FILTER canónico; CE solo ejecuta el filtro sobre WORKING_SET.
   if(localFilter){
     const md=localFilter.resultContext?.scc?.multidim||{},ws=md?.working_set;
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Filtro local aplicado sin perder la base.`);
@@ -11449,7 +11524,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // SCC 2.2.6 FIX2: LIST/SORT/SUMMARY sobre el conjunto vigente son transformaciones de
   // presentación, no nuevas preguntas a Gemini. Si las filas canónicas están cacheadas en el
   // WORKING_SET, CE responde sin planner, sin BBDD y sin redacción IA.
-  const localPresentation=v50BuildLocalPresentation(userPrompt,state,selectedEventId,contextBook,flowTrace);
+  const localPresentation=null; // v53: LIST/SORT/SUMMARY se normalizan en intent por Gemini.
   if(localPresentation){
     const md=localPresentation.resultContext?.scc?.multidim||{},ws=md?.working_set;
     zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 FIX2 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Presentación local reutilizada.`);
@@ -11492,8 +11567,17 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
     if(!calls.length){deterministicFallbackPlan=v44DeterministicFallbackPlan(userPrompt,state,selectedEventId,contextBook,flowTrace);if(!deterministicFallbackPlan){const e=new Error('SCC no devolvió el plan obligatorio.');e.status=502;throw e;}plan=deterministicFallbackPlan;}
     else{chosen=v40ChoosePlanCall(calls,state,selectedEventId);if(!chosen){deterministicFallbackPlan=v44DeterministicFallbackPlan(userPrompt,state,selectedEventId,contextBook,flowTrace);if(!deterministicFallbackPlan){const e=new Error('SCC no devolvió un plan utilizable.');e.status=502;throw e;}plan=deterministicFallbackPlan;}else plan=v40HumanPresentationPlan(chosen.plan,userPrompt,voiceConversation);}
   }
-  plan=v40StrengthenPlanCoverage(plan,userPrompt,voiceConversation,flowTrace);
+  // Primero valida el delta de contexto. Después, si Gemini ha normalizado una operación pura
+  // sobre WORKING_SET, CE la ejecuta directamente y NO rematerializa datos ni pide una segunda
+  // redacción IA. Las reglas regex antiguas quedan fuera del camino principal.
   plan=v41ApplyContextContract(plan,contextBook,userPrompt,state,selectedEventId,flowTrace);
+  const canonicalLocal=v53CanonicalLocalIntent(plan,contextBook,flowTrace);
+  if(canonicalLocal){
+    const md=canonicalLocal.resultContext?.scc?.multidim||{},ws=md?.working_set,usage=summarizeGeminiUsageFromTrace(flowTrace);
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Memoria','OK',`GENERAL=${md?.general?.event||'—'} · ESPECÍFICO=${md?.specific?.event||'—'} / ${arr(md?.specific?.subjects).join(' / ')||'—'} / ${md?.specific?.domain||'general'} / ${md?.specific?.requested_object||'none'} · WORKING_SET=${v46WorkingSetTrace(ws)} · TARGET_SET=${v45TargetSetNames(md?.target_set).join(' / ')||'—'} · STACK=${arr(md?.stack).length}. Intención lingüística normalizada por Gemini; ejecución local CE.`);
+    return{ok:true,rejected:false,title:canonicalLocal.title,answer:v40ConversationalPolish(canonicalLocal.answer,userPrompt,voiceConversation),warnings:[],charts:[],tables:voiceConversation?[]:arr(canonicalLocal.tables),files:voiceConversation?[]:arr(canonicalLocal.files),provider:'gemini-scc226-intent-normalizer',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'SCC 2.2.6: Gemini Intent Normalizer + CE canonical executor; sin regex lingüístico en el camino principal de LIST/SORT/FILTER/RESET_FILTER/SUMMARY',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext:canonicalLocal.resultContext,tools:[],scc:canonicalLocal.resultContext.scc,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
+  plan=v40StrengthenPlanCoverage(plan,userPrompt,voiceConversation,flowTrace);
   plan=v48ApplyPresentationContractToPlan(plan,userPrompt,flowTrace);
   if(plan._presentationSummaryOnly){
     const before=arr(plan.data_requests).length,explicitNarrative=/\b(?:contexto|descripci[oó]n|documentos?|por\s+qu[eé]|explica|historia|programa|acuerdos?|incidencias?)\b/.test(norm(userPrompt));
