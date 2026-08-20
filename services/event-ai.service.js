@@ -9910,6 +9910,12 @@ function v45ReferencesTargetSet(prompt=''){
 }
 function v45ResolveEventTargetSet(state={},selectedEventId='',prompt='',plan={},previousTargetSet=null){
   const explicit=v26ComparisonEventNamesFromPrompt(prompt,state);
+  // v3_0_exp · INTENT AUTHORITY: una mención explícita de UN solo evento en el mensaje actual
+  // cierra el TARGET_SET comparativo anterior, salvo que el propio mensaje siga refiriéndose
+  // inequívocamente al conjunto múltiple (ambos/los dos/etc.). Gemini interpreta la intención;
+  // CE solo aplica la jerarquía de contexto y evita que `plan.events` arrastre objetivos viejos.
+  const explicitSingle=v50TrustedExplicitEventMention(state,prompt);
+  if(explicitSingle&&explicit.length<2&&!v45ReferencesTargetSet(prompt))return null;
   const planned=arr(plan?.events).map(trim).filter(Boolean);
   const fromRequests=arr(plan?.data_requests).map(r=>trim(r?.arguments?.event)).filter(Boolean);
   let source='current_message',names=[...explicit,...planned,...fromRequests];
@@ -11461,7 +11467,10 @@ function v51BuildLocalProductFilter(userPrompt='',state={},selectedEventId='',co
 // Esta capa NO reconoce castellano mediante regex. Recibe exclusivamente intent ya normalizado
 // por Gemini en la MISMA llamada de planificación y opera sobre filas reales del WORKING_SET.
 function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
-  const intent=plan?.intent&&typeof plan.intent==='object'?plan.intent:null;if(!intent||Number(intent.confidence||0)<0.60||intent.requires_data===true)return null;
+  // `requires_data` es una petición del normalizador, no autoridad sobre la caché. Si CE ya
+  // posee un WORKING_SET completo, LIST/SORT/FILTER/RESET_FILTER/SUMMARY se ejecutan localmente
+  // aunque Gemini haya sido conservador y haya marcado requires_data=true.
+  const intent=plan?.intent&&typeof plan.intent==='object'?plan.intent:null;if(!intent||Number(intent.confidence||0)<0.60)return null;
   const op=trim(intent.operation).toUpperCase(),target=trim(intent.target).toUpperCase();
   if(!['LIST','SORT','FILTER','RESET_FILTER','SUMMARY'].includes(op)||!['WORKING_SET','PARENT_WORKING_SET'].includes(target))return null;
   const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null);if(!ws||ws.empty)return null;
@@ -11502,9 +11511,54 @@ function v53CanonicalLocalIntent(plan={},contextBook={},flowTrace=[]){
 function v51CanonicalCurrentProductFilter(state={},userPrompt=''){return trim(v29ProductSearchTerm(state,userPrompt));}
 function v51SanitizeSccRequestFilters(args={},req={},plan={},state={},userPrompt='',flowTrace=[]){
   const out={...args};if(trim(req?.tool)!=='event_purchase_lines')return out;
+  const intent=plan?.intent&&typeof plan.intent==='object'?plan.intent:null,op=trim(intent?.operation).toUpperCase();
+  // v3_0_exp · INTENT CANÓNICO = AUTORIDAD LINGÜÍSTICA. Una vez Gemini ha normalizado el
+  // turno, CE NO vuelve a releer el castellano con v29ProductSearchTerm. Así palabras como
+  // «más», «con», pronombres o preposiciones nunca pueden reaparecer como filtros físicos.
+  if(intent&&op!=='NONE') {
+    if(op==='FILTER'&&/^(?:producto|product)$/i.test(trim(intent.filter_field)||trim(intent.field)||'Producto')&&trim(intent.filter_value)) {
+      out.product=trim(intent.filter_value);
+      zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Canonical Filter Authority','OK',`Filtro físico de producto tomado exclusivamente de intent.filter_value=«${trim(intent.filter_value)}».`);
+    } else if('product' in out) {
+      delete out.product;
+      zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Canonical Filter Authority','OK',`Se elimina el filtro físico de producto porque intent.operation=${op} no es FILTER de Producto.`);
+    }
+    return out;
+  }
+  // Compatibilidad temporal para rutas legacy que aún no llegan con intent canónico.
   const canonical=v51CanonicalCurrentProductFilter(state,userPrompt),planned=trim(out.product);
   if(planned&&!canonical){delete out.product;zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Filter Authority Lock','OK',`Se descarta el filtro de producto propuesto por planner «${planned}»: el mensaje actual no nombra ningún producto canónico.`);}
   else if(canonical&&norm(planned)!==norm(canonical)){out.product=canonical;zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Filter Authority Lock','OK',`El filtro físico de producto queda ligado a la mención canónica del usuario «${canonical}».`);}
+  return out;
+}
+
+function v55ApplyCanonicalIntentAuthority(plan={},contextBook={},userPrompt='',state={},selectedEventId='',flowTrace=[]){
+  let out={...plan,data_requests:arr(plan?.data_requests).map((r,i)=>({...r,index:i+1,arguments:{...(r?.arguments||{})}}))};
+  const intent=out?.intent&&typeof out.intent==='object'?out.intent:null,op=trim(intent?.operation).toUpperCase();
+  if(!intent||op==='NONE')return out;
+  const explicit=trim(v50TrustedExplicitEventMention(state,userPrompt)),multi=v26ComparisonEventNamesFromPrompt(userPrompt,state);
+  // Un objetivo explícito único sustituye el conjunto comparativo anterior. No interpretamos
+  // vocabulario: usamos la entidad de evento ya resuelta canónicamente contra ce_eventos.
+  if(explicit&&multi.length<2&&!v45ReferencesTargetSet(userPrompt)) {
+    const rr=v26ResolveEvent(state,selectedEventId,explicit,'named_event');
+    if(rr?.ok){
+      out={...out,scope:'named_event',event:trim(rr.nombre),events:[trim(rr.nombre)],_targetSet:null};
+      out.data_requests=arr(out.data_requests).map(r=>{
+        if(v45TargetCapableTool(r.tool))return{...r,arguments:{...(r.arguments||{}),scope:'named_event',event:trim(rr.nombre)}};
+        return r;
+      });
+      zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Canonical Target Authority','OK',`El mensaje actual fija un único objetivo canónico «${trim(rr.nombre)}»; se cierra el TARGET_SET múltiple anterior.`);
+    }
+  }
+  // Para comparaciones de métricas/eventos, una única fuente compare_events evita reenviar cientos
+  // de líneas de compra a Gemini. No aplica a DETAIL/LIST de productos, que sí requieren filas.
+  const ts=v45CompactTargetSet(out._targetSet||contextBook?.multidim?.target_set||null),compareObjects=new Set(['purchases','metrics','summary','events','incomes','donations']);
+  if(op==='COMPARE'&&ts&&compareObjects.has(trim(out.requested_object)||'summary')){
+    const names=v45TargetSetNames(ts);
+    out={...out,events:names,data_requests:[{tool:'compare_events',purpose:'Comparar canónicamente los objetivos vigentes usando métricas agregadas, sin rematerializar líneas detalladas.',arguments:{events:names,scope:'named_event',detail:'standard'},index:1}]};
+    zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Canonical Compare Authority','OK',`COMPARE usa compare_events para ${names.join(' / ')}; se evitan líneas detalladas innecesarias.`);
+  }
+  out.data_requests=v44DeduplicateRequests(arr(out.data_requests)).map((r,i)=>({...r,index:i+1}));
   return out;
 }
 
@@ -11616,6 +11670,7 @@ async function runZuzuV40SccAgent({userPrompt,state,selectedEventId,flowTrace=[]
   // sobre WORKING_SET, CE la ejecuta directamente y NO rematerializa datos ni pide una segunda
   // redacción IA. Las reglas regex antiguas quedan fuera del camino principal.
   plan=v41ApplyContextContract(plan,contextBook,userPrompt,state,selectedEventId,flowTrace);
+  plan=v55ApplyCanonicalIntentAuthority(plan,contextBook,userPrompt,state,selectedEventId,flowTrace);
   const canonicalLocal=v53CanonicalLocalIntent(plan,contextBook,flowTrace);
   if(canonicalLocal){
     const md=canonicalLocal.resultContext?.scc?.multidim||{},ws=md?.working_set,usage=summarizeGeminiUsageFromTrace(flowTrace);
