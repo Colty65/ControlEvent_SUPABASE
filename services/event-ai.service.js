@@ -9769,7 +9769,7 @@ function v40SccPlanTool(){
       requires_data:{type:'boolean'},
       confidence:{type:'number'}
     },required:['operation','target','requires_data','confidence']},
-    context_delta:{type:'object',properties:{focus_mode:{type:'string',enum:['KEEP','REPLACE','MULTI','CLEAR']},working_set_mode:{type:'string',enum:['KEEP','REMATERIALIZE','TRANSFORM','RESET']}},required:['focus_mode','working_set_mode']},
+    context_delta:{type:'object',properties:{focus_mode:{type:'string',enum:['KEEP','REPLACE','MULTI','CLEAR'],description:'KEEP conserva exactamente los objetivos vivos del ACTIVE_CONTEXT para continuaciones/elipsis. REPLACE solo cuando el mensaje actual establece un nuevo foco único. MULTI cuando el mensaje actual mantiene/crea varios objetivos simultáneos. CLEAR cuando abandona el foco. Nunca uses REPLACE para caer por defecto al evento visible.'},working_set_mode:{type:'string',enum:['KEEP','REMATERIALIZE','TRANSFORM','RESET'],description:'KEEP conserva conjunto; REMATERIALIZE cambia entidad/granularidad y requiere datos; TRANSFORM opera sobre el conjunto vigente; RESET recupera el padre.'}},required:['focus_mode','working_set_mode']},
     presentation:{type:'object',properties:{show_table:{type:'boolean'},show_chart:{type:'boolean'},sort_field:{type:'string'},sort_direction:{type:'string',enum:['asc','desc','none']},limit:{type:'integer'}}},
     data_requests:{type:'array',items:{type:'object',properties:{tool:{type:'string',enum:V40_SCC_DATA_TOOLS},arguments:v40SccDataArgumentSchema()},required:['tool']}}
   },required:['relation','confidence','scope','event','events','subjects','domain','requested_object','intent','context_delta','presentation','data_requests']}};
@@ -9973,16 +9973,29 @@ function v45ValidatePhysicalTarget(result={},request={},state={},selectedEventId
   const same=expectedId?trim(rr.id)===expectedId:norm(rr.nombre)===norm(expectedName);
   return same?{ok:true,mode:'facts',expected:expectedName,actual:trim(rr.nombre)}:{ok:false,mode:'facts',expected:expectedName,actual:trim(rr.nombre),error:`La fuente ejecutada para «${expectedName}» devolvió realmente «${trim(rr.nombre)}». Se descarta el resultado para evitar mezclar objetivos.`};
 }
+function v57CompactActiveContext(raw=null,fallbackSpecific=null,fallbackTargetSet=null){
+  const hasRaw=!!(raw&&typeof raw==='object'),src=hasRaw?raw:{};const explicitNone=hasRaw&&trim(src.mode).toLowerCase()==='none';const ts=explicitNone?null:v45CompactTargetSet(src.target_set||fallbackTargetSet||null),specific=v42CompactSpecific(src.specific||fallbackSpecific||{});
+  const names=[];const add=v=>{const t=trim(v);if(t&&!names.some(x=>norm(x)===norm(t)))names.push(t.slice(0,180));};
+  if(!explicitNone){arr(src.events).forEach(add);if(ts)arr(ts.items).forEach(x=>add(x?.name));if(!names.length)add(src.event||(hasRaw?'':specific.event));if(!names.length&&!hasRaw)add(specific.event);}
+  const mode=names.length>=2?'multi':(names.length===1?'single':'none');
+  return{mode,events:names.slice(0,6),event:mode==='single'?names[0]:'',subjects:arr(src.subjects).length?arr(src.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4):arr(specific.subjects),domain:trim(src.domain)||trim(specific.domain)||'general',requested_object:trim(src.requested_object)||trim(specific.requested_object)||'none',origin:trim(src.origin)||'conversation'};
+}
+function v57CompactAmbientContext(raw=null){
+  if(!raw||typeof raw!=='object')return{visible_event:{id:'',name:'',status:''}};
+  const v=raw.visible_event&&typeof raw.visible_event==='object'?raw.visible_event:raw;
+  return{visible_event:{id:trim(v.id).slice(0,120),name:trim(v.name).slice(0,180),status:trim(v.status).slice(0,80)}};
+}
 function v42CompactMultidim(raw=null){
   if(!raw||typeof raw!=='object')return null;
   const general=v42CompactGeneral(raw.general),specific=v42CompactSpecific(raw.specific),working_set=v42CompactWorkingSet(raw.working_set),target_set=v45CompactTargetSet(raw.target_set),stack=arr(raw.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v50WorkingSetWithoutRowCache(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
-  return{general,specific,working_set,target_set,stack};
+  const active_context=v57CompactActiveContext(raw.active_context||null,specific,target_set),ambient_context=v57CompactAmbientContext(raw.ambient_context||null);
+  return{general,specific,working_set,target_set,active_context,ambient_context,stack};
 }
 function v42LegacyMultidim(last={},visibleEvent={}){
   const legacy=last&&typeof last==='object'?last:{};
   const event=trim(legacy.event)||trim(visibleEvent?.name),scope=trim(legacy.scope)||((event&&norm(event)===norm(visibleEvent?.name))?'active_event':(event?'named_event':'none'));
   const specific=v42CompactSpecific({active:!!(event||arr(legacy.subjects).length||trim(legacy.domain)||trim(legacy.requested_object)),event,scope,subjects:arr(legacy.subjects),domain:trim(legacy.domain)||'general',requested_object:trim(legacy.requested_object)||'none',operation:trim(legacy.operation)||'answer',dataset:legacy.dataset||null});
-  return{general:v42CompactGeneral({event,scope,domain:trim(legacy.domain)||'general'}),specific,working_set:null,stack:[]};
+  return{general:v42CompactGeneral({event,scope,domain:trim(legacy.domain)||'general'}),specific,working_set:null,target_set:null,active_context:v57CompactActiveContext(null,specific,null),ambient_context:v57CompactAmbientContext(visibleEvent),stack:[]};
 }
 function v42LastMultidim(conversationHistory=[],visibleEvent={}){
   for(const turn of arr(conversationHistory).slice(-16).reverse()){
@@ -10228,7 +10241,7 @@ function v50TrustedExplicitEventMention(state,userPrompt=''){
 function v41BuildContextBook(state,selectedEventId,conversationHistory=[],userPrompt=''){
   const active=v26EventById(state,selectedEventId),visible={id:trim(active?.id),name:trim(active?.titulo),status:trim(active?.situacion)};
   const last=v40LastSccContext(conversationHistory)||{},multidim=v42LastMultidim(conversationHistory,visible)||v42LegacyMultidim(last,visible);
-  let general=v42CompactGeneral(multidim?.general||{}),specific=v42CompactSpecific(multidim?.specific||{}),working_set=v42CompactWorkingSet(multidim?.working_set||null),target_set=v45CompactTargetSet(multidim?.target_set||null),stack=arr(multidim?.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v42CompactWorkingSet(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
+  let general=v42CompactGeneral(multidim?.general||{}),specific=v42CompactSpecific(multidim?.specific||{}),working_set=v42CompactWorkingSet(multidim?.working_set||null),target_set=v45CompactTargetSet(multidim?.target_set||null),active_context=v57CompactActiveContext(multidim?.active_context||null,specific,target_set),ambient_context=v57CompactAmbientContext({visible_event:visible}),stack=arr(multidim?.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v42CompactWorkingSet(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
   if(!trim(general.event)&&visible.name)general={...general,event:visible.name,scope:'active_event'};
   if(!specific.active&&trim(last?.event))specific=v42CompactSpecific({active:true,event:trim(last.event),scope:trim(last.scope),subjects:arr(last.subjects),domain:trim(last.domain)||'general',requested_object:trim(last.requested_object)||'none',operation:trim(last.operation)||'answer',dataset:last.dataset||null});
   const recent=[];const seen=new Set();
@@ -10241,7 +10254,7 @@ function v41BuildContextBook(state,selectedEventId,conversationHistory=[],userPr
   const currentObject=v42InferRequestedObject(userPrompt,fallbackObject);
   return{
     visible_event:visible,
-    multidim:{general,specific,working_set,target_set,stack},
+    multidim:{general,specific,working_set,target_set,active_context,ambient_context,stack},
     // Compatibilidad con reglas SCC 2.1 que todavía esperan una vista plana: siempre refleja
     // el foco ESPECÍFICO, no destruye el GENERAL.
     conversation:{event:trim(specific.event),events:arr(last?.events).map(trim).filter(Boolean),subjects:arr(specific.subjects).map(trim).filter(Boolean),scope:trim(specific.scope),domain:trim(specific.domain),operation:trim(specific.operation),requested_object:trim(specific.requested_object)||fallbackObject,dataset:specific.dataset||last?.dataset||null},
@@ -10272,13 +10285,15 @@ La memoria tiene dimensiones separadas:
 - GENERAL: navegación global de la conversación, especialmente el evento conversacional vigente. Cambiar el evento actualiza GENERAL sin borrar por sí solo un asunto específico anterior.
 - ESPECÍFICO: asunto de trabajo vigente: evento/ámbito, sujetos, dominio, objeto solicitado, operación y dataset. Un cambio parcial modifica SOLO el campo que el usuario ha cambiado.
 - WORKING_SET: conjunto canónico recién obtenido. Define qué significan «estos», «esas compras», «ordénalos», «cuánto suman», etc. Si TARGET_SET tiene varios objetivos, WORKING_SET.targets conserva una partición independiente por objetivo (filas, vacío y agregados); NO mezcles las particiones ni reconstruyas sus pertenencias desde la prosa. Si el conjunto o una partición es vacío, una referencia posterior sigue siendo vacía: NO amplíes el ámbito para fabricar resultados. CE puede resolver localmente operaciones derivadas puras sobre esos metadatos (conteo, suma, máximo/mínimo, diferencia, porcentaje o media) y en esos turnos NO recibirás una llamada de planner porque no hace falta rematerializar datos.
-- TARGET_SET: conjunto temporal de varios objetivos canónicos simultáneos. Cuando el usuario pide dos o más eventos, conserva TODOS; cada fuente de evento debe ejecutarse físicamente contra el objetivo que le corresponde y CE validará que la fuente realmente devolvió ese mismo evento. Cuando existan particiones en WORKING_SET, usa esas particiones como correspondencia factual objetivo→resultado.
+- ACTIVE_CONTEXT: únicos objetivos que están vivos AHORA en la conversación. Puede ser single, multi o none. Las elipsis y continuaciones se resuelven contra ACTIVE_CONTEXT; no contra la pantalla ni contra asuntos dormidos.
+- AMBIENT_CONTEXT: contexto externo disponible (por ejemplo, el evento visible en la interfaz). Es informativo, no tiene autoridad para sustituir ACTIVE_CONTEXT. Solo úsalo si el usuario lo señala expresamente o si no existe ningún foco conversacional vigente.
+- TARGET_SET: conjunto temporal de varios objetivos canónicos simultáneos y debe coincidir con ACTIVE_CONTEXT cuando éste es multi. Nunca es una bolsa histórica. Cuando el usuario pide dos o más eventos, conserva TODOS; cada fuente de evento debe ejecutarse físicamente contra el objetivo que le corresponde y CE validará que la fuente realmente devolvió ese mismo evento.
 - Si el mensaje nombra varios eventos, rellena events con todos ellos. No reduzcas una consulta múltiple a un solo event: event puede ser únicamente el ancla compatible, mientras TARGET_SET conserva el conjunto completo.
-- STACK: focos específicos suspendidos que permiten «vuelve al anterior», «retoma lo de antes» o recuperar un asunto sin reconstruirlo de la prosa histórica.
+- STACK: focos específicos suspendidos y DORMIDOS que permiten recuperar un asunto anterior. Un elemento de STACK no participa en consultas, TARGET_SET ni WORKING_SET hasta que TU delta lo reactive explícitamente mediante REPLACE/MULTI/NAVIGATE.
 
 Cómo decidir el contexto:
 - Aplica DELTAS, no reconstruyas todo el estado en cada turno. Si el usuario dice «ahora dámelos en todos los eventos», cambia solo scope; conserva sujeto, dominio y requested_object salvo que el mensaje los cambie explícitamente.
-- «este/ese evento» se refiere primero al evento GENERAL conversacional; si aún no existe, usa el evento visible. «evento activo/de pantalla/seleccionado» sí señala expresamente el evento visible: ${activeText}.
+- Una continuación elíptica conserva ACTIVE_CONTEXT. El evento visible NO recupera autoridad por omisión. «evento activo/de pantalla/seleccionado» sí señala expresamente AMBIENT_CONTEXT: ${activeText}. Una referencia deíctica como «este/ese evento» se resuelve contra el foco conversacional vigente y solo cae al visible si no existe foco.
 - Una pregunta autosuficiente sobre otro evento/persona/ámbito puede abrir un nuevo foco específico. Una elipsis humana («esos ingresos», «ordénalos», «¿y las donaciones?», «esas compras», «los de antes») continúa el ESPECÍFICO/WORKING_SET si son compatibles.
 - Nombrar una persona NO borra el evento conversacional. Nombrar «todos los eventos» como ámbito NO convierte requested_object en events. requested_object=events solo cuando el usuario pregunta realmente qué eventos/cuáles eventos.
 - Distingue domain de requested_object. Ejemplo conceptual: donations + products significa PRODUCTOS donados. No añadas compras solo porque aparezca la palabra «productos».
@@ -10715,16 +10730,34 @@ function v56CanonicalMaterializationTool(domain='general',requestedObject='none'
 }
 function v56EnsureCanonicalPlanIntegrity(plan={},contextBook={},state={},selectedEventId='',flowTrace=[]){
   let out={...plan,data_requests:arr(plan?.data_requests).map((r,i)=>({...r,index:i+1,arguments:{...(r?.arguments||{})}}))};
-  const plannerEvents=[...new Set(arr(out?.events).map(trim).filter(Boolean).map(x=>norm(x)))];
-  const canonicalTarget0=trim(out?.intent?.target).toUpperCase(),focusMode=trim(out?.context_delta?.focus_mode).toUpperCase()||'KEEP';
-  const previousTs=v45CompactTargetSet(contextBook?.multidim?.target_set||null);
-  // NHC: Gemini entrega un DELTA DE FOCO tipado. CE no relee lenguaje para decidir si uno/muchos.
-  if(focusMode==='REPLACE'&&trim(out.event)){out._dropPreviousTargetSet=true;out.events=[trim(out.event)];}
-  else if(focusMode==='CLEAR'){out._dropPreviousTargetSet=true;out.events=[];}
-  else if(focusMode==='MULTI'&&plannerEvents.length<2&&previousTs)out.events=v45TargetSetNames(previousTs);
-  const ts=out._dropPreviousTargetSet?null:v56TargetSetFromCanonicalPlan(out,state,selectedEventId);
+  const md=v42CompactMultidim(contextBook?.multidim||null),previousTs=v45CompactTargetSet(md?.target_set||null),previousActive=v57CompactActiveContext(md?.active_context||null,md?.specific||null,previousTs),ambient=v57CompactAmbientContext(md?.ambient_context||contextBook?.visible_event||null),focusMode=trim(out?.context_delta?.focus_mode).toUpperCase()||'KEEP';
+  const activeNames=arr(previousActive?.events).map(trim).filter(Boolean),visibleName=trim(ambient?.visible_event?.name)||trim(contextBook?.visible_event?.name);
+  const addUnique=(base=[],value='')=>{const outArr=[...base],t=trim(value);if(t&&!outArr.some(x=>norm(x)===norm(t)))outArr.push(t);return outArr;};
+  // NHC · LEASE DE FOCO: el delta tipado de Gemini gobierna qué objetivos están vivos. KEEP no
+  // puede incorporar por accidente AMBIENT/STACK; REPLACE mata el foco previo; MULTI crea/retiene
+  // solo los objetivos simultáneos declarados; CLEAR deja el foco vacío. CE no relee el castellano.
+  if(focusMode==='KEEP'&&activeNames.length){
+    out.events=[...activeNames];out.event=activeNames[0]||trim(out.event);out.scope='named_event';
+    if(activeNames.length>=2)out.intent={...(out.intent||{}),target:trim(out?.intent?.target)||'TARGET_SET'};
+  }else if(focusMode==='REPLACE'){
+    out._dropPreviousTargetSet=true;const replacement=trim(out.event)||arr(out.events).map(trim).find(Boolean)||'';out.events=replacement?[replacement]:[];if(replacement){out.event=replacement;out.scope='named_event';}
+  }else if(focusMode==='MULTI'){
+    let multi=[];arr(out.events).forEach(x=>{multi=addUnique(multi,x);});multi=addUnique(multi,out.event);
+    if(multi.length<2)activeNames.forEach(x=>{multi=addUnique(multi,x);});
+    out.events=multi.slice(0,6);if(out.events.length){out.event=out.events[0];out.scope='named_event';}
+  }else if(focusMode==='CLEAR'){
+    out._dropPreviousTargetSet=true;out.events=[];out.event='';out.scope='none';
+  }
+  // Reescribe únicamente el BINDING de las peticiones físicas según ACTIVE_CONTEXT. Esto no
+  // interpreta lenguaje: evita que una request con scope=active_event salte al evento de pantalla
+  // cuando Gemini dijo KEEP/REPLACE/MULTI sobre un foco conversacional distinto.
+  const bindNames=focusMode==='MULTI'?arr(out.events):(focusMode==='KEEP'?activeNames:arr(out.events));
+  if(bindNames.length===1){const bound=bindNames[0];out.data_requests=out.data_requests.map(r=>{const a={...(r?.arguments||{})};if(['active_event','named_event'].includes(trim(a.scope))||(!trim(a.scope)&&!['events_catalog','compare_events'].includes(trim(r?.tool)))){a.scope='named_event';a.event=bound;}return{...r,arguments:a};});out.data_requests=out.data_requests.filter(r=>trim(r?.tool)!=='compare_events');}
+  if(focusMode==='KEEP'&&activeNames.length&&visibleName&&activeNames.every(x=>norm(x)!==norm(visibleName)))out._ambientSuppressed=true;
+  const ts=out._dropPreviousTargetSet?null:(focusMode==='KEEP'&&previousTs&&activeNames.length>=2?previousTs:v56TargetSetFromCanonicalPlan(out,state,selectedEventId));
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC 2.2.6 · Active Context Lease','OK',`focus=${focusMode} · ACTIVE=${(focusMode==='CLEAR'?[]:(focusMode==='MULTI'?arr(out.events):(focusMode==='REPLACE'?arr(out.events):activeNames))).join(' / ')||'—'} · AMBIENT=${visibleName||'—'}${out._ambientSuppressed?' · ambient suprimido por continuidad':''}. STACK permanece dormido.`);
   if(ts){out._targetSet=ts;out.events=v45TargetSetNames(ts);if(!trim(out.event)||!out.events.some(x=>norm(x)===norm(out.event)))out.event=out.events[0]||trim(out.event);if(!['all_events','global'].includes(out.scope))out.scope='named_event';out.data_requests=v45ExpandRequestsForTargetSet(out.data_requests,ts,flowTrace);}
-  const md=v42CompactMultidim(contextBook?.multidim||null),ws=v42CompactWorkingSet(md?.working_set||null),desired=trim(out.requested_object)||'none',current=trim(ws?.requested_object)||trim(ws?.kind)||'none',intent=out?.intent||{},op=trim(intent.operation).toUpperCase(),localOp=['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY'].includes(op),subjects=arr(out.subjects).map(trim).filter(Boolean),previousSubjects=arr(md?.specific?.subjects).map(norm);
+  const ws=v42CompactWorkingSet(md?.working_set||null),desired=trim(out.requested_object)||'none',current=trim(ws?.requested_object)||trim(ws?.kind)||'none',intent=out?.intent||{},op=trim(intent.operation).toUpperCase(),localOp=['LIST','SORT','FILTER','RESET_FILTER','PROJECT','SUMMARY'].includes(op),subjects=arr(out.subjects).map(trim).filter(Boolean),previousSubjects=arr(md?.specific?.subjects).map(norm);
   if(op!=='FILTER'){out.data_requests=out.data_requests.map(r=>{if(trim(r?.tool)!=='event_purchase_lines')return r;const a={...(r.arguments||{})};delete a.product;return{...r,arguments:a};});}
   const objectChanged=desired!=='none'&&norm(desired)!==norm(current),newSubject=subjects.some(x=>!previousSubjects.includes(norm(x)));
   const wsMode=trim(out?.context_delta?.working_set_mode).toUpperCase()||'KEEP';
@@ -11083,9 +11116,9 @@ function v42PlanSpecific(plan={}){
   return v42CompactSpecific({active:true,event:trim(plan.event),scope:trim(plan.scope),subjects:arr(plan.subjects),domain:trim(plan.domain)||'general',requested_object:trim(plan.requested_object)||'none',operation:trim(plan.operation)||'answer',dataset:plan.dataset||null});
 }
 function v42CommitMultidimContext(contextBook={},plan={},results=[],userPrompt=''){
-  const prev=contextBook?.multidim||{},prevGeneral=v42CompactGeneral(prev.general||{}),prevSpecific=v42CompactSpecific(prev.specific||{}),prevWorking=v42CompactWorkingSet(prev.working_set||null),prevTargetSet=v45CompactTargetSet(prev.target_set||null);let stack=arr(prev.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v42CompactWorkingSet(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
-  const canonicalTarget=trim(plan?.intent?.target).toUpperCase();
-  let general={...prevGeneral},specific=v42PlanSpecific(plan),workingSet=null,targetSet=plan?._dropPreviousTargetSet?null:v45CompactTargetSet(plan?._targetSet||(canonicalTarget==='TARGET_SET'?prevTargetSet:null));
+  const prev=contextBook?.multidim||{},prevGeneral=v42CompactGeneral(prev.general||{}),prevSpecific=v42CompactSpecific(prev.specific||{}),prevWorking=v42CompactWorkingSet(prev.working_set||null),prevTargetSet=v45CompactTargetSet(prev.target_set||null),prevActive=v57CompactActiveContext(prev.active_context||null,prevSpecific,prevTargetSet),ambientContext=v57CompactAmbientContext({visible_event:contextBook?.visible_event||prev?.ambient_context?.visible_event||{}});let stack=arr(prev.stack).slice(0,4).map(x=>({specific:v42CompactSpecific(x?.specific||x),working_set:v42CompactWorkingSet(x?.working_set||null),target_set:v45CompactTargetSet(x?.target_set||null)}));
+  const canonicalTarget=trim(plan?.intent?.target).toUpperCase(),focusMode=trim(plan?.context_delta?.focus_mode).toUpperCase()||'KEEP';
+  let general={...prevGeneral},specific=v42PlanSpecific(plan),workingSet=null,targetSet=plan?._dropPreviousTargetSet?null:v45CompactTargetSet(plan?._targetSet||(canonicalTarget==='TARGET_SET'?prevTargetSet:null)),activeContext=prevActive;
   const planEvent=trim(plan.event),eventChanged=!!(planEvent&&norm(planEvent)!==norm(prevGeneral.event));
   const subjectChanged=JSON.stringify(arr(prevSpecific.subjects).map(norm))!==JSON.stringify(arr(specific.subjects).map(norm));
   const domainChanged=norm(prevSpecific.domain)!==norm(specific.domain)&&specific.domain!=='general';
@@ -11125,9 +11158,18 @@ function v42CommitMultidimContext(contextBook={},plan={},results=[],userPrompt='
       }
     }
   }
+  // LEASE DE FOCO NHC: ACTIVE_CONTEXT es lo único operativo; STACK queda dormido y
+  // AMBIENT_CONTEXT no se promociona por sí solo. KEEP conserva los objetivos y actualiza solo
+  // las dimensiones del asunto; REPLACE/MULTI/CLEAR aplican literalmente el delta de Gemini.
+  if(plan._contextNavigationOnly){activeContext=v57CompactActiveContext(null,specific,targetSet);}
+  else if(focusMode==='CLEAR')activeContext=v57CompactActiveContext({events:[],subjects:[],domain:'general',requested_object:'none',origin:'conversation'});
+  else if(focusMode==='REPLACE')activeContext=v57CompactActiveContext({events:trim(specific.event)?[trim(specific.event)]:[],subjects:specific.subjects,domain:specific.domain,requested_object:specific.requested_object,origin:'conversation'},specific,null);
+  else if(focusMode==='MULTI')activeContext=v57CompactActiveContext({events:v45TargetSetNames(targetSet).length?v45TargetSetNames(targetSet):arr(plan.events),subjects:specific.subjects,domain:specific.domain,requested_object:specific.requested_object,origin:'conversation'},specific,targetSet);
+  else if(arr(prevActive?.events).length)activeContext=v57CompactActiveContext({events:prevActive.events,subjects:arr(specific.subjects).length?specific.subjects:prevActive.subjects,domain:trim(specific.domain)||prevActive.domain,requested_object:trim(specific.requested_object)||prevActive.requested_object,origin:'conversation'},specific,targetSet);
+  else activeContext=v57CompactActiveContext(null,specific,targetSet);
   // El foco recién confirmado queda fuera del STACK para evitar volver a sí mismo.
   const currentKey=v42SpecificKey(specific);stack=stack.filter(x=>v42SpecificKey(x?.specific||x)!==currentKey).slice(0,4);
-  return v42CompactMultidim({general,specific,working_set:workingSet,target_set:targetSet,stack});
+  return v42CompactMultidim({general,specific,working_set:workingSet,target_set:targetSet,active_context:activeContext,ambient_context:ambientContext,stack});
 }
 function v40SccResultContext(plan,results=[],multidim=null){
   const event=trim(plan.event)||arr(results).map(r=>trim(r?.facts?.event)).find(Boolean)||'';
