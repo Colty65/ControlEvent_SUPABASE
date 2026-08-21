@@ -6546,25 +6546,35 @@ function v29DonationRowsForEvent(state,eventId){
   });
 }
 async function v29ToolEventDonationLines(tool,state,selectedEventId=''){
-  const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
-  let rows=v29DonationRowsForEvent(state,rr.id),donor=trim(tool?.donor);
-  if(donor)rows=rows.filter(r=>nameMatches(r?.Donante,donor));
-  rows.sort((a,b)=>num(b?.Valor)-num(a?.Valor)||text(a?.Donante).localeCompare(text(b?.Donante),'es')||text(a?.Producto).localeCompare(text(b?.Producto),'es'));
-  const donorMap=new Map(),productMap=new Map(),sdMap=new Map();
+  const scope=trim(tool?.scope)||'named_event',allEvents=scope==='all_events';
+  let eventRefs=[];
+  if(allEvents){
+    eventRefs=arr(state?.eventos).filter(e=>trim(e?.id)).map(e=>({id:trim(e.id),nombre:trim(e?.titulo)||trim(e.id)}));
+  }else{
+    const rr=v26ResolveEvent(state,selectedEventId,tool?.event,scope);if(!rr.ok)throw new Error(rr.error);eventRefs=[{id:rr.id,nombre:rr.nombre}];
+  }
+  let rows=[];
+  for(const ev of eventRefs){for(const row of v29DonationRowsForEvent(state,ev.id))rows.push(allEvents?{Evento:ev.nombre,...row}:row);}
+  const donor=trim(tool?.donor);if(donor)rows=rows.filter(r=>nameMatches(r?.Donante,donor));
+  rows.sort((a,b)=>num(b?.Valor)-num(a?.Valor)||text(a?.Evento).localeCompare(text(b?.Evento),'es')||text(a?.Donante).localeCompare(text(b?.Donante),'es')||text(a?.Producto).localeCompare(text(b?.Producto),'es'));
+  const donorMap=new Map(),productMap=new Map(),sdMap=new Map(),eventsFound=new Set();
   for(const r of rows){
-    const dk=trim(r.Donante)||'Sin donante',dg=donorMap.get(dk)||{Donante:dk,'Tipo donante':trim(r['Tipo donante'])||'Otro','Nº registros':0,'Productos distintos':new Set(),Unidades:0,Valor:0};dg['Nº registros']+=1;dg['Productos distintos'].add(trim(r.Producto)||'Sin producto');dg.Unidades+=num(r.Unidades);dg.Valor+=num(r.Valor);donorMap.set(dk,dg);
-    const pk=[dk,trim(r.Producto)].join('|'),pg=productMap.get(pk)||{Donante:dk,Producto:trim(r.Producto)||'Sin producto',Segmento:trim(r.Segmento),Destino:trim(r.Destino),Unidades:0,Valor:0,'Nº registros':0};pg.Unidades+=num(r.Unidades);pg.Valor+=num(r.Valor);pg['Nº registros']+=1;productMap.set(pk,pg);
+    if(trim(r?.Evento))eventsFound.add(trim(r.Evento));
+    const dk=trim(r.Donante)||'Sin donante',dg=donorMap.get(dk)||{Donante:dk,'Tipo donante':trim(r['Tipo donante'])||'Otro','Nº registros':0,'Productos distintos':new Set(),Eventos:new Set(),Unidades:0,Valor:0};dg['Nº registros']+=1;dg['Productos distintos'].add(trim(r.Producto)||'Sin producto');if(trim(r?.Evento))dg.Eventos.add(trim(r.Evento));dg.Unidades+=num(r.Unidades);dg.Valor+=num(r.Valor);donorMap.set(dk,dg);
+    const eventKey=allEvents?trim(r?.Evento):'',pk=[dk,eventKey,trim(r.Producto)].join('|'),pg=productMap.get(pk)||{...(allEvents?{Evento:eventKey}:{}),Donante:dk,Producto:trim(r.Producto)||'Sin producto',Segmento:trim(r.Segmento),Destino:trim(r.Destino),Unidades:0,Valor:0,'Nº registros':0};pg.Unidades+=num(r.Unidades);pg.Valor+=num(r.Valor);pg['Nº registros']+=1;productMap.set(pk,pg);
     const sk=[trim(r.Segmento),trim(r.Destino)].join('|'),sg=sdMap.get(sk)||{Segmento:trim(r.Segmento)||'Sin segmento',Destino:trim(r.Destino)||'Sin destino','Nº registros':0,Unidades:0,Valor:0};sg['Nº registros']+=1;sg.Unidades+=num(r.Unidades);sg.Valor+=num(r.Valor);sdMap.set(sk,sg);
   }
-  const byDonor=[...donorMap.values()].map(x=>({Donante:x.Donante,'Tipo donante':x['Tipo donante'],'Nº registros':x['Nº registros'],'Productos distintos':x['Productos distintos'].size,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor)||text(a.Donante).localeCompare(text(b.Donante),'es'));
-  const byDonorProduct=[...productMap.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor)||text(a.Donante).localeCompare(text(b.Donante),'es'));
+  const byDonor=[...donorMap.values()].map(x=>({Donante:x.Donante,'Tipo donante':x['Tipo donante'],'Nº registros':x['Nº registros'],'Productos distintos':x['Productos distintos'].size,...(allEvents?{'Eventos distintos':x.Eventos.size}:{}),Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor)||text(a.Donante).localeCompare(text(b.Donante),'es'));
+  const byDonorProduct=[...productMap.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor)||text(a.Evento).localeCompare(text(b.Evento),'es')||text(a.Donante).localeCompare(text(b.Donante),'es'));
   const bySegmentDestination=[...sdMap.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor));
-  const total=v26Money(rows.reduce((a,r)=>a+num(r.Valor),0));
-  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de donaciones · ${rr.nombre}`,facts:{event:rr.nombre,donor:donor||'',donation_record_count:rows.length,donor_count:byDonor.length,product_count:new Set(rows.map(r=>norm(r.Producto)).filter(Boolean)).size,total_value:total,detail_semantics:'Cada registro DONADO SOCIO/TIENDA/OTROS conserva el donante literal humanizado. donor_ref P: se resuelve contra PERSONAS y T: contra TIENDAS.'},provenance:'ControlEvent · ce_compras DONADO + catálogos humanizados',tables:[
-    v26Table('donors',`Donantes · ${rr.nombre}`,byDonor,{Donante:v26TextSchema('Persona, tienda u otra entidad donante'),'Tipo donante':v26TextSchema('Persona/Tienda/Otro'),'Nº registros':v26CountSchema('registros'),'Productos distintos':v26CountSchema('productos'),Unidades:v26SchemaField('quantity','uds','Unidades donadas'),Valor:v26MoneySchema('Valor total donado')}),
-    v26Table('donor_products',`Donaciones por donante y producto · ${rr.nombre}`,byDonorProduct,{Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema(),'Nº registros':v26CountSchema('registros')}),
-    v26Table('donation_lines',`Registros de donación · ${rr.nombre}`,rows.map(r=>({Donante:r.Donante,'Tipo donante':r['Tipo donante'],'Tipo de donación':r['Tipo de donación'],Producto:r.Producto,Segmento:r.Segmento,Destino:r.Destino,Unidades:r.Unidades,Precio:r.Precio,Valor:r.Valor,Responsable:r.Responsable,Tienda:r.Tienda})),{Donante:v26TextSchema(),'Tipo donante':v26TextSchema(),'Tipo de donación':v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema('Precio unitario registrado'),Valor:v26MoneySchema('Valor del registro'),Responsable:v26TextSchema(),Tienda:v26TextSchema()}),
-    v26Table('donations_by_segment_destination',`Donaciones por Segmento/Destino · ${rr.nombre}`,bySegmentDestination,{Segmento:v26TextSchema(),Destino:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema()})
+  const total=v26Money(rows.reduce((a,r)=>a+num(r.Valor),0)),scopeTitle=allEvents?'Todos los eventos':eventRefs[0]?.nombre||'';
+  const lineSchema={...(allEvents?{Evento:v26TextSchema()}:{}),Donante:v26TextSchema(),'Tipo donante':v26TextSchema(),'Tipo de donación':v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema('Precio unitario registrado'),Valor:v26MoneySchema('Valor del registro'),Responsable:v26TextSchema(),Tienda:v26TextSchema()};
+  const donorProductSchema={...(allEvents?{Evento:v26TextSchema()}:{}),Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema(),'Nº registros':v26CountSchema('registros')};
+  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de donaciones · ${scopeTitle}`,facts:{scope,event:allEvents?'':scopeTitle,event_count:allEvents?eventsFound.size:1,donor:donor||'',donation_record_count:rows.length,donor_count:byDonor.length,product_count:new Set(rows.map(r=>norm(r.Producto)).filter(Boolean)).size,total_value:total,detail_semantics:'Cada registro DONADO SOCIO/TIENDA/OTROS conserva el donante literal humanizado. Con scope=all_events no se hereda ni se aplica el evento visible.'},provenance:'ControlEvent · ce_compras DONADO + catálogos humanizados',tables:[
+    v26Table('donors',`Donantes · ${scopeTitle}`,byDonor,{Donante:v26TextSchema('Persona, tienda u otra entidad donante'),'Tipo donante':v26TextSchema('Persona/Tienda/Otro'),'Nº registros':v26CountSchema('registros'),'Productos distintos':v26CountSchema('productos'),...(allEvents?{'Eventos distintos':v26CountSchema('eventos')}:{}),Unidades:v26SchemaField('quantity','uds','Unidades donadas'),Valor:v26MoneySchema('Valor total donado')}),
+    v26Table('donor_products',`Donaciones por donante y producto · ${scopeTitle}`,byDonorProduct,donorProductSchema),
+    v26Table('donation_lines',`Registros de donación · ${scopeTitle}`,rows.map(r=>({...((allEvents&&trim(r?.Evento))?{Evento:r.Evento}:{}),Donante:r.Donante,'Tipo donante':r['Tipo donante'],'Tipo de donación':r['Tipo de donación'],Producto:r.Producto,Segmento:r.Segmento,Destino:r.Destino,Unidades:r.Unidades,Precio:r.Precio,Valor:r.Valor,Responsable:r.Responsable,Tienda:r.Tienda})),lineSchema),
+    v26Table('donations_by_segment_destination',`Donaciones por Segmento/Destino · ${scopeTitle}`,bySegmentDestination,{Segmento:v26TextSchema(),Destino:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema()})
   ].filter(t=>t.rows.length)};
 }
 
@@ -12319,7 +12329,7 @@ function v62NativeTools(){
     if(tool.name==='person_dossier')props.activate_subject={type:'boolean',description:'true si la persona queda como sujeto vigente.'};
     if(tool.name==='compare_events')props.activate_focus={type:'boolean',description:'true si los eventos comparados quedan como foco múltiple.'};
   }
-  tools.push({type:'function',name:'working_set_action',description:'Opera sobre el dataset completo que CE ya conserva; no consulta BBDD. group usa group_by y metrics como count, sum:Importe o distinct:Campo. reset quita filtro; back restaura la vista anterior.',parameters:{type:'object',properties:{action:{type:'string',enum:['list','filter','sort','reset','back','project','count','limit','inspect','group']},field:{type:'string'},group_by:{type:'string'},value:{type:'string'},direction:{type:'string',enum:['asc','desc']},fields:{type:'array',items:{type:'string'}},metrics:{type:'array',items:{type:'string'}},match_mode:{type:'string',enum:['exact','word','contains','semantic']},limit:{type:'integer'}},required:['action']}});
+  tools.push({type:'function',name:'working_set_action',description:'Opera sobre el dataset completo que CE ya conserva; no consulta BBDD. group usa group_by y metrics como count, sum:Importe o distinct:Campo. reset quita filtro; back restaura la vista anterior; activate recupera un dataset reciente por id.',parameters:{type:'object',properties:{action:{type:'string',enum:['list','filter','sort','reset','back','activate','project','count','limit','inspect','group']},dataset_id:{type:'string'},field:{type:'string'},group_by:{type:'string'},value:{type:'string'},direction:{type:'string',enum:['asc','desc']},fields:{type:'array',items:{type:'string'}},metrics:{type:'array',items:{type:'string'}},match_mode:{type:'string',enum:['exact','word','contains','semantic']},limit:{type:'integer'}},required:['action']}});
   tools.push({type:'function',name:'conversation_memory',description:'Inspecciona o borra TODA la memoria conversacional. reset solo cuando el usuario pide empezar de cero; no para cambiar de evento.',parameters:{type:'object',properties:{action:{type:'string',enum:['inspect','reset']}},required:['action']}});
   return tools;
 }
@@ -12355,8 +12365,8 @@ function v62LiteMemoryFromHistory(history=[]){
 }
 function v62LiteMemoryDescriptor(memory={}){
   const ws=v42CompactWorkingSet(memory?.active_dataset||null),cache=v50CompactWorkingRowCache(ws?.row_cache||null),parent=v50CompactWorkingRowCache(ws?.parent_cache||null);
-  const recent=arr(memory?._view_history).map(ds=>{const d=v42CompactWorkingSet(ds),c=v50CompactWorkingRowCache(d?.row_cache||null);return d?{type:trim(d.requested_object)||trim(d.kind),event:trim(d.event),count:Number(d.row_count)||0,visible_fields:arr(c?.visible_fields).slice(0,12),filter:trim(d.filter_summary),sort_field:trim(c?.sort_field),sort_direction:trim(c?.sort_direction)||'none'}:null;}).filter(Boolean).slice(0,3);
-  return{focus_events:arr(memory?.focus_events).map(trim).filter(Boolean).slice(0,6),subjects:arr(memory?.subjects).map(trim).filter(Boolean).slice(0,4),active_dataset:ws?{type:trim(ws.requested_object)||trim(ws.kind)||'none',event:trim(ws.event),scope:trim(ws.scope),count:Number(ws.row_count)||0,record_count:ws.record_count==null?null:Number(ws.record_count),filter:trim(ws.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)||'none',available_fields:arr(cache?.columns).slice(0,16),visible_fields:arr(cache?.visible_fields).slice(0,12),rows_complete:cache?.complete===true,parent_count:parent?arr(parent.rows).length:null,back_available:recent.length>0,known:{total_amount:ws?.aggregate?.total_amount??null,total_units:ws?.aggregate?.total_units??null},tool:trim(ws.tool),table_key:trim(ws.table_key)}:null,recent_datasets:recent};
+  const recent=arr(memory?._view_history).map(ds=>{const d=v42CompactWorkingSet(ds),c=v50CompactWorkingRowCache(d?.row_cache||null);return d?{id:trim(d.frame_id),type:trim(d.requested_object)||trim(d.kind),event:trim(d.event),count:Number(d.row_count)||0,rows_complete:c?.complete===true}:null;}).filter(Boolean).slice(0,3);
+  return{focus_events:arr(memory?.focus_events).map(trim).filter(Boolean).slice(0,6),subjects:arr(memory?.subjects).map(trim).filter(Boolean).slice(0,4),active_dataset:ws?{id:trim(ws.frame_id),type:trim(ws.requested_object)||trim(ws.kind)||'none',event:trim(ws.event),scope:trim(ws.scope),count:Number(ws.row_count)||0,record_count:ws.record_count==null?null:Number(ws.record_count),filter:trim(ws.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)||'none',available_fields:arr(cache?.columns).slice(0,16),visible_fields:arr(cache?.visible_fields).slice(0,12),rows_complete:cache?.complete===true,parent_count:parent?arr(parent.rows).length:null,back_available:recent.length>0,known:{total_amount:ws?.aggregate?.total_amount??null,total_units:ws?.aggregate?.total_units??null},tool:trim(ws.tool),table_key:trim(ws.table_key)}:null,recent_datasets:recent};
 }
 function v62NativeInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation=false}={}){
   const active=v26EventById(state,selectedEventId),visible=active?trim(active?.titulo):'ninguno',display=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
@@ -12369,8 +12379,8 @@ ARQUITECTURA OBLIGATORIA:
 - El evento visible en pantalla es «${visible}» y es SOLO ambiente. Si la memoria o el usuario fijan otro evento, no vuelvas al visible salvo que el usuario lo pida.
 - PRODUCT_SET: para productos distintos usa event_products. Para registros físicos/tickets/compras individuales usa event_purchase_lines. No mezcles ambas granularidades.
 - Para una lista/dataset que deba seguir vivo usa activate_dataset=true. Si una tool es solo apoyo lateral, usa activate_dataset=false. Para foco de evento usa activate_focus; person_dossier puede usar activate_subject=false cuando sea lateral.
-- Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. Si el dataset vigente ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; no vuelvas a consultar BBDD.
-- Para ordenar, filtrar, contar, proyectar o agrupar una lista YA vigente usa working_set_action. reset vuelve al conjunto padre de un filtro; back restaura la vista/dataset anterior del historial factual.
+- Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. Si el dataset vigente ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; no vuelvas a consultar BBDD. Si recent_datasets contiene claramente un conjunto anterior al que se refiere el usuario, recupéralo con working_set_action(action=activate,dataset_id=...).
+- Para ordenar, filtrar, contar, proyectar o agrupar una lista YA vigente usa working_set_action. reset vuelve al conjunto padre de un filtro; back restaura la vista/dataset anterior del historial factual; activate recupera un dataset reciente por id.
 - Una queja, corrección o frase como «eso está mal» NO modifica memoria por sí sola. Si necesitas verificar, vuelve a pedir la fuente canónica; solo muta memoria llamando explícitamente una tool que la cambie.
 - conversation_memory(reset) SOLO si el usuario pide inequívocamente borrar/reiniciar TODA la conversación. Cambiar de foco o pasar a otro evento NO es reset global: usa la tool del nuevo evento con activate_focus=true.
 - DATASETS ZERO-COPY: cuando una tool canónica devuelve una lista (PRODUCT_SET, PURCHASE_LINE_SET, DONATION_SET o working_set_action), CE adjunta automáticamente el dataset activo completo a pantalla y PDF. NO enumeres sus filas en answer ni copies la tabla en Markdown. Resume en 1-3 frases y usa una segunda tool si necesitas razonar sobre orden/filtro/top. show_tables queda para tablas laterales o adicionales.
@@ -12382,7 +12392,7 @@ Devuelve el JSON final exigido por la API. No menciones tools, SCC, datasets ni 
 }
 function v62NativeInput(userPrompt='',history=[],memory={}){
   const recent=arr(history).slice(-3).map(h=>`Usuario: ${trim(h?.user).slice(0,360)}\nZuzu: ${trim(h?.assistant).slice(0,420)}`).join('\n\n');
-  return `INVENTARIO CE DISPONIBLE (hechos, no lo recites):\n${JSON.stringify(v62LiteMemoryDescriptor(memory))}\nREGLA: available_fields indica lo que CE YA tiene; visible_fields solo lo que se está mostrando. Si rows_complete=true, usa working_set_action para reutilizar esos datos. recent_datasets/back_available indican que existe una vista anterior restaurable con back.\n\n${recent?`ÚLTIMOS TURNOS (solo para referencias humanas):\n${recent}\n\n`:''}MENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
+  return `INVENTARIO CE DISPONIBLE (hechos, no lo recites):\n${JSON.stringify(v62LiteMemoryDescriptor(memory))}\nREGLA: available_fields indica lo que CE YA tiene; visible_fields solo lo que se está mostrando. Si rows_complete=true, usa working_set_action para reutilizar esos datos. recent_datasets incluye hasta 3 conjuntos anteriores con id reutilizable mediante action=activate; back_available indica que existe una vista anterior restaurable con back.\n\n${recent?`ÚLTIMOS TURNOS (solo para referencias humanas):\n${recent}\n\n`:''}MENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
 }
 function v62WorkingResult(memory={},args={},callId='working_set_action'){
   let mem=JSON.parse(JSON.stringify(memory||{})),ws=v42CompactWorkingSet(mem.active_dataset||null),action=trim(args?.action).toLowerCase();
@@ -12397,6 +12407,14 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
     mem._view_history=arr(mem._view_history).filter(x=>v64DatasetViewSignature(x)!==v64DatasetViewSignature(prior));
     const restored=v42CompactWorkingSet(mem.active_dataset),rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
     return{result:{id:callId,name:'working_set_action',ok:true,title:trim(rc?.title)||'Vista anterior',facts:{action:'back',type:trim(restored?.requested_object)||trim(restored?.kind),event:trim(restored?.event),count:Number(restored?.row_count)||0,display_count:displayRows.length,filter:trim(restored?.filter_summary),sort_field:trim(rc?.sort_field),sort_direction:trim(rc?.sort_direction)},tables:displayRows.length?[{key:'working_set',title:trim(rc?.title)||'Vista anterior',rows:displayRows}]:[]},memory:mem};
+  }
+  if(action==='activate'){
+    const wanted=trim(args?.dataset_id),prior=arr(mem._view_history).find(x=>trim(x?.frame_id)===wanted);
+    if(!wanted||!prior)return{result:{id:callId,name:'working_set_action',ok:false,title:'Dataset reciente',facts:{error:'No existe ese dataset_id en el inventario reciente.',dataset_id:wanted},tables:[]},memory:mem,isError:true};
+    v64PushViewHistory(mem,ws);mem.active_dataset=v42CompactWorkingSet(prior);
+    mem._view_history=arr(mem._view_history).filter(x=>trim(x?.frame_id)!==wanted);
+    const restored=v42CompactWorkingSet(mem.active_dataset),rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
+    return{result:{id:callId,name:'working_set_action',ok:true,title:trim(rc?.title)||'Dataset recuperado',facts:{action:'activate',dataset_id:wanted,type:trim(restored?.requested_object)||trim(restored?.kind),event:trim(restored?.event),count:Number(restored?.row_count)||0,display_count:displayRows.length,filter:trim(restored?.filter_summary),sort_field:trim(rc?.sort_field),sort_direction:trim(rc?.sort_direction)},tables:displayRows.length?[{key:'working_set',title:trim(rc?.title)||'Dataset recuperado',rows:displayRows}]:[]},memory:mem};
   }
   if(!cache||!cache.complete)return{result:{id:callId,name:'working_set_action',ok:false,title:'Dataset',facts:{error:'El dataset vigente no conserva filas completas para esta transformación.'},tables:[]},memory:mem,isError:true};
   let rows=arr(cache.rows).map(r=>({...r})),nextCache={...cache},nextWs={...ws},mutates=false;
@@ -12520,7 +12538,7 @@ function v63PresentationColumns(result={},table={},memory={}){
   }
   if(name==='event_products')return v63DefaultVisibleFields('products',all);
   if(name==='event_purchase_lines')return v63DefaultVisibleFields('purchases',all);
-  if(name==='event_donation_lines')return v63DefaultVisibleFields('donations',all);
+  if(name==='event_donation_lines'){const cols=v63DefaultVisibleFields('donations',all);if(trim(result?.facts?.scope)==='all_events'&&all.includes('Evento')&&!cols.includes('Evento'))cols.unshift('Evento');return cols.slice(0,12);}
   if(name==='events_catalog')return v63DefaultVisibleFields('events',all);
   return all.slice(0,12);
 }
@@ -12551,6 +12569,7 @@ function v63MechanicalClosure(results=[],memory={}){
     if(action==='count')return{title:'Recuento',answer:`El conjunto vigente contiene ${count} ${noun}${event?` de ${event}`:''}.`,warnings:[],showTables:[],chartSpecs:[]};
     if(action==='group')return{title:'Agrupación',answer:`He agrupado los datos por ${trim(f.group_field)||'el campo solicitado'} en ${Number(f.group_count)||count} grupos. La tabla inferior muestra el resultado completo.`,warnings:[],showTables:[],chartSpecs:[]};
     if(action==='back')return{title:'Vista anterior',answer:`He restaurado la vista anterior${event?` de ${event}`:''}. Contiene ${count} ${noun}.`,warnings:[],showTables:[],chartSpecs:[]};
+    if(action==='activate')return{title:'Dataset recuperado',answer:`He recuperado el conjunto anterior${event?` de ${event}`:''}. Contiene ${count} ${noun}.`,warnings:[],showTables:[],chartSpecs:[]};
     if(['list','filter','sort','reset','project','limit'].includes(action))return{title:trim(last.title)||'Datos',answer:`He actualizado la lista${event?` de ${event}`:''}. El conjunto vigente contiene ${count} ${noun} y la presentación completa queda debajo.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='event_products'){
@@ -12560,7 +12579,7 @@ function v63MechanicalClosure(results=[],memory={}){
     const f=last?.facts||{},n=Number(f.purchase_line_count)||0,e=trim(f.event);return{title:trim(last.title)||'Compras',answer:`He preparado ${n} registros de compra${e?` de ${e}`:''}. El detalle completo queda en la tabla inferior.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='event_donation_lines'){
-    const f=last?.facts||{},n=Number(f.donation_record_count||f.row_count)||0,e=trim(f.event);return{title:trim(last.title)||'Donaciones',answer:`He preparado ${n} registros de donación${e?` de ${e}`:''}. El detalle completo queda en la tabla inferior.`,warnings:[],showTables:[],chartSpecs:[]};
+    const f=last?.facts||{},n=Number(f.donation_record_count||f.row_count)||0,e=trim(f.event),global=trim(f.scope)==='all_events';return{title:trim(last.title)||'Donaciones',answer:`He preparado ${n} registros de donación${global?' de todos los eventos':e?` de ${e}`:''}. El detalle completo queda en la tabla inferior.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='events_catalog'){
     const f=last?.facts||{},n=Number(f.event_count)||arr(last?.tables?.[0]?.rows).length;return{title:'Eventos',answer:`He preparado los ${n} eventos registrados. La tabla inferior contiene el catálogo completo.`,warnings:[],showTables:[],chartSpecs:[]};
@@ -12587,7 +12606,8 @@ function v62DatasetFromToolResult(call={},result={},previous=null){
   const kind=name==='event_products'?'products':name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':'data';
   const event=trim(result?.facts?.event)||trim(args?.event),rowCount=name==='event_products'?(Number(result?.facts?.product_count)||rows.length):name==='events_catalog'?(Number(result?.facts?.event_count)||rows.length):(Number(result?.facts?.row_count||result?.facts?.purchase_line_count||result?.facts?.donation_record_count)||rows.length),recordCount=Number(result?.facts?.purchase_line_count||result?.facts?.donation_record_count||rowCount)||rowCount;
   const primary=kind==='events'?'Evento':columns.includes('Producto')?'Producto':columns[0]||'',initialSort=kind==='events'?'Fecha inicio':'',initialDirection=kind==='events'?'desc':'none';
-  const cache=v50CompactWorkingRowCache({table_key:trim(table.key)||tableKey,title:trim(table.title)||trim(result.title),source_tool:name,primary_field:primary,visible_fields:v63DefaultVisibleFields(kind,columns),sort_field:initialSort,sort_direction:initialDirection,columns:columns.slice(0,16),rows,complete:true});
+  const initialVisible=v63DefaultVisibleFields(kind,columns);if(kind==='donations'&&trim(args?.scope)==='all_events'&&columns.includes('Evento')&&!initialVisible.includes('Evento'))initialVisible.unshift('Evento');
+  const cache=v50CompactWorkingRowCache({table_key:trim(table.key)||tableKey,title:trim(table.title)||trim(result.title),source_tool:name,primary_field:primary,visible_fields:initialVisible.slice(0,12),sort_field:initialSort,sort_direction:initialDirection,columns:columns.slice(0,16),rows,complete:true});
   return v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:kind==='events'?'all_events':trim(args?.scope)||'named_event',subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},row_cache:cache});
 }
 function v62UpdateMemoryFromCall(memory={},call={},result={}){
