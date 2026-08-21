@@ -6546,25 +6546,35 @@ function v29DonationRowsForEvent(state,eventId){
   });
 }
 async function v29ToolEventDonationLines(tool,state,selectedEventId=''){
-  const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
-  let rows=v29DonationRowsForEvent(state,rr.id),donor=trim(tool?.donor);
-  if(donor)rows=rows.filter(r=>nameMatches(r?.Donante,donor));
-  rows.sort((a,b)=>num(b?.Valor)-num(a?.Valor)||text(a?.Donante).localeCompare(text(b?.Donante),'es')||text(a?.Producto).localeCompare(text(b?.Producto),'es'));
-  const donorMap=new Map(),productMap=new Map(),sdMap=new Map();
+  const scope=trim(tool?.scope)||'named_event',allEvents=scope==='all_events';
+  let eventRefs=[];
+  if(allEvents){
+    eventRefs=arr(state?.eventos).filter(e=>trim(e?.id)).map(e=>({id:trim(e.id),nombre:trim(e?.titulo)||trim(e.id)}));
+  }else{
+    const rr=v26ResolveEvent(state,selectedEventId,tool?.event,scope);if(!rr.ok)throw new Error(rr.error);eventRefs=[{id:rr.id,nombre:rr.nombre}];
+  }
+  let rows=[];
+  for(const ev of eventRefs){for(const row of v29DonationRowsForEvent(state,ev.id))rows.push(allEvents?{Evento:ev.nombre,...row}:row);}
+  const donor=trim(tool?.donor);if(donor)rows=rows.filter(r=>nameMatches(r?.Donante,donor));
+  rows.sort((a,b)=>num(b?.Valor)-num(a?.Valor)||text(a?.Evento).localeCompare(text(b?.Evento),'es')||text(a?.Donante).localeCompare(text(b?.Donante),'es')||text(a?.Producto).localeCompare(text(b?.Producto),'es'));
+  const donorMap=new Map(),productMap=new Map(),sdMap=new Map(),eventsFound=new Set();
   for(const r of rows){
-    const dk=trim(r.Donante)||'Sin donante',dg=donorMap.get(dk)||{Donante:dk,'Tipo donante':trim(r['Tipo donante'])||'Otro','Nº registros':0,'Productos distintos':new Set(),Unidades:0,Valor:0};dg['Nº registros']+=1;dg['Productos distintos'].add(trim(r.Producto)||'Sin producto');dg.Unidades+=num(r.Unidades);dg.Valor+=num(r.Valor);donorMap.set(dk,dg);
-    const pk=[dk,trim(r.Producto)].join('|'),pg=productMap.get(pk)||{Donante:dk,Producto:trim(r.Producto)||'Sin producto',Segmento:trim(r.Segmento),Destino:trim(r.Destino),Unidades:0,Valor:0,'Nº registros':0};pg.Unidades+=num(r.Unidades);pg.Valor+=num(r.Valor);pg['Nº registros']+=1;productMap.set(pk,pg);
+    if(trim(r?.Evento))eventsFound.add(trim(r.Evento));
+    const dk=trim(r.Donante)||'Sin donante',dg=donorMap.get(dk)||{Donante:dk,'Tipo donante':trim(r['Tipo donante'])||'Otro','Nº registros':0,'Productos distintos':new Set(),Eventos:new Set(),Unidades:0,Valor:0};dg['Nº registros']+=1;dg['Productos distintos'].add(trim(r.Producto)||'Sin producto');if(trim(r?.Evento))dg.Eventos.add(trim(r.Evento));dg.Unidades+=num(r.Unidades);dg.Valor+=num(r.Valor);donorMap.set(dk,dg);
+    const eventKey=allEvents?trim(r?.Evento):'',pk=[dk,eventKey,trim(r.Producto)].join('|'),pg=productMap.get(pk)||{...(allEvents?{Evento:eventKey}:{}),Donante:dk,Producto:trim(r.Producto)||'Sin producto',Segmento:trim(r.Segmento),Destino:trim(r.Destino),Unidades:0,Valor:0,'Nº registros':0};pg.Unidades+=num(r.Unidades);pg.Valor+=num(r.Valor);pg['Nº registros']+=1;productMap.set(pk,pg);
     const sk=[trim(r.Segmento),trim(r.Destino)].join('|'),sg=sdMap.get(sk)||{Segmento:trim(r.Segmento)||'Sin segmento',Destino:trim(r.Destino)||'Sin destino','Nº registros':0,Unidades:0,Valor:0};sg['Nº registros']+=1;sg.Unidades+=num(r.Unidades);sg.Valor+=num(r.Valor);sdMap.set(sk,sg);
   }
-  const byDonor=[...donorMap.values()].map(x=>({Donante:x.Donante,'Tipo donante':x['Tipo donante'],'Nº registros':x['Nº registros'],'Productos distintos':x['Productos distintos'].size,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor)||text(a.Donante).localeCompare(text(b.Donante),'es'));
-  const byDonorProduct=[...productMap.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor)||text(a.Donante).localeCompare(text(b.Donante),'es'));
+  const byDonor=[...donorMap.values()].map(x=>({Donante:x.Donante,'Tipo donante':x['Tipo donante'],'Nº registros':x['Nº registros'],'Productos distintos':x['Productos distintos'].size,...(allEvents?{'Eventos distintos':x.Eventos.size}:{}),Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor)||text(a.Donante).localeCompare(text(b.Donante),'es'));
+  const byDonorProduct=[...productMap.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor)||text(a.Evento).localeCompare(text(b.Evento),'es')||text(a.Donante).localeCompare(text(b.Donante),'es'));
   const bySegmentDestination=[...sdMap.values()].map(x=>({...x,Unidades:round(x.Unidades,3),Valor:v26Money(x.Valor)})).sort((a,b)=>num(b.Valor)-num(a.Valor));
-  const total=v26Money(rows.reduce((a,r)=>a+num(r.Valor),0));
-  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de donaciones · ${rr.nombre}`,facts:{event:rr.nombre,donor:donor||'',donation_record_count:rows.length,donor_count:byDonor.length,product_count:new Set(rows.map(r=>norm(r.Producto)).filter(Boolean)).size,total_value:total,detail_semantics:'Cada registro DONADO SOCIO/TIENDA/OTROS conserva el donante literal humanizado. donor_ref P: se resuelve contra PERSONAS y T: contra TIENDAS.'},provenance:'ControlEvent · ce_compras DONADO + catálogos humanizados',tables:[
-    v26Table('donors',`Donantes · ${rr.nombre}`,byDonor,{Donante:v26TextSchema('Persona, tienda u otra entidad donante'),'Tipo donante':v26TextSchema('Persona/Tienda/Otro'),'Nº registros':v26CountSchema('registros'),'Productos distintos':v26CountSchema('productos'),Unidades:v26SchemaField('quantity','uds','Unidades donadas'),Valor:v26MoneySchema('Valor total donado')}),
-    v26Table('donor_products',`Donaciones por donante y producto · ${rr.nombre}`,byDonorProduct,{Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema(),'Nº registros':v26CountSchema('registros')}),
-    v26Table('donation_lines',`Registros de donación · ${rr.nombre}`,rows.map(r=>({Donante:r.Donante,'Tipo donante':r['Tipo donante'],'Tipo de donación':r['Tipo de donación'],Producto:r.Producto,Segmento:r.Segmento,Destino:r.Destino,Unidades:r.Unidades,Precio:r.Precio,Valor:r.Valor,Responsable:r.Responsable,Tienda:r.Tienda})),{Donante:v26TextSchema(),'Tipo donante':v26TextSchema(),'Tipo de donación':v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema('Precio unitario registrado'),Valor:v26MoneySchema('Valor del registro'),Responsable:v26TextSchema(),Tienda:v26TextSchema()}),
-    v26Table('donations_by_segment_destination',`Donaciones por Segmento/Destino · ${rr.nombre}`,bySegmentDestination,{Segmento:v26TextSchema(),Destino:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema()})
+  const total=v26Money(rows.reduce((a,r)=>a+num(r.Valor),0)),scopeTitle=allEvents?'Todos los eventos':eventRefs[0]?.nombre||'';
+  const lineSchema={...(allEvents?{Evento:v26TextSchema()}:{}),Donante:v26TextSchema(),'Tipo donante':v26TextSchema(),'Tipo de donación':v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema('Precio unitario registrado'),Valor:v26MoneySchema('Valor del registro'),Responsable:v26TextSchema(),Tienda:v26TextSchema()};
+  const donorProductSchema={...(allEvents?{Evento:v26TextSchema()}:{}),Donante:v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema(),'Nº registros':v26CountSchema('registros')};
+  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de donaciones · ${scopeTitle}`,facts:{scope,event:allEvents?'':scopeTitle,event_count:allEvents?eventsFound.size:1,donor:donor||'',donation_record_count:rows.length,donor_count:byDonor.length,product_count:new Set(rows.map(r=>norm(r.Producto)).filter(Boolean)).size,total_value:total,detail_semantics:'Cada registro DONADO SOCIO/TIENDA/OTROS conserva el donante literal humanizado. Con scope=all_events no se hereda ni se aplica el evento visible.'},provenance:'ControlEvent · ce_compras DONADO + catálogos humanizados',tables:[
+    v26Table('donors',`Donantes · ${scopeTitle}`,byDonor,{Donante:v26TextSchema('Persona, tienda u otra entidad donante'),'Tipo donante':v26TextSchema('Persona/Tienda/Otro'),'Nº registros':v26CountSchema('registros'),'Productos distintos':v26CountSchema('productos'),...(allEvents?{'Eventos distintos':v26CountSchema('eventos')}:{}),Unidades:v26SchemaField('quantity','uds','Unidades donadas'),Valor:v26MoneySchema('Valor total donado')}),
+    v26Table('donor_products',`Donaciones por donante y producto · ${scopeTitle}`,byDonorProduct,donorProductSchema),
+    v26Table('donation_lines',`Registros de donación · ${scopeTitle}`,rows.map(r=>({...((allEvents&&trim(r?.Evento))?{Evento:r.Evento}:{}),Donante:r.Donante,'Tipo donante':r['Tipo donante'],'Tipo de donación':r['Tipo de donación'],Producto:r.Producto,Segmento:r.Segmento,Destino:r.Destino,Unidades:r.Unidades,Precio:r.Precio,Valor:r.Valor,Responsable:r.Responsable,Tienda:r.Tienda})),lineSchema),
+    v26Table('donations_by_segment_destination',`Donaciones por Segmento/Destino · ${scopeTitle}`,bySegmentDestination,{Segmento:v26TextSchema(),Destino:v26TextSchema(),'Nº registros':v26CountSchema('registros'),Unidades:v26SchemaField('quantity','uds'),Valor:v26MoneySchema()})
   ].filter(t=>t.rows.length)};
 }
 
@@ -7994,9 +8004,10 @@ function v261FinalSchema(){
     title:{type:'string'},
     answer:{type:'string'},
     warnings:{type:'array',items:{type:'string'}},
+    state_effects:{type:'array',items:{type:'string',enum:['dataset','view','focus','subjects','memory_reset']}},
     show_tables:{type:'array',items:{type:'object',properties:{tool_id:{type:'string'},table_key:{type:'string'}},required:['tool_id','table_key']}},
     charts:{type:'array',items:{type:'object',properties:{title:{type:'string'},type:{type:'string',enum:['bar','horizontalBar','pie','donut','line','stackedBar']},tool_id:{type:'string'},table_key:{type:'string'},label_field:{type:'string',description:'Campo canónico. Para comparaciones multi usa row_count (elementos distintos), record_count (registros), total_amount (importe) o total_units (unidades).'},value_field:{type:'string',description:'Campo canónico. Para comparaciones multi usa row_count (elementos distintos), record_count (registros), total_amount (importe) o total_units (unidades).'},series_fields:{type:'array',items:{type:'string'}},marker_field:{type:'string',description:'Campo categórico opcional para colorear marcadores en gráficas de línea, p. ej. Tipo=INGRESO/CARGO.'},point_label_fields:{type:'array',items:{type:'string'},description:'Campos opcionales que deben quedar rotulados de forma estática junto a cada punto, especialmente para PDF.'},unit:{type:'string'}},required:['title','type','tool_id','table_key','label_field']}}
-  },required:['title','answer','warnings','show_tables','charts']};
+  },required:['title','answer','warnings','state_effects','show_tables','charts']};
 }
 
 function v261SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,userPrompt,conversationHistory,voiceConversation=false}={}){
@@ -8086,11 +8097,11 @@ function v281StripInternalPresentationLeak(raw){
   return v281StripInternalIdentifiers(clean||'Aquí tienes el resultado solicitado con los datos disponibles en ControlEvent.');
 }
 function v261ParseFinal(payload){
-  const raw=v261OutputText(payload);if(!raw)return{title:'Respuesta de Zuzu',answer:'',warnings:[],showTables:[],chartSpecs:[]};
+  const raw=v261OutputText(payload);if(!raw)return{title:'Respuesta de Zuzu',answer:'',warnings:[],stateEffects:[],showTables:[],chartSpecs:[]};
   try{
     const parsed=parsePlanJsonLenientHf37(raw).parsed||{};
-    return{title:trim(parsed?.title)||'Respuesta de Zuzu',answer:v281StripInternalPresentationLeak(trim(parsed?.answer)),warnings:arr(parsed?.warnings).map(trim).filter(Boolean).slice(0,8),showTables:arr(parsed?.show_tables||parsed?.showTables).slice(0,8),chartSpecs:arr(parsed?.charts||parsed?.chart_specs||parsed?.chartSpecs).slice(0,8)};
-  }catch(_){return{title:'Respuesta de Zuzu',answer:v281StripInternalPresentationLeak(raw),warnings:[],showTables:[],chartSpecs:[]};}
+    return{title:trim(parsed?.title)||'Respuesta de Zuzu',answer:v281StripInternalPresentationLeak(trim(parsed?.answer)),warnings:arr(parsed?.warnings).map(trim).filter(Boolean).slice(0,8),stateEffects:arr(parsed?.state_effects||parsed?.stateEffects).map(trim).filter(Boolean).slice(0,8),showTables:arr(parsed?.show_tables||parsed?.showTables).slice(0,8),chartSpecs:arr(parsed?.charts||parsed?.chart_specs||parsed?.chartSpecs).slice(0,8)};
+  }catch(_){return{title:'Respuesta de Zuzu',answer:v281StripInternalPresentationLeak(raw),warnings:[],stateEffects:[],showTables:[],chartSpecs:[]};}
 }
 
 function v261CompactToolResult(result,detail='standard'){
@@ -9960,7 +9971,7 @@ function v42CompactWorkingSet(raw=null){
   const metrics={};for(const [k,v] of Object.entries(raw.metrics&&typeof raw.metrics==='object'?raw.metrics:{})){const n=Number(v);if(Number.isFinite(n))metrics[trim(k).slice(0,60)]=n;}
   const targets=[];const seen=new Set();for(const item of arr(raw.targets)){const c=v46CompactWorkingTarget(item);if(!c)continue;const key=trim(c.target.id)||norm(c.target.name);if(seen.has(key))continue;seen.add(key);targets.push(c);if(targets.length>=6)break;}
   const rowCache=v50CompactWorkingRowCache(raw.row_cache||null),parentCache=v50CompactWorkingRowCache(raw.parent_cache||null),recordCount=raw.record_count==null?null:Math.max(0,Math.min(100000,Number(raw.record_count)||0));
-  return{frame_id:trim(raw.frame_id).slice(0,90),parent_frame_id:trim(raw.parent_frame_id).slice(0,90),frame_op:trim(raw.frame_op).slice(0,40),kind:trim(raw.kind).slice(0,40)||'none',event:trim(raw.event).slice(0,140),scope:trim(raw.scope).slice(0,30)||'none',subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50)||'general',requested_object:trim(raw.requested_object).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),...(recordCount!=null?{record_count:recordCount}:{}),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(Object.keys(metrics).length?{metrics}:{}),...(rowCache?{row_cache:rowCache}:{}),...(parentCache?{parent_cache:parentCache}:{}),...(targets.length?{partitioned:true,target_count:targets.length,targets}:{})};
+  return{frame_id:trim(raw.frame_id).slice(0,90),parent_frame_id:trim(raw.parent_frame_id).slice(0,90),frame_op:trim(raw.frame_op).slice(0,40),kind:trim(raw.kind).slice(0,40)||'none',event:trim(raw.event).slice(0,140),scope:trim(raw.scope).slice(0,30)||'none',subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50)||'general',requested_object:trim(raw.requested_object).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),source_call_id:trim(raw.source_call_id).slice(0,120),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),...(recordCount!=null?{record_count:recordCount}:{}),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(Object.keys(metrics).length?{metrics}:{}),...(rowCache?{row_cache:rowCache}:{}),...(parentCache?{parent_cache:parentCache}:{}),...(targets.length?{partitioned:true,target_count:targets.length,targets}:{})};
 }
 function v46WorkingTargetNames(working=null){return arr(v42CompactWorkingSet(working)?.targets).map(x=>trim(x?.target?.name)).filter(Boolean);}
 // SCC 2.2.6 · TARGET_SET representa varios objetivos canónicos simultáneos sin aplastarlos
@@ -12314,12 +12325,17 @@ function v62NativeTools(){
     if(shortDesc[tool.name])tool.description=shortDesc[tool.name];
     const props=tool?.parameters?.properties;if(!props)continue;
     for(const prop of Object.values(props))if(prop&&typeof prop==='object'&&'description' in prop)delete prop.description;
+    if(eventScoped.has(tool.name)&&props.scope){const allEventsCapable=new Set(['event_donation_lines','person_dossier','store_purchases']);props.scope.enum=allEventsCapable.has(tool.name)?['active_event','named_event','all_events']:['active_event','named_event'];}
     if(eventScoped.has(tool.name))props.activate_focus={type:'boolean',description:'true si este evento queda como foco; false si es apoyo lateral.'};
-    if(datasetTools.has(tool.name))props.activate_dataset={type:'boolean',description:'true si este resultado queda como dataset vigente; false si es lateral.'};
+    if(datasetTools.has(tool.name)){
+      props.activate_dataset={type:'boolean',description:'Compatibilidad: true si puede quedar vigente; false si es lateral.'};
+      props.dataset_role={type:'string',enum:['primary','support'],description:'primary = ÚNICO dataset principal del turno; support = evidencia auxiliar que nunca sustituye el dataset vigente.'};
+      tool.parameters.required=[...new Set([...(tool.parameters.required||[]),'dataset_role'])];
+    }
     if(tool.name==='person_dossier')props.activate_subject={type:'boolean',description:'true si la persona queda como sujeto vigente.'};
     if(tool.name==='compare_events')props.activate_focus={type:'boolean',description:'true si los eventos comparados quedan como foco múltiple.'};
   }
-  tools.push({type:'function',name:'working_set_action',description:'Opera sobre el dataset completo que CE ya conserva; no consulta BBDD. group usa group_by y metrics como count, sum:Importe o distinct:Campo. reset quita filtro; back restaura la vista anterior.',parameters:{type:'object',properties:{action:{type:'string',enum:['list','filter','sort','reset','back','project','count','limit','inspect','group']},field:{type:'string'},group_by:{type:'string'},value:{type:'string'},direction:{type:'string',enum:['asc','desc']},fields:{type:'array',items:{type:'string'}},metrics:{type:'array',items:{type:'string'}},match_mode:{type:'string',enum:['exact','word','contains','semantic']},limit:{type:'integer'}},required:['action']}});
+  tools.push({type:'function',name:'working_set_action',description:'Opera sobre datasets que CE ya conserva; no consulta BBDD. activate recupera por dataset_id un dataset reciente del inventario. group usa group_by y metrics como count, sum:Importe o distinct:Campo. reset quita filtro; back restaura la vista anterior.',parameters:{type:'object',properties:{action:{type:'string',enum:['list','filter','sort','reset','back','activate','project','count','limit','inspect','group']},dataset_id:{type:'string'},field:{type:'string'},group_by:{type:'string'},value:{type:'string'},direction:{type:'string',enum:['asc','desc']},fields:{type:'array',items:{type:'string'}},metrics:{type:'array',items:{type:'string'}},match_mode:{type:'string',enum:['exact','word','contains','semantic']},limit:{type:'integer'}},required:['action']}});
   tools.push({type:'function',name:'conversation_memory',description:'Inspecciona o borra TODA la memoria conversacional. reset solo cuando el usuario pide empezar de cero; no para cambiar de evento.',parameters:{type:'object',properties:{action:{type:'string',enum:['inspect','reset']}},required:['action']}});
   return tools;
 }
@@ -12355,8 +12371,8 @@ function v62LiteMemoryFromHistory(history=[]){
 }
 function v62LiteMemoryDescriptor(memory={}){
   const ws=v42CompactWorkingSet(memory?.active_dataset||null),cache=v50CompactWorkingRowCache(ws?.row_cache||null),parent=v50CompactWorkingRowCache(ws?.parent_cache||null);
-  const recent=arr(memory?._view_history).map(ds=>{const d=v42CompactWorkingSet(ds),c=v50CompactWorkingRowCache(d?.row_cache||null);return d?{type:trim(d.requested_object)||trim(d.kind),event:trim(d.event),count:Number(d.row_count)||0,visible_fields:arr(c?.visible_fields).slice(0,12),filter:trim(d.filter_summary),sort_field:trim(c?.sort_field),sort_direction:trim(c?.sort_direction)||'none'}:null;}).filter(Boolean).slice(0,3);
-  return{focus_events:arr(memory?.focus_events).map(trim).filter(Boolean).slice(0,6),subjects:arr(memory?.subjects).map(trim).filter(Boolean).slice(0,4),active_dataset:ws?{type:trim(ws.requested_object)||trim(ws.kind)||'none',event:trim(ws.event),scope:trim(ws.scope),count:Number(ws.row_count)||0,record_count:ws.record_count==null?null:Number(ws.record_count),filter:trim(ws.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)||'none',available_fields:arr(cache?.columns).slice(0,16),visible_fields:arr(cache?.visible_fields).slice(0,12),rows_complete:cache?.complete===true,parent_count:parent?arr(parent.rows).length:null,back_available:recent.length>0,known:{total_amount:ws?.aggregate?.total_amount??null,total_units:ws?.aggregate?.total_units??null},tool:trim(ws.tool),table_key:trim(ws.table_key)}:null,recent_datasets:recent};
+  const recent=arr(memory?._view_history).map(ds=>{const d=v42CompactWorkingSet(ds),c=v50CompactWorkingRowCache(d?.row_cache||null);return d?{id:trim(d.frame_id),type:trim(d.requested_object)||trim(d.kind),event:trim(d.event),scope:trim(d.scope),count:Number(d.row_count)||0,tool:trim(d.tool),available_fields:arr(c?.columns).slice(0,16),visible_fields:arr(c?.visible_fields).slice(0,12),rows_complete:c?.complete===true,filter:trim(d.filter_summary),sort_field:trim(c?.sort_field),sort_direction:trim(c?.sort_direction)||'none'}:null;}).filter(Boolean).slice(0,5);
+  return{focus_events:arr(memory?.focus_events).map(trim).filter(Boolean).slice(0,6),subjects:arr(memory?.subjects).map(trim).filter(Boolean).slice(0,4),active_dataset:ws?{id:trim(ws.frame_id),type:trim(ws.requested_object)||trim(ws.kind)||'none',event:trim(ws.event),scope:trim(ws.scope),count:Number(ws.row_count)||0,record_count:ws.record_count==null?null:Number(ws.record_count),filter:trim(ws.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)||'none',available_fields:arr(cache?.columns).slice(0,16),visible_fields:arr(cache?.visible_fields).slice(0,12),rows_complete:cache?.complete===true,parent_count:parent?arr(parent.rows).length:null,back_available:recent.length>0,known:{total_amount:ws?.aggregate?.total_amount??null,total_units:ws?.aggregate?.total_units??null},tool:trim(ws.tool),table_key:trim(ws.table_key)}:null,recent_datasets:recent};
 }
 function v62NativeInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation=false}={}){
   const active=v26EventById(state,selectedEventId),visible=active?trim(active?.titulo):'ninguno',display=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
@@ -12368,9 +12384,11 @@ ARQUITECTURA OBLIGATORIA:
 - Nunca generes SQL ni SELECT. Tú decides QUÉ tool y argumentos; CE decide únicamente CÓMO ejecutar esa tool y garantiza los datos.
 - El evento visible en pantalla es «${visible}» y es SOLO ambiente. Si la memoria o el usuario fijan otro evento, no vuelvas al visible salvo que el usuario lo pida.
 - PRODUCT_SET: para productos distintos usa event_products. Para registros físicos/tickets/compras individuales usa event_purchase_lines. No mezcles ambas granularidades.
-- Para una lista/dataset que deba seguir vivo usa activate_dataset=true. Si una tool es solo apoyo lateral, usa activate_dataset=false. Para foco de evento usa activate_focus; person_dossier puede usar activate_subject=false cuando sea lateral.
-- Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. Si el dataset vigente ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; no vuelvas a consultar BBDD.
-- Para ordenar, filtrar, contar, proyectar o agrupar una lista YA vigente usa working_set_action. reset vuelve al conjunto padre de un filtro; back restaura la vista/dataset anterior del historial factual.
+- SINGLE WRITER: toda tool que devuelve dataset exige dataset_role. Si pides varias en la misma ronda, EXACTAMENTE UNA puede ser dataset_role=primary; las demás deben ser support. Una tool support aporta hechos pero JAMÁS sustituye el dataset principal. No confíes en el orden de ejecución.
+- Para una lista/dataset que deba seguir vivo usa dataset_role=primary y activate_dataset=true. Si una tool es solo apoyo lateral, usa dataset_role=support y activate_dataset=false. Para foco de evento usa activate_focus; person_dossier puede usar activate_subject=false cuando sea lateral.
+- Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. Si el dataset vigente o uno de recent_datasets ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; para recuperar uno reciente usa action=activate con su dataset_id. No vuelvas a consultar BBDD.
+- Para ordenar, filtrar, contar, proyectar o agrupar una lista YA vigente usa working_set_action. Para orden por varias columnas usa UNA acción sort con fields en orden de prioridad. reset vuelve al conjunto padre de un filtro; back restaura la vista anterior; activate recupera un dataset reciente por id.
+- ACTION RECEIPT: state_effects del JSON final debe declarar TODOS los cambios de estado que afirmes en answer: dataset, view, focus, subjects o memory_reset. Si no has ejecutado una tool que produzca ese efecto en ESTE turno, NO afirmes que ya lo hiciste y deja state_effects=[].
 - Una queja, corrección o frase como «eso está mal» NO modifica memoria por sí sola. Si necesitas verificar, vuelve a pedir la fuente canónica; solo muta memoria llamando explícitamente una tool que la cambie.
 - conversation_memory(reset) SOLO si el usuario pide inequívocamente borrar/reiniciar TODA la conversación. Cambiar de foco o pasar a otro evento NO es reset global: usa la tool del nuevo evento con activate_focus=true.
 - DATASETS ZERO-COPY: cuando una tool canónica devuelve una lista (PRODUCT_SET, PURCHASE_LINE_SET, DONATION_SET o working_set_action), CE adjunta automáticamente el dataset activo completo a pantalla y PDF. NO enumeres sus filas en answer ni copies la tabla en Markdown. Resume en 1-3 frases y usa una segunda tool si necesitas razonar sobre orden/filtro/top. show_tables queda para tablas laterales o adicionales.
@@ -12382,7 +12400,7 @@ Devuelve el JSON final exigido por la API. No menciones tools, SCC, datasets ni 
 }
 function v62NativeInput(userPrompt='',history=[],memory={}){
   const recent=arr(history).slice(-3).map(h=>`Usuario: ${trim(h?.user).slice(0,360)}\nZuzu: ${trim(h?.assistant).slice(0,420)}`).join('\n\n');
-  return `INVENTARIO CE DISPONIBLE (hechos, no lo recites):\n${JSON.stringify(v62LiteMemoryDescriptor(memory))}\nREGLA: available_fields indica lo que CE YA tiene; visible_fields solo lo que se está mostrando. Si rows_complete=true, usa working_set_action para reutilizar esos datos. recent_datasets/back_available indican que existe una vista anterior restaurable con back.\n\n${recent?`ÚLTIMOS TURNOS (solo para referencias humanas):\n${recent}\n\n`:''}MENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
+  return `INVENTARIO CE DISPONIBLE (hechos, no lo recites):\n${JSON.stringify(v62LiteMemoryDescriptor(memory))}\nREGLA: available_fields indica lo que CE YA tiene; visible_fields solo lo que se está mostrando. Si rows_complete=true, usa working_set_action para reutilizar esos datos. recent_datasets contiene datasets recientes con id estable para action=activate; back_available indica que existe una vista anterior restaurable con back. No pidas BBDD para un dataset que figure completo en este inventario.\n\n${recent?`ÚLTIMOS TURNOS (solo para referencias humanas):\n${recent}\n\n`:''}MENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
 }
 function v62WorkingResult(memory={},args={},callId='working_set_action'){
   let mem=JSON.parse(JSON.stringify(memory||{})),ws=v42CompactWorkingSet(mem.active_dataset||null),action=trim(args?.action).toLowerCase();
@@ -12398,6 +12416,14 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
     const restored=v42CompactWorkingSet(mem.active_dataset),rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
     return{result:{id:callId,name:'working_set_action',ok:true,title:trim(rc?.title)||'Vista anterior',facts:{action:'back',type:trim(restored?.requested_object)||trim(restored?.kind),event:trim(restored?.event),count:Number(restored?.row_count)||0,display_count:displayRows.length,filter:trim(restored?.filter_summary),sort_field:trim(rc?.sort_field),sort_direction:trim(rc?.sort_direction)},tables:displayRows.length?[{key:'working_set',title:trim(rc?.title)||'Vista anterior',rows:displayRows}]:[]},memory:mem};
   }
+  if(action==='activate'){
+    const wanted=trim(args?.dataset_id),prior=arr(mem._view_history).find(x=>trim(x?.frame_id)===wanted);
+    if(!wanted||!prior)return{result:{id:callId,name:'working_set_action',ok:false,title:'Dataset reciente',facts:{error:'No existe ese dataset_id en el inventario reciente.',dataset_id:wanted,available_dataset_ids:arr(mem._view_history).map(x=>trim(x?.frame_id)).filter(Boolean)},tables:[]},memory:mem,isError:true};
+    v64PushViewHistory(mem,ws);mem.active_dataset=v42CompactWorkingSet(prior);
+    mem._view_history=arr(mem._view_history).filter(x=>trim(x?.frame_id)!==wanted);
+    const restored=v42CompactWorkingSet(mem.active_dataset),rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
+    return{result:{id:callId,name:'working_set_action',ok:true,title:trim(rc?.title)||'Dataset recuperado',facts:{action:'activate',dataset_id:wanted,type:trim(restored?.requested_object)||trim(restored?.kind),event:trim(restored?.event),count:Number(restored?.row_count)||0,display_count:displayRows.length,filter:trim(restored?.filter_summary),sort_field:trim(rc?.sort_field),sort_direction:trim(rc?.sort_direction)},tables:displayRows.length?[{key:'working_set',title:trim(rc?.title)||'Dataset recuperado',rows:displayRows}]:[]},memory:mem};
+  }
   if(!cache||!cache.complete)return{result:{id:callId,name:'working_set_action',ok:false,title:'Dataset',facts:{error:'El dataset vigente no conserva filas completas para esta transformación.'},tables:[]},memory:mem,isError:true};
   let rows=arr(cache.rows).map(r=>({...r})),nextCache={...cache},nextWs={...ws},mutates=false;
   const sample=rows[0]||{};
@@ -12407,10 +12433,11 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
     const baseParent=parent||cache;rows=rows.filter(r=>v56SemanticTextMatch(r?.[key],value,mode));
     nextCache=v50CompactWorkingRowCache({...cache,rows,complete:true});nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|filter|${field}|${value}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'FILTER',row_count:rows.length,empty:rows.length===0,filter_summary:`${field}=${value}`,row_cache:nextCache,parent_cache:baseParent});mutates=true;
   }else if(action==='sort'){
-    const field=v49CanonicalPresentationField(trim(args?.field)||trim(cache.sort_field))||trim(args?.field)||trim(cache.sort_field),key=v48ColumnKey(sample,field)||field,direction=trim(args?.direction)==='desc'?'desc':'asc';
-    if(!field||!Object.prototype.hasOwnProperty.call(sample,key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Ordenación',facts:{error:'Campo de ordenación no válido.',field,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
-    const mult=direction==='desc'?-1:1;rows.sort((a,b)=>{const av=a?.[key],bv=b?.[key];if(/fecha/i.test(norm(key))){const ad=v40ParseDateMillis(av),bd=v40ParseDateMillis(bv);if(ad!=null&&bd!=null)return mult*(ad-bd);}const an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});
-    nextCache=v50CompactWorkingRowCache({...cache,rows,sort_field:key,sort_direction:direction,complete:true});nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|sort|${key}|${direction}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'SORT',row_cache:nextCache});mutates=true;
+    const requested=arr(args?.fields).map(x=>v49CanonicalPresentationField(x)||trim(x)).filter(Boolean),fallback=v49CanonicalPresentationField(trim(args?.field)||trim(cache.sort_field))||trim(args?.field)||trim(cache.sort_field),fields=requested.length?requested:[fallback],keys=fields.map(f=>v48ColumnKey(sample,f)||f).filter(Boolean),direction=trim(args?.direction)==='desc'?'desc':'asc';
+    if(!keys.length||keys.some(key=>!Object.prototype.hasOwnProperty.call(sample,key)))return{result:{id:callId,name:'working_set_action',ok:false,title:'Ordenación',facts:{error:'Campo de ordenación no válido.',fields,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
+    const mult=direction==='desc'?-1:1,cmp=(av,bv,key)=>{if(/fecha/i.test(norm(key))){const ad=v40ParseDateMillis(av),bd=v40ParseDateMillis(bv);if(ad!=null&&bd!=null)return mult*(ad-bd);}const an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});};
+    rows.sort((a,b)=>{for(const key of keys){const c=cmp(a?.[key],b?.[key],key);if(c)return c;}return 0;});
+    nextCache=v50CompactWorkingRowCache({...cache,rows,sort_field:keys.join(' > '),sort_direction:direction,complete:true});nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|sort|${keys.join('|')}|${direction}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'SORT',row_cache:nextCache});mutates=true;
   }else if(action==='reset'){
     if(!parent)return{result:{id:callId,name:'working_set_action',ok:false,title:'Restauración',facts:{error:'No existe un conjunto padre de filtro que restaurar. Para una vista anterior usa back.'},tables:[]},memory:mem,isError:true};
     rows=arr(parent.rows).map(r=>({...r}));nextCache=parent;nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|reset|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'RESET',row_count:rows.length,empty:false,filter_summary:'',row_cache:parent,parent_cache:null});mutates=true;
@@ -12420,11 +12447,14 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
     if(!visible.length)return{result:{id:callId,name:'working_set_action',ok:false,title:'Columnas',facts:{error:'No se reconocieron campos disponibles.',fields:wanted,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
     nextCache=v50CompactWorkingRowCache({...cache,visible_fields:visible});nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|project|${visible.join('|')}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'PROJECT',row_cache:nextCache});mutates=true;
   }else if(action==='group'){
-    const field=trim(args?.group_by)||trim(args?.field),key=v48ColumnKey(sample,field)||field;
-    if(!field||!Object.prototype.hasOwnProperty.call(sample,key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Agrupación',facts:{error:'Campo de agrupación no válido.',field,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
+    // GROUP siempre se calcula sobre el dataset factual fuente. Si el conjunto vigente ya es una
+    // agrupación, reutilizamos su parent_cache en vez de volver a agrupar columnas derivadas.
+    const sourceCache=(trim(ws.kind)==='groups'&&parent?.complete)?parent:cache,sourceRows=arr(sourceCache?.rows).map(r=>({...r})),sourceSample=sourceRows[0]||{};
+    const field=trim(args?.group_by)||trim(args?.field),key=v48ColumnKey(sourceSample,field)||field;
+    if(!field||!Object.prototype.hasOwnProperty.call(sourceSample,key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Agrupación',facts:{error:'Campo de agrupación no válido.',field,available_fields:arr(sourceCache?.columns)},tables:[]},memory:mem,isError:true};
     const metricSpecs=arr(args?.metrics).map(trim).filter(Boolean);if(!metricSpecs.length)metricSpecs.push('count');
     const groups=new Map();
-    for(const row of rows){
+    for(const row of sourceRows){
       const label=trim(row?.[key])||'(Sin valor)';if(!groups.has(label))groups.set(label,{label,rows:[]});groups.get(label).rows.push(row);
     }
     const grouped=[];
@@ -12433,7 +12463,7 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
       for(const spec of metricSpecs){
         const [opRaw,...rest]=spec.split(':'),op=trim(opRaw).toLowerCase(),fieldRaw=trim(rest.join(':'));
         if(op==='count'){out.Registros=g.rows.length;continue;}
-        const mk=v48ColumnKey(sample,fieldRaw)||fieldRaw;if(!mk||!Object.prototype.hasOwnProperty.call(sample,mk))continue;
+        const mk=v48ColumnKey(sourceSample,fieldRaw)||fieldRaw;if(!mk||!Object.prototype.hasOwnProperty.call(sourceSample,mk))continue;
         if(op==='sum'){out[`Suma ${mk}`]=g.rows.reduce((acc,r)=>acc+(v40MaybeNumber(r?.[mk])??0),0);}
         else if(op==='distinct'||op==='count_distinct'){out[`Distintos ${mk}`]=new Set(g.rows.map(r=>trim(r?.[mk])).filter(Boolean)).size;}
       }
@@ -12442,7 +12472,7 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
     }
     const gcols=[];grouped.forEach(r=>Object.keys(r).forEach(k=>{if(!gcols.includes(k))gcols.push(k);}));
     const gcache=v50CompactWorkingRowCache({table_key:'working_set',title:`Agrupación por ${key} · ${trim(ws.event)}`,source_tool:'working_set_action',primary_field:key,visible_fields:gcols,sort_field:'',sort_direction:'none',columns:gcols,rows:grouped,complete:true});
-    nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|group|${key}|${metricSpecs.join('|')}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'GROUP',kind:'groups',requested_object:'groups',row_count:grouped.length,record_count:rows.length,filter_summary:'',row_cache:gcache,parent_cache:null});nextCache=gcache;rows=grouped;mutates=true;
+    nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|group|${key}|${metricSpecs.join('|')}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'GROUP',kind:'groups',requested_object:'groups',row_count:grouped.length,record_count:sourceRows.length,filter_summary:'',row_cache:gcache,parent_cache:sourceCache});nextCache=gcache;rows=grouped;mutates=true;
   }else if(action==='list'){
     // Sin mutación.
   }else if(action==='limit'){
@@ -12489,23 +12519,21 @@ function v63CanonicalDatasetKey(result={}){
   if(name==='working_set_action')return'working_set';
   return'';
 }
-function v63AutoPresentationRefs(results=[]){
-  // Una única presentación principal automática: la última transformación del dataset
-  // gana sobre la materialización inicial. Las tablas laterales siguen dependiendo de show_tables.
+function v63AutoPresentationRefs(results=[],memory={}){
+  // Una transformación local del dataset vigente es siempre la presentación principal más reciente.
   let chosen=null;
   for(const r of arr(results)){
-    const args=r?._native_call_args||{},name=trim(r?.name),key=v63CanonicalDatasetKey(r);
-    if(!key)continue;
-    if(name==='working_set_action'){
-      const action=trim(args?.action).toLowerCase();
-      if(['count','inspect'].includes(action)||!arr(r?.tables).some(t=>trim(t?.key)===key&&arr(t?.rows).length))continue;
-      chosen={tool_id:trim(r?.id),table_key:key};
-      continue;
-    }
-    if(args.activate_dataset===false)continue;
-    if(arr(r?.tables).some(t=>trim(t?.key)===key&&arr(t?.rows).length))chosen={tool_id:trim(r?.id),table_key:key};
+    const name=trim(r?.name),key=v63CanonicalDatasetKey(r);if(name!=='working_set_action'||!key)continue;
+    const action=trim(r?._native_call_args?.action).toLowerCase();
+    if(['count','inspect'].includes(action)||!arr(r?.tables).some(t=>trim(t?.key)===key&&arr(t?.rows).length))continue;
+    chosen={tool_id:trim(r?.id),table_key:key};
   }
-  return chosen?[chosen]:[];
+  if(chosen)return[chosen];
+  // Para materializaciones externas no gana "la última": se presenta el artefacto que CE aceptó
+  // como PRIMARY y que quedó registrado como source_call_id del dataset activo.
+  const sourceId=trim(memory?.active_dataset?.source_call_id);
+  if(sourceId){const r=arr(results).find(x=>trim(x?.id)===sourceId),key=v63CanonicalDatasetKey(r||{});if(r&&key&&arr(r?.tables).some(t=>trim(t?.key)===key&&arr(t?.rows).length))return[{tool_id:sourceId,table_key:key}];}
+  return[];
 }
 function v63PresentationColumns(result={},table={},memory={}){
   const rows=arr(table?.rows),sample=rows[0]||{},all=[];
@@ -12520,7 +12548,7 @@ function v63PresentationColumns(result={},table={},memory={}){
   }
   if(name==='event_products')return v63DefaultVisibleFields('products',all);
   if(name==='event_purchase_lines')return v63DefaultVisibleFields('purchases',all);
-  if(name==='event_donation_lines')return v63DefaultVisibleFields('donations',all);
+  if(name==='event_donation_lines'){const cols=v63DefaultVisibleFields('donations',all);if(trim(result?.facts?.scope)==='all_events'&&all.includes('Evento')&&!cols.includes('Evento'))cols.unshift('Evento');return cols.slice(0,12);}
   if(name==='events_catalog')return v63DefaultVisibleFields('events',all);
   return all.slice(0,12);
 }
@@ -12551,6 +12579,7 @@ function v63MechanicalClosure(results=[],memory={}){
     if(action==='count')return{title:'Recuento',answer:`El conjunto vigente contiene ${count} ${noun}${event?` de ${event}`:''}.`,warnings:[],showTables:[],chartSpecs:[]};
     if(action==='group')return{title:'Agrupación',answer:`He agrupado los datos por ${trim(f.group_field)||'el campo solicitado'} en ${Number(f.group_count)||count} grupos. La tabla inferior muestra el resultado completo.`,warnings:[],showTables:[],chartSpecs:[]};
     if(action==='back')return{title:'Vista anterior',answer:`He restaurado la vista anterior${event?` de ${event}`:''}. Contiene ${count} ${noun}.`,warnings:[],showTables:[],chartSpecs:[]};
+    if(action==='activate')return{title:'Dataset recuperado',answer:`He recuperado el conjunto anterior${event?` de ${event}`:''}. Contiene ${count} ${noun}.`,warnings:[],showTables:[],chartSpecs:[]};
     if(['list','filter','sort','reset','project','limit'].includes(action))return{title:trim(last.title)||'Datos',answer:`He actualizado la lista${event?` de ${event}`:''}. El conjunto vigente contiene ${count} ${noun} y la presentación completa queda debajo.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='event_products'){
@@ -12587,17 +12616,20 @@ function v62DatasetFromToolResult(call={},result={},previous=null){
   const kind=name==='event_products'?'products':name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':'data';
   const event=trim(result?.facts?.event)||trim(args?.event),rowCount=name==='event_products'?(Number(result?.facts?.product_count)||rows.length):name==='events_catalog'?(Number(result?.facts?.event_count)||rows.length):(Number(result?.facts?.row_count||result?.facts?.purchase_line_count||result?.facts?.donation_record_count)||rows.length),recordCount=Number(result?.facts?.purchase_line_count||result?.facts?.donation_record_count||rowCount)||rowCount;
   const primary=kind==='events'?'Evento':columns.includes('Producto')?'Producto':columns[0]||'',initialSort=kind==='events'?'Fecha inicio':'',initialDirection=kind==='events'?'desc':'none';
-  const cache=v50CompactWorkingRowCache({table_key:trim(table.key)||tableKey,title:trim(table.title)||trim(result.title),source_tool:name,primary_field:primary,visible_fields:v63DefaultVisibleFields(kind,columns),sort_field:initialSort,sort_direction:initialDirection,columns:columns.slice(0,16),rows,complete:true});
-  return v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:kind==='events'?'all_events':trim(args?.scope)||'named_event',subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},row_cache:cache});
+  const initialVisible=v63DefaultVisibleFields(kind,columns);if(kind==='donations'&&trim(args?.scope)==='all_events'&&columns.includes('Evento')&&!initialVisible.includes('Evento'))initialVisible.unshift('Evento');
+  const cache=v50CompactWorkingRowCache({table_key:trim(table.key)||tableKey,title:trim(table.title)||trim(result.title),source_tool:name,primary_field:primary,visible_fields:initialVisible.slice(0,12),sort_field:initialSort,sort_direction:initialDirection,columns:columns.slice(0,16),rows,complete:true});
+  return v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:kind==='events'?'all_events':trim(args?.scope)||'named_event',subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,source_call_id:trim(call?.id),table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},row_cache:cache});
 }
-function v62UpdateMemoryFromCall(memory={},call={},result={}){
+function v62UpdateMemoryFromCall(memory={},call={},result={},options={}){
   let mem=JSON.parse(JSON.stringify(memory||{})),args=call?.arguments&&typeof call.arguments==='object'?call.arguments:{},name=trim(call?.name);
   const datasetTools=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog']);
   if(datasetTools.has(name)&&result?.ok!==false){
-    const activate=args.activate_dataset!==false;if(activate){const ds=v62DatasetFromToolResult(call,result,mem.active_dataset);if(ds){if(mem.active_dataset)v64PushViewHistory(mem,mem.active_dataset);mem.active_dataset=ds;}}
+    const activate=typeof options.activateDataset==='boolean'?options.activateDataset:(args.activate_dataset!==false&&trim(args?.dataset_role)!=='support');if(activate){const ds=v62DatasetFromToolResult(call,result,mem.active_dataset);if(ds){if(mem.active_dataset)v64PushViewHistory(mem,mem.active_dataset);mem.active_dataset=ds;}}
   }
   const eventScoped=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','store_purchases']);
-  if(eventScoped.has(name)&&args.activate_focus!==false){const event=trim(result?.facts?.event)||trim(args?.event);if(event)mem.focus_events=[event];}
+  const globalScope=trim(args?.scope)==='all_events';
+  const focusAllowed=typeof options.activateFocus==='boolean'?options.activateFocus:(args.activate_focus!==false&&trim(args?.dataset_role)!=='support');
+  if(eventScoped.has(name)&&focusAllowed){if(globalScope)mem.focus_events=[];else{const event=trim(result?.facts?.event)||trim(args?.event);if(event)mem.focus_events=[event];}}
   if(name==='compare_events'&&args.activate_focus!==false){const ev=arr(result?.facts?.event_names||args?.events).map(trim).filter(Boolean);if(ev.length)mem.focus_events=ev.slice(0,6);}
   if(name==='person_dossier'&&args.activate_subject!==false){const person=trim(result?.facts?.person||args?.person);if(person)mem.subjects=[person];if(args.activate_focus===true){const event=trim(result?.facts?.event||args?.event);if(event)mem.focus_events=[event];}}
   mem.updated_at=new Date().toISOString();return mem;
@@ -12608,7 +12640,7 @@ function v62ResultContext(memory={}){
 function v62ExactPresentation(final={},results=[],memory={}){
   // Presentación canónica sin releer el lenguaje: Gemini decide las tools; CE adjunta automáticamente
   // el dataset que Gemini marcó como vigente y conserva show_tables solo para tablas laterales.
-  const auto=v63AutoPresentationRefs(results),refs=[],seen=new Set();
+  const auto=v63AutoPresentationRefs(results,memory),refs=[],seen=new Set();
   for(const ref of [...auto,...arr(final?.showTables)]){
     const key=`${trim(ref?.tool_id)}::${trim(ref?.table_key)}`;if(!trim(ref?.tool_id)||!trim(ref?.table_key)||seen.has(key))continue;seen.add(key);refs.push(ref);
   }
@@ -12619,6 +12651,44 @@ function v62ExactPresentation(final={},results=[],memory={}){
   }
   const chartOnly=v26BuildPresentation({...final,showTables:[]},results,'',{wantsCharts:false,bankContext:false,staticPointLabels:false});
   return{...chartOnly,tables,stats:{...(chartOnly?.stats||{}),renderedTableRows:tables.reduce((n,t)=>n+arr(t?.rows).length,0)}};
+}
+
+function v65DataReadCacheKey(name='',args={}){
+  const clean={...((args&&typeof args==='object')?args:{})};for(const k of ['activate_dataset','activate_focus','activate_subject','dataset_role'])delete clean[k];
+  return `${trim(name)}:${JSON.stringify(clean)}`;
+}
+function v65DatasetRoundPolicy(calls=[]){
+  const datasetTools=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog']),items=arr(calls).filter(c=>datasetTools.has(trim(c?.name)));
+  if(!items.length)return{primaryId:'',conflict:false,datasetCalls:[]};
+  const eligible=items.filter(c=>c?.arguments?.activate_dataset!==false&&trim(c?.arguments?.dataset_role)!=='support');
+  const explicit=eligible.filter(c=>trim(c?.arguments?.dataset_role)==='primary');
+  if(items.length===1){const c=items[0];return{primaryId:(c?.arguments?.activate_dataset===false||trim(c?.arguments?.dataset_role)==='support')?'':trim(c?.id),conflict:false,datasetCalls:items};}
+  if(explicit.length===1)return{primaryId:trim(explicit[0]?.id),conflict:false,datasetCalls:items};
+  return{primaryId:'',conflict:true,datasetCalls:items};
+}
+function v65NativeScopeError(name='',args={}){
+  const scope=trim(args?.scope),singleOnly=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather']);
+  if(scope==='named_event'&&!trim(args?.event))return `La tool ${name} usa scope=named_event pero no especifica event.`;
+  if(scope==='all_events'&&singleOnly.has(trim(name)))return `La tool ${name} no admite scope=all_events. Gemini debe elegir una tool global compatible; CE no reducirá el ámbito al evento visible.`;
+  return'';
+}
+function v65ValidateScopeResult(name='',args={},result={}){
+  const scope=trim(args?.scope);if(scope!=='all_events'||result?.ok===false)return'';
+  const facts=result?.facts||{};
+  if(trim(facts?.scope)&&trim(facts.scope)!=='all_events')return `La tool ${name} recibió scope=all_events pero devolvió scope=${trim(facts.scope)}.`;
+  if(trim(facts?.scope_event))return `La tool ${name} recibió scope=all_events pero devolvió un scope_event concreto (${trim(facts.scope_event)}).`;
+  if(trim(name)==='event_donation_lines'&&trim(facts?.scope)!=='all_events')return 'event_donation_lines no certificó el ámbito global solicitado.';
+  return'';
+}
+function v65ReceiptEffects(results=[]){
+  const out=new Set();
+  for(const r of arr(results)){
+    for(const e of arr(r?._receipt_effects))if(trim(e))out.add(trim(e));
+  }
+  return out;
+}
+function v65MissingReceiptEffects(final={},results=[]){
+  const have=v65ReceiptEffects(results),asked=arr(final?.stateEffects).map(trim).filter(Boolean);return asked.filter(x=>!have.has(x));
 }
 async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[],conversationDigest='',voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
   userPrompt=v336NormalizeStructuredPromptRefs(userPrompt);
@@ -12640,8 +12710,10 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
   currentId=trim(payload?.id);
   for(let cycle=1;cycle<=2;cycle++){
     const calls=v261FunctionCalls(payload);if(!calls.length)break;
-    const roundStart=allResults.length;
+    const roundStart=allResults.length,roundPolicy=v65DatasetRoundPolicy(calls);
     zuzuTracePush(flowTrace,`v3_0_exp · Gemini Native · tools ronda ${cycle}`,'OK',`${calls.length} llamada(s) elegidas por Gemini: ${calls.map(c=>trim(c.name)).join(', ')}. CE no añade, sustituye ni reordena tools.`);
+    if(roundPolicy.conflict)zuzuTracePush(flowTrace,'v3_0_exp · Single Writer','WARN',`Gemini pidió ${roundPolicy.datasetCalls.length} datasets sin un único dataset_role=primary. CE ejecutará las fuentes como evidencia, pero ninguna sustituirá el dataset vigente.`);
+    else if(roundPolicy.primaryId)zuzuTracePush(flowTrace,'v3_0_exp · Single Writer','OK',`Dataset principal del turno fijado por contrato en call_id=${roundPolicy.primaryId.slice(0,24)}; las fuentes support no pueden sustituirlo.`);
     const functionResults=[];
     for(const call of calls){
       const name=trim(call?.name),rawArgs=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{};
@@ -12656,10 +12728,20 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
           // CONTRATO ESTRICTO: no se reescriben argumentos ni se aplica foco inferido por CE.
           const scoped=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','person_dossier','store_purchases']);
           if(scoped.has(name)&&!trim(rawArgs?.scope))throw new Error(`La tool ${name} requiere scope explícito decidido por Gemini.`);
-          const key=`${name}:${JSON.stringify(rawArgs)}`;full=cache.get(key);if(!full){full=await v261ExecuteAgentTool({...call,arguments:rawArgs},state,selectedEventId,flowTrace);cache.set(key,full);}else full={...full};
-          full={...full,id:trim(call.id),name};memory=v62UpdateMemoryFromCall(memory,{...call,arguments:rawArgs},full);
+          const scopeError=v65NativeScopeError(name,rawArgs);if(scopeError)throw new Error(scopeError);
+          const key=v65DataReadCacheKey(name,rawArgs),cached=cache.has(key);full=cache.get(key);if(!full){full=await v261ExecuteAgentTool({...call,arguments:rawArgs},state,selectedEventId,flowTrace);cache.set(key,full);}else full={...full};
+          if(cached)zuzuTracePush(flowTrace,`v3_0_exp · Tool cache · ${name}`,'OK','Llamada de solo lectura idéntica reutilizada dentro del turno; no se repite acceso a datos.');
+          full={...full,id:trim(call.id),name};const scopeResultError=v65ValidateScopeResult(name,rawArgs,full);if(scopeResultError)throw new Error(scopeResultError);
+          const datasetAccepted=roundPolicy.primaryId&&trim(call.id)===roundPolicy.primaryId;
+          const eventFocusTools=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','store_purchases']);
+          const focusAccepted=eventFocusTools.has(name)?(trim(rawArgs?.dataset_role)==='support'?(rawArgs?.activate_focus===true):(rawArgs?.activate_focus!==false)):undefined;
+          memory=v62UpdateMemoryFromCall(memory,{...call,arguments:rawArgs},full,{activateDataset:datasetAccepted,activateFocus:focusAccepted});
+          const effects=[];if(datasetAccepted)effects.push('dataset','view');if(eventFocusTools.has(name)&&focusAccepted===true)effects.push('focus');if(name==='person_dossier'&&rawArgs?.activate_subject!==false)effects.push('subjects');if(name==='person_dossier'&&rawArgs?.activate_focus===true)effects.push('focus');full._receipt_effects=[...new Set(effects)];
         }
-        full={...full,_native_call_args:{...rawArgs}};allResults.push(full);const compact=v63NativeCompactToolResult(full,trim(rawArgs?.detail)||'standard');functionResults.push({type:'function_result',name,call_id:trim(call.id),result:compact});
+        if(name==='working_set_action'){
+          const a=trim(rawArgs?.action).toLowerCase(),effects=[];if(['filter','sort','reset','back','activate','project','group'].includes(a))effects.push('view');if(a==='activate')effects.push('dataset');full._receipt_effects=effects;
+        }else if(name==='conversation_memory'&&trim(rawArgs?.action)==='reset')full._receipt_effects=['memory_reset'];
+        full={...full,_native_call_args:{...rawArgs}};allResults.push(full);const compact=v63NativeCompactToolResult(full,trim(rawArgs?.detail)||'standard');functionResults.push({type:'function_result',name,call_id:trim(call.id),result:{...compact,dataset_receipt:{role:trim(rawArgs?.dataset_role)||'',primary_accepted:!!(roundPolicy.primaryId&&trim(call.id)===roundPolicy.primaryId)}}});
         zuzuTracePush(flowTrace,`v3_0_exp · Tool exacta · ${name}`,full?.ok===false?'WARN':'OK',`${trim(full?.title)||'Resultado'} · argumentos ejecutados=${JSON.stringify(rawArgs).slice(0,500)}.`);
       }catch(error){
         const msg=cleanGeminiError(error);functionResults.push({type:'function_result',name,call_id:trim(call.id),is_error:true,result:{ok:false,error:msg}});zuzuTracePush(flowTrace,`v3_0_exp · Tool exacta · ${name}`,'WARN',msg);
@@ -12677,6 +12759,13 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
   }
   if(!fastFinal&&v261FunctionCalls(payload).length){const e=new Error('Gemini solicitó una tercera ronda de tools. El turno se detiene para evitar bucles; las tools ya ejecutadas se conservan sin reinterpretación.');e.status=502;e._ceOrigin='gemini';e.canonicalResults=[...allResults];e.nativeMemory=memory;throw e;}
   let final=fastFinal||v261ParseFinal(payload);if(!trim(final.answer)){const mechanical=v63MechanicalClosure(allResults,memory);if(mechanical){final=mechanical;zuzuTracePush(flowTrace,'v3_0_exp · Zero-copy · cierre mecánico post-tool','OK','Gemini eligió y ejecutó las tools, pero no dejó texto final. CE solo resume los facts ya devueltos; no reinterpreta el mensaje ni cambia la decisión.');}else{const e=new Error('Gemini terminó el turno sin respuesta final legible.');e.status=502;e._ceOrigin='gemini';e.canonicalResults=[...allResults];e.nativeMemory=memory;throw e;}}
+  const missingReceipts=v65MissingReceiptEffects(final,allResults);
+  if(missingReceipts.length){
+    zuzuTracePush(flowTrace,'v3_0_exp · Action Receipt','WARN',`Gemini declaró cambios de estado sin recibo de tool en este turno: ${missingReceipts.join(', ')}. CE no da por ejecutada una acción que no ocurrió.`);
+    final={...final,title:'Vista sin cambios',answer:'No he aplicado ningún cambio adicional en este turno porque no se ejecutó una acción sobre los datos. La vista anterior permanece intacta.',warnings:[...arr(final.warnings),'La respuesta generativa declaró un cambio sin recibo de ejecución y fue bloqueada.'],stateEffects:[]};
+  }else if(arr(final?.stateEffects).length){
+    zuzuTracePush(flowTrace,'v3_0_exp · Action Receipt','OK',`Cambios declarados por Gemini respaldados por recibos de tool: ${arr(final.stateEffects).join(', ')}.`);
+  }
   // Único saneo posterior: ocultar protocolo interno. NO se corrigen decisiones, cifras, foco ni tools.
   final={...final,answer:v57StripInternalProtocolLeak(final.answer,flowTrace)};
   if(voiceConversation)final={...final,chartSpecs:[]};
@@ -18128,6 +18217,14 @@ export const __zuzuStructuralTesting = Object.freeze({
   v62DatasetFromToolResult,
   v62UpdateMemoryFromCall,
   v62ResultContext,
+  v64FastClosure,
+  v65DataReadCacheKey,
+  v65DatasetRoundPolicy,
+  v65NativeScopeError,
+  v65ValidateScopeResult,
+  v65ReceiptEffects,
+  v65MissingReceiptEffects,
+  v29ToolEventDonationLines,
   buildLocalEventReport: directEventReportIfApplicable,
   attachWeatherVisualsIfNeeded,
   finalizeResult: finalizeZuzuResult,
