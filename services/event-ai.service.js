@@ -1,18 +1,17 @@
 import { GoogleGenAI } from '@google/genai';
 import { supabase } from '../lib/supabase.js';
 
-// Inicializamos el SDK moderno de Gemini unificado de Google
+// Inicializamos el SDK moderno unificado de Google
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 export const EventAIService = {
   /**
-   * Procesa la consulta usando RAG Semántico y Gemini Flash-lite
-   * @param {string} query - Pregunta o consulta conversacional del usuario
-   * @param {string} userId - ID del usuario autenticado extraído del token/sesión
+   * Procesa la consulta usando RAG Semántico y Gemini 1.5 Flash-lite
+   * @param {string} query - Pregunta del usuario
    */
-  async converseAboutEvents(query, userId) {
+  async converseAboutEvents(query) {
     try {
-      // 1. Generar el embedding de la pregunta usando el modelo oficial text-embedding-004
+      // 1. Generar el embedding de la pregunta
       const embeddingResponse = await ai.models.embedContent({
         model: 'text-embedding-004',
         contents: query,
@@ -20,37 +19,37 @@ export const EventAIService = {
 
       const queryEmbedding = embeddingResponse.embedding.values;
 
-      // 2. Ejecutar la búsqueda de similitud en Supabase a través del RPC 'match_events'
+      // 2. Ejecutar la búsqueda de similitud en Supabase (RPC corregido sin user_id)
       const { data: matchedEvents, error } = await supabase.rpc('match_events', {
         query_embedding: queryEmbedding,
-        match_threshold: 0.25, // Umbral de coincidencia mínima semántica
-        match_count: 4,        // Traer máximo 4 eventos para optimizar rendimiento y tokens
-        p_user_id: userId      // Filtro estricto por usuario autenticado
+        match_threshold: 0.20,
+        match_count: 5
       });
 
       if (error) throw new Error(`Error en Supabase RPC: ${error.message}`);
 
-      // 3. Estructurar el bloque de contexto mínimo en formato legible
-      let contextText = "No se encontraron eventos relevantes en tu agenda para esta consulta.";
+      // 3. Construir el contexto adaptado a los campos reales de ce_eventos
+      let contextText = "No se encontraron eventos relevantes en la base de datos para esta consulta.";
       if (matchedEvents && matchedEvents.length > 0) {
         contextText = matchedEvents.map(event => 
-          `- Evento: ${event.nombre} | Fecha: ${event.fecha} | Tipo: ${event.tipo} | Ubicación: ${event.ubicacion} | Descripción: ${event.descripcion || 'N/A'}`
-        ).join('\n');
+          `- Evento: ${event.titulo} | Precio: ${event.precio || 0}€ | Fecha Inicio: ${event.fecha_ini} | Fecha Fin: ${event.fecha_fin}`
+        ).join('
+');
       }
 
-      // 4. Configurar el System Prompt y llamar a Gemini 1.5 Flash-lite
+      // 4. Configurar el System Prompt e invocar a Gemini 1.5 Flash-lite
       const systemInstruction = 
         `Eres el asistente inteligente de la app CE. Tu objetivo es conversar con el usuario ` +
         `basándote única y exclusivamente en la lista de eventos proporcionada en el contexto. ` +
         `Si la información provista no responde la duda, indícalo amablemente sin inventar datos. ` +
-        `Responde siempre de manera concisa y en español de España de forma profesional y atenta.`;
+        `Responde siempre de manera concisa y en español de España de forma profesional.`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-1.5-flash-lite',
-        contents: `Contexto (Mis Eventos):\n${contextText}\n\nPregunta del usuario: ${query}`,
+        contents: `Contexto (Eventos Encontrados):\n${contextText}\n\nPregunta del usuario: ${query}`,
         config: {
           systemInstruction: systemInstruction,
-          temperature: 0.3 // Temperatura baja para evitar alucinaciones creativas
+          temperature: 0.3
         }
       });
 
@@ -63,30 +62,28 @@ export const EventAIService = {
   },
 
   /**
-   * Genera y actualiza el embedding de un evento (Útil para llamar al crear o actualizar un evento)
-   * @param {string} eventId - ID del evento en Supabase
-   * @param {Object} eventData - Objeto con datos del evento (nombre, descripcion, tipo, ubicacion)
+   * Método auxiliar para actualizar el embedding de un evento específico cuando se crea o edita
    */
   async updateEventEmbedding(eventId, eventData) {
     try {
-      const textToEmbed = `Evento: ${eventData.nombre} | Tipo: ${eventData.tipo} | Ubicación: ${eventData.ubicacion} | Descripción: ${eventData.descripcion || ''}`;
+      const textToEmbed = `Evento: ${eventData.titulo}. Precio: ${eventData.precio || 0}. Inicio: ${eventData.fecha_ini}. Fin: ${eventData.fecha_fin}.`;
       
       const embeddingResponse = await ai.models.embedContent({
         model: 'text-embedding-004',
         contents: textToEmbed,
       });
 
-      const embeddingValues = embeddingResponse.embedding.values;
+      const vector = embeddingResponse.embedding.values;
 
       const { error } = await supabase
-        .from('eventos')
-        .update({ embedding: embeddingValues })
+        .from('ce_eventos')
+        .update({ embedding: vector })
         .eq('id', eventId);
 
       if (error) throw error;
       return true;
-    } catch (error) {
-      console.error('Error generando embedding para el evento:', error);
+    } catch (err) {
+      console.error(`Error guardando embedding para el evento ${eventId}:`, err);
       return false;
     }
   }
