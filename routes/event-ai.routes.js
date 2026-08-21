@@ -1,10 +1,23 @@
-const { Router } = require('express');
-const { EventAIService } = require('../services/event-ai.service.js');
-const router = Router();
-router.post('/ask', async (req, res) => {
-  const { query } = req.body;
-  if (!query) return res.status(400).json({ error: 'Query vacía' });
-  try { const response = await EventAIService.converseAboutEvents(query); return res.status(200).json({ response }); }
-  catch (error) { return res.status(500).json({ error: error.message }); }
-});
-module.exports = router;
+import express from 'express';
+import { asyncHandler } from './_async.js';
+import { analyzeEventPrompt, planificacionInicialZuzu } from '../services/event-ai.service.js';
+import { classifyZuzuShadow } from '../services/zuzu-router-shadow.service.js';
+
+const router = express.Router();
+
+router.post('/event-ai/analyze', asyncHandler(async (req, res) => {
+  res.json(await analyzeEventPrompt(req.body || {}));
+}));
+
+// v3_0_exp · nueva arquitectura en SOMBRA: clasifica la misma pregunta, pero NO interviene
+// en la respuesta actual ni consulta/modifica datos de ControlEvent. La UI la ejecuta después
+// de recibir la respuesta principal para no añadir latencia ni riesgo al Zuzu vigente.
+router.post('/event-ai/router-shadow', asyncHandler(async (req, res) => {
+  res.json(await classifyZuzuShadow(req.body || {}));
+}));
+
+router.post('/event-ai/planificacion-propuesta', asyncHandler(async (req, res) => {
+  res.json(await planificacionInicialZuzu(req.body || {}));
+}));
+
+export default router;
