@@ -9989,13 +9989,30 @@ function v50WorkingSetWithoutRowCache(raw=null){
   if(view)out.view_state=view;if(parentView)out.parent_view_state=parentView;
   return out;
 }
+function v67CompactSourceArgs(raw={}){
+  const src=raw&&typeof raw==='object'?raw:{},out={},allowed=['view','donor','store','product','ticket','responsible','person','status'];
+  for(const key of allowed){
+    const v=src[key];if(v==null)continue;
+    if(Array.isArray(v)){const a=v.map(x=>trim(x)).filter(Boolean).slice(0,12);if(a.length)out[key]=a;continue;}
+    if(typeof v==='boolean'||typeof v==='number'){out[key]=v;continue;}
+    const t=trim(v).slice(0,180);if(t)out[key]=t;
+  }
+  return out;
+}
+function v67CompactDatasetProvenance(raw=null){
+  if(!raw||typeof raw!=='object')return null;
+  const source_tool=trim(raw.source_tool||raw.tool).slice(0,70),source_event=trim(raw.source_event||raw.event).slice(0,140),source_scope=trim(raw.source_scope||raw.scope).slice(0,30)||'none',source_args=v67CompactSourceArgs(raw.source_args||raw.args||{});
+  if(!source_tool&&!source_event&&!Object.keys(source_args).length)return null;
+  return{source_tool,source_event,source_scope,source_args};
+}
 function v42CompactWorkingSet(raw=null){
   if(!raw||typeof raw!=='object')return null;
   const aggregate=raw.aggregate&&typeof raw.aggregate==='object'?{total_amount:raw.aggregate.total_amount==null?null:(Number.isFinite(Number(raw.aggregate.total_amount))?Number(raw.aggregate.total_amount):null),total_units:raw.aggregate.total_units==null?null:(Number.isFinite(Number(raw.aggregate.total_units))?Number(raw.aggregate.total_units):null)}:null;
   const metrics={};for(const [k,v] of Object.entries(raw.metrics&&typeof raw.metrics==='object'?raw.metrics:{})){const n=Number(v);if(Number.isFinite(n))metrics[trim(k).slice(0,60)]=n;}
   const targets=[];const seen=new Set();for(const item of arr(raw.targets)){const c=v46CompactWorkingTarget(item);if(!c)continue;const key=trim(c.target.id)||norm(c.target.name);if(seen.has(key))continue;seen.add(key);targets.push(c);if(targets.length>=6)break;}
   const rowCache=v50CompactWorkingRowCache(raw.row_cache||null),parentCache=v50CompactWorkingRowCache(raw.parent_cache||null),recordCount=raw.record_count==null?null:Math.max(0,Math.min(100000,Number(raw.record_count)||0));
-  return{frame_id:trim(raw.frame_id).slice(0,90),parent_frame_id:trim(raw.parent_frame_id).slice(0,90),frame_op:trim(raw.frame_op).slice(0,40),kind:trim(raw.kind).slice(0,40)||'none',event:trim(raw.event).slice(0,140),scope:trim(raw.scope).slice(0,30)||'none',subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50)||'general',requested_object:trim(raw.requested_object).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),...(recordCount!=null?{record_count:recordCount}:{}),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(Object.keys(metrics).length?{metrics}:{}),...(rowCache?{row_cache:rowCache}:{}),...(parentCache?{parent_cache:parentCache}:{}),...(targets.length?{partitioned:true,target_count:targets.length,targets}:{})};
+  const provenance=v67CompactDatasetProvenance(raw.provenance||null);
+  return{frame_id:trim(raw.frame_id).slice(0,90),parent_frame_id:trim(raw.parent_frame_id).slice(0,90),frame_op:trim(raw.frame_op).slice(0,40),kind:trim(raw.kind).slice(0,40)||'none',event:trim(raw.event).slice(0,140),scope:trim(raw.scope).slice(0,30)||'none',subjects:arr(raw.subjects).map(x=>trim(x)).filter(Boolean).slice(0,4),domain:trim(raw.domain).slice(0,50)||'general',requested_object:trim(raw.requested_object).slice(0,40)||'none',tool:trim(raw.tool).slice(0,70),table_key:trim(raw.table_key).slice(0,100),row_count:Math.max(0,Math.min(100000,Number(raw.row_count)||0)),...(recordCount!=null?{record_count:recordCount}:{}),empty:raw.empty===true,filter_summary:trim(raw.filter_summary).slice(0,220),...(aggregate?{aggregate}:{}),...(Object.keys(metrics).length?{metrics}:{}),...(provenance?{provenance}:{}),...(rowCache?{row_cache:rowCache}:{}),...(parentCache?{parent_cache:parentCache}:{}),...(targets.length?{partitioned:true,target_count:targets.length,targets}:{})};
 }
 function v46WorkingTargetNames(working=null){return arr(v42CompactWorkingSet(working)?.targets).map(x=>trim(x?.target?.name)).filter(Boolean);}
 // SCC 2.2.6 · TARGET_SET representa varios objetivos canónicos simultáneos sin aplastarlos
@@ -12376,6 +12393,7 @@ function v62NativeTools(){
     if(tool.name==='compare_events')props.activate_focus={type:'boolean',description:'true si los eventos comparados quedan como foco múltiple.'};
   }
   tools.push({type:'function',name:'working_set_action',description:'Opera sobre el dataset completo que CE ya conserva; no consulta BBDD. group usa group_by y metrics como count, sum:Importe o distinct:Campo. reset quita filtro; back restaura la vista anterior; activate recupera un dataset reciente por id.',parameters:{type:'object',properties:{action:{type:'string',enum:['list','filter','sort','reset','back','activate','project','count','limit','inspect','group']},dataset_id:{type:'string'},field:{type:'string'},group_by:{type:'string'},value:{type:'string'},direction:{type:'string',enum:['asc','desc']},fields:{type:'array',items:{type:'string'}},metrics:{type:'array',items:{type:'string'}},match_mode:{type:'string',enum:['exact','word','contains','semantic']},limit:{type:'integer'}},required:['action']}});
+  tools.push({type:'function',name:'retarget_dataset',description:'Cambia SOLO el evento de un dataset ya existente conservando su tipo/granularidad y, cuando son compatibles, su filtro, orden y columnas visibles. Úsala para continuaciones como cambiar de edición/año/evento manteniendo products→products, purchases→purchases o donations→donations. No uses event_dossier para ese cambio.',parameters:{type:'object',properties:{event:{type:'string',description:'Evento destino; puede ser aproximado. CE lo resolverá únicamente contra EVENTOS y usando la procedencia del dataset como contexto.'},dataset_id:{type:'string',description:'Opcional: id de un dataset reciente a retargetear; si se omite usa el dataset vigente.'}},required:['event']}});
   tools.push({type:'function',name:'conversation_memory',description:'Inspecciona o borra TODA la memoria conversacional. reset solo cuando el usuario pide empezar de cero; no para cambiar de evento.',parameters:{type:'object',properties:{action:{type:'string',enum:['inspect','reset']}},required:['action']}});
   return tools;
 }
@@ -12415,8 +12433,9 @@ function v62LiteMemoryFromHistory(history=[]){
 }
 function v62LiteMemoryDescriptor(memory={}){
   const ws=v42CompactWorkingSet(memory?.active_dataset||null),cache=v50CompactWorkingRowCache(ws?.row_cache||null),parent=v50CompactWorkingRowCache(ws?.parent_cache||null);
-  const recent=arr(memory?._view_history).map(ds=>{const d=v42CompactWorkingSet(ds),c=v50CompactWorkingRowCache(d?.row_cache||null);return d?{id:trim(d.frame_id),type:trim(d.requested_object)||trim(d.kind),event:trim(d.event),count:Number(d.row_count)||0,rows_complete:c?.complete===true}:null;}).filter(Boolean).slice(0,3);
-  return{focus_events:arr(memory?.focus_events).map(trim).filter(Boolean).slice(0,6),subjects:arr(memory?.subjects).map(trim).filter(Boolean).slice(0,4),active_dataset:ws?{id:trim(ws.frame_id),type:trim(ws.requested_object)||trim(ws.kind)||'none',event:trim(ws.event),scope:trim(ws.scope),count:Number(ws.row_count)||0,record_count:ws.record_count==null?null:Number(ws.record_count),filter:trim(ws.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)||'none',available_fields:arr(cache?.columns).slice(0,16),visible_fields:arr(cache?.visible_fields).slice(0,12),rows_complete:cache?.complete===true,parent_count:parent?arr(parent.rows).length:null,back_available:recent.length>0,known:{total_amount:ws?.aggregate?.total_amount??null,total_units:ws?.aggregate?.total_units??null,...(ws?.metrics&&typeof ws.metrics==='object'?ws.metrics:{})},tool:trim(ws.tool),table_key:trim(ws.table_key)}:null,recent_datasets:recent};
+  const recent=arr(memory?._view_history).map(ds=>{const d=v42CompactWorkingSet(ds),c=v50CompactWorkingRowCache(d?.row_cache||null),p=v67CompactDatasetProvenance(d?.provenance||null);return d?{id:trim(d.frame_id),type:trim(d.requested_object)||trim(d.kind),event:trim(d.event),count:Number(d.row_count)||0,rows_complete:c?.complete===true,source_tool:trim(p?.source_tool)}:null;}).filter(Boolean).slice(0,3);
+  const provenance=v67CompactDatasetProvenance(ws?.provenance||null);
+  return{focus_events:arr(memory?.focus_events).map(trim).filter(Boolean).slice(0,6),subjects:arr(memory?.subjects).map(trim).filter(Boolean).slice(0,4),active_dataset:ws?{id:trim(ws.frame_id),type:trim(ws.requested_object)||trim(ws.kind)||'none',event:trim(ws.event),scope:trim(ws.scope),count:Number(ws.row_count)||0,record_count:ws.record_count==null?null:Number(ws.record_count),filter:trim(ws.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)||'none',available_fields:arr(cache?.columns).slice(0,16),visible_fields:arr(cache?.visible_fields).slice(0,12),rows_complete:cache?.complete===true,parent_count:parent?arr(parent.rows).length:null,back_available:recent.length>0,known:{total_amount:ws?.aggregate?.total_amount??null,total_units:ws?.aggregate?.total_units??null,...(ws?.metrics&&typeof ws.metrics==='object'?ws.metrics:{})},tool:trim(ws.tool),table_key:trim(ws.table_key),provenance:provenance?{source_tool:trim(provenance.source_tool),source_event:trim(provenance.source_event),source_scope:trim(provenance.source_scope),source_args:provenance.source_args}:null}:null,recent_datasets:recent};
 }
 function v62NativeInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation=false}={}){
   const active=v26EventById(state,selectedEventId),visible=active?trim(active?.titulo):'ninguno',display=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
@@ -12431,11 +12450,11 @@ ARQUITECTURA OBLIGATORIA:
 - PETICIONES DE DATOS: si el usuario solicita obtener, ver, sacar o conocer un conjunto plural de entidades, la respuesta incluye la relación completa y su tabla canónica. Solo responde con un número sin lista cuando la petición sea exclusivamente de recuento.
 - PRODUCT_SET: para productos distintos usa event_products. Para registros físicos/tickets/compras individuales usa event_purchase_lines. No llames ambas tools para una misma lista salvo que el usuario pida explícitamente LAS DOS granularidades. event_products ya devuelve product_count, purchase_line_count e importe total.
 - DONACIONES: usa event_donation_lines. Para productos donados usa view=products; para cada registro view=records; para donantes view=donors. No añadas event_products ni event_purchase_lines a una consulta de donaciones salvo que el usuario también pida explícitamente compras.
-- CAMBIO DE EVENTO: si el usuario cambia únicamente el evento y no cambia el objeto de trabajo, conserva la misma granularidad/objeto del dataset vigente (products→products, purchases→purchases, donations→donations) y consulta ese objeto para el nuevo evento. El conjunto anterior queda disponible en recent_datasets para comparar o volver.
+- CAMBIO DE EVENTO: si el usuario cambia únicamente el evento y no cambia el objeto de trabajo, usa retarget_dataset. Esa tool conserva la misma granularidad/objeto del dataset vigente (products→products, purchases→purchases, donations→donations) y deja el conjunto anterior disponible para comparar o volver. NO uses event_dossier para un simple cambio de evento de una lista vigente.
 - TÍTULOS DE EVENTO: cuando uses scope=named_event, pasa en event el título completo o aproximado del evento como una sola unidad. No repartas partes del nombre/año entre event, store, product u otros argumentos. Si el usuario cambia solo una edición/año y el foco previo identifica claramente la familia del evento, conserva esa identidad y envía el título completo resultante, no solo el año.
 - RESOLUCIÓN TIPADA: CE puede normalizar un valor ya tipado contra el catálogo del MISMO tipo y usar continuidad factual inequívoca del foco vigente. Si aún quedan varios candidatos plausibles, pide aclaración; una ambigüedad normal NO implica reiniciar la conversación.
 - Para una lista/dataset que deba seguir vivo usa activate_dataset=true. Si una tool es solo apoyo lateral, usa activate_dataset=false. En una misma ronda puede haber como máximo UN dataset principal; si solicitas varias tools de datos, solo una lleva activate_dataset=true. Para foco de evento usa activate_focus; person_dossier puede usar activate_subject=false cuando sea lateral.
-- Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. Si el dataset vigente ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; no vuelvas a consultar BBDD. Si recent_datasets contiene claramente un conjunto anterior al que se refiere el usuario, recupéralo con working_set_action(action=activate,dataset_id=...). El bloque known contiene hechos agregados ya calculados (totales, recuentos, etc.); si basta para responder, usa inspect y no vuelvas a BBDD.
+- Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. active_dataset.event/provenance identifica de forma inmutable de qué evento proceden realmente sus filas aunque el foco conversacional haya cambiado. Si el dataset vigente ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; no vuelvas a consultar BBDD. Si recent_datasets contiene claramente un conjunto anterior al que se refiere el usuario, recupéralo con working_set_action(action=activate,dataset_id=...). El bloque known contiene hechos agregados ya calculados (totales, recuentos, etc.); si basta para responder, usa inspect y no vuelvas a BBDD.
 - Para ordenar, filtrar, contar, proyectar o agrupar una lista YA vigente usa working_set_action. reset vuelve al conjunto padre de un filtro; back restaura la vista/dataset anterior del historial factual; activate recupera un dataset reciente por id.
 - Una queja, corrección o frase como «eso está mal» NO modifica memoria por sí sola. Si necesitas verificar, vuelve a pedir la fuente canónica; solo muta memoria llamando explícitamente una tool que la cambie.
 - conversation_memory(reset) SOLO si el usuario pide inequívocamente borrar/reiniciar TODA la conversación. Cambiar de foco o pasar a otro evento NO es reset global: usa la tool del nuevo evento con activate_focus=true.
@@ -12448,7 +12467,7 @@ Devuelve el JSON final exigido por la API. No menciones tools, SCC, datasets ni 
 }
 function v62NativeInput(userPrompt='',history=[],memory={}){
   const recent=arr(history).slice(-3).map(h=>`Usuario: ${trim(h?.user).slice(0,360)}\nZuzu: ${trim(h?.assistant).slice(0,420)}`).join('\n\n');
-  return `INVENTARIO CE DISPONIBLE (hechos, no lo recites):\n${JSON.stringify(v62LiteMemoryDescriptor(memory))}\nREGLA: available_fields indica lo que CE YA tiene; visible_fields solo lo que se está mostrando. known contiene totales/recuentos ya calculados que pueden responder sin consultar BBDD. Si rows_complete=true, usa working_set_action para reutilizar esos datos. recent_datasets incluye hasta 3 conjuntos anteriores con id reutilizable mediante action=activate; back_available indica que existe una vista anterior restaurable con back.\n\n${recent?`ÚLTIMOS TURNOS (solo para referencias humanas):\n${recent}\n\n`:''}MENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
+  return `INVENTARIO CE DISPONIBLE (hechos, no lo recites):\n${JSON.stringify(v62LiteMemoryDescriptor(memory))}\nREGLA: available_fields indica lo que CE YA tiene; visible_fields solo lo que se está mostrando. active_dataset.event y provenance.source_event describen la PROCEDENCIA real e inmutable de las filas; focus_events es solo el foco conversacional. known contiene totales/recuentos ya calculados que pueden responder sin consultar BBDD. Si rows_complete=true, usa working_set_action para reutilizar esos datos. Si solo cambia el evento y se conserva el objeto de trabajo, usa retarget_dataset. recent_datasets incluye hasta 3 conjuntos anteriores con id reutilizable mediante action=activate; back_available indica que existe una vista anterior restaurable con back.\n\n${recent?`ÚLTIMOS TURNOS (solo para referencias humanas):\n${recent}\n\n`:''}MENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
 }
 function v62WorkingResult(memory={},args={},callId='working_set_action'){
   let mem=JSON.parse(JSON.stringify(memory||{})),ws=v42CompactWorkingSet(mem.active_dataset||null),action=trim(args?.action).toLowerCase();
@@ -12461,15 +12480,23 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
     if(!prior)return{result:{id:callId,name:'working_set_action',ok:false,title:'Restauración',facts:{error:'No existe una vista anterior distinta que restaurar.'},tables:[]},memory:mem,isError:true};
     v64PushViewHistory(mem,ws);mem.active_dataset=v42CompactWorkingSet(prior);
     mem._view_history=arr(mem._view_history).filter(x=>v64DatasetViewSignature(x)!==v64DatasetViewSignature(prior));
-    const restored=v42CompactWorkingSet(mem.active_dataset),rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
+    const restored=v42CompactWorkingSet(mem.active_dataset);if(trim(restored?.event)&&trim(restored?.scope)!=='all_events')mem.focus_events=[trim(restored.event)];
+    const rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
     return{result:{id:callId,name:'working_set_action',ok:true,title:trim(rc?.title)||'Vista anterior',facts:{action:'back',type:trim(restored?.requested_object)||trim(restored?.kind),event:trim(restored?.event),count:Number(restored?.row_count)||0,display_count:displayRows.length,filter:trim(restored?.filter_summary),sort_field:trim(rc?.sort_field),sort_direction:trim(rc?.sort_direction)},tables:displayRows.length?[{key:'working_set',title:trim(rc?.title)||'Vista anterior',rows:displayRows}]:[]},memory:mem};
   }
   if(action==='activate'){
-    const wanted=trim(args?.dataset_id),prior=arr(mem._view_history).find(x=>trim(x?.frame_id)===wanted);
+    const wanted=trim(args?.dataset_id);
+    if(wanted&&wanted===trim(ws?.frame_id)){
+      const restored=v42CompactWorkingSet(ws);if(trim(restored?.event)&&trim(restored?.scope)!=='all_events')mem.focus_events=[trim(restored.event)];
+      const rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
+      return{result:{id:callId,name:'working_set_action',ok:true,title:trim(rc?.title)||'Dataset vigente',facts:{action:'activate',dataset_id:wanted,type:trim(restored?.requested_object)||trim(restored?.kind),event:trim(restored?.event),count:Number(restored?.row_count)||0,display_count:displayRows.length,already_active:true,filter:trim(restored?.filter_summary),sort_field:trim(rc?.sort_field),sort_direction:trim(rc?.sort_direction)},tables:displayRows.length?[{key:'working_set',title:trim(rc?.title)||'Dataset vigente',rows:displayRows}]:[]},memory:mem};
+    }
+    const prior=arr(mem._view_history).find(x=>trim(x?.frame_id)===wanted);
     if(!wanted||!prior)return{result:{id:callId,name:'working_set_action',ok:false,title:'Dataset reciente',facts:{error:'No existe ese dataset_id en el inventario reciente.',dataset_id:wanted},tables:[]},memory:mem,isError:true};
     v64PushViewHistory(mem,ws);mem.active_dataset=v42CompactWorkingSet(prior);
     mem._view_history=arr(mem._view_history).filter(x=>trim(x?.frame_id)!==wanted);
-    const restored=v42CompactWorkingSet(mem.active_dataset),rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
+    const restored=v42CompactWorkingSet(mem.active_dataset);if(trim(restored?.event)&&trim(restored?.scope)!=='all_events')mem.focus_events=[trim(restored.event)];
+    const rc=v50CompactWorkingRowCache(restored?.row_cache||null),displayRows=arr(rc?.rows);
     return{result:{id:callId,name:'working_set_action',ok:true,title:trim(rc?.title)||'Dataset recuperado',facts:{action:'activate',dataset_id:wanted,type:trim(restored?.requested_object)||trim(restored?.kind),event:trim(restored?.event),count:Number(restored?.row_count)||0,display_count:displayRows.length,filter:trim(restored?.filter_summary),sort_field:trim(rc?.sort_field),sort_direction:trim(rc?.sort_direction)},tables:displayRows.length?[{key:'working_set',title:trim(rc?.title)||'Dataset recuperado',rows:displayRows}]:[]},memory:mem};
   }
   if(!cache||!cache.complete)return{result:{id:callId,name:'working_set_action',ok:false,title:'Dataset',facts:{error:'El dataset vigente no conserva filas completas para esta transformación.'},tables:[]},memory:mem,isError:true};
@@ -12529,6 +12556,56 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
   return{result,memory:mem};
 }
 
+
+function v67RetargetSourceDataset(memory={},datasetId=''){
+  const active=v42CompactWorkingSet(memory?.active_dataset||null),wanted=trim(datasetId);
+  if(!wanted)return active;
+  if(active&&trim(active.frame_id)===wanted)return active;
+  return v42CompactWorkingSet(arr(memory?._view_history).find(x=>trim(x?.frame_id)===wanted)||null);
+}
+function v67ApplyRetargetView(source=null,target=null){
+  const src=v42CompactWorkingSet(source),dst=v42CompactWorkingSet(target);if(!src||!dst)return dst;
+  const sc=v50CompactWorkingRowCache(src?.row_cache||null),dc=v50CompactWorkingRowCache(dst?.row_cache||null);if(!sc||!dc||!dc.complete)return dst;
+  const baseRows=arr(dc.rows).map(r=>({...r})),sample=baseRows[0]||{};let rows=baseRows,nextParent=null,filter=trim(src.filter_summary);
+  if(filter&&filter.includes('=')){
+    const cut=filter.indexOf('='),field=trim(filter.slice(0,cut)),value=trim(filter.slice(cut+1)),key=v48ColumnKey(sample,field)||field;
+    if(value&&Object.prototype.hasOwnProperty.call(sample,key)){nextParent=dc;rows=rows.filter(r=>v56SemanticTextMatch(r?.[key],value,'semantic'));}
+    else filter='';
+  }
+  const sortField=v49CanonicalPresentationField(trim(sc.sort_field))||trim(sc.sort_field),sortKey=sortField?(v48ColumnKey(sample,sortField)||sortField):'',direction=trim(sc.sort_direction)==='desc'?'desc':trim(sc.sort_direction)==='asc'?'asc':'none';
+  if(sortKey&&direction!=='none'&&Object.prototype.hasOwnProperty.call(sample,sortKey)){
+    const mult=direction==='desc'?-1:1;rows.sort((a,b)=>{const av=a?.[sortKey],bv=b?.[sortKey];if(/fecha/i.test(norm(sortKey))){const ad=v40ParseDateMillis(av),bd=v40ParseDateMillis(bv);if(ad!=null&&bd!=null)return mult*(ad-bd);}const an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});
+  }
+  const visible=[];for(const f of arr(sc.visible_fields)){const k=v48ColumnKey(sample,f)||f;if(k&&Object.prototype.hasOwnProperty.call(sample,k)&&!visible.includes(k))visible.push(k);}
+  const nextCache=v50CompactWorkingRowCache({...dc,rows,visible_fields:visible.length?visible:dc.visible_fields,sort_field:sortKey&&direction!=='none'?sortKey:dc.sort_field,sort_direction:sortKey&&direction!=='none'?direction:dc.sort_direction,complete:true});
+  const amountKey=v48ColumnKey(sample,'Importe')||v48ColumnKey(sample,'Valor'),unitsKey=v48ColumnKey(sample,'Unidades'),amount=amountKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[amountKey])||0),0):dst?.aggregate?.total_amount??null,units=unitsKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[unitsKey])||0),0):dst?.aggregate?.total_units??null;
+  return v42CompactWorkingSet({...dst,frame_op:'RETARGET',row_count:rows.length,empty:rows.length===0,filter_summary:filter,aggregate:{total_amount:amount,total_units:units},row_cache:nextCache,parent_cache:nextParent});
+}
+async function v67RetargetDataset(memory={},args={},state={},selectedEventId='',flowTrace=[],callId='retarget_dataset'){
+  let mem=JSON.parse(JSON.stringify(memory||{})),source=v67RetargetSourceDataset(mem,args?.dataset_id);
+  if(!source)return{result:{id:callId,name:'retarget_dataset',ok:false,title:'Cambio de evento',facts:{error:'No existe un dataset vigente o reciente que pueda cambiar de evento.'},tables:[]},memory:mem,isError:true};
+  const prov=v67CompactDatasetProvenance(source?.provenance||{source_tool:source?.tool,source_event:source?.event,source_scope:source?.scope}),sourceTool=trim(prov?.source_tool)||trim(source?.tool);
+  if(!['event_products','event_purchase_lines','event_donation_lines'].includes(sourceTool))return{result:{id:callId,name:'retarget_dataset',ok:false,title:'Cambio de evento',facts:{error:`El dataset ${trim(source?.requested_object)||trim(source?.kind)} no admite retarget de evento.`,dataset_id:trim(source?.frame_id)},tables:[]},memory:mem,isError:true};
+  const targetRaw=trim(args?.event),currentName=trim(source?.event)||trim(prov?.source_event)||arr(mem?.focus_events).map(trim).filter(Boolean)[0]||'',resolved=v66ResolveTypedEntity(state,'event',targetRaw,{currentName});
+  if(!resolved.ok){
+    const msg=resolved.ambiguous?`El evento «${targetRaw}» sigue siendo ambiguo entre: ${arr(resolved.candidates).map(x=>x.nombre).join(' / ')}`:`No puedo resolver «${targetRaw}» como un EVENTO registrado.`;
+    return{result:{id:callId,name:'retarget_dataset',ok:false,title:'Cambio de evento',facts:{error:msg,event_query:targetRaw,candidates:arr(resolved.candidates).map(x=>x.nombre)},tables:[]},memory:mem,isError:true};
+  }
+  const sourceArgs={...(prov?.source_args||{})};sourceArgs.event=resolved.nombre;sourceArgs.scope='named_event';sourceArgs.activate_dataset=true;sourceArgs.activate_focus=true;
+  if(sourceTool==='event_donation_lines'&&!trim(sourceArgs.view)){const tk=trim(source?.table_key);sourceArgs.view=tk==='donor_products'?'products':tk==='donors'?'donors':'records';}
+  v65TypedToolContract(sourceTool,sourceArgs,state,selectedEventId);
+  let full=await v261ExecuteAgentTool({id:`${callId}_source`,name:sourceTool,arguments:sourceArgs},state,selectedEventId,flowTrace);full={...full,id:`${callId}_source`,name:sourceTool,_native_call_args:{...sourceArgs}};
+  v65ValidateToolResult(sourceTool,sourceArgs,full,state);
+  let target=v62DatasetFromToolResult({id:`${callId}_source`,name:sourceTool,arguments:sourceArgs},full,source);target=v67ApplyRetargetView(source,target);
+  if(!target)return{result:{id:callId,name:'retarget_dataset',ok:false,title:'Cambio de evento',facts:{error:'La tool canónica no materializó un dataset completo para el evento destino.'},tables:[]},memory:mem,isError:true};
+  if(mem.active_dataset)v64PushViewHistory(mem,mem.active_dataset);
+  mem.active_dataset=target;if(trim(target?.event)&&trim(target?.scope)!=='all_events')mem.focus_events=[trim(target.event)];mem.updated_at=new Date().toISOString();
+  const cache=v50CompactWorkingRowCache(target?.row_cache||null),rows=arr(cache?.rows),type=trim(target?.requested_object)||trim(target?.kind),result={id:callId,name:'retarget_dataset',ok:true,title:trim(cache?.title)||`Cambio de evento · ${resolved.nombre}`,facts:{action:'retarget',dataset_id:trim(target?.frame_id),source_dataset_id:trim(source?.frame_id),type,from_event:trim(source?.event),event:trim(target?.event),count:Number(target?.row_count)||0,record_count:target?.record_count==null?null:Number(target.record_count),source_tool:sourceTool,filter:trim(target?.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)},tables:rows.length?[{key:'working_set',title:trim(cache?.title)||`Dataset · ${resolved.nombre}`,rows}]:[]};
+  zuzuTracePush(flowTrace,'v3_0_exp · Dataset Retarget','OK',`${trim(source?.requested_object)||trim(source?.kind)} · ${trim(source?.event)||'—'} → ${trim(target?.event)||'—'} · ${Number(target?.row_count)||0} filas. Procedencia anterior preservada como dataset reciente.`);
+  return{result,memory:mem};
+}
+
+
 function v63DefaultVisibleFields(kind='',columns=[]){
   const cols=arr(columns).map(trim).filter(Boolean),has=k=>cols.includes(k);
   const profiles={
@@ -12553,7 +12630,7 @@ function v65DonationDatasetKey(result={}){
 }
 function v63NativeCompactToolResult(result={},detail='standard'){
   const base=v261CompactToolResult(result,detail),name=trim(result?.name);
-  const zeroCopyKey=name==='event_products'?'products':name==='event_purchase_lines'?'purchase_lines':name==='event_donation_lines'?v65DonationDatasetKey(result):name==='events_catalog'?'events':name==='working_set_action'?'working_set':'';
+  const zeroCopyKey=name==='event_products'?'products':name==='event_purchase_lines'?'purchase_lines':name==='event_donation_lines'?v65DonationDatasetKey(result):name==='events_catalog'?'events':(name==='working_set_action'||name==='retarget_dataset')?'working_set':'';
   if(!zeroCopyKey)return base;
   const src=arr(result?.tables).find(t=>trim(t?.key)===zeroCopyKey)||arr(result?.tables).find(t=>arr(t?.rows).length);
   if(!src)return base;
@@ -12568,7 +12645,7 @@ function v63CanonicalDatasetKey(result={}){
   if(name==='event_purchase_lines')return'purchase_lines';
   if(name==='event_donation_lines')return v65DonationDatasetKey(result);
   if(name==='events_catalog')return'events';
-  if(name==='working_set_action')return'working_set';
+  if(name==='working_set_action'||name==='retarget_dataset')return'working_set';
   return'';
 }
 function v63AutoPresentationRefs(results=[]){
@@ -12578,7 +12655,7 @@ function v63AutoPresentationRefs(results=[]){
   for(const r of arr(results)){
     const args=r?._native_call_args||{},name=trim(r?.name),key=v63CanonicalDatasetKey(r);
     if(!key)continue;
-    if(name==='working_set_action'){
+    if(name==='working_set_action'||name==='retarget_dataset'){
       const action=trim(args?.action).toLowerCase();
       if(['count','inspect'].includes(action)||!arr(r?.tables).some(t=>trim(t?.key)===key&&arr(t?.rows).length))continue;
       chosen={tool_id:trim(r?.id),table_key:key};
@@ -12593,7 +12670,7 @@ function v63PresentationColumns(result={},table={},memory={}){
   const rows=arr(table?.rows),sample=rows[0]||{},all=[];
   rows.forEach(r=>{if(r&&typeof r==='object'&&!Array.isArray(r))Object.keys(r).forEach(k=>{if(!all.includes(k))all.push(k);});});
   const name=trim(result?.name),args=result?._native_call_args||{};
-  if(name==='working_set_action'){
+  if(name==='working_set_action'||name==='retarget_dataset'){
     const ws=v42CompactWorkingSet(memory?.active_dataset||null),cache=v50CompactWorkingRowCache(ws?.row_cache||null);
     const explicit=trim(args?.action)==='project'?arr(args?.fields):arr(cache?.visible_fields);
     const cols=[];for(const f of explicit){const k=v48ColumnKey(sample,v49CanonicalPresentationField(f)||trim(f))||v48ColumnKey(sample,trim(f))||trim(f);if(k&&Object.prototype.hasOwnProperty.call(sample,k)&&!cols.includes(k))cols.push(k);}
@@ -12621,7 +12698,7 @@ function v64PresentationMeta(table={},column='',row={}){
 function v63BuildNativeTable(result={},table={},memory={}){
   const rows=arr(table?.rows),cols=v63PresentationColumns(result,table,memory);
   const fmtRows=rows.map(row=>cols.map(c=>v26FormatPresentationCell(row?.[c],v64PresentationMeta(table,c,row))));
-  const name=trim(result?.name),kind=name==='event_products'?'products':name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':name==='working_set_action'?trim(memory?.active_dataset?.requested_object)||'dataset':'generic';
+  const name=trim(result?.name),kind=name==='event_products'?'products':name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':(name==='working_set_action'||name==='retarget_dataset')?trim(memory?.active_dataset?.requested_object)||'dataset':'generic';
   const donationView=trim(result?._native_call_args?.view||result?.facts?.view),logicalCount=name==='event_products'?Number(result?.facts?.product_count):name==='event_purchase_lines'?Number(result?.facts?.purchase_line_count):name==='event_donation_lines'?(donationView==='products'?Number(result?.facts?.donation_product_row_count):donationView==='donors'?Number(result?.facts?.donor_count):Number(result?.facts?.donation_record_count)):name==='events_catalog'?Number(result?.facts?.event_count):Number(result?.facts?.group_count||result?.facts?.count);
   return{title:v63PrettyTableTitle(result,table,rows),columns:cols,rows:fmtRows,presentationKind:kind,logicalCount:logicalCount||rows.length,displayCount:rows.length};
 }
@@ -12643,6 +12720,10 @@ function v63MechanicalClosure(results=[],memory={}){
     if(action==='back')return{title:'Vista anterior',answer:`He restaurado la vista anterior${event?` de ${event}`:''}. Contiene ${count} ${noun}.`,warnings:[],showTables:[],chartSpecs:[]};
     if(action==='activate')return{title:'Dataset recuperado',answer:`He recuperado el conjunto anterior${event?` de ${event}`:''}. Contiene ${count} ${noun}.`,warnings:[],showTables:[],chartSpecs:[]};
     if(['list','filter','sort','reset','project','limit'].includes(action))return{title:trim(last.title)||'Datos',answer:`He actualizado la lista${event?` de ${event}`:''}. El conjunto vigente contiene ${count} ${noun} y la presentación completa queda debajo.`,warnings:[],showTables:[],chartSpecs:[]};
+  }
+  if(trim(last?.name)==='retarget_dataset'){
+    const f=last?.facts||{},count=Number(f.count)||0,type=trim(f.type)||'elementos',event=trim(f.event),from=trim(f.from_event),noun=type==='products'?'productos':type==='purchases'?'registros de compra':type==='donations'?'registros de donación':'elementos';
+    return{title:trim(last.title)||'Cambio de evento',answer:`He mantenido el mismo tipo de información y lo he cambiado${from?` de ${from}`:''}${event?` a ${event}`:''}. El conjunto vigente contiene ${count} ${noun} y la tabla completa queda debajo.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='event_products'){
     const f=last?.facts||{},n=Number(f.product_count)||0,e=trim(f.event);return{title:trim(last.title)||'Productos',answer:`He preparado los ${n} productos comprados${e?` en ${e}`:''}. La tabla inferior contiene el conjunto completo.`,warnings:[],showTables:[],chartSpecs:[]};
@@ -12670,7 +12751,7 @@ function v64FastClosure(calls=[],roundResults=[],memory={}){
   const names=arr(calls).map(c=>trim(c?.name)).filter(Boolean),ok=arr(roundResults).length===names.length&&arr(roundResults).every(r=>r?.ok!==false);
   if(!ok||!names.length)return null;
   if(names.length===1&&names[0]==='conversation_memory')return v63MechanicalClosure(roundResults,memory);
-  const base=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog']),allowed=new Set([...base,'working_set_action']);
+  const base=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog','retarget_dataset']),allowed=new Set([...base,'working_set_action']);
   if(names.some(n=>!allowed.has(n)))return null;
   if(names.filter(n=>base.has(n)).length>1)return null;
   if(arr(calls).some(c=>base.has(trim(c?.name))&&c?.arguments?.activate_dataset===false))return null;
@@ -12688,7 +12769,8 @@ function v62DatasetFromToolResult(call={},result={},previous=null){
   const initialVisible=v63DefaultVisibleFields(kind,columns);if(kind==='donations'&&trim(args?.scope)==='all_events'&&columns.includes('Evento')&&!initialVisible.includes('Evento'))initialVisible.unshift('Evento');
   const cache=v50CompactWorkingRowCache({table_key:trim(table.key)||tableKey,title:trim(table.title)||trim(result.title),source_tool:name,primary_field:primary,visible_fields:initialVisible.slice(0,12),sort_field:initialSort,sort_direction:initialDirection,columns:columns.slice(0,16),rows,complete:true});
   const metricNames=['total_value','event_count','product_count','donor_count','purchase_line_count','donation_record_count','donation_product_row_count'];const metrics={};for(const k of metricNames){if(result?.facts?.[k]!=null&&Number.isFinite(Number(result.facts[k])))metrics[k]=Number(result.facts[k]);}
-  return v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:kind==='events'?'all_events':trim(args?.scope)||'named_event',subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},metrics,row_cache:cache});
+  const sourceScope=kind==='events'?'all_events':trim(args?.scope)||'named_event',provenance={source_tool:name,source_event:event,source_scope:sourceScope,source_args:v67CompactSourceArgs(args)};
+  return v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:sourceScope,subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},metrics,provenance,row_cache:cache});
 }
 function v62UpdateMemoryFromCall(memory={},call={},result={}){
   let mem=JSON.parse(JSON.stringify(memory||{})),args=call?.arguments&&typeof call.arguments==='object'?call.arguments:{},name=trim(call?.name);
@@ -12762,7 +12844,7 @@ function v65ValidateToolResult(name='',args={},result={},state={}){
   return true;
 }
 function v65DatasetWriterConflict(calls=[]){
-  const datasetTools=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog']);
+  const datasetTools=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog','retarget_dataset']);
   const writers=arr(calls).filter(c=>datasetTools.has(trim(c?.name))&&c?.arguments?.activate_dataset!==false);
   if(writers.length<=1)return null;
   const signatures=[...new Set(writers.map(c=>`${trim(c?.name)}|${trim(c?.arguments?.scope)}|${trim(c?.arguments?.event)}|${trim(c?.arguments?.view)}`))];
@@ -12777,8 +12859,8 @@ function v65LooksLikeProtocolLeak(answer='',tools=[]){
 }
 function v66CanonicalizeTypedArgs(name='',args={},state={},selectedEventId='',memory={}){
   const out={...(args&&typeof args==='object'?args:{})},scope=trim(out.scope);
-  if(scope==='named_event'&&trim(out.event)){
-    const current=arr(memory?.focus_events).map(trim).filter(Boolean).length===1?trim(memory.focus_events[0]):'';
+  if((scope==='named_event'||trim(name)==='retarget_dataset')&&trim(out.event)){
+    const currentDatasetEvent=trim(memory?.active_dataset?.event),currentFocus=arr(memory?.focus_events).map(trim).filter(Boolean).length===1?trim(memory.focus_events[0]):'',current=currentDatasetEvent||currentFocus;
     const r=v66ResolveTypedEntity(state,'event',out.event,{currentName:current});
     if(r.ok){out.event=r.nombre;out._ce_entity_resolution=r.resolution||'catalog';}
   }
@@ -12805,7 +12887,7 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
   let memory=v62LiteMemoryFromHistory(conversationHistory),modelPolicy=v332InteractionPolicy(userPrompt),model=modelPolicy.model,payload,currentId='',escalated=false,fastFinal=null,protocolRepairUsed=false,integrityConflictSeen=false;
   const tools=v62NativeTools(),instruction=v62NativeInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation}),input=v62NativeInput(userPrompt,conversationHistory,memory),allResults=[],cache=new Map(),toolErrors=[];
   zuzuTracePush(flowTrace,'v3_0_exp · SCC-Lite · Arquitectura','OK','Gemini es el único intérprete lingüístico. CE ejecuta literalmente las tools solicitadas, conserva memoria factual y materializa referencias de presentación; Turn Program/Plan Authority/leases/fallbacks lingüísticos quedan fuera de la ruta activa.');
-  zuzuTracePush(flowTrace,'v3_0_exp · SCC-Lite · Contexto','OK',`Foco=${arr(memory.focus_events).join(' / ')||'—'} · dataset=${trim(memory?.active_dataset?.requested_object)||'—'}:${Number(memory?.active_dataset?.row_count)||0} · evento de pantalla=${trim(v26EventById(state,selectedEventId)?.titulo)||'—'} (ambiental).`);
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC-Lite · Contexto','OK',`Foco=${arr(memory.focus_events).join(' / ')||'—'} · dataset=${trim(memory?.active_dataset?.requested_object)||'—'}:${Number(memory?.active_dataset?.row_count)||0}${trim(memory?.active_dataset?.event)?`@${trim(memory.active_dataset.event)}`:''} · evento de pantalla=${trim(v26EventById(state,selectedEventId)?.titulo)||'—'} (ambiental).`);
   {const inv=v62LiteMemoryDescriptor(memory)?.active_dataset;zuzuTracePush(flowTrace,'v3_0_exp · SCC-Lite · Inventario CE','OK',inv?`Disponible=${inv.type}:${inv.count} · campos=${arr(inv.available_fields).join(', ')||'—'} · visibles=${arr(inv.visible_fields).join(', ')||'—'} · completo=${inv.rows_complete?'sí':'no'} · back=${inv.back_available?'sí':'no'}.`:'No hay dataset previo reutilizable.');}
   const callGemini=async({input,previousInteractionId='',stage,toolChoice='auto',maxCalls=3})=>{
     try{return await v261CallInteraction({input,previousInteractionId,model,systemInstruction:instruction,tools,flowTrace,stage,toolChoice,externalSignal,maxCalls,maxOutputTokens:voiceConversation?1400:2200});}
@@ -12846,6 +12928,8 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
         let full;
         if(name==='working_set_action'){
           const local=v62WorkingResult(memory,execArgs,trim(call.id));memory=local.memory;full=local.result;
+        }else if(name==='retarget_dataset'){
+          const local=await v67RetargetDataset(memory,execArgs,state,selectedEventId,flowTrace,trim(call.id));memory=local.memory;full=local.result;
         }else if(name==='conversation_memory'){
           if(trim(execArgs?.action)==='reset')memory=v65SafeResetMemory();
           full={id:trim(call.id),name,ok:true,title:'Memoria conversacional',facts:{action:trim(execArgs?.action),memory:v62LiteMemoryDescriptor(memory)},tables:[]};
@@ -12902,7 +12986,7 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
   zuzuTracePush(flowTrace,'v3_0_exp · Zero-copy · Presentación canónica','OK',`Tablas automáticas=${v63AutoPresentationRefs(allResults).length} · filas renderizadas=${arr(presentation?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}. Las filas completas no se reinyectan a Gemini para que las recopie.`);
   const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),files=[];
   for(const t of presentation.tables.slice(0,8)){const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));files.push({filename:fileSafe(`${t.title}_v3_0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});}
-  zuzuTracePush(flowTrace,'v3_0_exp · SCC-Lite · Memoria','OK',`Foco=${arr(memory.focus_events).join(' / ')||'—'} · sujetos=${arr(memory.subjects).join(' / ')||'—'} · dataset=${trim(memory?.active_dataset?.requested_object)||'—'}:${Number(memory?.active_dataset?.row_count)||0}. Memoria factual; CE no relee el mensaje.`);
+  zuzuTracePush(flowTrace,'v3_0_exp · SCC-Lite · Memoria','OK',`Foco=${arr(memory.focus_events).join(' / ')||'—'} · sujetos=${arr(memory.subjects).join(' / ')||'—'} · dataset=${trim(memory?.active_dataset?.requested_object)||'—'}:${Number(memory?.active_dataset?.row_count)||0}${trim(memory?.active_dataset?.event)?`@${trim(memory.active_dataset.event)}`:''}. Memoria factual; CE no relee el mensaje.`);
   return{ok:true,rejected:false,title:final.title||'Respuesta de Zuzu',answer:final.answer,warnings:arr(final.warnings),charts:presentation.charts||[],tables:presentation.tables||[],files,provider:'gemini-native-tools-scc-lite',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Gemini Native Tool Calling + SCC-Lite factual memory',modelTier:modelPolicy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:[...new Set(allResults.map(r=>trim(r?.name)).filter(Boolean))],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
@@ -18329,6 +18413,10 @@ export const __zuzuStructuralTesting = Object.freeze({
   v66ResolveTypedEntity,
   v66CanonicalizeTypedArgs,
   v66SoftFailureResult,
+  v67CompactDatasetProvenance,
+  v67ApplyRetargetView,
+  v67RetargetSourceDataset,
+  v67RetargetDataset,
   v65TypedToolContract,
   v65ValidateToolResult,
   v65DatasetWriterConflict,
