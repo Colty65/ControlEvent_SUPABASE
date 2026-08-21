@@ -1,23 +1,31 @@
-import express from 'express';
-import { asyncHandler } from './_async.js';
-import { analyzeEventPrompt, planificacionInicialZuzu } from '../services/event-ai.service.js';
-import { classifyZuzuShadow } from '../services/zuzu-router-shadow.service.js';
+import { Router } from 'express';
+import { EventAIService } from '../services/event-ai.service.js';
+import { requireAuth } from '../services/auth.service.js'; // Ajusta el paso de tu middleware según corresponda
 
-const router = express.Router();
+const router = Router();
 
-router.post('/event-ai/analyze', asyncHandler(async (req, res) => {
-  res.json(await analyzeEventPrompt(req.body || {}));
-}));
+/**
+ * @route POST /api/event-ai/ask
+ * @desc Consulta conversacional sobre los eventos propios del usuario logueado usando RAG
+ */
+router.post('/ask', requireAuth, async (req, res) => {
+  const { query } = req.body;
+  const userId = req.user?.id || req.userId; // Extrae de forma segura el ID inyectado por tu middleware auth
 
-// v3_0_exp · nueva arquitectura en SOMBRA: clasifica la misma pregunta, pero NO interviene
-// en la respuesta actual ni consulta/modifica datos de ControlEvent. La UI la ejecuta después
-// de recibir la respuesta principal para no añadir latencia ni riesgo al Zuzu vigente.
-router.post('/event-ai/router-shadow', asyncHandler(async (req, res) => {
-  res.json(await classifyZuzuShadow(req.body || {}));
-}));
+  if (!query || query.trim() === '') {
+    return res.status(400).json({ error: 'La consulta (query) no puede estar vacía.' });
+  }
 
-router.post('/event-ai/planificacion-propuesta', asyncHandler(async (req, res) => {
-  res.json(await planificacionInicialZuzu(req.body || {}));
-}));
+  if (!userId) {
+    return res.status(401).json({ error: 'Usuario no autenticado o sesión inválida.' });
+  }
+
+  try {
+    const aiResponse = await EventAIService.converseAboutEvents(query, userId);
+    return res.status(200).json({ response: aiResponse });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 export default router;
