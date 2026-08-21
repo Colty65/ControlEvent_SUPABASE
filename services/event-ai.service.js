@@ -9968,7 +9968,7 @@ function v46CompactWorkingTarget(raw=null){
 }
 function v50CompactWorkingRowCache(raw=null){
   if(!raw||typeof raw!=='object')return null;
-  const srcRows=arr(raw.rows);if(!srcRows.length||srcRows.length>220)return null;
+  const srcRows=arr(raw.rows);if(srcRows.length>220)return null;
   const columns=arr(raw.columns).map(x=>trim(x)).filter(Boolean).slice(0,16);if(!columns.length)return null;
   const cleanRows=[];
   for(const row of srcRows){
@@ -9976,7 +9976,7 @@ function v50CompactWorkingRowCache(raw=null){
     const clean={};for(const c of columns){let v=row?.[c];if(v==null)continue;if(typeof v==='string')v=trim(v).slice(0,240);else if(typeof v!=='number'&&typeof v!=='boolean')v=trim(String(v)).slice(0,240);clean[c]=v;}
     cleanRows.push(clean);if(cleanRows.length>=220)break;
   }
-  if(!cleanRows.length)return null;
+  if(srcRows.length&&!cleanRows.length)return null;
   const visible=arr(raw.visible_fields).map(x=>trim(x)).filter(x=>columns.includes(x)).slice(0,10);
   return{table_key:trim(raw.table_key).slice(0,100),title:trim(raw.title).slice(0,180),source_tool:trim(raw.source_tool).slice(0,70),primary_field:trim(raw.primary_field).slice(0,80),visible_fields:visible,sort_field:trim(raw.sort_field).slice(0,80),sort_direction:['asc','desc','none'].includes(trim(raw.sort_direction))?trim(raw.sort_direction):'none',columns,rows:cleanRows,complete:raw.complete!==false};
 }
@@ -9990,7 +9990,7 @@ function v50WorkingSetWithoutRowCache(raw=null){
   return out;
 }
 function v67CompactSourceArgs(raw={}){
-  const src=raw&&typeof raw==='object'?raw:{},out={},allowed=['view','donor','store','product','ticket','responsible','person','status'];
+  const src=raw&&typeof raw==='object'?raw:{},out={},allowed=['view','donor','store','product','ticket','responsible','person','status','events','year','event_limit','event_order'];
   for(const key of allowed){
     const v=src[key];if(v==null)continue;
     if(Array.isArray(v)){const a=v.map(x=>trim(x)).filter(Boolean).slice(0,12);if(a.length)out[key]=a;continue;}
@@ -12364,7 +12364,7 @@ function v62NativeTools(){
   };
   const propDesc={
     event:'Título del evento. Conserva nombre y año juntos tal como los expresa el usuario; este campo nunca es una tienda.',
-    scope:'Ámbito técnico: active_event=evento visible; named_event=el título indicado en event; all_events=todos los eventos cuando la tool lo admite.',
+    scope:'Ámbito técnico: screen_event=evento visible SOLO cuando no hay contexto conversacional; named_event=un evento concreto; all_events=todos; named_events=conjunto explícito; year=todos los eventos de un año, cuando la tool lo admita.',
     store:'Tienda o proveedor. Nunca pongas aquí el nombre de un evento.',
     product:'Producto o familia de producto. Nunca pongas aquí partes del nombre de un evento.',
     donor:'Donante: persona, tienda u otra entidad donante.',
@@ -12379,11 +12379,17 @@ function v62NativeTools(){
       if(prop&&typeof prop==='object'&&'description' in prop)delete prop.description;
       if(prop&&typeof prop==='object'&&propDesc[key])prop.description=propDesc[key];
     }
-    // event_products y event_purchase_lines son deliberadamente mono-evento. Pedir all_events
-    // a estas tools sería una contradicción de contrato, no una cuestión lingüística.
+    // En Native distinguimos explícitamente evento de pantalla y ámbito conversacional.
+    // Productos/compras admiten además conjuntos de eventos como UNA sola consulta física.
     if(['event_products','event_purchase_lines'].includes(tool.name)&&props.scope){
-      props.scope={type:'string',enum:['active_event','named_event'],description:propDesc.scope};
+      props.scope={type:'string',enum:['screen_event','named_event','all_events','named_events','year'],description:propDesc.scope};
+      props.events={type:'array',items:{type:'string'},description:'Solo con named_events: títulos de los eventos a consultar como un único conjunto.'};
+      props.year={type:'integer',description:'Solo con year: año natural de los eventos a consultar.'};
+      props.event_limit={type:'integer',description:'Límite opcional de eventos del ámbito, aplicado después de ordenarlos.'};
+      props.event_order={type:'string',enum:['newest','oldest'],description:'Orden temporal de los eventos cuando se usa event_limit.'};
     }else if(props.scope){
+      const enums=arr(props.scope.enum).map(x=>x==='active_event'?'screen_event':x);
+      if(enums.length)props.scope.enum=[...new Set(enums)];
       props.scope.description=propDesc.scope;
     }
     if(eventScoped.has(tool.name))props.activate_focus={type:'boolean',description:'true si este evento queda como foco conversacional; false si es solo apoyo.'};
@@ -12445,17 +12451,17 @@ ARQUITECTURA OBLIGATORIA:
 - TÚ eres el único intérprete del lenguaje humano. ControlEvent NO reinterpretará tu decisión después.
 - Para datos de la app usa las tools disponibles. Puedes pedir VARIAS tools independientes en la MISMA ronda y luego integrar sus resultados en una única respuesta.
 - Nunca generes SQL ni SELECT. Tú decides QUÉ tool y argumentos; CE decide únicamente CÓMO ejecutar esa tool y garantiza los datos.
-- El evento visible en pantalla es «${visible}» y es contexto ambiental. Si el usuario hace una petición autónoma de datos SIN nombrar evento ni referirse al hilo anterior, usa active_event. Si el hilo o el usuario fijan otro evento, conserva ese foco.
+- El evento visible en pantalla es «${visible}» y es SOLO contexto ambiental. En tools Native se llama screen_event. PRECEDENCIA DE ÁMBITO: (1) evento/conjunto explícito del usuario; (2) focus_events conversacional; (3) provenance.source_event del dataset al que se refiere; (4) screen_event únicamente si no existe ningún contexto conversacional aplicable. Nunca saltes al evento de pantalla porque una frase de continuación omita el nombre.
 - Cuando el usuario corrige el TIPO o identidad de un referente del turno anterior, conserva el referente completo ya escrito y aplica la corrección; no le pidas de nuevo un nombre que ya consta en los últimos turnos.
 - PETICIONES DE DATOS: si el usuario solicita obtener, ver, sacar o conocer un conjunto plural de entidades, la respuesta incluye la relación completa y su tabla canónica. Solo responde con un número sin lista cuando la petición sea exclusivamente de recuento.
-- PRODUCT_SET: para productos distintos usa event_products. Para registros físicos/tickets/compras individuales usa event_purchase_lines. No llames ambas tools para una misma lista salvo que el usuario pida explícitamente LAS DOS granularidades. event_products ya devuelve product_count, purchase_line_count e importe total.
+- PRODUCT_SET: para productos distintos usa event_products. Para registros físicos/tickets/compras individuales usa event_purchase_lines. No llames ambas tools para una misma lista salvo que el usuario pida explícitamente LAS DOS granularidades. event_products ya devuelve product_count, purchase_line_count e importe total. Ambas tools admiten un único evento o un CONJUNTO como una sola consulta: all_events, named_events o year. Para peticiones globales/anuales usa ese scope; NO emitas una tool por evento.
 - DONACIONES: usa event_donation_lines. Para productos donados usa view=products; para cada registro view=records; para donantes view=donors. No añadas event_products ni event_purchase_lines a una consulta de donaciones salvo que el usuario también pida explícitamente compras.
 - CAMBIO DE EVENTO: si el usuario cambia únicamente el evento y no cambia el objeto de trabajo, usa retarget_dataset. Esa tool conserva la misma granularidad/objeto del dataset vigente (products→products, purchases→purchases, donations→donations) y deja el conjunto anterior disponible para comparar o volver. NO uses event_dossier para un simple cambio de evento de una lista vigente.
 - TÍTULOS DE EVENTO: cuando uses scope=named_event, pasa en event el título completo o aproximado del evento como una sola unidad. No repartas partes del nombre/año entre event, store, product u otros argumentos. Si el usuario cambia solo una edición/año y el foco previo identifica claramente la familia del evento, conserva esa identidad y envía el título completo resultante, no solo el año.
 - RESOLUCIÓN TIPADA: CE puede normalizar un valor ya tipado contra el catálogo del MISMO tipo y usar continuidad factual inequívoca del foco vigente. Si aún quedan varios candidatos plausibles, pide aclaración; una ambigüedad normal NO implica reiniciar la conversación.
 - Para una lista/dataset que deba seguir vivo usa activate_dataset=true. Si una tool es solo apoyo lateral, usa activate_dataset=false. En una misma ronda puede haber como máximo UN dataset principal; si solicitas varias tools de datos, solo una lleva activate_dataset=true. Para foco de evento usa activate_focus; person_dossier puede usar activate_subject=false cuando sea lateral.
 - Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. active_dataset.event/provenance identifica de forma inmutable de qué evento proceden realmente sus filas aunque el foco conversacional haya cambiado. Si el dataset vigente ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; no vuelvas a consultar BBDD. Si recent_datasets contiene claramente un conjunto anterior al que se refiere el usuario, recupéralo con working_set_action(action=activate,dataset_id=...). El bloque known contiene hechos agregados ya calculados (totales, recuentos, etc.); si basta para responder, usa inspect y no vuelvas a BBDD.
-- Para ordenar, filtrar, contar, proyectar o agrupar una lista YA vigente usa working_set_action. reset vuelve al conjunto padre de un filtro; back restaura la vista/dataset anterior del historial factual; activate recupera un dataset reciente por id.
+- Para ordenar, filtrar, contar, proyectar o agrupar una lista YA vigente usa working_set_action. Un FILTER nunca destruye su fuente: si el resultado queda vacío, conserva esquema y padre. Si después corriges el campo/entidad del filtro, vuelve a filtrar desde el padre disponible, no sobre el vacío. reset vuelve al conjunto padre de un filtro; back restaura la vista/dataset anterior del historial factual; activate recupera un dataset reciente por id.
 - Una queja, corrección o frase como «eso está mal» NO modifica memoria por sí sola. Si necesitas verificar, vuelve a pedir la fuente canónica; solo muta memoria llamando explícitamente una tool que la cambie.
 - conversation_memory(reset) SOLO si el usuario pide inequívocamente borrar/reiniciar TODA la conversación. Cambiar de foco o pasar a otro evento NO es reset global: usa la tool del nuevo evento con activate_focus=true.
 - DATASETS ZERO-COPY: cuando una tool canónica devuelve una lista (PRODUCT_SET, PURCHASE_LINE_SET, DONATION_SET o working_set_action), CE adjunta automáticamente el dataset activo completo a pantalla y PDF. NO enumeres sus filas en answer ni copies la tabla en Markdown. Resume en 1-3 frases y usa una segunda tool si necesitas razonar sobre orden/filtro/top. show_tables queda para tablas laterales o adicionales.
@@ -12501,15 +12507,16 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
   }
   if(!cache||!cache.complete)return{result:{id:callId,name:'working_set_action',ok:false,title:'Dataset',facts:{error:'El dataset vigente no conserva filas completas para esta transformación.'},tables:[]},memory:mem,isError:true};
   let rows=arr(cache.rows).map(r=>({...r})),nextCache={...cache},nextWs={...ws},mutates=false;
-  const sample=rows[0]||{};
+  let sample=rows[0]||{};
   if(action==='filter'){
-    const field=trim(args?.field)||trim(cache.primary_field)||'Producto',key=v48ColumnKey(sample,field)||field,value=trim(args?.value),mode=trim(args?.match_mode)||'semantic';
-    if(!value||!Object.prototype.hasOwnProperty.call(sample,key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Filtro',facts:{error:'Campo o valor de filtro no válido.',field,value},tables:[]},memory:mem,isError:true};
-    const baseParent=parent||cache;rows=rows.filter(r=>v56SemanticTextMatch(r?.[key],value,mode));
-    nextCache=v50CompactWorkingRowCache({...cache,rows,complete:true});nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|filter|${field}|${value}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'FILTER',row_count:rows.length,empty:rows.length===0,filter_summary:`${field}=${value}`,row_cache:nextCache,parent_cache:baseParent});mutates=true;
+    let sourceRows=rows,sourceCache=cache;if(!sourceRows.length&&parent?.complete){sourceRows=arr(parent.rows).map(r=>({...r}));sourceCache=parent;sample=sourceRows[0]||{};}
+    const field=trim(args?.field)||trim(sourceCache.primary_field)||'Producto',key=v68WorkingColumn(sourceCache.columns,sample,field)||field,value=trim(args?.value),mode=trim(args?.match_mode)||'semantic';
+    if(!value||!arr(sourceCache.columns).includes(key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Filtro',facts:{error:'Campo o valor de filtro no válido.',field,value,available_fields:arr(sourceCache.columns)},tables:[]},memory:mem,isError:true};
+    const baseParent=parent||cache;rows=sourceRows.filter(r=>v56SemanticTextMatch(r?.[key],value,mode));
+    nextCache=v50CompactWorkingRowCache({...sourceCache,rows,complete:true});nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|filter|${field}|${value}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'FILTER',row_count:rows.length,empty:rows.length===0,filter_summary:`${field}=${value}`,row_cache:nextCache,parent_cache:baseParent});mutates=true;
   }else if(action==='sort'){
-    const field=v49CanonicalPresentationField(trim(args?.field)||trim(cache.sort_field))||trim(args?.field)||trim(cache.sort_field),key=v48ColumnKey(sample,field)||field,direction=trim(args?.direction)==='desc'?'desc':'asc';
-    if(!field||!Object.prototype.hasOwnProperty.call(sample,key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Ordenación',facts:{error:'Campo de ordenación no válido.',field,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
+    const field=v49CanonicalPresentationField(trim(args?.field)||trim(cache.sort_field))||trim(args?.field)||trim(cache.sort_field),key=v68WorkingColumn(cache.columns,sample,field)||field,direction=trim(args?.direction)==='desc'?'desc':'asc';
+    if(!field||!arr(cache.columns).includes(key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Ordenación',facts:{error:'Campo de ordenación no válido.',field,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
     const mult=direction==='desc'?-1:1;rows.sort((a,b)=>{const av=a?.[key],bv=b?.[key];if(/fecha/i.test(norm(key))){const ad=v40ParseDateMillis(av),bd=v40ParseDateMillis(bv);if(ad!=null&&bd!=null)return mult*(ad-bd);}const an=v40MaybeNumber(av),bn=v40MaybeNumber(bv);if(an!=null&&bn!=null)return mult*(an-bn);return mult*String(av??'').localeCompare(String(bv??''),'es',{numeric:true,sensitivity:'base'});});
     nextCache=v50CompactWorkingRowCache({...cache,rows,sort_field:key,sort_direction:direction,complete:true});nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|sort|${key}|${direction}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'SORT',row_cache:nextCache});mutates=true;
   }else if(action==='reset'){
@@ -12517,12 +12524,12 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
     rows=arr(parent.rows).map(r=>({...r}));nextCache=parent;nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|reset|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'RESET',row_count:rows.length,empty:false,filter_summary:'',row_cache:parent,parent_cache:null});mutates=true;
   }else if(action==='project'){
     const wanted=arr(args?.fields).map(x=>v49CanonicalPresentationField(x)||trim(x)).filter(Boolean),visible=[];
-    for(const f of wanted){const k=v48ColumnKey(sample,f)||f;if(Object.prototype.hasOwnProperty.call(sample,k)&&!visible.includes(k))visible.push(k);}
+    for(const f of wanted){const k=v68WorkingColumn(cache.columns,sample,f)||f;if(arr(cache.columns).includes(k)&&!visible.includes(k))visible.push(k);}
     if(!visible.length)return{result:{id:callId,name:'working_set_action',ok:false,title:'Columnas',facts:{error:'No se reconocieron campos disponibles.',fields:wanted,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
     nextCache=v50CompactWorkingRowCache({...cache,visible_fields:visible});nextWs=v42CompactWorkingSet({...ws,frame_id:`N_${v61Hash(`${ws.frame_id}|project|${visible.join('|')}|${Date.now()}`)}`,parent_frame_id:trim(ws.frame_id),frame_op:'PROJECT',row_cache:nextCache});mutates=true;
   }else if(action==='group'){
-    const field=trim(args?.group_by)||trim(args?.field),key=v48ColumnKey(sample,field)||field;
-    if(!field||!Object.prototype.hasOwnProperty.call(sample,key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Agrupación',facts:{error:'Campo de agrupación no válido.',field,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
+    const field=trim(args?.group_by)||trim(args?.field),key=v68WorkingColumn(cache.columns,sample,field)||field;
+    if(!field||!arr(cache.columns).includes(key))return{result:{id:callId,name:'working_set_action',ok:false,title:'Agrupación',facts:{error:'Campo de agrupación no válido.',field,available_fields:arr(cache.columns)},tables:[]},memory:mem,isError:true};
     const metricSpecs=arr(args?.metrics).map(trim).filter(Boolean);if(!metricSpecs.length)metricSpecs.push('count');
     const groups=new Map();
     for(const row of rows){
@@ -12534,7 +12541,7 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
       for(const spec of metricSpecs){
         const [opRaw,...rest]=spec.split(':'),op=trim(opRaw).toLowerCase(),fieldRaw=trim(rest.join(':'));
         if(op==='count'){out.Registros=g.rows.length;continue;}
-        const mk=v48ColumnKey(sample,fieldRaw)||fieldRaw;if(!mk||!Object.prototype.hasOwnProperty.call(sample,mk))continue;
+        const mk=v68WorkingColumn(cache.columns,sample,fieldRaw)||fieldRaw;if(!mk||!arr(cache.columns).includes(mk))continue;
         if(op==='sum'){out[`Suma ${mk}`]=g.rows.reduce((acc,r)=>acc+(v40MaybeNumber(r?.[mk])??0),0);}
         else if(op==='distinct'||op==='count_distinct'){out[`Distintos ${mk}`]=new Set(g.rows.map(r=>trim(r?.[mk])).filter(Boolean)).size;}
       }
@@ -12550,7 +12557,7 @@ function v62WorkingResult(memory={},args={},callId='working_set_action'){
     const n=Math.max(1,Math.min(200,Number(args?.limit)||10));rows=rows.slice(0,n);
     // LIMIT solo afecta a esta presentación: NO modifica el dataset canónico.
   }else return{result:{id:callId,name:'working_set_action',ok:false,title:'Dataset',facts:{error:`Acción no soportada: ${action}`},tables:[]},memory:mem,isError:true};
-  if(mutates){v64PushViewHistory(mem,ws);mem.active_dataset=nextWs;}
+  if(mutates){nextWs=v68RecomputeWorkingFacts(nextWs,rows,nextCache);v64PushViewHistory(mem,ws);mem.active_dataset=nextWs;}
   const effectiveWs=(['limit','list'].includes(action)?ws:(mem.active_dataset||nextWs)),effectiveCache=v50CompactWorkingRowCache(effectiveWs?.row_cache||cache),displayRows=action==='limit'?rows:arr(effectiveCache?.rows),tableKey='working_set',title=trim(effectiveCache?.title)||`Dataset vigente · ${trim(ws.event)}`;
   const result={id:callId,name:'working_set_action',ok:true,title,facts:{action,type:trim(effectiveWs?.requested_object)||trim(effectiveWs?.kind),event:trim(effectiveWs?.event),count:Number(effectiveWs?.row_count)||0,display_count:displayRows.length,filter:trim(effectiveWs?.filter_summary),sort_field:trim(effectiveCache?.sort_field),sort_direction:trim(effectiveCache?.sort_direction),...(action==='group'?{group_field:trim(args?.group_by)||trim(args?.field),group_count:displayRows.length,source_count:Number(ws.row_count)||0}: {})},tables:[{key:tableKey,title,rows:displayRows}]};
   return{result,memory:mem};
@@ -12579,7 +12586,8 @@ function v67ApplyRetargetView(source=null,target=null){
   const visible=[];for(const f of arr(sc.visible_fields)){const k=v48ColumnKey(sample,f)||f;if(k&&Object.prototype.hasOwnProperty.call(sample,k)&&!visible.includes(k))visible.push(k);}
   const nextCache=v50CompactWorkingRowCache({...dc,rows,visible_fields:visible.length?visible:dc.visible_fields,sort_field:sortKey&&direction!=='none'?sortKey:dc.sort_field,sort_direction:sortKey&&direction!=='none'?direction:dc.sort_direction,complete:true});
   const amountKey=v48ColumnKey(sample,'Importe')||v48ColumnKey(sample,'Valor'),unitsKey=v48ColumnKey(sample,'Unidades'),amount=amountKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[amountKey])||0),0):dst?.aggregate?.total_amount??null,units=unitsKey?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[unitsKey])||0),0):dst?.aggregate?.total_units??null;
-  return v42CompactWorkingSet({...dst,frame_op:'RETARGET',row_count:rows.length,empty:rows.length===0,filter_summary:filter,aggregate:{total_amount:amount,total_units:units},row_cache:nextCache,parent_cache:nextParent});
+  const retargeted=v42CompactWorkingSet({...dst,frame_op:'RETARGET',row_count:rows.length,empty:rows.length===0,filter_summary:filter,aggregate:{total_amount:amount,total_units:units},row_cache:nextCache,parent_cache:nextParent});
+  return v68RecomputeWorkingFacts(retargeted,rows,nextCache);
 }
 async function v67RetargetDataset(memory={},args={},state={},selectedEventId='',flowTrace=[],callId='retarget_dataset'){
   let mem=JSON.parse(JSON.stringify(memory||{})),source=v67RetargetSourceDataset(mem,args?.dataset_id);
@@ -12630,7 +12638,7 @@ function v65DonationDatasetKey(result={}){
 }
 function v63NativeCompactToolResult(result={},detail='standard'){
   const base=v261CompactToolResult(result,detail),name=trim(result?.name);
-  const zeroCopyKey=name==='event_products'?'products':name==='event_purchase_lines'?'purchase_lines':name==='event_donation_lines'?v65DonationDatasetKey(result):name==='events_catalog'?'events':(name==='working_set_action'||name==='retarget_dataset')?'working_set':'';
+  const zeroCopyKey=name==='event_products'?'products':name==='event_purchase_lines'?'purchase_lines':name==='event_donation_lines'?v65DonationDatasetKey(result):name==='events_catalog'?'events':name==='store_purchases'?'by_event':name==='compare_events'?'comparison':(name==='working_set_action'||name==='retarget_dataset')?'working_set':'';
   if(!zeroCopyKey)return base;
   const src=arr(result?.tables).find(t=>trim(t?.key)===zeroCopyKey)||arr(result?.tables).find(t=>arr(t?.rows).length);
   if(!src)return base;
@@ -12645,6 +12653,8 @@ function v63CanonicalDatasetKey(result={}){
   if(name==='event_purchase_lines')return'purchase_lines';
   if(name==='event_donation_lines')return v65DonationDatasetKey(result);
   if(name==='events_catalog')return'events';
+  if(name==='store_purchases')return'by_event';
+  if(name==='compare_events')return'comparison';
   if(name==='working_set_action'||name==='retarget_dataset')return'working_set';
   return'';
 }
@@ -12677,9 +12687,11 @@ function v63PresentationColumns(result={},table={},memory={}){
     if(cols.length)return cols.slice(0,12);
     return v63DefaultVisibleFields(trim(ws?.requested_object)||trim(ws?.kind),all).slice(0,12);
   }
-  if(name==='event_products')return v63DefaultVisibleFields('products',all);
-  if(name==='event_purchase_lines')return v63DefaultVisibleFields('purchases',all);
+  if(name==='event_products'){const scope=trim(result?.facts?.scope||args?.scope);if(['all_events','named_events','year'].includes(scope)&&all.includes('Evento'))return ['Evento','Producto','Unidades','Importe','Responsables','Tiendas'].filter(x=>all.includes(x));return v63DefaultVisibleFields('products',all);}
+  if(name==='event_purchase_lines'){const cols=v63DefaultVisibleFields('purchases',all);if(['all_events','named_events','year'].includes(trim(result?.facts?.scope||args?.scope))&&all.includes('Evento')&&!cols.includes('Evento'))cols.unshift('Evento');return cols.slice(0,12);}
   if(name==='event_donation_lines'){const view=trim(result?._native_call_args?.view||result?.facts?.view);if(view==='products'){const wanted=[...(trim(result?.facts?.scope)==='all_events'&&all.includes('Evento')?['Evento']:[]),...(!trim(result?.facts?.donor)&&all.includes('Donante')?['Donante']:[]),'Producto','Segmento','Destino','Unidades','Valor'];return wanted.filter((x,i)=>all.includes(x)&&wanted.indexOf(x)===i).slice(0,12);}const cols=v63DefaultVisibleFields('donations',all);if(trim(result?.facts?.scope)==='all_events'&&all.includes('Evento')&&!cols.includes('Evento'))cols.unshift('Evento');return cols.slice(0,12);}
+  if(name==='store_purchases')return ['Evento','Fecha inicio','Registros de compra','Importe'].filter(x=>all.includes(x));
+  if(name==='compare_events')return ['Evento','Estado','Fecha inicio','Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas','Saldo operativo','Valoración del evento','Asistentes canónicos'].filter(x=>all.includes(x)).slice(0,12);
   if(name==='events_catalog')return v63DefaultVisibleFields('events',all);
   return all.slice(0,12);
 }
@@ -12698,8 +12710,8 @@ function v64PresentationMeta(table={},column='',row={}){
 function v63BuildNativeTable(result={},table={},memory={}){
   const rows=arr(table?.rows),cols=v63PresentationColumns(result,table,memory);
   const fmtRows=rows.map(row=>cols.map(c=>v26FormatPresentationCell(row?.[c],v64PresentationMeta(table,c,row))));
-  const name=trim(result?.name),kind=name==='event_products'?'products':name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':(name==='working_set_action'||name==='retarget_dataset')?trim(memory?.active_dataset?.requested_object)||'dataset':'generic';
-  const donationView=trim(result?._native_call_args?.view||result?.facts?.view),logicalCount=name==='event_products'?Number(result?.facts?.product_count):name==='event_purchase_lines'?Number(result?.facts?.purchase_line_count):name==='event_donation_lines'?(donationView==='products'?Number(result?.facts?.donation_product_row_count):donationView==='donors'?Number(result?.facts?.donor_count):Number(result?.facts?.donation_record_count)):name==='events_catalog'?Number(result?.facts?.event_count):Number(result?.facts?.group_count||result?.facts?.count);
+  const name=trim(result?.name),multiScope=['all_events','named_events','year'].includes(trim(result?.facts?.scope||result?._native_call_args?.scope)),kind=name==='event_products'?(multiScope?'event_product_rows':'products'):name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':name==='store_purchases'?'purchases_by_store':name==='compare_events'?'comparison':(name==='working_set_action'||name==='retarget_dataset')?trim(memory?.active_dataset?.requested_object)||'dataset':'generic';
+  const donationView=trim(result?._native_call_args?.view||result?.facts?.view),logicalCount=name==='event_products'?(multiScope?Number(result?.facts?.row_count):Number(result?.facts?.product_count)):name==='event_purchase_lines'?(Number(result?.facts?.row_count)||Number(result?.facts?.purchase_line_count)):name==='event_donation_lines'?(donationView==='products'?Number(result?.facts?.donation_product_row_count):donationView==='donors'?Number(result?.facts?.donor_count):Number(result?.facts?.donation_record_count)):name==='events_catalog'?Number(result?.facts?.event_count):name==='store_purchases'?Number(result?.facts?.event_count):name==='compare_events'?Number(result?.facts?.event_count):Number(result?.facts?.group_count||result?.facts?.count);
   return{title:v63PrettyTableTitle(result,table,rows),columns:cols,rows:fmtRows,presentationKind:kind,logicalCount:logicalCount||rows.length,displayCount:rows.length};
 }
 function v63MechanicalClosure(results=[],memory={}){
@@ -12726,10 +12738,14 @@ function v63MechanicalClosure(results=[],memory={}){
     return{title:trim(last.title)||'Cambio de evento',answer:`He mantenido el mismo tipo de información y lo he cambiado${from?` de ${from}`:''}${event?` a ${event}`:''}. El conjunto vigente contiene ${count} ${noun} y la tabla completa queda debajo.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='event_products'){
-    const f=last?.facts||{},n=Number(f.product_count)||0,e=trim(f.event);return{title:trim(last.title)||'Productos',answer:`He preparado los ${n} productos comprados${e?` en ${e}`:''}. La tabla inferior contiene el conjunto completo.`,warnings:[],showTables:[],chartSpecs:[]};
+    const f=last?.facts||{},n=Number(f.product_count)||0,e=trim(f.event),scope=trim(f.scope),multi=['all_events','named_events','year'].includes(scope);
+    if(multi){const rows=Number(f.row_count)||0,events=Number(f.event_count)||0,queried=Number(f.queried_event_count)||0,where=scope==='year'?` en los eventos de ${Number(f.year)||''}`:scope==='all_events'?' en todos los eventos':' en el conjunto de eventos solicitado';return{title:trim(last.title)||'Productos',answer:`He localizado ${n} productos distintos${where}; aparecen en ${rows} filas Evento+Producto y ${events} de ${queried||events} eventos tienen coincidencias. La tabla inferior contiene el conjunto completo con responsables y tiendas.`,warnings:[],showTables:[],chartSpecs:[]};}
+    return{title:trim(last.title)||'Productos',answer:`He preparado los ${n} productos comprados${e?` en ${e}`:''}. La tabla inferior contiene el conjunto completo.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='event_purchase_lines'){
-    const f=last?.facts||{},n=Number(f.purchase_line_count)||0,e=trim(f.event);return{title:trim(last.title)||'Compras',answer:`He preparado ${n} registros de compra${e?` de ${e}`:''}. El detalle completo queda en la tabla inferior.`,warnings:[],showTables:[],chartSpecs:[]};
+    const f=last?.facts||{},n=Number(f.purchase_line_count)||0,e=trim(f.event),scope=trim(f.scope),multi=['all_events','named_events','year'].includes(scope);
+    if(multi){const events=Number(f.event_count)||0,queried=Number(f.queried_event_count)||0,where=scope==='year'?` de los eventos de ${Number(f.year)||''}`:scope==='all_events'?' de todos los eventos':' del conjunto de eventos solicitado';return{title:trim(last.title)||'Compras',answer:`He preparado ${n} registros de compra${where}; ${events} de ${queried||events} eventos tienen coincidencias. El detalle completo queda en la tabla inferior.`,warnings:[],showTables:[],chartSpecs:[]};}
+    return{title:trim(last.title)||'Compras',answer:`He preparado ${n} registros de compra${e?` de ${e}`:''}. El detalle completo queda en la tabla inferior.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='event_donation_lines'){
     const f=last?.facts||{},e=trim(f.event),global=trim(f.scope)==='all_events',view=trim(f.view)||'records',total=v26Money(f.total_value),donor=trim(f.donor);
@@ -12741,6 +12757,14 @@ function v63MechanicalClosure(results=[],memory={}){
     }
     const n=Number(f.donation_record_count||f.row_count)||0;return{title:trim(last.title)||'Donaciones',answer:`He preparado ${n} registros de donación${global?' de todos los eventos':e?` de ${e}`:''}. El valor total donado es ${v26FormatEuro(total)}. El detalle completo queda en la tabla inferior.`,warnings:[],showTables:[],chartSpecs:[]};
   }
+  if(trim(last?.name)==='store_purchases'){
+    const f=last?.facts||{},store=trim(f.store),records=Number(f.total_records)||0,events=Number(f.event_count)||0,total=v26Money(f.total_amount);
+    return{title:trim(last.title)||'Compras por tienda',answer:`En ${store||'la tienda indicada'} constan ${records} registros de compra repartidos en ${events} eventos, por un importe total de ${v26FormatEuro(total)}. La tabla inferior muestra el desglose por evento.`,warnings:[],showTables:[],chartSpecs:[]};
+  }
+  if(trim(last?.name)==='compare_events'){
+    const f=last?.facts||{},n=Number(f.event_count)||arr(last?.tables?.find(t=>trim(t?.key)==='comparison')?.rows).length;
+    return{title:trim(last.title)||'Comparativa de eventos',answer:`He comparado ${n} eventos con las métricas canónicas disponibles. La tabla inferior muestra la comparación completa.`,warnings:[],showTables:[],chartSpecs:[]};
+  }
   if(trim(last?.name)==='events_catalog'){
     const f=last?.facts||{},n=Number(f.event_count)||arr(last?.tables?.[0]?.rows).length;return{title:'Eventos',answer:`He preparado los ${n} eventos registrados. La tabla inferior contiene el catálogo completo.`,warnings:[],showTables:[],chartSpecs:[]};
   }
@@ -12751,7 +12775,7 @@ function v64FastClosure(calls=[],roundResults=[],memory={}){
   const names=arr(calls).map(c=>trim(c?.name)).filter(Boolean),ok=arr(roundResults).length===names.length&&arr(roundResults).every(r=>r?.ok!==false);
   if(!ok||!names.length)return null;
   if(names.length===1&&names[0]==='conversation_memory')return v63MechanicalClosure(roundResults,memory);
-  const base=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog','retarget_dataset']),allowed=new Set([...base,'working_set_action']);
+  const base=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog','store_purchases','compare_events','retarget_dataset']),allowed=new Set([...base,'working_set_action']);
   if(names.some(n=>!allowed.has(n)))return null;
   if(names.filter(n=>base.has(n)).length>1)return null;
   if(arr(calls).some(c=>base.has(trim(c?.name))&&c?.arguments?.activate_dataset===false))return null;
@@ -12760,17 +12784,18 @@ function v64FastClosure(calls=[],roundResults=[],memory={}){
 
 function v62DatasetFromToolResult(call={},result={},previous=null){
   const name=trim(call?.name),args=call?.arguments&&typeof call.arguments==='object'?call.arguments:{},tableKey=name==='event_products'?'products':name==='event_purchase_lines'?'purchase_lines':name==='event_donation_lines'?v65DonationDatasetKey({...result,_native_call_args:args}):name==='events_catalog'?'events':'';
-  const table=arr(result?.tables).find(t=>trim(t?.key)===trim(tableKey))||arr(result?.tables).find(t=>arr(t?.rows).length);if(!table)return null;
-  const rows=arr(table.rows).filter(r=>r&&typeof r==='object'&&!Array.isArray(r));if(!rows.length)return null;
-  const columns=[];rows.forEach(r=>Object.keys(r).forEach(k=>{if(!columns.includes(k))columns.push(k);}));
+  const table=arr(result?.tables).find(t=>trim(t?.key)===trim(tableKey))||arr(result?.tables).find(t=>t&&typeof t==='object');if(!table)return null;
+  const rows=arr(table.rows).filter(r=>r&&typeof r==='object'&&!Array.isArray(r)),columns=[];rows.forEach(r=>Object.keys(r).forEach(k=>{if(!columns.includes(k))columns.push(k);}));if(!columns.length)Object.keys(table?.schema||{}).forEach(k=>{if(!columns.includes(k))columns.push(k);});if(!columns.length)return null;
   const kind=name==='event_products'?'products':name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':'data';
-  const event=trim(result?.facts?.event)||trim(args?.event),donationView=trim(args?.view||result?.facts?.view),rowCount=name==='event_products'?(Number(result?.facts?.product_count)||rows.length):name==='events_catalog'?(Number(result?.facts?.event_count)||rows.length):name==='event_donation_lines'?(donationView==='products'?(Number(result?.facts?.donation_product_row_count)||rows.length):donationView==='donors'?(Number(result?.facts?.donor_count)||rows.length):(Number(result?.facts?.donation_record_count)||rows.length)):(Number(result?.facts?.row_count||result?.facts?.purchase_line_count)||rows.length),recordCount=Number(result?.facts?.purchase_line_count||result?.facts?.donation_record_count||rowCount)||rowCount;
-  const primary=kind==='events'?'Evento':columns.includes('Producto')?'Producto':columns[0]||'',initialSort=kind==='events'?'Fecha inicio':'',initialDirection=kind==='events'?'desc':'none';
-  const initialVisible=v63DefaultVisibleFields(kind,columns);if(kind==='donations'&&trim(args?.scope)==='all_events'&&columns.includes('Evento')&&!initialVisible.includes('Evento'))initialVisible.unshift('Evento');
+  const event=trim(result?.facts?.event)||trim(args?.event),donationView=trim(args?.view||result?.facts?.view),explicitRows=Number(result?.facts?.row_count),rowCount=Number.isFinite(explicitRows)?explicitRows:name==='event_products'?(Number(result?.facts?.product_count)||rows.length):name==='events_catalog'?(Number(result?.facts?.event_count)||rows.length):name==='event_donation_lines'?(donationView==='products'?(Number(result?.facts?.donation_product_row_count)||rows.length):donationView==='donors'?(Number(result?.facts?.donor_count)||rows.length):(Number(result?.facts?.donation_record_count)||rows.length)):(Number(result?.facts?.purchase_line_count)||rows.length),recordCount=Number(result?.facts?.purchase_line_count||result?.facts?.donation_record_count||rowCount)||0;
+  const primary=kind==='events'?'Evento':columns.includes('Producto')?'Producto':columns[0]||'',initialSort=kind==='events'?'Fecha inicio':'',initialDirection=kind==='events'?'desc':'none',sourceScope=kind==='events'?'all_events':trim(result?.facts?.scope)||trim(args?.scope)||'named_event';
+  let initialVisible=v63DefaultVisibleFields(kind,columns);if(['all_events','named_events','year'].includes(sourceScope)&&columns.includes('Evento')&&!initialVisible.includes('Evento'))initialVisible.unshift('Evento');
+  if(kind==='products'&&['all_events','named_events','year'].includes(sourceScope)){for(const f of ['Responsables','Tiendas'])if(columns.includes(f)&&!initialVisible.includes(f))initialVisible.push(f);}
   const cache=v50CompactWorkingRowCache({table_key:trim(table.key)||tableKey,title:trim(table.title)||trim(result.title),source_tool:name,primary_field:primary,visible_fields:initialVisible.slice(0,12),sort_field:initialSort,sort_direction:initialDirection,columns:columns.slice(0,16),rows,complete:true});
-  const metricNames=['total_value','event_count','product_count','donor_count','purchase_line_count','donation_record_count','donation_product_row_count'];const metrics={};for(const k of metricNames){if(result?.facts?.[k]!=null&&Number.isFinite(Number(result.facts[k])))metrics[k]=Number(result.facts[k]);}
-  const sourceScope=kind==='events'?'all_events':trim(args?.scope)||'named_event',provenance={source_tool:name,source_event:event,source_scope:sourceScope,source_args:v67CompactSourceArgs(args)};
-  return v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:sourceScope,subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},metrics,provenance,row_cache:cache});
+  const metricNames=['total_value','event_count','queried_event_count','product_count','donor_count','purchase_line_count','donation_record_count','donation_product_row_count'];const metrics={};for(const k of metricNames){if(result?.facts?.[k]!=null&&Number.isFinite(Number(result.facts[k])))metrics[k]=Number(result.facts[k]);}
+  const provenance={source_tool:name,source_event:event,source_scope:sourceScope,source_args:v67CompactSourceArgs(args)};
+  const raw=v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${sourceScope}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:sourceScope,subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},metrics,provenance,row_cache:cache});
+  return raw;
 }
 function v62UpdateMemoryFromCall(memory={},call={},result={}){
   let mem=JSON.parse(JSON.stringify(memory||{})),args=call?.arguments&&typeof call.arguments==='object'?call.arguments:{},name=trim(call?.name);
@@ -12779,7 +12804,7 @@ function v62UpdateMemoryFromCall(memory={},call={},result={}){
     const activate=args.activate_dataset!==false;if(activate){const ds=v62DatasetFromToolResult(call,result,mem.active_dataset);if(ds){if(mem.active_dataset)v64PushViewHistory(mem,mem.active_dataset);mem.active_dataset=ds;}}
   }
   const eventScoped=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','store_purchases']);
-  if(eventScoped.has(name)&&args.activate_focus!==false){const event=trim(result?.facts?.event)||trim(args?.event);if(event)mem.focus_events=[event];}
+  if(eventScoped.has(name)&&args.activate_focus!==false){const events=arr(result?.facts?.event_names).map(trim).filter(Boolean),event=trim(result?.facts?.event)||trim(args?.event);if(events.length)mem.focus_events=events.slice(0,12);else if(event)mem.focus_events=[event];}
   if(name==='compare_events'&&args.activate_focus!==false){const ev=arr(result?.facts?.event_names||args?.events).map(trim).filter(Boolean);if(ev.length)mem.focus_events=ev.slice(0,6);}
   if(name==='person_dossier'&&args.activate_subject!==false){const person=trim(result?.facts?.person||args?.person);if(person)mem.subjects=[person];if(args.activate_focus===true){const event=trim(result?.facts?.event||args?.event);if(event)mem.focus_events=[event];}}
   mem.updated_at=new Date().toISOString();return mem;
@@ -12802,27 +12827,90 @@ function v62ExactPresentation(final={},results=[],memory={}){
   const chartOnly=v26BuildPresentation({...final,showTables:[]},results,'',{wantsCharts:false,bankContext:false,staticPointLabels:false});
   return{...chartOnly,tables,stats:{...(chartOnly?.stats||{}),renderedTableRows:tables.reduce((n,t)=>n+arr(t?.rows).length,0)}};
 }
-function v65TypedToolContract(name='',args={},state={},selectedEventId=''){
-  const n=trim(name),a=args&&typeof args==='object'?args:{},scope=trim(a.scope);
-  if(['event_products','event_purchase_lines'].includes(n)&&scope==='all_events'){
-    const e=new Error(`${n} trabaja con un único evento; all_events no es un ámbito físico válido para esta tool.`);e.code='CE_TOOL_CONTRACT';throw e;
+
+// v3_0_exp · SCC-Lite 6.8 · EVENT_SCOPE_SET + hechos derivados.
+// Reglas algebraicas: no interpretan texto humano. Trabajan solo con scopes, entidades ya
+// tipadas y filas canónicas producidas por las tools elegidas por Gemini.
+function v68EventYear(row={}){
+  const start=trim(row?.fechaIni||row?.fecha_ini||row?.['Fecha inicio']);
+  const ms=v40ParseDateMillis(start);if(ms!=null){const y=new Date(ms).getFullYear();if(Number.isFinite(y)&&y>1900&&y<2200)return y;}
+  for(const raw of [start,trim(row?.fechaFin||row?.fecha_fin),trim(row?.titulo||row?.Evento)]){const m=String(raw||'').match(/\b(19\d{2}|20\d{2}|21\d{2})\b/);if(m)return Number(m[1]);}
+  return null;
+}
+function v68ResolveEventScopeSet(state={},selectedEventId='',args={}){
+  const a=args&&typeof args==='object'?args:{},scope=trim(a.scope)||'named_event',all=arr(state?.eventos).filter(e=>trim(e?.id));let refs=[];
+  const add=ev=>{if(!ev)return;const id=trim(ev?.id),nombre=trim(ev?.titulo||ev?.nombre);if(!id||refs.some(x=>x.id===id))return;refs.push({id,nombre,row:ev});};
+  if(scope==='active_event'||scope==='screen_event')add(v26EventById(state,selectedEventId));
+  else if(scope==='named_event'){
+    const r=semanticResolveEntity(state,'event',a.event);if(!r.ok)throw Object.assign(new Error(r.ambiguous?`El argumento event «${trim(a.event)}» es ambiguo entre eventos: ${r.candidates.map(x=>x.nombre).join(' / ')}`:`El argumento event «${trim(a.event)}» no resuelve ningún EVENTO registrado.`),{code:'CE_TOOL_CONTRACT'});add(v26EventById(state,r.id));
+  }else if(scope==='all_events')all.forEach(add);
+  else if(scope==='year'){
+    const year=Number(a.year);if(!Number.isInteger(year)||year<1900||year>2200)throw Object.assign(new Error('scope=year requiere un año natural válido en year.'),{code:'CE_TOOL_CONTRACT'});
+    all.filter(e=>v68EventYear(e)===year).forEach(add);
+  }else if(scope==='named_events'){
+    const names=arr(a.events).map(trim).filter(Boolean);if(!names.length)throw Object.assign(new Error('scope=named_events requiere al menos un título en events.'),{code:'CE_TOOL_CONTRACT'});
+    for(const name of names){const r=semanticResolveEntity(state,'event',name);if(!r.ok)throw Object.assign(new Error(r.ambiguous?`El evento «${name}» es ambiguo: ${r.candidates.map(x=>x.nombre).join(' / ')}`:`No encuentro el evento «${name}».`),{code:'CE_TOOL_CONTRACT'});add(v26EventById(state,r.id));}
+  }else throw Object.assign(new Error(`Scope de eventos no soportado: ${scope||'—'}.`),{code:'CE_TOOL_CONTRACT'});
+  if(!refs.length)throw Object.assign(new Error(scope==='year'?`No hay eventos registrados para el año ${Number(a.year)||''}.`:'El ámbito solicitado no contiene eventos resolubles.'),{code:'CE_TOOL_CONTRACT'});
+  const order=trim(a.event_order)==='oldest'?'oldest':'newest';refs.sort((x,y)=>{const ax=v40ParseDateMillis(x?.row?.fechaIni),ay=v40ParseDateMillis(y?.row?.fechaIni),av=ax==null?0:ax,bv=ay==null?0:ay;return order==='oldest'?av-bv:bv-av;});
+  const limit=Math.max(0,Math.min(100,Number(a.event_limit)||0));if(limit)refs=refs.slice(0,limit);
+  return{scope,refs,event_names:refs.map(x=>x.nombre),year:scope==='year'?Number(a.year):null,order,limit};
+}
+async function v68ExecuteEventSetTool(name='',args={},state={},selectedEventId='',flowTrace=[],callId=''){
+  const n=trim(name),set=v68ResolveEventScopeSet(state,selectedEventId,args),productRows=[],purchaseRows=[];let lineCount=0,totalAmount=0,totalUnits=0,matchedEvents=new Set();
+  for(let i=0;i<set.refs.length;i++){
+    const ev=set.refs[i],child={id:`${trim(callId)||n}_${i+1}`,name:n,...args,scope:'named_event',event:ev.nombre};delete child.events;delete child.year;delete child.event_limit;delete child.event_order;delete child.activate_dataset;delete child.activate_focus;delete child._ce_entity_resolution;delete child._ce_scope_origin;
+    const r=n==='event_products'?await v61ToolEventProducts(child,state,selectedEventId):await v274ToolEventPurchaseLines(child,state,selectedEventId);
+    if(n==='event_products'){
+      const t=arr(r?.tables).find(x=>trim(x?.key)==='products'),rows=arr(t?.rows);if(rows.length)matchedEvents.add(ev.nombre);for(const row of rows)productRows.push({Evento:ev.nombre,...row});
+      lineCount+=Number(r?.facts?.purchase_line_count)||0;totalAmount+=num(r?.facts?.total_amount);totalUnits+=num(r?.facts?.total_units);
+    }else{
+      const t=arr(r?.tables).find(x=>trim(x?.key)==='purchase_lines'),rows=arr(t?.rows);if(rows.length)matchedEvents.add(ev.nombre);for(const row of rows)purchaseRows.push({Evento:ev.nombre,...row});
+      lineCount+=Number(r?.facts?.purchase_line_count)||rows.length;totalAmount+=num(r?.facts?.total_amount);totalUnits+=rows.reduce((a,x)=>a+num(x?.Unidades),0);
+    }
   }
+  const rows=n==='event_products'?productRows:purchaseRows,distinctProducts=new Set(rows.map(r=>norm(r?.Producto)).filter(Boolean));
+  const scopeLabel=set.scope==='all_events'?'todos los eventos':set.scope==='year'?`eventos de ${set.year}`:set.scope==='named_events'?`${set.refs.length} eventos`:set.refs[0]?.nombre||'evento';
+  if(n==='event_products'){
+    const schema={Evento:v26TextSchema('Evento'),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas en el evento'),'Precios registrados':v26TextSchema(),Importe:v26MoneySchema(),'Nº registros':v26CountSchema('registros'),Tiendas:v26TextSchema(),Responsables:v26TextSchema(),Tickets:v26TextSchema(),Tipo:v26StatusSchema()};
+    return{id:callId,name:n,ok:true,title:`Productos comprados · ${scopeLabel}`,facts:{scope:set.scope,event:'',event_names:set.event_names,queried_event_count:set.refs.length,event_count:matchedEvents.size,year:set.year,granularity:'EVENT_PRODUCT_SET',row_count:rows.length,product_count:distinctProducts.size,purchase_line_count:lineCount,total_amount:v26Money(totalAmount),total_units:round(totalUnits,3),store:trim(args?.store),product:trim(args?.product),responsible:trim(args?.responsible),presentation_contract:'Una fila por Evento+Producto; el conjunto multi-evento se materializa como una única fuente canónica.'},facts_schema:{row_count:v26CountSchema('filas','Filas Evento+Producto'),product_count:v26CountSchema('productos','Productos distintos globales'),purchase_line_count:v26CountSchema('registros','Registros físicos que sustentan el conjunto'),event_count:v26CountSchema('eventos','Eventos con coincidencias'),total_amount:v26MoneySchema(),total_units:v26SchemaField('quantity','uds')},provenance:'ControlEvent · PRODUCT_SET multi-evento',tables:[v26Table('products',`Productos comprados · ${scopeLabel}`,rows,schema)]};
+  }
+  const schema={Evento:v26TextSchema('Evento'),'Ticket u otros gastos':v26TextSchema(),Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds'),Precio:v26MoneySchema(),Importe:v26MoneySchema(),Tienda:v26TextSchema(),Responsable:v26TextSchema(),Donante:v26TextSchema(),Tipo:v26StatusSchema(),'ID compra':v26TextSchema(),'ID producto':v26TextSchema(),'ID tienda':v26TextSchema(),'ID responsable':v26TextSchema(),Creado:v26DateSchema(),Actualizado:v26DateSchema()};
+  return{id:callId,name:n,ok:true,title:`Detalle de compras · ${scopeLabel}`,facts:{scope:set.scope,event:'',event_names:set.event_names,queried_event_count:set.refs.length,event_count:matchedEvents.size,year:set.year,granularity:'EVENT_PURCHASE_LINE_SET',row_count:rows.length,purchase_line_count:rows.length,product_count:distinctProducts.size,total_amount:v26Money(totalAmount),total_units:round(totalUnits,3),store:trim(args?.store),product:trim(args?.product),responsible:trim(args?.responsible)},facts_schema:{row_count:v26CountSchema('registros'),purchase_line_count:v26CountSchema('registros'),product_count:v26CountSchema('productos'),event_count:v26CountSchema('eventos'),total_amount:v26MoneySchema(),total_units:v26SchemaField('quantity','uds')},provenance:'ControlEvent · PURCHASE_LINE_SET multi-evento',tables:[v26Table('purchase_lines',`Compras producto a producto · ${scopeLabel}`,rows,schema)]};
+}
+function v68WorkingColumn(columns=[],sample={},name=''){
+  const direct=v48ColumnKey(sample,name);if(direct)return direct;const n=norm(name);return arr(columns).find(c=>norm(c)===n)||arr(columns).find(c=>norm(c).includes(n)||n.includes(norm(c)))||'';
+}
+function v68RecomputeWorkingFacts(rawWs=null,rowsArg=[],cacheArg=null){
+  const ws=v42CompactWorkingSet(rawWs)||rawWs;if(!ws)return ws;const rows=arr(rowsArg),cache=v50CompactWorkingRowCache(cacheArg||ws?.row_cache||null),columns=arr(cache?.columns),sample=rows[0]||{};
+  const amountKey=v68WorkingColumn(columns,sample,'Importe')||v68WorkingColumn(columns,sample,'Suma Importe'),valueKey=v68WorkingColumn(columns,sample,'Valor')||v68WorkingColumn(columns,sample,'Suma Valor'),unitsKey=v68WorkingColumn(columns,sample,'Unidades'),productKey=v68WorkingColumn(columns,sample,'Producto'),eventKey=v68WorkingColumn(columns,sample,'Evento'),donorKey=v68WorkingColumn(columns,sample,'Donante'),recordsKey=v68WorkingColumn(columns,sample,'Nº registros')||v68WorkingColumn(columns,sample,'Registros');
+  const sum=k=>k?rows.reduce((a,r)=>a+(v40MaybeNumber(r?.[k])??0),0):null,distinct=k=>k?new Set(rows.map(r=>trim(r?.[k])).filter(Boolean)).size:0,kind=trim(ws?.requested_object)||trim(ws?.kind);
+  const totalAmount=amountKey?sum(amountKey):(valueKey?sum(valueKey):null),totalUnits=unitsKey?sum(unitsKey):null;let recordCount=rows.length;if(recordsKey)recordCount=Math.round(sum(recordsKey)||0);
+  const metrics={};if(productKey)metrics.product_count=distinct(productKey);else if(kind==='products')metrics.product_count=rows.length;if(eventKey)metrics.event_count=distinct(eventKey);else if(trim(ws?.event)&&rows.length)metrics.event_count=1;if(donorKey)metrics.donor_count=distinct(donorKey);
+  if(kind==='products'||kind==='purchases')metrics.purchase_line_count=kind==='purchases'?rows.length:recordCount;if(kind==='donations')metrics.donation_record_count=recordCount;if(valueKey)metrics.total_value=v26Money(sum(valueKey)||0);
+  return v42CompactWorkingSet({...ws,row_count:rows.length,record_count:recordCount,empty:rows.length===0,aggregate:{total_amount:totalAmount==null?null:v26Money(totalAmount),total_units:totalUnits==null?null:round(totalUnits,3)},metrics,row_cache:cache});
+}
+function v65TypedToolContract(name='',args={},state={},selectedEventId=''){
+  const n=trim(name),a=args&&typeof args==='object'?args:{},scope=trim(a.scope),multiCapable=new Set(['event_products','event_purchase_lines']);
   const scoped=new Set(['event_dossier','event_breakdowns','event_products','event_purchase_lines','event_donation_lines','event_people','event_documentation','event_management','event_bank','event_bank_timeline','event_weather','person_dossier','store_purchases']);
   if(scoped.has(n)&&!scope){const e=new Error(`La tool ${n} requiere scope explícito.`);e.code='CE_TOOL_CONTRACT';throw e;}
+  if(['named_events','year'].includes(scope)&&!multiCapable.has(n)){const e=new Error(`${n} no admite un conjunto de eventos en una sola llamada.`);e.code='CE_TOOL_CONTRACT';throw e;}
   if(scope==='named_event'){
-    const event=trim(a.event);if(!event){const e=new Error(`scope=named_event requiere un título en event.`);e.code='CE_TOOL_CONTRACT';throw e;}
+    const event=trim(a.event);if(!event){const e=new Error('scope=named_event requiere un título en event.');e.code='CE_TOOL_CONTRACT';throw e;}
     const r=semanticResolveEntity(state,'event',event);if(!r.ok){const e=new Error(r.ambiguous?`El argumento event «${event}» es ambiguo entre eventos: ${r.candidates.map(x=>x.nombre).join(' / ')}`:`El argumento event «${event}» no resuelve ningún EVENTO registrado.`);e.code='CE_TOOL_CONTRACT';throw e;}
   }
-  if(scope==='active_event'&&trim(a.event)){
+  if((scope==='active_event'||scope==='screen_event')&&trim(a.event)){
     const selected=v26EventById(state,selectedEventId),named=semanticResolveEntity(state,'event',a.event);
-    if(selected&&named.ok&&trim(named.id)!==trim(selected.id)){const e=new Error(`scope=active_event no puede combinarse con un event distinto del evento visible.`);e.code='CE_TOOL_CONTRACT';throw e;}
+    if(selected&&named.ok&&trim(named.id)!==trim(selected.id)){const e=new Error('scope=screen_event no puede combinarse con un event distinto del evento visible.');e.code='CE_TOOL_CONTRACT';throw e;}
   }
   if(scope==='all_events'&&trim(a.event)){const e=new Error('scope=all_events no admite un event particular simultáneo.');e.code='CE_TOOL_CONTRACT';throw e;}
+  if(multiCapable.has(n)&&['all_events','named_events','year'].includes(scope))v68ResolveEventScopeSet(state,selectedEventId,a);
   if(trim(a.store)){
     const r=semanticResolveEntity(state,'store',a.store);if(!r.ok){const e=new Error(r.ambiguous?`El argumento store «${a.store}» es ambiguo entre tiendas: ${r.candidates.map(x=>x.nombre).join(' / ')}`:`El argumento store «${a.store}» no resuelve ninguna TIENDA registrada. No reutilices aquí partes del nombre del evento.`);e.code='CE_TOOL_CONTRACT';throw e;}
   }
   return true;
 }
+
 function v65ValidateToolResult(name='',args={},result={},state={}){
   const n=trim(name),a=args&&typeof args==='object'?args:{},scope=trim(a.scope),facts=result?.facts||{};
   if(result?.ok===false)return true;
@@ -12834,6 +12922,12 @@ function v65ValidateToolResult(name='',args={},result={},state={}){
     if(rows.length&&key==='donor_products'&&!Object.prototype.hasOwnProperty.call(rows[0]||{},'Evento')){
       const e=new Error('La vista de productos donados all_events perdió la columna Evento.');e.code='CE_RESULT_CONTRACT';throw e;
     }
+  }
+  if(['all_events','named_events','year'].includes(scope)&&['event_products','event_purchase_lines'].includes(n)){
+    if(trim(facts.scope)!==scope||trim(facts.event)){const e=new Error(`${n} recibió ${scope} pero devolvió un ámbito de evento único o distinto.`);e.code='CE_RESULT_CONTRACT';throw e;}
+    const key=n==='event_products'?'products':'purchase_lines',table=arr(result?.tables).find(t=>trim(t?.key)===key),rows=arr(table?.rows),expected=Number(facts.row_count);
+    if(rows.length&&!Object.prototype.hasOwnProperty.call(rows[0]||{},'Evento')){const e=new Error(`${n} multi-evento perdió la columna Evento.`);e.code='CE_RESULT_CONTRACT';throw e;}
+    if(Number.isFinite(expected)&&expected!==rows.length){const e=new Error(`${n} multi-evento declara ${expected} filas pero materializa ${rows.length}.`);e.code='CE_RESULT_CONTRACT';throw e;}
   }
   if(scope==='named_event'&&trim(a.event)&&trim(facts.event)){
     const wanted=semanticResolveEntity(state,'event',a.event),got=semanticResolveEntity(state,'event',facts.event);
@@ -12849,7 +12943,9 @@ function v65DatasetWriterConflict(calls=[]){
   if(writers.length<=1)return null;
   const signatures=[...new Set(writers.map(c=>`${trim(c?.name)}|${trim(c?.arguments?.scope)}|${trim(c?.arguments?.event)}|${trim(c?.arguments?.view)}`))];
   if(signatures.length<=1)return null;
-  return{writers,signatures,message:'Varias tools intentan convertirse simultáneamente en dataset principal. Debes elegir UNA con activate_dataset=true y marcar las demás como apoyo con activate_dataset=false.'};
+  const sameName=[...new Set(writers.map(c=>trim(c?.name)))].length===1?trim(writers[0]?.name):'';
+  const allNamed=sameName&&['event_products','event_purchase_lines'].includes(sameName)&&writers.every(c=>trim(c?.arguments?.scope)==='named_event');
+  return{writers,signatures,message:allNamed?`Has fragmentado el mismo dataset en varios eventos. Reintenta UNA sola ${sameName} con scope=named_events y events=[...], dejando un único dataset principal.`:'Varias tools intentan convertirse simultáneamente en dataset principal. Debes elegir UNA con activate_dataset=true y marcar las demás como apoyo con activate_dataset=false.'};
 }
 function v65LooksLikeProtocolLeak(answer='',tools=[]){
   const a=trim(answer);if(!a)return false;
@@ -12858,18 +12954,24 @@ function v65LooksLikeProtocolLeak(answer='',tools=[]){
   return mentions&&(/^\s*[\[{]/.test(a)||/['\"]action['\"]\s*[: ,]/.test(a)||/\[\s*\[\s*['\"]/.test(a));
 }
 function v66CanonicalizeTypedArgs(name='',args={},state={},selectedEventId='',memory={}){
-  const out={...(args&&typeof args==='object'?args:{})},scope=trim(out.scope);
+  const out={...(args&&typeof args==='object'?args:{})};let scope=trim(out.scope);
+  if(scope==='screen_event'){out.scope='active_event';out._ce_scope_origin='screen_event';scope='active_event';}
   if((scope==='named_event'||trim(name)==='retarget_dataset')&&trim(out.event)){
-    const currentDatasetEvent=trim(memory?.active_dataset?.event),currentFocus=arr(memory?.focus_events).map(trim).filter(Boolean).length===1?trim(memory.focus_events[0]):'',current=currentDatasetEvent||currentFocus;
+    const currentDatasetEvent=trim(memory?.active_dataset?.event),currentFocus=arr(memory?.focus_events).map(trim).filter(Boolean).length===1?trim(memory.focus_events[0]):'',current=currentFocus||currentDatasetEvent;
     const r=v66ResolveTypedEntity(state,'event',out.event,{currentName:current});
     if(r.ok){out.event=r.nombre;out._ce_entity_resolution=r.resolution||'catalog';}
   }
+  if(scope==='named_events'&&arr(out.events).length){
+    const normalized=[];for(const value of arr(out.events).map(trim).filter(Boolean)){const r=v66ResolveTypedEntity(state,'event',value,{});normalized.push(r.ok?r.nombre:value);}out.events=[...new Set(normalized)];
+  }
+  if(scope==='year'&&out.year!=null){const y=Number(String(out.year).match(/\d{4}/)?.[0]||out.year);if(Number.isInteger(y))out.year=y;}
   // Primera capa genérica del futuro SAANE: normalización determinista por catálogo para
   // entidades ya tipadas. No adivina intención y no cruza tipos.
   const typed=[['store','store'],['person','person']];
   for(const [field,type] of typed){if(!trim(out[field]))continue;const r=semanticResolveEntity(state,type,out[field]);if(r.ok)out[field]=r.nombre;}
   return out;
 }
+
 function v66SoftFailureResult({flowTrace=[],model='',voiceConversation=false,memory={},reason='No he podido completar este turno con seguridad',answer=''}={}){
   const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),txt=trim(answer)||'No he podido completar esta petición, pero he conservado intacto el contexto anterior. Reformúlala o repítela con un poco más de detalle.';
   zuzuTracePush(flowTrace,'v3_0_exp · Recuperación segura','WARN',`${reason}. El contexto se conserva; NO se ejecuta SAFE_RESET porque no hay evidencia de corrupción de memoria.`);
@@ -12937,7 +13039,11 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
           // Contrato físico tipado: se valida EVENTO como evento, TIENDA como tienda y el scope
           // admitido por la tool. Solo se canonizan entidades ya tipadas; CE no relee el mensaje humano ni cambia la intención.
           v65TypedToolContract(name,execArgs,state,selectedEventId);
-          const key=`${name}:${JSON.stringify(execArgs)}`;full=cache.get(key);if(!full){full=await v261ExecuteAgentTool({...call,arguments:execArgs},state,selectedEventId,flowTrace);cache.set(key,full);}else full={...full};
+          const key=`${name}:${JSON.stringify(execArgs)}`;full=cache.get(key);if(!full){
+            if(['event_products','event_purchase_lines'].includes(name)&&['all_events','named_events','year'].includes(trim(execArgs?.scope)))full=await v68ExecuteEventSetTool(name,execArgs,state,selectedEventId,flowTrace,trim(call.id));
+            else full=await v261ExecuteAgentTool({...call,arguments:execArgs},state,selectedEventId,flowTrace);
+            cache.set(key,full);
+          }else full={...full};
           v65ValidateToolResult(name,execArgs,full,state);
           full={...full,id:trim(call.id),name};memory=v62UpdateMemoryFromCall(memory,{...call,arguments:execArgs},full);
         }
@@ -18417,6 +18523,10 @@ export const __zuzuStructuralTesting = Object.freeze({
   v67ApplyRetargetView,
   v67RetargetSourceDataset,
   v67RetargetDataset,
+  v68EventYear,
+  v68ResolveEventScopeSet,
+  v68ExecuteEventSetTool,
+  v68RecomputeWorkingFacts,
   v65TypedToolContract,
   v65ValidateToolResult,
   v65DatasetWriterConflict,
