@@ -4996,6 +4996,31 @@ function semanticResolveEntity(state, type, value) {
   if (near.length > 1 && top.score < 0.995) return { ok: false, ambiguous: true, value: trim(value), type, candidates: near.slice(0,5) };
   return { ok: true, id: top.id, nombre: top.nombre, score: top.score, type, candidates: scored.slice(0,5) };
 }
+
+// v3_0_exp · Resolución contextual TIPADA (base genérica del futuro SAANE).
+// No interpreta intención ni palabras del prompt. Solo intenta convertir un valor ya tipado por
+// Gemini (event/store/person/...) en una entidad canónica del MISMO tipo. Si la búsqueda directa
+// queda ambigua, puede usar una entidad canónica anterior del mismo tipo como continuidad factual.
+function v66EntityIdentityTokens(value='',type=''){
+  const roman=new Set(['i','ii','iii','iv','v','vi','vii','viii','ix','x']);
+  return semanticCleanToken(value,type).split(' ').map(trim).filter(Boolean).filter(t=>!roman.has(t)&&!/^(?:19|20)\d{2}$/.test(t)&&!/^\d+$/.test(t));
+}
+function v66TokenContinuityScore(a='',b='',type=''){
+  const A=v66EntityIdentityTokens(a,type),B=v66EntityIdentityTokens(b,type);if(!A.length||!B.length)return 0;
+  const used=new Set();let matched=0;
+  for(const x of A){let best=-1,bestScore=0;for(let i=0;i<B.length;i++){if(used.has(i))continue;const sc=semanticTokenNear(x,B[i]);if(sc>bestScore){bestScore=sc;best=i;}}if(best>=0&&bestScore>=0.82){used.add(best);matched+=bestScore;}}
+  const coverageA=matched/Math.max(1,A.length),coverageB=matched/Math.max(1,B.length);
+  return Math.min(1,(coverageA+coverageB)/2);
+}
+function v66ResolveTypedEntity(state,type,value,{currentName=''}={}){
+  const direct=semanticResolveEntity(state,type,value);if(direct.ok||!direct.ambiguous||!trim(currentName))return direct;
+  const current=semanticResolveEntity(state,type,currentName);if(!current.ok)return direct;
+  const ranked=arr(direct.candidates).map(c=>({...c,continuity:v66TokenContinuityScore(current.nombre,c.nombre,type)})).sort((a,b)=>b.continuity-a.continuity||b.score-a.score||a.nombre.localeCompare(b.nombre,'es'));
+  const top=ranked[0],second=ranked[1];
+  if(top&&top.continuity>=0.82&&(!second||top.continuity-second.continuity>=0.18))return{ok:true,id:top.id,nombre:top.nombre,score:top.score,type,candidates:ranked.slice(0,5),resolution:'contextual_continuity',context_name:current.nombre};
+  return direct;
+}
+
 function semanticSqlLiteral(value) { return `'${text(value).replace(/'/g,"''")}'`; }
 function semanticNormExpr(expr) { return `UPPER(TRANSLATE(TRIM(COALESCE(${expr},'')), 'ÁÉÍÓÚÜÑáéíóúüñ', 'AEIOUUNAEIOUUN'))`; }
 function semanticSqlLike(expr, value) { return `${semanticNormExpr(expr)} LIKE ${semanticSqlLiteral(`%${semanticCleanToken(value).toUpperCase().replace(/\s+/g,'%')}%`)}`; }
@@ -12391,7 +12416,7 @@ function v62LiteMemoryFromHistory(history=[]){
 function v62LiteMemoryDescriptor(memory={}){
   const ws=v42CompactWorkingSet(memory?.active_dataset||null),cache=v50CompactWorkingRowCache(ws?.row_cache||null),parent=v50CompactWorkingRowCache(ws?.parent_cache||null);
   const recent=arr(memory?._view_history).map(ds=>{const d=v42CompactWorkingSet(ds),c=v50CompactWorkingRowCache(d?.row_cache||null);return d?{id:trim(d.frame_id),type:trim(d.requested_object)||trim(d.kind),event:trim(d.event),count:Number(d.row_count)||0,rows_complete:c?.complete===true}:null;}).filter(Boolean).slice(0,3);
-  return{focus_events:arr(memory?.focus_events).map(trim).filter(Boolean).slice(0,6),subjects:arr(memory?.subjects).map(trim).filter(Boolean).slice(0,4),active_dataset:ws?{id:trim(ws.frame_id),type:trim(ws.requested_object)||trim(ws.kind)||'none',event:trim(ws.event),scope:trim(ws.scope),count:Number(ws.row_count)||0,record_count:ws.record_count==null?null:Number(ws.record_count),filter:trim(ws.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)||'none',available_fields:arr(cache?.columns).slice(0,16),visible_fields:arr(cache?.visible_fields).slice(0,12),rows_complete:cache?.complete===true,parent_count:parent?arr(parent.rows).length:null,back_available:recent.length>0,known:{total_amount:ws?.aggregate?.total_amount??null,total_units:ws?.aggregate?.total_units??null},tool:trim(ws.tool),table_key:trim(ws.table_key)}:null,recent_datasets:recent};
+  return{focus_events:arr(memory?.focus_events).map(trim).filter(Boolean).slice(0,6),subjects:arr(memory?.subjects).map(trim).filter(Boolean).slice(0,4),active_dataset:ws?{id:trim(ws.frame_id),type:trim(ws.requested_object)||trim(ws.kind)||'none',event:trim(ws.event),scope:trim(ws.scope),count:Number(ws.row_count)||0,record_count:ws.record_count==null?null:Number(ws.record_count),filter:trim(ws.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)||'none',available_fields:arr(cache?.columns).slice(0,16),visible_fields:arr(cache?.visible_fields).slice(0,12),rows_complete:cache?.complete===true,parent_count:parent?arr(parent.rows).length:null,back_available:recent.length>0,known:{total_amount:ws?.aggregate?.total_amount??null,total_units:ws?.aggregate?.total_units??null,...(ws?.metrics&&typeof ws.metrics==='object'?ws.metrics:{})},tool:trim(ws.tool),table_key:trim(ws.table_key)}:null,recent_datasets:recent};
 }
 function v62NativeInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation=false}={}){
   const active=v26EventById(state,selectedEventId),visible=active?trim(active?.titulo):'ninguno',display=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null});
@@ -12407,9 +12432,10 @@ ARQUITECTURA OBLIGATORIA:
 - PRODUCT_SET: para productos distintos usa event_products. Para registros físicos/tickets/compras individuales usa event_purchase_lines. No llames ambas tools para una misma lista salvo que el usuario pida explícitamente LAS DOS granularidades. event_products ya devuelve product_count, purchase_line_count e importe total.
 - DONACIONES: usa event_donation_lines. Para productos donados usa view=products; para cada registro view=records; para donantes view=donors. No añadas event_products ni event_purchase_lines a una consulta de donaciones salvo que el usuario también pida explícitamente compras.
 - CAMBIO DE EVENTO: si el usuario cambia únicamente el evento y no cambia el objeto de trabajo, conserva la misma granularidad/objeto del dataset vigente (products→products, purchases→purchases, donations→donations) y consulta ese objeto para el nuevo evento. El conjunto anterior queda disponible en recent_datasets para comparar o volver.
-- TÍTULOS DE EVENTO: cuando uses scope=named_event, pasa en event el título completo o aproximado del evento como una sola unidad. No repartas partes del nombre/año entre event, store, product u otros argumentos.
+- TÍTULOS DE EVENTO: cuando uses scope=named_event, pasa en event el título completo o aproximado del evento como una sola unidad. No repartas partes del nombre/año entre event, store, product u otros argumentos. Si el usuario cambia solo una edición/año y el foco previo identifica claramente la familia del evento, conserva esa identidad y envía el título completo resultante, no solo el año.
+- RESOLUCIÓN TIPADA: CE puede normalizar un valor ya tipado contra el catálogo del MISMO tipo y usar continuidad factual inequívoca del foco vigente. Si aún quedan varios candidatos plausibles, pide aclaración; una ambigüedad normal NO implica reiniciar la conversación.
 - Para una lista/dataset que deba seguir vivo usa activate_dataset=true. Si una tool es solo apoyo lateral, usa activate_dataset=false. En una misma ronda puede haber como máximo UN dataset principal; si solicitas varias tools de datos, solo una lleva activate_dataset=true. Para foco de evento usa activate_focus; person_dossier puede usar activate_subject=false cuando sea lateral.
-- Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. Si el dataset vigente ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; no vuelvas a consultar BBDD. Si recent_datasets contiene claramente un conjunto anterior al que se refiere el usuario, recupéralo con working_set_action(action=activate,dataset_id=...).
+- Antes de pedir datos nuevos, mira el INVENTARIO CE del mensaje. Si el dataset vigente ya contiene los campos necesarios y rows_complete=true, REUTILÍZALO con working_set_action; no vuelvas a consultar BBDD. Si recent_datasets contiene claramente un conjunto anterior al que se refiere el usuario, recupéralo con working_set_action(action=activate,dataset_id=...). El bloque known contiene hechos agregados ya calculados (totales, recuentos, etc.); si basta para responder, usa inspect y no vuelvas a BBDD.
 - Para ordenar, filtrar, contar, proyectar o agrupar una lista YA vigente usa working_set_action. reset vuelve al conjunto padre de un filtro; back restaura la vista/dataset anterior del historial factual; activate recupera un dataset reciente por id.
 - Una queja, corrección o frase como «eso está mal» NO modifica memoria por sí sola. Si necesitas verificar, vuelve a pedir la fuente canónica; solo muta memoria llamando explícitamente una tool que la cambie.
 - conversation_memory(reset) SOLO si el usuario pide inequívocamente borrar/reiniciar TODA la conversación. Cambiar de foco o pasar a otro evento NO es reset global: usa la tool del nuevo evento con activate_focus=true.
@@ -12422,7 +12448,7 @@ Devuelve el JSON final exigido por la API. No menciones tools, SCC, datasets ni 
 }
 function v62NativeInput(userPrompt='',history=[],memory={}){
   const recent=arr(history).slice(-3).map(h=>`Usuario: ${trim(h?.user).slice(0,360)}\nZuzu: ${trim(h?.assistant).slice(0,420)}`).join('\n\n');
-  return `INVENTARIO CE DISPONIBLE (hechos, no lo recites):\n${JSON.stringify(v62LiteMemoryDescriptor(memory))}\nREGLA: available_fields indica lo que CE YA tiene; visible_fields solo lo que se está mostrando. Si rows_complete=true, usa working_set_action para reutilizar esos datos. recent_datasets incluye hasta 3 conjuntos anteriores con id reutilizable mediante action=activate; back_available indica que existe una vista anterior restaurable con back.\n\n${recent?`ÚLTIMOS TURNOS (solo para referencias humanas):\n${recent}\n\n`:''}MENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
+  return `INVENTARIO CE DISPONIBLE (hechos, no lo recites):\n${JSON.stringify(v62LiteMemoryDescriptor(memory))}\nREGLA: available_fields indica lo que CE YA tiene; visible_fields solo lo que se está mostrando. known contiene totales/recuentos ya calculados que pueden responder sin consultar BBDD. Si rows_complete=true, usa working_set_action para reutilizar esos datos. recent_datasets incluye hasta 3 conjuntos anteriores con id reutilizable mediante action=activate; back_available indica que existe una vista anterior restaurable con back.\n\n${recent?`ÚLTIMOS TURNOS (solo para referencias humanas):\n${recent}\n\n`:''}MENSAJE ACTUAL DEL USUARIO:\n${userPrompt}`;
 }
 function v62WorkingResult(memory={},args={},callId='working_set_action'){
   let mem=JSON.parse(JSON.stringify(memory||{})),ws=v42CompactWorkingSet(mem.active_dataset||null),action=trim(args?.action).toLowerCase();
@@ -12603,8 +12629,15 @@ function v63MechanicalClosure(results=[],memory={}){
   const list=arr(results).filter(r=>r?.ok!==false),last=list.at(-1);
   if(!last)return null;
   if(trim(last?.name)==='working_set_action'){
-    const f=last?.facts||{},action=trim(last?._native_call_args?.action||f.action),count=Number(f.count)||0,type=trim(f.type)||'elementos',event=trim(f.event);
+    const f=last?.facts||{},action=trim(last?._native_call_args?.action||f.action),inspectDs=f?.active_dataset||null,count=Number(f.count??inspectDs?.count)||0,type=trim(f.type||inspectDs?.type)||'elementos',event=trim(f.event||inspectDs?.event),known=(inspectDs?.known&&typeof inspectDs.known==='object')?inspectDs.known:{};
     const noun=type==='products'?'productos':type==='purchases'?'registros de compra':type==='donations'?'registros de donación':type==='events'?'eventos':type==='groups'?'grupos':'elementos';
+    if(action==='inspect'){
+      const totalValue=Number(known.total_value),totalAmount=Number(known.total_amount),eventCount=Number(known.event_count),productCount=Number(known.product_count);
+      const parts=[`El conjunto vigente contiene ${count} ${noun}${event?` de ${event}`:''}.`];
+      if(Number.isFinite(totalValue))parts.push(`Su valor total es ${v26FormatEuro(v26Money(totalValue))}.`);else if(Number.isFinite(totalAmount))parts.push(`Su importe total es ${v26FormatEuro(v26Money(totalAmount))}.`);
+      if(Number.isFinite(eventCount)&&eventCount>0)parts.push(`Abarca ${eventCount} eventos.`);if(Number.isFinite(productCount)&&productCount>0&&type!=='products')parts.push(`Incluye ${productCount} productos distintos.`);
+      return{title:'Datos del conjunto',answer:parts.join(' '),warnings:[],showTables:[],chartSpecs:[]};
+    }
     if(action==='count')return{title:'Recuento',answer:`El conjunto vigente contiene ${count} ${noun}${event?` de ${event}`:''}.`,warnings:[],showTables:[],chartSpecs:[]};
     if(action==='group')return{title:'Agrupación',answer:`He agrupado los datos por ${trim(f.group_field)||'el campo solicitado'} en ${Number(f.group_count)||count} grupos. La tabla inferior muestra el resultado completo.`,warnings:[],showTables:[],chartSpecs:[]};
     if(action==='back')return{title:'Vista anterior',answer:`He restaurado la vista anterior${event?` de ${event}`:''}. Contiene ${count} ${noun}.`,warnings:[],showTables:[],chartSpecs:[]};
@@ -12654,7 +12687,8 @@ function v62DatasetFromToolResult(call={},result={},previous=null){
   const primary=kind==='events'?'Evento':columns.includes('Producto')?'Producto':columns[0]||'',initialSort=kind==='events'?'Fecha inicio':'',initialDirection=kind==='events'?'desc':'none';
   const initialVisible=v63DefaultVisibleFields(kind,columns);if(kind==='donations'&&trim(args?.scope)==='all_events'&&columns.includes('Evento')&&!initialVisible.includes('Evento'))initialVisible.unshift('Evento');
   const cache=v50CompactWorkingRowCache({table_key:trim(table.key)||tableKey,title:trim(table.title)||trim(result.title),source_tool:name,primary_field:primary,visible_fields:initialVisible.slice(0,12),sort_field:initialSort,sort_direction:initialDirection,columns:columns.slice(0,16),rows,complete:true});
-  return v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:kind==='events'?'all_events':trim(args?.scope)||'named_event',subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},row_cache:cache});
+  const metricNames=['total_value','event_count','product_count','donor_count','purchase_line_count','donation_record_count','donation_product_row_count'];const metrics={};for(const k of metricNames){if(result?.facts?.[k]!=null&&Number.isFinite(Number(result.facts[k])))metrics[k]=Number(result.facts[k]);}
+  return v42CompactWorkingSet({frame_id:`N_${v61Hash(`${name}|${event}|${rowCount}|${Date.now()}`)}`,parent_frame_id:'',frame_op:'MATERIALIZE',kind,event,scope:kind==='events'?'all_events':trim(args?.scope)||'named_event',subjects:[],domain:kind==='products'||kind==='purchases'?'purchases':kind,requested_object:kind,tool:name,table_key:trim(table.key)||tableKey,row_count:rowCount,record_count:recordCount,empty:rowCount===0,filter_summary:'',aggregate:{total_amount:result?.facts?.total_amount==null?null:Number(result.facts.total_amount),total_units:result?.facts?.total_units==null?null:Number(result.facts.total_units)},metrics,row_cache:cache});
 }
 function v62UpdateMemoryFromCall(memory={},call={},result={}){
   let mem=JSON.parse(JSON.stringify(memory||{})),args=call?.arguments&&typeof call.arguments==='object'?call.arguments:{},name=trim(call?.name);
@@ -12737,8 +12771,27 @@ function v65DatasetWriterConflict(calls=[]){
 }
 function v65LooksLikeProtocolLeak(answer='',tools=[]){
   const a=trim(answer);if(!a)return false;
+  if(/<ctrl\d+>\s*call\b/i.test(a)||/<(?:tool|function)[^>]*>\s*call\b/i.test(a))return true;
   const names=arr(tools).map(t=>trim(t?.name)).filter(Boolean),mentions=names.some(n=>a.includes(n));
   return mentions&&(/^\s*[\[{]/.test(a)||/['\"]action['\"]\s*[: ,]/.test(a)||/\[\s*\[\s*['\"]/.test(a));
+}
+function v66CanonicalizeTypedArgs(name='',args={},state={},selectedEventId='',memory={}){
+  const out={...(args&&typeof args==='object'?args:{})},scope=trim(out.scope);
+  if(scope==='named_event'&&trim(out.event)){
+    const current=arr(memory?.focus_events).map(trim).filter(Boolean).length===1?trim(memory.focus_events[0]):'';
+    const r=v66ResolveTypedEntity(state,'event',out.event,{currentName:current});
+    if(r.ok){out.event=r.nombre;out._ce_entity_resolution=r.resolution||'catalog';}
+  }
+  // Primera capa genérica del futuro SAANE: normalización determinista por catálogo para
+  // entidades ya tipadas. No adivina intención y no cruza tipos.
+  const typed=[['store','store'],['person','person']];
+  for(const [field,type] of typed){if(!trim(out[field]))continue;const r=semanticResolveEntity(state,type,out[field]);if(r.ok)out[field]=r.nombre;}
+  return out;
+}
+function v66SoftFailureResult({flowTrace=[],model='',voiceConversation=false,memory={},reason='No he podido completar este turno con seguridad',answer=''}={}){
+  const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),txt=trim(answer)||'No he podido completar esta petición, pero he conservado intacto el contexto anterior. Reformúlala o repítela con un poco más de detalle.';
+  zuzuTracePush(flowTrace,'v3_0_exp · Recuperación segura','WARN',`${reason}. El contexto se conserva; NO se ejecuta SAFE_RESET porque no hay evidencia de corrupción de memoria.`);
+  return{ok:true,rejected:false,title:'No pude completar el turno',answer:txt,warnings:[],charts:[],tables:[],files:[],provider:'gemini-native-tools-scc-lite-soft-failure',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Gemini Native Tool Calling + SCC-Lite + soft recovery',modelTier:'soft-recovery',interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:[],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 function v65SafeResetMemory(){return{focus_events:[],subjects:[],active_dataset:null,_view_history:[],updated_at:new Date().toISOString(),safe_reset:true};}
 function v65SafeResetResult({flowTrace=[],model='',voiceConversation=false,reason='Estado conversacional no fiable'}={}){
@@ -12780,7 +12833,7 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
     const writerConflict=v65DatasetWriterConflict(calls);
     if(writerConflict){
       integrityConflictSeen=true;zuzuTracePush(flowTrace,'v3_0_exp · Integridad · Single Writer','WARN',`${writerConflict.message} Escritores=${writerConflict.signatures.join(' ; ')}`);
-      if(cycle>=2)return v65SafeResetResult({flowTrace,model,voiceConversation,reason:'Gemini mantuvo dos datasets principales incompatibles después del único intento de recuperación'});
+      if(cycle>=2)return v66SoftFailureResult({flowTrace,model,voiceConversation,memory,reason:'Gemini mantuvo dos datasets principales incompatibles después del único intento de recuperación'});
       const conflictResults=calls.map(call=>({type:'function_result',name:trim(call?.name),call_id:trim(call?.id),is_error:true,result:{ok:false,error:writerConflict.message}}));
       payload=await callGemini({input:conflictResults,previousInteractionId:currentId,stage:'v3_0_exp · Gemini Native · corrige conflicto de dataset principal'});currentId=trim(payload?.id)||currentId;
       await repairProtocolLeak('v3_0_exp · Gemini Native · corrige protocolo tras conflicto');
@@ -12788,26 +12841,26 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
     }
     const functionResults=[];
     for(const call of calls){
-      const name=trim(call?.name),rawArgs=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{};
+      const name=trim(call?.name),rawArgs=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{},execArgs=v66CanonicalizeTypedArgs(name,rawArgs,state,selectedEventId,memory);
       try{
         let full;
         if(name==='working_set_action'){
-          const local=v62WorkingResult(memory,rawArgs,trim(call.id));memory=local.memory;full=local.result;
+          const local=v62WorkingResult(memory,execArgs,trim(call.id));memory=local.memory;full=local.result;
         }else if(name==='conversation_memory'){
-          if(trim(rawArgs?.action)==='reset')memory=v65SafeResetMemory();
-          full={id:trim(call.id),name,ok:true,title:'Memoria conversacional',facts:{action:trim(rawArgs?.action),memory:v62LiteMemoryDescriptor(memory)},tables:[]};
+          if(trim(execArgs?.action)==='reset')memory=v65SafeResetMemory();
+          full={id:trim(call.id),name,ok:true,title:'Memoria conversacional',facts:{action:trim(execArgs?.action),memory:v62LiteMemoryDescriptor(memory)},tables:[]};
         }else{
           // Contrato físico tipado: se valida EVENTO como evento, TIENDA como tienda y el scope
-          // admitido por la tool. No se reescribe ningún argumento ni se relee el mensaje humano.
-          v65TypedToolContract(name,rawArgs,state,selectedEventId);
-          const key=`${name}:${JSON.stringify(rawArgs)}`;full=cache.get(key);if(!full){full=await v261ExecuteAgentTool({...call,arguments:rawArgs},state,selectedEventId,flowTrace);cache.set(key,full);}else full={...full};
-          v65ValidateToolResult(name,rawArgs,full,state);
-          full={...full,id:trim(call.id),name};memory=v62UpdateMemoryFromCall(memory,{...call,arguments:rawArgs},full);
+          // admitido por la tool. Solo se canonizan entidades ya tipadas; CE no relee el mensaje humano ni cambia la intención.
+          v65TypedToolContract(name,execArgs,state,selectedEventId);
+          const key=`${name}:${JSON.stringify(execArgs)}`;full=cache.get(key);if(!full){full=await v261ExecuteAgentTool({...call,arguments:execArgs},state,selectedEventId,flowTrace);cache.set(key,full);}else full={...full};
+          v65ValidateToolResult(name,execArgs,full,state);
+          full={...full,id:trim(call.id),name};memory=v62UpdateMemoryFromCall(memory,{...call,arguments:execArgs},full);
         }
-        full={...full,_native_call_args:{...rawArgs}};allResults.push(full);const compact=v63NativeCompactToolResult(full,trim(rawArgs?.detail)||'standard');functionResults.push({type:'function_result',name,call_id:trim(call.id),result:compact});
-        zuzuTracePush(flowTrace,`v3_0_exp · Tool exacta · ${name}`,full?.ok===false?'WARN':'OK',`${trim(full?.title)||'Resultado'} · argumentos ejecutados=${JSON.stringify(rawArgs).slice(0,500)}.`);
+        full={...full,_native_call_args:{...execArgs}};allResults.push(full);const compact=v63NativeCompactToolResult(full,trim(execArgs?.detail)||'standard');functionResults.push({type:'function_result',name,call_id:trim(call.id),result:compact});
+        zuzuTracePush(flowTrace,`v3_0_exp · Tool exacta · ${name}`,full?.ok===false?'WARN':'OK',`${trim(full?.title)||'Resultado'} · argumentos ejecutados=${JSON.stringify(execArgs).slice(0,500)}.`);
       }catch(error){
-        const msg=cleanGeminiError(error);toolErrors.push({name,args:{...rawArgs},message:msg,code:trim(error?.code)});functionResults.push({type:'function_result',name,call_id:trim(call.id),is_error:true,result:{ok:false,error:msg}});zuzuTracePush(flowTrace,`v3_0_exp · Tool exacta · ${name}`,'WARN',msg);
+        const msg=cleanGeminiError(error);toolErrors.push({name,args:{...execArgs},message:msg,code:trim(error?.code)});functionResults.push({type:'function_result',name,call_id:trim(call.id),is_error:true,result:{ok:false,error:msg}});zuzuTracePush(flowTrace,`v3_0_exp · Tool exacta · ${name}`,'WARN',msg);
       }
     }
     const roundResults=allResults.slice(roundStart),fast=v64FastClosure(calls,roundResults,memory);
@@ -12821,14 +12874,14 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
     currentId=trim(payload?.id)||currentId;
     await repairProtocolLeak(`v3_0_exp · Gemini Native · corrige fuga tras tools ${cycle}`);
   }
-  if(!fastFinal&&payload&&v261FunctionCalls(payload).length)return v65SafeResetResult({flowTrace,model,voiceConversation,reason:'Gemini solicitó una tercera ronda de tools y el turno dejó de ser estable'});
+  if(!fastFinal&&payload&&v261FunctionCalls(payload).length)return v66SoftFailureResult({flowTrace,model,voiceConversation,memory,reason:'Gemini solicitó una tercera ronda de tools; se corta el turno sin tocar el contexto'});
   const contractFailures=toolErrors.filter(x=>['CE_TOOL_CONTRACT','CE_RESULT_CONTRACT'].includes(trim(x?.code)));
-  if(!allResults.length&&contractFailures.length)return v65SafeResetResult({flowTrace,model,voiceConversation,reason:'Las tools no pudieron cumplir su contrato tipado después del intento de recuperación'});
-  if(integrityConflictSeen&&!allResults.length)return v65SafeResetResult({flowTrace,model,voiceConversation,reason:'No se pudo resolver de forma inequívoca qué dataset debía quedar vigente'});
-  let final=fastFinal||v261ParseFinal(payload);if(!trim(final.answer)){const mechanical=v63MechanicalClosure(allResults,memory);if(mechanical){final=mechanical;zuzuTracePush(flowTrace,'v3_0_exp · Zero-copy · cierre mecánico post-tool','OK','Gemini eligió y ejecutó las tools, pero no dejó texto final. CE solo resume los facts ya devueltos; no reinterpreta el mensaje ni cambia la decisión.');}else return v65SafeResetResult({flowTrace,model,voiceConversation,reason:'Gemini terminó el turno sin respuesta final legible y no existe un resultado canónico suficiente para cerrarlo'});}
+  if(!allResults.length&&contractFailures.length){const clarification=v261ParseFinal(payload);return v66SoftFailureResult({flowTrace,model,voiceConversation,memory,reason:'Las tools no pudieron cumplir su contrato tipado, pero la memoria anterior sigue íntegra',answer:v65LooksLikeProtocolLeak(clarification?.answer,tools)?'':clarification?.answer});}
+  if(integrityConflictSeen&&!allResults.length)return v66SoftFailureResult({flowTrace,model,voiceConversation,memory,reason:'No se pudo resolver de forma inequívoca qué dataset debía quedar vigente; no se ejecutó ningún escritor y la memoria previa sigue válida'});
+  let final=fastFinal||v261ParseFinal(payload);if(!trim(final.answer)){const mechanical=v63MechanicalClosure(allResults,memory);if(mechanical){final=mechanical;zuzuTracePush(flowTrace,'v3_0_exp · Zero-copy · cierre mecánico post-tool','OK','Gemini eligió y ejecutó las tools, pero no dejó texto final. CE solo resume los facts ya devueltos; no reinterpreta el mensaje ni cambia la decisión.');}else return v66SoftFailureResult({flowTrace,model,voiceConversation,memory,reason:'Gemini terminó el turno sin respuesta final legible y no existe un resultado canónico suficiente para cerrarlo'});}
   if(v65LooksLikeProtocolLeak(final.answer,tools)){
     const mechanical=v63MechanicalClosure(allResults,memory);if(mechanical){final=mechanical;zuzuTracePush(flowTrace,'v3_0_exp · Protocolo IA · cierre seguro','WARN','La respuesta final aún contenía protocolo interno. CE no lo muestra: usa únicamente el cierre mecánico de las tools realmente ejecutadas.');}
-    else return v65SafeResetResult({flowTrace,model,voiceConversation,reason:'La respuesta final contenía protocolo interno sin acciones ejecutadas que permitieran un cierre fiable'});
+    else return v66SoftFailureResult({flowTrace,model,voiceConversation,memory,reason:'La respuesta final contenía protocolo interno sin acciones ejecutadas que permitieran un cierre fiable'});
   }
   // Único saneo posterior: ocultar protocolo interno. NO se corrigen decisiones, cifras, foco ni tools.
   final={...final,answer:v57StripInternalProtocolLeak(final.answer,flowTrace)};
@@ -18273,6 +18326,9 @@ export const __zuzuStructuralTesting = Object.freeze({
   v64PublicLiteMemory,
   v62LiteMemoryFromHistory,
   v65DonationDatasetKey,
+  v66ResolveTypedEntity,
+  v66CanonicalizeTypedArgs,
+  v66SoftFailureResult,
   v65TypedToolContract,
   v65ValidateToolResult,
   v65DatasetWriterConflict,
