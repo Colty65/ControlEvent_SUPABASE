@@ -53,3 +53,26 @@ Para usar las tablas dedicadas de largo plazo ejecutar una vez:
 `sql/ce_zuzu_conversation_ledger.sql`
 
 Sin ese SQL existe fallback server-side a `ce_meta`, pero para continuidad larga y DATASET grandes se recomiendan las tablas dedicadas.
+
+## Corrección carga Excel ITV · 22/08/2026
+
+Incidencia reproducida exactamente con las dos baterías entregadas:
+
+`Cannot read properties of undefined (reading 'sheets')`
+
+Causa: el importador ITV ejecutaba `ExcelJS.Workbook().xlsx.load()` en el navegador. Los XLSX de las baterías son OOXML válidos pero usan prefijos de namespace (`x:workbook`, `x:worksheet`, etc.). ExcelJS 4.4.0 en navegador no materializa `workbook.xml` en ese caso y falla antes de llegar a leer las preguntas.
+
+Corrección aplicada:
+- La ITV ya no interpreta el XLSX con ExcelJS en el navegador.
+- El navegador solo lee el fichero seleccionado y lo envía al endpoint GD `/api/zuzu-tests/import-excel`.
+- El servidor extrae únicamente las piezas OOXML necesarias mediante un lector ZIP/XLSX propio basado en `node:zlib`, sin cargar la librería Excel en el dispositivo.
+- El parser acepta tags OOXML con o sin prefijo de namespace, celdas `str`, `inlineStr`, `sharedStrings`, números y booleanos.
+- Límite de seguridad: 8 MB por batería ITV.
+- La lógica posterior de semilla estable, código XLS, escenario y FULL-CERT no cambia.
+
+Regresión añadida: `npm run test:zuzu-itv-excel`.
+
+Resultado de auditoría con los mismos archivos que daban el error:
+- `ITV_Zuzu_Bateria_Tecnica_21.xlsx`: 21/21 preguntas leídas correctamente.
+- `ITV_Zuzu_Bateria_Humana_33.xlsx`: 33/33 preguntas leídas correctamente.
+- Sintaxis JS global: 234 archivos OK.

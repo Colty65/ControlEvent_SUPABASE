@@ -185,16 +185,28 @@
   }
   function itvNormHeader(v){return trim(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'');}
   function itvHash(textValue=''){let h=2166136261>>>0;for(let i=0;i<textValue.length;i++){h^=textValue.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h>>>0;}
-  async function ensureExcelJs(){if(window.ExcelJS)return window.ExcelJS;await new Promise((resolve,reject)=>{const old=document.querySelector('script[data-ce-exceljs="1"]');if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return;}const sc=document.createElement('script');sc.src='/vendor/exceljs.min.js';sc.dataset.ceExceljs='1';sc.onload=resolve;sc.onerror=()=>reject(new Error('No se pudo cargar ExcelJS.'));document.head.appendChild(sc);});if(!window.ExcelJS)throw new Error('ExcelJS no está disponible.');return window.ExcelJS;}
+  async function fileToBase64(file){
+    if(!file)throw new Error('No se ha seleccionado ningún Excel.');
+    if(num(file.size)>8*1024*1024)throw new Error('El Excel supera el máximo de 8 MB permitido para una batería ITV.');
+    return await new Promise((resolve,reject)=>{
+      const reader=new FileReader();
+      reader.onload=()=>{const value=text(reader.result),comma=value.indexOf(',');resolve(comma>=0?value.slice(comma+1):value);};
+      reader.onerror=()=>reject(reader.error||new Error('No se pudo leer el Excel seleccionado.'));
+      reader.readAsDataURL(file);
+    });
+  }
   async function importBatteryExcel(file){
-    if(uiRunning){setPhase('Detén la ejecución antes de cargar otro Excel.');return;}setPhase('Leyendo preguntas del Excel…');
-    try{const ExcelJS=await ensureExcelJs(),wb=new ExcelJS.Workbook(),buf=await file.arrayBuffer();await wb.xlsx.load(buf);let ws=wb.worksheets.find(x=>itvNormHeader(x.name)==='PREGUNTAS')||wb.worksheets[0];if(!ws)throw new Error('El Excel no contiene hojas.');
-      const headers={};ws.getRow(1).eachCell((cell,col)=>{const h=itvNormHeader(cell.text||cell.value);if(h)headers[h]=col;});const qCol=headers.PREGUNTA||headers.PROMPT||headers.PREGUNTAS;if(!qCol)throw new Error('La primera fila debe contener una columna PREGUNTA.');
-      const seqCol=headers.SECUENCIA||headers.SEQ,groupCol=headers.GRUPO,labelCol=headers.ETIQUETA||headers.LABEL,expCol=headers.ESPERADO||headers.EXPECTED,scenarioCol=headers.ESCENARIO||headers.SCENARIO;const raw=[];
-      ws.eachRow((row,idx)=>{if(idx===1)return;const prompt=trim(row.getCell(qCol).text||row.getCell(qCol).value);if(!prompt)return;raw.push({seq:seqCol?num(row.getCell(seqCol).value)||idx-1:idx-1,prompt,group:groupCol?trim(row.getCell(groupCol).text||row.getCell(groupCol).value):'EXCEL',label:labelCol?trim(row.getCell(labelCol).text||row.getCell(labelCol).value):'',expected:expCol?trim(row.getCell(expCol).text||row.getCell(expCol).value):'',scenario:scenarioCol?trim(row.getCell(scenarioCol).text||row.getCell(scenarioCol).value):''});});
-      raw.sort((a,b)=>a.seq-b.seq);if(!raw.length)throw new Error('No se han encontrado preguntas debajo de la cabecera PREGUNTA.');const signature=raw.map(x=>`${x.seq}|${x.prompt}|${x.expected}`).join('\n'),hash=itvHash(signature)||0x6d2b79f5,binary=hash.toString(36).toUpperCase();batterySeed=hash;batteryCode=`XLS-${binary.slice(0,9)}`;batteryClock=`Excel · ${file.name}`;const defaultScenario=`EXCEL-${batteryCode}`;
+    if(uiRunning){setPhase('Detén la ejecución antes de cargar otro Excel.');return;}
+    setPhase('Leyendo preguntas del Excel en el servidor…');
+    try{
+      const dataBase64=await fileToBase64(file);
+      const imported=await fetchJson('/api/zuzu-tests/import-excel',{method:'POST',headers:apiHeaders(),body:JSON.stringify({fileName:file.name,dataBase64})},45000);
+      const raw=(Array.isArray(imported?.questions)?imported.questions:[]).map((x,i)=>({seq:num(x?.seq)||i+1,prompt:trim(x?.prompt),group:trim(x?.group)||'EXCEL',label:trim(x?.label),expected:trim(x?.expected),scenario:trim(x?.scenario)})).filter(x=>x.prompt);
+      raw.sort((a,b)=>a.seq-b.seq);
+      if(!raw.length)throw new Error('No se han encontrado preguntas debajo de la cabecera PREGUNTA.');
+      const signature=raw.map(x=>`${x.seq}|${x.prompt}|${x.expected}`).join('\n'),hash=itvHash(signature)||0x6d2b79f5,binary=hash.toString(36).toUpperCase();batterySeed=hash;batteryCode=`XLS-${binary.slice(0,9)}`;batteryClock=`Excel · ${file.name}`;const defaultScenario=`EXCEL-${batteryCode}`;
       const cases=raw.map((x,i)=>({id:`excel-${String(i+1).padStart(3,'0')}`,group:x.group||'EXCEL',label:x.label||`Pregunta ${i+1}`,prompt:x.prompt,expected:x.expected||'Respuesta coherente con los datos reales y el hilo conversacional.',scenario:x.scenario||defaultScenario,mode:'FULL-CERT',requireAnswer:true,validationRule:'',meta:{excelRow:x.seq}}));
-      preview={ok:true,source:'excel',batteryCode,replayContractVersion:3,seed:batterySeed,generatedAt:new Date().toISOString(),fileName:file.name,dataCounts:{},tests:{FAST:0,'AI-SMOKE':cases.length,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':cases.map(x=>({...x,scenario:''})),'FULL-CERT':cases}};batterySource='excel';historicReplayKey='';currentRunKey=`excel-${batteryCode}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;lastMode='FULL-CERT';renderPreview();renderModeStatuses();selectMode('FULL-CERT');setPhase(`Excel cargado · ${cases.length} preguntas · código ${batteryCode}. La semilla depende del contenido: si vuelves a cargar el mismo Excel obtendrás la misma semilla.`);
+      preview={ok:true,source:'excel',batteryCode,replayContractVersion:3,seed:batterySeed,generatedAt:new Date().toISOString(),fileName:file.name,sheetName:trim(imported?.sheetName),dataCounts:{},tests:{FAST:0,'AI-SMOKE':cases.length,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':cases.map(x=>({...x,scenario:''})),'FULL-CERT':cases}};batterySource='excel';historicReplayKey='';currentRunKey=`excel-${batteryCode}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;lastMode='FULL-CERT';renderPreview();renderModeStatuses();selectMode('FULL-CERT');setPhase(`Excel cargado · ${cases.length} preguntas · código ${batteryCode}. La semilla depende del contenido: si vuelves a cargar el mismo Excel obtendrás la misma semilla.`);
     }catch(e){setPhase('No se pudo cargar el Excel: '+(e.message||e),true);}
   }
 

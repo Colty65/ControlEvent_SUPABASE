@@ -1,6 +1,7 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
 import { assertGdActor, previewZuzuBattery, runZuzuTestCase, runSavedZuzuTestCase, runZuzuTestStream } from '../services/zuzu-test-lab.service.js';
+import { parseZuzuBatteryExcel } from '../services/zuzu-itv-excel.service.js';
 import { saveZuzuTestRun, listZuzuTestRuns, getZuzuTestRun, deleteZuzuTestRun } from '../services/zuzu-test-history.service.js';
 
 const router = express.Router();
@@ -43,6 +44,12 @@ router.post('/zuzu-tests/history/:runKey/run-case', async (req,res,next)=>{
     if(!res.writableEnded)res.json(result);
   }catch(error){if(error?.name==='AbortError'&&res.headersSent)return;next(error);}
 });
+
+
+router.post('/zuzu-tests/import-excel', asyncHandler(async (req,res)=>{
+  await assertGdActor(actorFromRequest(req));
+  res.json(await parseZuzuBatteryExcel({dataBase64:req.body?.dataBase64,fileName:req.body?.fileName}));
+}));
 
 router.get('/zuzu-tests/preview', asyncHandler(async (req,res)=>{
   await assertGdActor(actorFromRequest(req));
