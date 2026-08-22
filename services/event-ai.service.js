@@ -12344,8 +12344,8 @@ function v62NativeTools(){
     event_dossier:'Resumen canónico de un evento.',
     event_breakdowns:'Desgloses canónicos de un evento.',
     master_catalog:'Catálogos maestros de productos, tiendas, personas o eventos.',
-    event_products:'PRODUCT_SET canónico de UN evento: una fila por producto distinto. Úsala para productos comprados, listas, filtros, orden y tablas. Sus facts ya incluyen registros físicos e importe; no añadas event_purchase_lines salvo que el usuario pida explícitamente cada registro, ticket o compra individual.',
-    event_purchase_lines:'PURCHASE_LINE_SET físico de UN evento: una fila por registro real de compra. Úsala solo cuando el usuario pida líneas, registros, tickets o compras por separado; no la uses como apoyo para una lista de productos.',
+    event_products:'PRODUCT_SET canónico de uno o varios eventos. En un evento devuelve una fila por producto distinto; en ámbitos multi-evento devuelve una fila por Evento+Producto. Incluye tiendas, Responsables, tickets, unidades e importe agregados, por lo que también resuelve quién o dónde compró cada producto. No añadas event_purchase_lines salvo que el usuario pida explícitamente cada registro, ticket o compra individual.',
+    event_purchase_lines:'PURCHASE_LINE_SET físico de uno o varios eventos: una fila por registro real de compra. Úsala solo cuando el usuario pida líneas, registros, tickets o compras por separado; no la uses como apoyo para una lista de productos, porque event_products ya incluye responsables y tiendas agregados.',
     event_donation_lines:'DONATION_SET canónico. view=products devuelve una fila por evento+donante+producto; view=records conserva cada registro; view=donors agrega por donante. scope=all_events conserva la columna Evento. Para una consulta de donaciones no añadas tools de compras salvo petición explícita.',
     event_people:'Participantes, asistencia e ingresos del evento.',
     event_documentation:'Evidencias, justificantes y documentos del evento.',
@@ -12400,6 +12400,7 @@ function v62NativeTools(){
   }
   tools.push({type:'function',name:'working_set_action',description:'Opera sobre el dataset completo que CE ya conserva; no consulta BBDD. group usa group_by y metrics como count, sum:Importe o distinct:Campo. reset quita filtro; back restaura la vista anterior; activate recupera un dataset reciente por id.',parameters:{type:'object',properties:{action:{type:'string',enum:['list','filter','sort','reset','back','activate','project','count','limit','inspect','group']},dataset_id:{type:'string'},field:{type:'string'},group_by:{type:'string'},value:{type:'string'},direction:{type:'string',enum:['asc','desc']},fields:{type:'array',items:{type:'string'}},metrics:{type:'array',items:{type:'string'}},match_mode:{type:'string',enum:['exact','word','contains','semantic']},limit:{type:'integer'}},required:['action']}});
   tools.push({type:'function',name:'retarget_dataset',description:'Cambia SOLO el evento de un dataset ya existente conservando su tipo/granularidad y, cuando son compatibles, su filtro, orden y columnas visibles. Úsala para continuaciones como cambiar de edición/año/evento manteniendo products→products, purchases→purchases o donations→donations. No uses event_dossier para ese cambio.',parameters:{type:'object',properties:{event:{type:'string',description:'Evento destino; puede ser aproximado. CE lo resolverá únicamente contra EVENTOS y usando la procedencia del dataset como contexto.'},dataset_id:{type:'string',description:'Opcional: id de un dataset reciente a retargetear; si se omite usa el dataset vigente.'}},required:['event']}});
+  tools.push({type:'function',name:'rescope_dataset',description:'Cambia SOLO el conjunto de eventos de un dataset ya existente, conservando su objeto, filtros de fuente y granularidad. Úsala cuando una continuación restringe o amplía el ámbito temporal/eventos (todos, un año, varios eventos o los últimos N eventos). No uses working_set_action(limit) para limitar EVENTOS: limit solo limita filas.',parameters:{type:'object',properties:{scope:{type:'string',enum:['all_events','named_events','year'],description:'Nuevo ámbito de eventos.'},events:{type:'array',items:{type:'string'},description:'Solo con named_events.'},year:{type:'integer',description:'Solo con year.'},event_limit:{type:'integer',description:'Número máximo de eventos del ámbito, después de ordenarlos.'},event_order:{type:'string',enum:['newest','oldest'],description:'Orden temporal para event_limit.'},dataset_id:{type:'string',description:'Opcional: dataset reciente a re-acotar; si se omite usa el vigente.'}},required:['scope']}});
   tools.push({type:'function',name:'conversation_memory',description:'Inspecciona o borra TODA la memoria conversacional. reset solo cuando el usuario pide empezar de cero; no para cambiar de evento.',parameters:{type:'object',properties:{action:{type:'string',enum:['inspect','reset']}},required:['action']}});
   return tools;
 }
@@ -12457,6 +12458,7 @@ ARQUITECTURA OBLIGATORIA:
 - PRODUCT_SET: para productos distintos usa event_products. Para registros físicos/tickets/compras individuales usa event_purchase_lines. No llames ambas tools para una misma lista salvo que el usuario pida explícitamente LAS DOS granularidades. event_products ya devuelve product_count, purchase_line_count e importe total. Ambas tools admiten un único evento o un CONJUNTO como una sola consulta: all_events, named_events o year. Para peticiones globales/anuales usa ese scope; NO emitas una tool por evento.
 - DONACIONES: usa event_donation_lines. Para productos donados usa view=products; para cada registro view=records; para donantes view=donors. No añadas event_products ni event_purchase_lines a una consulta de donaciones salvo que el usuario también pida explícitamente compras.
 - CAMBIO DE EVENTO: si el usuario cambia únicamente el evento y no cambia el objeto de trabajo, usa retarget_dataset. Esa tool conserva la misma granularidad/objeto del dataset vigente (products→products, purchases→purchases, donations→donations) y deja el conjunto anterior disponible para comparar o volver. NO uses event_dossier para un simple cambio de evento de una lista vigente.
+- CAMBIO DE ÁMBITO MULTI-EVENTO: si el dataset vigente procede de all_events, year o named_events y el usuario cambia SOLO qué conjunto de eventos debe abarcar (otro año, todos, una selección o los últimos N), usa rescope_dataset. Esta tool conserva el objeto y los filtros de fuente. working_set_action(limit) limita FILAS, nunca eventos.
 - TÍTULOS DE EVENTO: cuando uses scope=named_event, pasa en event el título completo o aproximado del evento como una sola unidad. No repartas partes del nombre/año entre event, store, product u otros argumentos. Si el usuario cambia solo una edición/año y el foco previo identifica claramente la familia del evento, conserva esa identidad y envía el título completo resultante, no solo el año.
 - RESOLUCIÓN TIPADA: CE puede normalizar un valor ya tipado contra el catálogo del MISMO tipo y usar continuidad factual inequívoca del foco vigente. Si aún quedan varios candidatos plausibles, pide aclaración; una ambigüedad normal NO implica reiniciar la conversación.
 - Para una lista/dataset que deba seguir vivo usa activate_dataset=true. Si una tool es solo apoyo lateral, usa activate_dataset=false. En una misma ronda puede haber como máximo UN dataset principal; si solicitas varias tools de datos, solo una lleva activate_dataset=true. Para foco de evento usa activate_focus; person_dossier puede usar activate_subject=false cuando sea lateral.
@@ -12614,6 +12616,31 @@ async function v67RetargetDataset(memory={},args={},state={},selectedEventId='',
 }
 
 
+async function v69RescopeDataset(memory={},args={},state={},selectedEventId='',flowTrace=[],callId='rescope_dataset'){
+  let mem=JSON.parse(JSON.stringify(memory||{})),source=v67RetargetSourceDataset(mem,args?.dataset_id);
+  if(!source)return{result:{id:callId,name:'rescope_dataset',ok:false,title:'Cambio de ámbito',facts:{error:'No existe un dataset vigente o reciente que pueda cambiar de ámbito.'},tables:[]},memory:mem,isError:true};
+  const prov=v67CompactDatasetProvenance(source?.provenance||{source_tool:source?.tool,source_event:source?.event,source_scope:source?.scope}),sourceTool=trim(prov?.source_tool)||trim(source?.tool);
+  if(!['event_products','event_purchase_lines'].includes(sourceTool))return{result:{id:callId,name:'rescope_dataset',ok:false,title:'Cambio de ámbito',facts:{error:`El dataset ${trim(source?.requested_object)||trim(source?.kind)} no admite ámbitos multi-evento.`,dataset_id:trim(source?.frame_id)},tables:[]},memory:mem,isError:true};
+  const scope=trim(args?.scope),sourceArgs={...(prov?.source_args||{})};
+  delete sourceArgs.event;delete sourceArgs.events;delete sourceArgs.year;delete sourceArgs.event_limit;delete sourceArgs.event_order;
+  sourceArgs.scope=scope;sourceArgs.activate_dataset=true;sourceArgs.activate_focus=true;
+  if(scope==='year')sourceArgs.year=Number(args?.year);
+  else if(scope==='named_events')sourceArgs.events=arr(args?.events).map(trim).filter(Boolean);
+  if(args?.event_limit!=null)sourceArgs.event_limit=Number(args.event_limit);
+  if(trim(args?.event_order))sourceArgs.event_order=trim(args.event_order);
+  v65TypedToolContract(sourceTool,sourceArgs,state,selectedEventId);
+  const fullRaw=await v68ExecuteEventSetTool(sourceTool,sourceArgs,state,selectedEventId,flowTrace,`${callId}_source`),full={...fullRaw,id:`${callId}_source`,name:sourceTool,_native_call_args:{...sourceArgs}};
+  v65ValidateToolResult(sourceTool,sourceArgs,full,state);
+  let target=v62DatasetFromToolResult({id:`${callId}_source`,name:sourceTool,arguments:sourceArgs},full,source);target=v67ApplyRetargetView(source,target);
+  if(!target)return{result:{id:callId,name:'rescope_dataset',ok:false,title:'Cambio de ámbito',facts:{error:'La tool canónica no materializó un dataset completo para el nuevo ámbito.'},tables:[]},memory:mem,isError:true};
+  if(mem.active_dataset)v64PushViewHistory(mem,mem.active_dataset);mem.active_dataset=target;
+  const eventNames=arr(full?.facts?.event_names).map(trim).filter(Boolean);mem.focus_events=eventNames.slice(0,12);mem.updated_at=new Date().toISOString();
+  const cache=v50CompactWorkingRowCache(target?.row_cache||null),rows=arr(cache?.rows),type=trim(target?.requested_object)||trim(target?.kind),result={id:callId,name:'rescope_dataset',ok:true,title:trim(cache?.title)||'Cambio de ámbito',facts:{action:'rescope',dataset_id:trim(target?.frame_id),source_dataset_id:trim(source?.frame_id),type,scope:trim(full?.facts?.scope)||scope,year:full?.facts?.year??null,queried_event_count:Number(full?.facts?.queried_event_count)||eventNames.length,event_count:Number(full?.facts?.event_count)||0,count:Number(target?.row_count)||0,record_count:target?.record_count==null?null:Number(target.record_count),source_tool:sourceTool,filter:trim(target?.filter_summary),sort_field:trim(cache?.sort_field),sort_direction:trim(cache?.sort_direction)},tables:rows.length?[{key:'working_set',title:trim(cache?.title)||'Dataset',rows}]:[]};
+  zuzuTracePush(flowTrace,'v3_0_exp · Dataset Rescope','OK',`${trim(source?.requested_object)||trim(source?.kind)} · ${trim(prov?.source_scope)||trim(source?.scope)||'—'} → ${scope} · ${Number(target?.row_count)||0} filas. Filtros de fuente y procedencia preservados.`);
+  return{result,memory:mem};
+}
+
+
 function v63DefaultVisibleFields(kind='',columns=[]){
   const cols=arr(columns).map(trim).filter(Boolean),has=k=>cols.includes(k);
   const profiles={
@@ -12638,7 +12665,7 @@ function v65DonationDatasetKey(result={}){
 }
 function v63NativeCompactToolResult(result={},detail='standard'){
   const base=v261CompactToolResult(result,detail),name=trim(result?.name);
-  const zeroCopyKey=name==='event_products'?'products':name==='event_purchase_lines'?'purchase_lines':name==='event_donation_lines'?v65DonationDatasetKey(result):name==='events_catalog'?'events':name==='store_purchases'?'by_event':name==='compare_events'?'comparison':(name==='working_set_action'||name==='retarget_dataset')?'working_set':'';
+  const zeroCopyKey=name==='event_products'?'products':name==='event_purchase_lines'?'purchase_lines':name==='event_donation_lines'?v65DonationDatasetKey(result):name==='events_catalog'?'events':name==='store_purchases'?'by_event':name==='compare_events'?'comparison':(name==='working_set_action'||name==='retarget_dataset'||name==='rescope_dataset')?'working_set':'';
   if(!zeroCopyKey)return base;
   const src=arr(result?.tables).find(t=>trim(t?.key)===zeroCopyKey)||arr(result?.tables).find(t=>arr(t?.rows).length);
   if(!src)return base;
@@ -12655,7 +12682,7 @@ function v63CanonicalDatasetKey(result={}){
   if(name==='events_catalog')return'events';
   if(name==='store_purchases')return'by_event';
   if(name==='compare_events')return'comparison';
-  if(name==='working_set_action'||name==='retarget_dataset')return'working_set';
+  if(name==='working_set_action'||name==='retarget_dataset'||name==='rescope_dataset')return'working_set';
   return'';
 }
 function v63AutoPresentationRefs(results=[]){
@@ -12665,7 +12692,7 @@ function v63AutoPresentationRefs(results=[]){
   for(const r of arr(results)){
     const args=r?._native_call_args||{},name=trim(r?.name),key=v63CanonicalDatasetKey(r);
     if(!key)continue;
-    if(name==='working_set_action'||name==='retarget_dataset'){
+    if(name==='working_set_action'||name==='retarget_dataset'||name==='rescope_dataset'){
       const action=trim(args?.action).toLowerCase();
       if(['count','inspect'].includes(action)||!arr(r?.tables).some(t=>trim(t?.key)===key&&arr(t?.rows).length))continue;
       chosen={tool_id:trim(r?.id),table_key:key};
@@ -12680,7 +12707,7 @@ function v63PresentationColumns(result={},table={},memory={}){
   const rows=arr(table?.rows),sample=rows[0]||{},all=[];
   rows.forEach(r=>{if(r&&typeof r==='object'&&!Array.isArray(r))Object.keys(r).forEach(k=>{if(!all.includes(k))all.push(k);});});
   const name=trim(result?.name),args=result?._native_call_args||{};
-  if(name==='working_set_action'||name==='retarget_dataset'){
+  if(name==='working_set_action'||name==='retarget_dataset'||name==='rescope_dataset'){
     const ws=v42CompactWorkingSet(memory?.active_dataset||null),cache=v50CompactWorkingRowCache(ws?.row_cache||null);
     const explicit=trim(args?.action)==='project'?arr(args?.fields):arr(cache?.visible_fields);
     const cols=[];for(const f of explicit){const k=v48ColumnKey(sample,v49CanonicalPresentationField(f)||trim(f))||v48ColumnKey(sample,trim(f))||trim(f);if(k&&Object.prototype.hasOwnProperty.call(sample,k)&&!cols.includes(k))cols.push(k);}
@@ -12710,7 +12737,7 @@ function v64PresentationMeta(table={},column='',row={}){
 function v63BuildNativeTable(result={},table={},memory={}){
   const rows=arr(table?.rows),cols=v63PresentationColumns(result,table,memory);
   const fmtRows=rows.map(row=>cols.map(c=>v26FormatPresentationCell(row?.[c],v64PresentationMeta(table,c,row))));
-  const name=trim(result?.name),multiScope=['all_events','named_events','year'].includes(trim(result?.facts?.scope||result?._native_call_args?.scope)),kind=name==='event_products'?(multiScope?'event_product_rows':'products'):name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':name==='store_purchases'?'purchases_by_store':name==='compare_events'?'comparison':(name==='working_set_action'||name==='retarget_dataset')?trim(memory?.active_dataset?.requested_object)||'dataset':'generic';
+  const name=trim(result?.name),multiScope=['all_events','named_events','year'].includes(trim(result?.facts?.scope||result?._native_call_args?.scope)),kind=name==='event_products'?(multiScope?'event_product_rows':'products'):name==='event_purchase_lines'?'purchases':name==='event_donation_lines'?'donations':name==='events_catalog'?'events':name==='store_purchases'?'purchases_by_store':name==='compare_events'?'comparison':(name==='working_set_action'||name==='retarget_dataset'||name==='rescope_dataset')?trim(memory?.active_dataset?.requested_object)||'dataset':'generic';
   const donationView=trim(result?._native_call_args?.view||result?.facts?.view),logicalCount=name==='event_products'?(multiScope?Number(result?.facts?.row_count):Number(result?.facts?.product_count)):name==='event_purchase_lines'?(Number(result?.facts?.row_count)||Number(result?.facts?.purchase_line_count)):name==='event_donation_lines'?(donationView==='products'?Number(result?.facts?.donation_product_row_count):donationView==='donors'?Number(result?.facts?.donor_count):Number(result?.facts?.donation_record_count)):name==='events_catalog'?Number(result?.facts?.event_count):name==='store_purchases'?Number(result?.facts?.event_count):name==='compare_events'?Number(result?.facts?.event_count):Number(result?.facts?.group_count||result?.facts?.count);
   return{title:v63PrettyTableTitle(result,table,rows),columns:cols,rows:fmtRows,presentationKind:kind,logicalCount:logicalCount||rows.length,displayCount:rows.length};
 }
@@ -12736,6 +12763,10 @@ function v63MechanicalClosure(results=[],memory={}){
   if(trim(last?.name)==='retarget_dataset'){
     const f=last?.facts||{},count=Number(f.count)||0,type=trim(f.type)||'elementos',event=trim(f.event),from=trim(f.from_event),noun=type==='products'?'productos':type==='purchases'?'registros de compra':type==='donations'?'registros de donación':'elementos';
     return{title:trim(last.title)||'Cambio de evento',answer:`He mantenido el mismo tipo de información y lo he cambiado${from?` de ${from}`:''}${event?` a ${event}`:''}. El conjunto vigente contiene ${count} ${noun} y la tabla completa queda debajo.`,warnings:[],showTables:[],chartSpecs:[]};
+  }
+  if(trim(last?.name)==='rescope_dataset'){
+    const f=last?.facts||{},count=Number(f.count)||0,type=trim(f.type)||'elementos',scope=trim(f.scope),events=Number(f.queried_event_count)||0,noun=type==='products'?'filas Evento+Producto':type==='purchases'?'registros de compra':'elementos',where=scope==='year'?`los eventos de ${Number(f.year)||''}`:scope==='all_events'?'todos los eventos':`${events} eventos`;
+    return{title:trim(last.title)||'Cambio de ámbito',answer:`He mantenido el mismo tipo de información y he cambiado su ámbito a ${where}. El conjunto vigente contiene ${count} ${noun} y la tabla completa queda debajo.`,warnings:[],showTables:[],chartSpecs:[]};
   }
   if(trim(last?.name)==='event_products'){
     const f=last?.facts||{},n=Number(f.product_count)||0,e=trim(f.event),scope=trim(f.scope),multi=['all_events','named_events','year'].includes(scope);
@@ -12772,13 +12803,14 @@ function v63MechanicalClosure(results=[],memory={}){
   return null;
 }
 function v64FastClosure(calls=[],roundResults=[],memory={}){
-  const names=arr(calls).map(c=>trim(c?.name)).filter(Boolean),ok=arr(roundResults).length===names.length&&arr(roundResults).every(r=>r?.ok!==false);
+  const callList=arr(calls),names=callList.map(c=>trim(c?.name)).filter(Boolean),ok=arr(roundResults).length===names.length&&arr(roundResults).every(r=>r?.ok!==false);
   if(!ok||!names.length)return null;
   if(names.length===1&&names[0]==='conversation_memory')return v63MechanicalClosure(roundResults,memory);
-  const base=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog','store_purchases','compare_events','retarget_dataset']),allowed=new Set([...base,'working_set_action']);
+  const base=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog','store_purchases','compare_events','retarget_dataset','rescope_dataset']),allowed=new Set([...base,'working_set_action']);
   if(names.some(n=>!allowed.has(n)))return null;
+  const primaryIndexes=[];for(let i=0;i<callList.length;i++){const c=callList[i],n=trim(c?.name);if(base.has(n)&&c?.arguments?.activate_dataset!==false)primaryIndexes.push(i);}
+  if(primaryIndexes.length===1){const idx=primaryIndexes[0],primaryResult=arr(roundResults)[idx];if(primaryResult?.ok!==false)return v63MechanicalClosure([primaryResult],memory);}
   if(names.filter(n=>base.has(n)).length>1)return null;
-  if(arr(calls).some(c=>base.has(trim(c?.name))&&c?.arguments?.activate_dataset===false))return null;
   return v63MechanicalClosure(roundResults,memory);
 }
 
@@ -12937,6 +12969,27 @@ function v65ValidateToolResult(name='',args={},result={},state={}){
   }
   return true;
 }
+function v69ExpectedCanonicalRows(result={},table={}){
+  const name=trim(result?.name),key=trim(table?.key),facts=result?.facts||{},view=trim(result?._native_call_args?.view||facts.view);
+  if(name==='event_products'&&key==='products'){const rowCount=Number(facts.row_count);return Number.isFinite(rowCount)?rowCount:(Number(facts.product_count)||0);}
+  if(name==='event_purchase_lines'&&key==='purchase_lines'){const rowCount=Number(facts.row_count);return Number.isFinite(rowCount)?rowCount:(Number(facts.purchase_line_count)||0);}
+  if(name==='event_donation_lines'&&key===v65DonationDatasetKey(result))return view==='products'?(Number(facts.donation_product_row_count)||0):view==='donors'?(Number(facts.donor_count)||0):(Number(facts.donation_record_count)||0);
+  if(name==='events_catalog'&&key==='events')return Number(facts.event_count)||0;
+  return null;
+}
+function v69DatasetWriterKind(name=''){
+  const n=trim(name);if(n==='event_products')return'products';if(n==='event_purchase_lines')return'purchases';if(n==='event_donation_lines')return'donations';if(n==='events_catalog')return'events';return'';
+}
+function v69DatasetTargetSignature(call={}){
+  const a=call?.arguments&&typeof call.arguments==='object'?call.arguments:{};return JSON.stringify({scope:trim(a.scope),event:trim(a.event),events:arr(a.events).map(trim).filter(Boolean).sort(),year:a.year==null?null:Number(a.year),event_limit:a.event_limit==null?null:Number(a.event_limit),event_order:trim(a.event_order)});
+}
+function v69NormalizeDatasetWriters(calls=[],memory={},flowTrace=[]){
+  const list=arr(calls).map(c=>({...c,arguments:{...(c?.arguments&&typeof c.arguments==='object'?c.arguments:{})}})),datasetTools=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog']);
+  const writers=list.filter(c=>datasetTools.has(trim(c?.name))&&c?.arguments?.activate_dataset!==false);if(writers.length<=1)return list;
+  const targets=[...new Set(writers.map(v69DatasetTargetSignature))],current=trim(memory?.active_dataset?.requested_object)||trim(memory?.active_dataset?.kind),matching=writers.filter(c=>v69DatasetWriterKind(c?.name)===current);
+  if(targets.length===1&&current&&matching.length===1){const chosen=matching[0];for(const c of list){if(c!==chosen&&datasetTools.has(trim(c?.name))&&c?.arguments?.activate_dataset!==false)c.arguments.activate_dataset=false;}zuzuTracePush(flowTrace,'v3_0_exp · Integridad · Single Writer por continuidad','OK',`Varias tools apuntaban al mismo ámbito; se conserva como dataset principal la granularidad vigente ${current}. Las demás siguen ejecutándose solo como apoyo.`);}
+  return list;
+}
 function v65DatasetWriterConflict(calls=[]){
   const datasetTools=new Set(['event_products','event_purchase_lines','event_donation_lines','events_catalog','retarget_dataset']);
   const writers=arr(calls).filter(c=>datasetTools.has(trim(c?.name))&&c?.arguments?.activate_dataset!==false);
@@ -13011,7 +13064,8 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
   };
   await repairProtocolLeak('v3_0_exp · Gemini Native · corrige fuga de protocolo');
   for(let cycle=1;cycle<=2;cycle++){
-    const calls=v261FunctionCalls(payload);if(!calls.length)break;
+    let calls=v261FunctionCalls(payload);if(!calls.length)break;
+    calls=v69NormalizeDatasetWriters(calls,memory,flowTrace);
     const roundStart=allResults.length;
     zuzuTracePush(flowTrace,`v3_0_exp · Gemini Native · tools ronda ${cycle}`,'OK',`${calls.length} llamada(s) elegidas por Gemini: ${calls.map(c=>trim(c.name)).join(', ')}. CE no añade, sustituye ni reordena tools.`);
     const writerConflict=v65DatasetWriterConflict(calls);
@@ -13032,6 +13086,8 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
           const local=v62WorkingResult(memory,execArgs,trim(call.id));memory=local.memory;full=local.result;
         }else if(name==='retarget_dataset'){
           const local=await v67RetargetDataset(memory,execArgs,state,selectedEventId,flowTrace,trim(call.id));memory=local.memory;full=local.result;
+        }else if(name==='rescope_dataset'){
+          const local=await v69RescopeDataset(memory,execArgs,state,selectedEventId,flowTrace,trim(call.id));memory=local.memory;full=local.result;
         }else if(name==='conversation_memory'){
           if(trim(execArgs?.action)==='reset')memory=v65SafeResetMemory();
           full={id:trim(call.id),name,ok:true,title:'Memoria conversacional',facts:{action:trim(execArgs?.action),memory:v62LiteMemoryDescriptor(memory)},tables:[]};
@@ -13082,11 +13138,7 @@ async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowT
   // del tipo que la produjo. Si no, no seguimos con un estado potencialmente contaminado.
   for(const ref of [...v63AutoPresentationRefs(allResults),...arr(final.showTables)]){
     const r=allResults.find(x=>trim(x?.id)===trim(ref?.tool_id)),t=arr(r?.tables).find(x=>trim(x?.key)===trim(ref?.table_key));if(!r||!t)continue;
-    const name=trim(r?.name),view=trim(r?._native_call_args?.view||r?.facts?.view);let expected=null;
-    if(name==='event_products'&&trim(t?.key)==='products')expected=Number(r?.facts?.product_count)||0;
-    else if(name==='event_purchase_lines'&&trim(t?.key)==='purchase_lines')expected=Number(r?.facts?.purchase_line_count)||0;
-    else if(name==='event_donation_lines'&&trim(t?.key)===v65DonationDatasetKey(r))expected=view==='products'?(Number(r?.facts?.donation_product_row_count)||0):view==='donors'?(Number(r?.facts?.donor_count)||0):(Number(r?.facts?.donation_record_count)||0);
-    else if(name==='events_catalog'&&trim(t?.key)==='events')expected=Number(r?.facts?.event_count)||0;
+    const name=trim(r?.name),expected=v69ExpectedCanonicalRows(r,t);
     if(expected!=null){const rawCount=arr(t?.rows).length;if(rawCount!==expected)return v65SafeResetResult({flowTrace,model,voiceConversation,reason:`Auditoría UX detectó cardinalidad incoherente en ${name}: esperado ${expected}, tabla ${rawCount}`});zuzuTracePush(flowTrace,`v3_0_exp · Auditoría UX · ${name}`,'OK',`Tabla canónica=${rawCount} filas · cardinalidad=${expected}.`);}
   }
   zuzuTracePush(flowTrace,'v3_0_exp · Zero-copy · Presentación canónica','OK',`Tablas automáticas=${v63AutoPresentationRefs(allResults).length} · filas renderizadas=${arr(presentation?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}. Las filas completas no se reinyectan a Gemini para que las recopie.`);
@@ -18527,6 +18579,12 @@ export const __zuzuStructuralTesting = Object.freeze({
   v68ResolveEventScopeSet,
   v68ExecuteEventSetTool,
   v68RecomputeWorkingFacts,
+  v69ExpectedCanonicalRows,
+  v69DatasetWriterKind,
+  v69DatasetTargetSignature,
+  v69NormalizeDatasetWriters,
+  v69RescopeDataset,
+  v64FastClosure,
   v65TypedToolContract,
   v65ValidateToolResult,
   v65DatasetWriterConflict,
