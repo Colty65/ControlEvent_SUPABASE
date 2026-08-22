@@ -13076,7 +13076,7 @@ function v70KernelResultContext(memory={}){
 }
 function v70CatalogNgrams(value=''){
   const tokens=(semanticCleanToken(value)||'').split(' ').map(trim).filter(x=>x.length>=2).slice(0,32),out=[];
-  for(let n=1;n<=Math.min(5,tokens.length);n++)for(let i=0;i+n<=tokens.length;i++)out.push(tokens.slice(i,i+n).join(' '));
+  for(let n=1;n<=Math.min(5,tokens.length);n++)for(let i=0;i+n<=tokens.length;i++){const parts=tokens.slice(i,i+n),numericOnly=parts.every(t=>t!==''&&Number.isFinite(Number(t)));if(numericOnly)continue;out.push(parts.join(' '));}
   return [...new Set(out)].slice(0,120);
 }
 function v70CandidateRows(state={},type='',prompt='',limit=12){
@@ -13336,6 +13336,189 @@ async function runZuzuV70QueryKernel({userPrompt,state,selectedEventId,flowTrace
     return{ok:true,rejected:false,title:trim(result?.title)||'Respuesta de Zuzu',answer:answer||frame.reply||'He preparado la información solicitada.',warnings:[],charts:[],tables,files,provider:'gemini-query-kernel',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Query Kernel v1 · transactional semantic frame',modelTier:policy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:['zuzu_query_frame',trim(result?.name)].filter(Boolean),scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }catch(error){
     const preserved=JSON.parse(JSON.stringify(base));preserved.failure_count=Math.min(9,(Number(base?.failure_count)||0)+1);const resultContext=v70KernelResultContext(preserved),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel · ROLLBACK','WARN',`${cleanGeminiError(error)}. No se confirma ningún cambio de frame, foco ni LAST_VIEW.`);return{ok:true,rejected:false,title:'No pude completar el turno',answer:'No he podido completar esta petición con seguridad. He dejado exactamente igual el contexto anterior para que el fallo no contamine la conversación. Reformula solo esta petición si quieres reintentarlo.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-query-kernel-rollback',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel v1 · rollback',modelTier:policy.tier,resetInteractionId:true,pendingAction:preserved.pending||null,resultContext,tools:['zuzu_query_frame'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
+}
+
+
+// ============================================================================
+// v3_0_exp · ZUZU QUERY KERNEL v2
+// Semantic Delta + Turn Classifier + View History + Compile Validation.
+// La IA clasifica el turno y expresa solo la semántica NUEVA. CE valida el contrato
+// estructurado antes de consultar datos. Ninguna regla de esta capa relee el texto humano.
+// ============================================================================
+function v71TurnTool(){
+  const scope={type:'object',properties:{kind:{type:'string',enum:['screen_event','named_event','named_events','all_events','year','latest_events','none']},event:{type:'string'},events:{type:'array',items:{type:'string'}},year:{type:'integer'},count:{type:'integer'},order:{type:'string',enum:['newest','oldest']},base:{type:'string',enum:['all','current']}},required:['kind']};
+  const filters={type:'object',properties:{product_text:{type:'string'},product_mode:{type:'string',enum:['none','exact','family','semantic']},resolved_products:{type:'array',items:{type:'string'}},store:{type:'string'},donor:{type:'string'},donor_type:{type:'string',enum:['auto','person','store','other']},person:{type:'string'},responsible:{type:'string'},ticket:{type:'string'},purchase_status:{type:'string',enum:['','realized','pending','all']},event_status:{type:'string'}}};
+  const presentation={type:'object',properties:{table:{type:'boolean'},summary:{type:'boolean'},reasoned:{type:'boolean'},chart:{type:'boolean'},exhaustive:{type:'boolean'}}};
+  const domainEnum=['products','purchases','donations','events','event_summary','people','person','stores','catalog_products','catalog_stores','catalog_people','bank','bank_timeline','documentation','management','weather','comparison'];
+  const granEnum=['product','purchase_line','donation_product','donation_record','donor','event','attendee','person','summary','comparison'];
+  return {type:'function',name:'zuzu_turn',description:'Clasifica el turno humano y expresa UNA sola acción semántica. NEW_QUERY crea una consulta nueva; MODIFY_QUERY aporta solo el delta sobre la consulta vigente; TRANSFORM_VIEW opera solo sobre LAST_VIEW; GENERAL_CONVERSATION conversa sin tocar datos.',parameters:{type:'object',properties:{
+    turn_class:{type:'string',enum:['new_query','modify_query','transform_view','general_conversation','inspect_context','restore_view','reset','clarify']},
+    signals:{type:'object',properties:{data_request:{type:'boolean'},continuity:{type:'string',enum:['new','modify','transform','none']},object_signal:{type:'string',enum:['unknown','products','purchases','donations','events','event_info','people','person','stores','bank','documentation','management','weather','comparison','conversation']},scope_signal:{type:'string',enum:['unspecified','screen_event','named_event','named_events','all_events','year','latest_events','current_view']}},required:['data_request','continuity','object_signal','scope_signal']},
+    query:{type:'object',properties:{domain:{type:'string',enum:domainEnum},granularity:{type:'string',enum:granEnum},scope,filters:{...filters,required:['product_mode']},presentation:{...presentation,required:['table','summary','reasoned','chart']},freshness:{type:'string',enum:['auto','fresh','cache']}}},
+    patch:{type:'object',properties:{domain:{type:'string',enum:domainEnum},granularity:{type:'string',enum:granEnum},scope,filters:{type:'object',properties:{...filters.properties,reset_filters:{type:'boolean'}}},freshness:{type:'string',enum:['auto','fresh','cache']}}},
+    transform:{type:'object',properties:{navigation:{type:'string',enum:['none','repeat']},view_filters:{type:'array',items:{type:'object',properties:{field:{type:'string'},value:{type:'string'},match_mode:{type:'string',enum:['exact','word','contains','semantic']}},required:['field','value','match_mode']}},project:{type:'array',items:{type:'string'}},sort:{type:'array',items:{type:'object',properties:{field:{type:'string'},direction:{type:'string',enum:['asc','desc']}},required:['field','direction']}},group_by:{type:'array',items:{type:'string'}},metrics:{type:'array',items:{type:'string'}},row_limit:{type:'integer'},presentation}},
+    restore:{type:'object',properties:{offset:{type:'integer',description:'0 repite la última vista de datos; 1 restaura la vista inmediatamente anterior; 2 la siguiente anterior.'}}},
+    pending:{type:'object',properties:{topic:{type:'string'},question:{type:'string'},choices:{type:'array',items:{type:'string'}}}},reply:{type:'string'}
+  },required:['turn_class','signals']}};
+}
+function v71DefaultGranularity(domain=''){
+  const d=trim(domain),m={products:'product',purchases:'purchase_line',donations:'donation_product',events:'event',event_summary:'summary',people:'attendee',person:'person',comparison:'comparison'};return m[d]||'summary';
+}
+function v71NormalizeSignals(raw={}){
+  const continuity=new Set(['new','modify','transform','none']),objects=new Set(['unknown','products','purchases','donations','events','event_info','people','person','stores','bank','documentation','management','weather','comparison','conversation']),scopes=new Set(['unspecified','screen_event','named_event','named_events','all_events','year','latest_events','current_view']);
+  return{data_request:raw?.data_request===true,continuity:continuity.has(trim(raw?.continuity))?trim(raw.continuity):'none',object_signal:objects.has(trim(raw?.object_signal))?trim(raw.object_signal):'unknown',scope_signal:scopes.has(trim(raw?.scope_signal))?trim(raw.scope_signal):'unspecified'};
+}
+function v71NormalizeScope(raw={},fallback='none'){
+  const kinds=new Set(['screen_event','named_event','named_events','all_events','year','latest_events','none']),kind=kinds.has(trim(raw?.kind))?trim(raw.kind):fallback;
+  return{kind,event:trim(raw?.event),events:arr(raw?.events).map(trim).filter(Boolean).slice(0,40),year:raw?.year==null?null:Number(raw.year),count:raw?.count==null?null:Math.max(1,Math.min(100,Number(raw.count)||1)),order:trim(raw?.order)==='oldest'?'oldest':'newest',base:trim(raw?.base)==='current'?'current':'all'};
+}
+function v71NormalizeFilters(raw={},partial=false){
+  const out={};
+  const put=(k,v)=>{if(!partial||v!==undefined)out[k]=v;};
+  put('product_text',raw?.product_text===undefined?undefined:trim(raw.product_text));put('product_mode',raw?.product_mode===undefined?(partial?undefined:'none'):(['none','exact','family','semantic'].includes(trim(raw.product_mode))?trim(raw.product_mode):'none'));put('resolved_products',raw?.resolved_products===undefined?undefined:arr(raw.resolved_products).map(trim).filter(Boolean).slice(0,60));put('store',raw?.store===undefined?undefined:trim(raw.store));put('donor',raw?.donor===undefined?undefined:trim(raw.donor));put('donor_type',raw?.donor_type===undefined?(partial?undefined:'auto'):(['auto','person','store','other'].includes(trim(raw.donor_type))?trim(raw.donor_type):'auto'));put('person',raw?.person===undefined?undefined:trim(raw.person));put('responsible',raw?.responsible===undefined?undefined:trim(raw.responsible));put('ticket',raw?.ticket===undefined?undefined:trim(raw.ticket));put('purchase_status',raw?.purchase_status===undefined?undefined:trim(raw.purchase_status));put('event_status',raw?.event_status===undefined?undefined:trim(raw.event_status));if(raw?.reset_filters!==undefined)out.reset_filters=raw.reset_filters===true;
+  return Object.fromEntries(Object.entries(out).filter(([,v])=>v!==undefined));
+}
+function v71NormalizePresentation(raw={},partial=false){
+  const out={};for(const k of ['table','summary','reasoned','chart','exhaustive'])if(!partial||raw?.[k]!==undefined)out[k]=raw?.[k]===true;if(!partial){if(raw?.table===undefined)out.table=true;if(raw?.summary===undefined)out.summary=true;}return out;
+}
+function v71NormalizeTransform(raw={}){
+  return{navigation:trim(raw?.navigation)==='repeat'?'repeat':'none',view_filters:arr(raw?.view_filters).map(x=>({field:trim(x?.field),value:trim(x?.value),match_mode:['exact','word','contains','semantic'].includes(trim(x?.match_mode))?trim(x.match_mode):'exact'})).filter(x=>x.field&&x.value).slice(0,16),project:arr(raw?.project).map(trim).filter(Boolean).slice(0,24),sort:arr(raw?.sort).map(x=>({field:trim(x?.field),direction:trim(x?.direction)==='desc'?'desc':'asc'})).filter(x=>x.field).slice(0,8),group_by:arr(raw?.group_by).map(trim).filter(Boolean).slice(0,8),metrics:arr(raw?.metrics).map(trim).filter(Boolean).slice(0,16),row_limit:raw?.row_limit==null?null:Math.max(1,Math.min(10000,Number(raw.row_limit)||1)),presentation:v71NormalizePresentation(raw?.presentation||{},true)};
+}
+function v71NormalizeTurn(raw={}){
+  const classes=new Set(['new_query','modify_query','transform_view','general_conversation','inspect_context','restore_view','reset','clarify']),turn_class=classes.has(trim(raw?.turn_class))?trim(raw.turn_class):'clarify',q=raw?.query&&typeof raw.query==='object'?raw.query:{},p=raw?.patch&&typeof raw.patch==='object'?raw.patch:{};
+  return{turn_class,signals:v71NormalizeSignals(raw?.signals||{}),query:{domain:trim(q.domain),granularity:trim(q.granularity),scope:v71NormalizeScope(q.scope||{},'none'),filters:v71NormalizeFilters(q.filters||{},false),presentation:v71NormalizePresentation(q.presentation||{},false),freshness:['auto','fresh','cache'].includes(trim(q.freshness))?trim(q.freshness):'auto'},patch:{...(p.domain!==undefined?{domain:trim(p.domain)}:{}),...(p.granularity!==undefined?{granularity:trim(p.granularity)}:{}),...(p.scope!==undefined?{scope:v71NormalizeScope(p.scope||{},'none')}:{ }),...(p.filters!==undefined?{filters:v71NormalizeFilters(p.filters||{},true)}:{}),...(p.freshness!==undefined?{freshness:['auto','fresh','cache'].includes(trim(p.freshness))?trim(p.freshness):'auto'}:{})},transform:v71NormalizeTransform(raw?.transform||{}),restore:{offset:Math.max(0,Math.min(4,Number(raw?.restore?.offset)||0))},pending:raw?.pending&&typeof raw.pending==='object'?{topic:trim(raw.pending.topic),question:trim(raw.pending.question),choices:arr(raw.pending.choices).map(trim).filter(Boolean).slice(0,8)}:null,reply:trim(raw?.reply).slice(0,1600)};
+}
+function v71ObjectDomain(signal=''){
+  return({products:'products',purchases:'purchases',donations:'donations',events:'events',event_info:'event_summary',people:'people',person:'person',stores:'stores',bank:'bank',documentation:'documentation',management:'management',weather:'weather',comparison:'comparison'})[trim(signal)]||'';
+}
+function v71ScopeKind(signal=''){
+  return({screen_event:'screen_event',named_event:'named_event',named_events:'named_events',all_events:'all_events',year:'year',latest_events:'latest_events',current_view:'current_view'})[trim(signal)]||'';
+}
+function v71PatchHasMeaning(p={}){
+  if(trim(p.domain)||trim(p.granularity)||p.scope||trim(p.freshness))return true;const f=p.filters||{};return Object.keys(f).length>0;
+}
+function v71ValidateTurn(turn={},memory={}){
+  const e=[],c=trim(turn.turn_class),sig=turn.signals||{},expectedDomain=v71ObjectDomain(sig.object_signal),expectedScope=v71ScopeKind(sig.scope_signal),current=v70PublicFrame(memory?.current_frame),last=v42CompactWorkingSet(memory?.last_view||memory?.active_dataset||null);
+  if(c==='new_query'){
+    if(!trim(turn?.query?.domain))e.push('NEW_QUERY requiere query.domain.');if(!trim(turn?.query?.scope?.kind)||trim(turn.query.scope.kind)==='none'&&['products','purchases','donations','event_summary','people','bank','bank_timeline','documentation','management','weather','comparison'].includes(trim(turn?.query?.domain)))e.push('NEW_QUERY de datos requiere un ámbito explícito en query.scope.');
+    if(expectedDomain&&trim(turn?.query?.domain)!==expectedDomain)e.push(`object_signal=${sig.object_signal} exige domain=${expectedDomain}.`);if(expectedScope&&expectedScope!=='current_view'&&trim(turn?.query?.scope?.kind)!==expectedScope)e.push(`scope_signal=${sig.scope_signal} exige scope.kind=${expectedScope}.`);
+    if(sig.continuity!=='new')e.push('NEW_QUERY requiere signals.continuity=new.');if(sig.data_request!==true)e.push('NEW_QUERY requiere signals.data_request=true.');
+  }else if(c==='modify_query'){
+    if(!current)e.push('MODIFY_QUERY requiere CURRENT_FRAME.');if(!v71PatchHasMeaning(turn.patch))e.push('MODIFY_QUERY requiere un patch semántico no vacío.');if(expectedDomain&&current&&expectedDomain!==trim(current.domain))e.push(`El objeto actual cambia de ${trim(current.domain)} a ${expectedDomain}; eso debe ser NEW_QUERY, no MODIFY_QUERY.`);if(expectedScope&&expectedScope!=='current_view'&&trim(turn?.patch?.scope?.kind)!==expectedScope)e.push(`scope_signal=${sig.scope_signal} exige patch.scope.kind=${expectedScope}.`);if(sig.continuity!=='modify')e.push('MODIFY_QUERY requiere signals.continuity=modify.');
+  }else if(c==='transform_view'){
+    if(!last)e.push('TRANSFORM_VIEW requiere LAST_VIEW.');if(sig.continuity!=='transform')e.push('TRANSFORM_VIEW requiere signals.continuity=transform.');
+  }else if(c==='restore_view'){
+    const off=Number(turn?.restore?.offset)||0;if(off>0&&arr(memory?._view_history).length<off)e.push(`RESTORE_VIEW offset=${off} no existe en VIEW_HISTORY.`);
+  }else if(c==='general_conversation'){
+    if(sig.data_request===true)e.push('GENERAL_CONVERSATION no puede declarar data_request=true.');if(!trim(turn.reply))e.push('GENERAL_CONVERSATION requiere reply.');
+  }else if(c==='clarify'){
+    if(!trim(turn?.pending?.question)&&!trim(turn.reply))e.push('CLARIFY requiere una pregunta concreta.');
+  }
+  return e;
+}
+function v71KernelInstruction(state={},selectedEventId='',display='usuario'){
+  const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'ninguno';
+  return `Eres el compilador semántico de Zuzu para ControlEvent. Emite EXACTAMENTE una llamada a zuzu_turn y nada más. El usuario es ${display}.
+
+PRIMERO CLASIFICA EL TURNO
+- new_query: el usuario introduce un nuevo objeto de información o una consulta autónoma. El estado anterior NO decide el dominio.
+- modify_query: mantiene exactamente el mismo objeto y modifica solo alguna dimensión semántica del frame vigente (ámbito, filtro, edición, estado...). Devuelve SOLO el patch.
+- transform_view: modifica únicamente la tabla/colección ya mostrada (filtro de filas, columnas, orden, grupo, límite de filas).
+- general_conversation: pregunta, consejo, explicación o charla que no exige extraer una nueva colección de datos de CE. Responde en reply y NO alteres LAST_VIEW.
+- inspect_context: pregunta sobre dónde estamos o qué contexto/datos están vigentes.
+- restore_view: recuperar/repetir una vista de datos ya mostrada. offset=0 repite la última vista de datos; offset=1 vuelve a la vista anterior a esa.
+- reset: SOLO petición explícita de borrar/reiniciar toda la conversación.
+- clarify: solo si una ambigüedad material no puede resolverse con contexto ni candidatos.
+
+SEÑALES OBLIGATORIAS
+signals describe SOLO lo que expresa el mensaje ACTUAL, antes de heredar nada. object_signal y scope_signal deben ser coherentes con query/patch. CE rechazará una compilación inconsistente y te pedirá corregirla antes de ejecutar datos.
+
+ÁMBITO
+El evento visible en pantalla es «${screen}» y es solo ambiente. La petición actual tiene prioridad. Si el mensaje establece ámbito total, anual, varios eventos o N eventos recientes, exprésalo directamente en scope. screen_event solo cuando el significado actual remite al evento ambiente o no existe otro ámbito y la consulta, por su naturaleza, se entiende sobre el evento ambiente. latest_events limita EVENTOS, nunca filas. base=current solo cuando el usuario limita los eventos presentes en la vista/consulta vigente; si no, base=all.
+
+OBJETO Y GRANULARIDAD
+products = productos lógicos agregados; ya incluyen Responsables y Tiendas, por lo que pedir productos y quién los compró sigue siendo domain=products. purchases = registros físicos/tickets/compras. donations por defecto usa donation_product cuando se pide lo donado/productos donados; donation_record solo si se piden registros físicos. event_summary es información/dossier de un evento. Una consulta nueva sobre un objeto claro nunca debe heredar el domain de LAST_VIEW.
+
+SEMANTIC DELTA
+En modify_query NO reconstruyas el frame completo. Si solo cambia el ámbito, devuelve únicamente patch.scope. Si solo cambia un filtro, únicamente patch.filters. Los campos ausentes significan «conservar».
+
+LAST_VIEW
+Transformaciones visuales o tabulares operan sobre LAST_VIEW. Una conversación general no la reemplaza. Añadir Fecha inicio, Fecha fin, Descripción, Estado o Precio a filas que contienen Evento es válido: CE puede enriquecer por relación con EVENTOS. row_limit limita filas, nunca eventos.
+
+ENTIDADES / SAANE-LITE
+ENTITY_CANDIDATES son recuperación mecánica Top-K, no decisiones. Selecciona tipo y nombre canónico cuando haya un candidato claro. No confundas evento, persona, tienda y producto. Para familias de producto usa product_mode=family y product_text; CE certificará productos por tokens/catálogo, no por substring ciego. Si la entidad dictada se parece claramente a un candidato del tipo correcto, utiliza el nombre canónico. Si quedan candidatos materialmente equivalentes, clarify.
+
+PENDING
+Si existe PENDING, una respuesta corta resuelve primero esa pregunta pendiente. Una afirmación no significa reset salvo que la pregunta pendiente fuese una confirmación explícita de reset.
+
+PRESENTACIÓN
+Consultas plurales normalmente llevan table=true. Para listas normales reasoned=false. general_conversation responde en reply y no consulta BBDD. No generes SQL, nombres de tools ni protocolo.`;
+}
+function v71KernelInput(userPrompt='',history=[],memory={},candidates={}){
+  const recent=arr(history).slice(-5).map(x=>({user:trim(x?.user).slice(0,420),assistant:trim(x?.assistant).slice(0,520)})),last=v42CompactWorkingSet(memory?.last_view||memory?.active_dataset||null),cache=v50CompactWorkingRowCache(last?.row_cache||null),views=[last,...arr(memory?._view_history)].filter(Boolean).slice(0,4).map((v,i)=>{const w=v42CompactWorkingSet(v),c=v50CompactWorkingRowCache(w?.row_cache||null);return{offset:i===0?0:i,id:trim(w?.frame_id),type:trim(w?.requested_object)||trim(w?.kind),event:trim(w?.event),scope:trim(w?.scope),count:Number(w?.row_count)||0,fields:arr(c?.columns).slice(0,14),visible:arr(c?.visible_fields).slice(0,10),filter:trim(w?.filter_summary)};});
+  const state={current_frame:v70PublicFrame(memory?.current_frame),last_view:views[0]||null,view_history:views.slice(1),previous_frames:arr(memory?._frame_history).map(v70PublicFrame).filter(Boolean).slice(0,3),pending:memory?.pending||null};
+  return `CURRENT_USER:\n${trim(userPrompt)}\n\nKERNEL_STATE:\n${JSON.stringify(state)}\n\nENTITY_CANDIDATES:\n${JSON.stringify(candidates)}\n\nRECENT_DIALOGUE:\n${JSON.stringify(recent)}`;
+}
+function v71FrameFromQuery(turn={}){
+  const q=turn.query||{},domain=trim(q.domain),gran=trim(q.granularity)||v71DefaultGranularity(domain);
+  return v70NormalizeFrame({mode:'query',domain,source:q.freshness==='cache'?'auto':'fresh',granularity:gran,scope:q.scope,filters:{...q.filters,inherit_filters:false,reset_filters:false},transform:{navigation:'none'},presentation:q.presentation,freshness:q.freshness||'auto'});
+}
+function v71FrameFromPatch(current={},turn={}){
+  const out=JSON.parse(JSON.stringify(v70PublicFrame(current)||{})),p=turn.patch||{};if(!out.domain)throw Object.assign(new Error('No existe CURRENT_FRAME para aplicar el delta.'),{code:'CE_KERNEL_COMPILE'});
+  out.mode='query';out.source='fresh';if(trim(p.domain))out.domain=trim(p.domain);if(trim(p.granularity))out.granularity=trim(p.granularity);if(p.scope)out.scope={...p.scope};if(p.filters){if(p.filters.reset_filters===true)out.filters={product_text:'',product_mode:'none',resolved_products:[],store:'',donor:'',donor_type:'auto',person:'',responsible:'',ticket:'',purchase_status:'',event_status:'',inherit_filters:false,reset_filters:true};else out.filters={...(out.filters||{}),...p.filters,inherit_filters:false,reset_filters:false};}if(trim(p.freshness))out.freshness=trim(p.freshness);return v70NormalizeFrame(out);
+}
+function v71FrameForTransform(current={},last=null,turn={}){
+  const base=v70PublicFrame(current)||{mode:'transform',domain:trim(last?.requested_object)||trim(last?.kind)||'conversation',source:'last_view',granularity:v71DefaultGranularity(trim(last?.requested_object)||trim(last?.kind)),scope:{kind:trim(last?.scope)||'current_view'},filters:{product_mode:'none'},transform:{navigation:'none'},presentation:{table:true,summary:true,reasoned:false,chart:false},freshness:'cache'};
+  const tr=turn.transform||{},presentation={...(base.presentation||{}),...tr.presentation};return v70NormalizeFrame({...base,mode:'transform',source:'last_view',transform:{navigation:tr.navigation||'none',view_filters:tr.view_filters||[],project:tr.project||[],sort:tr.sort||[],group_by:tr.group_by||[],metrics:tr.metrics||[],row_limit:tr.row_limit},presentation,freshness:'cache'});
+}
+function v71KernelResultContext(memory={}){
+  const base=v62ResultContext(memory),last=v42CompactWorkingSet(memory?.last_view||memory?.active_dataset||null);return{...base,domain:'zuzu_query_kernel',query_kernel:{version:'v2',current_frame:v70PublicFrame(memory?.current_frame),last_view:last||null,pending:memory?.pending&&typeof memory.pending==='object'?JSON.parse(JSON.stringify(memory.pending)):null,frame_history:arr(memory?._frame_history).map(v70PublicFrame).filter(Boolean).slice(0,5),failure_count:Math.max(0,Number(memory?.failure_count)||0),last_turn_class:trim(memory?.last_turn_class),updated_at:new Date().toISOString()}};
+}
+async function v71CompileTurn({input,instruction,tool,model,policy,flowTrace,externalSignal,base}){
+  const call=async(stage,m,inText)=>v261CallInteraction({input:inText,previousInteractionId:'',model:m,systemInstruction:instruction,tools:[tool],flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_turn']}},externalSignal,maxCalls:1,maxOutputTokens:1200});let payload,usedModel=model;
+  try{payload=await call('v3_0_exp · Query Kernel v2 · Gemini clasifica/compila',usedModel,input);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==usedModel&&v332CanEscalateLiteFailure(error)){usedModel=policy.flashModel;zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · Lite → Flash','WARN',`Lite no compiló el turno (${cleanGeminiError(error)}). Flash reintenta la misma compilación, sin tocar estado.`);payload=await call('v3_0_exp · Query Kernel v2 · Flash clasifica/compila',usedModel,input);}else throw error;}
+  const parse=(pl)=>{const calls=v261FunctionCalls(pl);if(calls.length!==1||trim(calls[0]?.name)!=='zuzu_turn')throw Object.assign(new Error('Gemini no devolvió exactamente un zuzu_turn.'),{code:'CE_KERNEL_COMPILE'});return v71NormalizeTurn(calls[0].arguments||{});};let turn=parse(payload),errors=v71ValidateTurn(turn,base);
+  if(errors.length){zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · Compile Validation','WARN',`Compilación rechazada antes de BBDD: ${errors.join(' | ')}`);const repairInput=`${input}\n\nPREVIOUS_COMPILATION:\n${JSON.stringify(turn)}\n\nCOMPILER_VALIDATION_ERRORS:\n${JSON.stringify(errors)}\n\nCorrige SOLO la compilación. Vuelve a emitir exactamente una llamada zuzu_turn coherente con CURRENT_USER y estas validaciones.`;payload=await call('v3_0_exp · Query Kernel v2 · reparación de compilación',usedModel,repairInput);turn=parse(payload);errors=v71ValidateTurn(turn,base);if(errors.length)throw Object.assign(new Error(`El compilador semántico sigue siendo inconsistente: ${errors.join(' | ')}`),{code:'CE_KERNEL_COMPILE'});zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · Compile Validation','OK','La segunda compilación ya es estructuralmente coherente; todavía no se había ejecutado ninguna consulta.');}
+  return{turn,model:usedModel};
+}
+function v71RestoreView(memory={},offset=0){
+  const off=Math.max(0,Math.min(4,Number(offset)||0));if(off===0)return{ws:v42CompactWorkingSet(memory?.last_view||memory?.active_dataset||null),frame:v70PublicFrame(memory?.current_frame)};const ws=v42CompactWorkingSet(arr(memory?._view_history)[off-1]);if(!ws)return{ws:null,frame:null};const fromProv=v70PublicFrame(ws?.provenance?.source_args?.frame),hist=v70PublicFrame(arr(memory?._frame_history)[off-1]);return{ws,frame:fromProv||hist||v70PublicFrame(memory?.current_frame)};
+}
+async function runZuzuV71QueryKernel({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,externalSignal=null}){
+  userPrompt=v336NormalizeStructuredPromptRefs(userPrompt);const base=v70KernelMemoryFromHistory(conversationHistory),draft=JSON.parse(JSON.stringify(base)),candidates=v70EntityCandidates(state,userPrompt),display=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||null}),policy=v332InteractionPolicy(userPrompt),tool=v71TurnTool(),instruction=v71KernelInstruction(state,selectedEventId,display),input=v71KernelInput(userPrompt,conversationHistory,base,candidates);let model=policy.model;
+  zuzuTracePush(flowTrace,'v3_0_exp · QUERY KERNEL v2','OK',`Semantic Delta transaccional: CURRENT_FRAME=${trim(base?.current_frame?.domain)||'—'} · LAST_VIEW=${trim(base?.last_view?.requested_object)||'—'}:${Number(base?.last_view?.row_count)||0} · VIEW_HISTORY=${arr(base?._view_history).length} · PENDING=${trim(base?.pending?.topic)||'—'} · pantalla=${trim(v26EventById(state,selectedEventId)?.titulo)||'—'} (ambiental).`);
+  try{
+    const compiled=await v71CompileTurn({input,instruction,tool,model,policy,flowTrace,externalSignal,base});model=compiled.model;const turn=compiled.turn;zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · Turn','OK',`class=${turn.turn_class} · object_signal=${turn.signals.object_signal} · scope_signal=${turn.signals.scope_signal} · continuity=${turn.signals.continuity}.`);draft.last_turn_class=turn.turn_class;
+    if(turn.turn_class==='reset'){
+      const memory={...v65SafeResetMemory(),current_frame:null,last_view:null,pending:null,failure_count:0,_frame_history:[],last_turn_class:'reset'},resultContext=v71KernelResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · COMMIT RESET','OK','Reset explícito: contexto conversacional borrado.');return{ok:true,rejected:false,title:'Conversación reiniciada',answer:turn.reply||'He borrado el contexto conversacional anterior. Empezamos de cero.',warnings:[],charts:[],tables:[],files:[],provider:'gemini-query-kernel-v2',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel v2',modelTier:policy.tier,resetInteractionId:true,pendingAction:null,resultContext,tools:['zuzu_turn'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    }
+    if(turn.turn_class==='clarify'){
+      draft.pending={topic:trim(turn?.pending?.topic)||'clarification',question:trim(turn?.pending?.question)||trim(turn.reply),choices:arr(turn?.pending?.choices)};draft.failure_count=0;const resultContext=v71KernelResultContext(draft),usage=summarizeGeminiUsageFromTrace(flowTrace);return{ok:true,rejected:false,title:'Necesito una precisión',answer:turn.reply||draft.pending.question||'Necesito una precisión para continuar.',warnings:[],charts:[],tables:[],files:[],provider:'gemini-query-kernel-v2',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel v2',modelTier:policy.tier,resetInteractionId:true,pendingAction:draft.pending,resultContext,tools:['zuzu_turn'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    }
+    if(turn.turn_class==='general_conversation'){
+      draft.pending=null;draft.failure_count=0;const resultContext=v71KernelResultContext(draft),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · NO-DATA COMMIT','OK','Conversación general: no se consulta BBDD y LAST_VIEW queda intacta.');return{ok:true,rejected:false,title:'Zuzu',answer:turn.reply||'De acuerdo.',warnings:[],charts:[],tables:[],files:[],provider:'gemini-query-kernel-v2',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel v2 · no-data conversation',modelTier:policy.tier,resetInteractionId:true,pendingAction:null,resultContext,tools:['zuzu_turn'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    }
+    if(turn.turn_class==='inspect_context'){
+      draft.pending=null;draft.failure_count=0;const resultContext=v71KernelResultContext(draft),usage=summarizeGeminiUsageFromTrace(flowTrace);return{ok:true,rejected:false,title:'Contexto actual',answer:v70InspectAnswer(draft,selectedEventId,state),warnings:[],charts:[],tables:[],files:[],provider:'gemini-query-kernel-v2',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel v2',modelTier:policy.tier,resetInteractionId:true,pendingAction:null,resultContext,tools:['zuzu_turn'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    }
+    if(turn.turn_class==='restore_view'){
+      const restored=v71RestoreView(base,turn.restore.offset);if(!restored.ws)throw Object.assign(new Error('No existe la vista solicitada en VIEW_HISTORY.'),{code:'CE_KERNEL_VIEW'});draft.active_dataset=restored.ws;draft.last_view=restored.ws;if(restored.frame)draft.current_frame=restored.frame;draft.pending=null;draft.failure_count=0;const tables=v70PresentationFromWorking(restored.ws),resultContext=v71KernelResultContext(draft),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · RESTORE VIEW','OK',`offset=${turn.restore.offset} · ${trim(restored.ws.requested_object)||'view'}:${Number(restored.ws.row_count)||0}.`);return{ok:true,rejected:false,title:trim(restored.ws?.row_cache?.title)||'Vista recuperada',answer:turn.restore.offset===0?'Te muestro de nuevo la última tabla de datos.':'He recuperado la vista anterior.',warnings:[],charts:[],tables,files:[],provider:'gemini-query-kernel-v2',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel v2 · view history',modelTier:policy.tier,resetInteractionId:true,pendingAction:null,resultContext,tools:['zuzu_turn'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    }
+    let frame=null,ws=null,result=null,scopeInfo=null,last=v42CompactWorkingSet(base?.last_view||base?.active_dataset||null);
+    if(turn.turn_class==='new_query')frame=v71FrameFromQuery(turn);else if(turn.turn_class==='modify_query')frame=v71FrameFromPatch(base.current_frame,turn);else if(turn.turn_class==='transform_view')frame=v71FrameForTransform(base.current_frame,last,turn);else throw Object.assign(new Error(`Clase de turno no ejecutable: ${turn.turn_class}`),{code:'CE_KERNEL_COMPILE'});
+    zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · Frame efectivo','OK',`domain=${frame.domain} · scope=${frame.scope.kind} · granularity=${frame.granularity} · source=${frame.source}.`);
+    if(turn.turn_class==='transform_view'){
+      if(!last)throw Object.assign(new Error('No hay LAST_VIEW para transformar.'),{code:'CE_KERNEL_VIEW'});const fake={name:trim(last?.provenance?.source_tool)||'working_set',title:trim(last?.row_cache?.title)||'Datos',facts:{},tables:[{key:'kernel_view',title:trim(last?.row_cache?.title)||'Datos',rows:arr(last?.row_cache?.rows)}]};scopeInfo=v70ResolveScope(frame,base,state,selectedEventId);const view=v70ApplyView(frame,fake,scopeInfo,state,[]);ws=v70WorkingSetFromView(frame,view,fake,scopeInfo,last);result=fake;
+    }else{
+      const executed=await v70ExecuteCanonicalSource(frame,base,state,selectedEventId,flowTrace);result=executed.result;scopeInfo=executed.scopeInfo;const view=v70ApplyView(frame,result,scopeInfo,state,executed.productNames);ws=v70WorkingSetFromView(frame,view,result,scopeInfo,last);
+    }
+    if(!ws)throw Object.assign(new Error('El turno no pudo materializar LAST_VIEW.'),{code:'CE_KERNEL_VIEW'});
+    if(base?.last_view&&v64DatasetViewSignature(base.last_view)!==v64DatasetViewSignature(ws))v64PushViewHistory(draft,base.last_view);if(base?.current_frame){const prev=v70PublicFrame(base.current_frame),sig=JSON.stringify(prev);draft._frame_history=[prev,...arr(base._frame_history).filter(x=>JSON.stringify(v70PublicFrame(x))!==sig)].slice(0,5);}draft.active_dataset=ws;draft.last_view=ws;draft.current_frame=v70PublicFrame({...frame,scope:{...(frame.scope||{}),kind:scopeInfo.kind,event:scopeInfo.eventNames.length===1?scopeInfo.eventNames[0]:trim(frame?.scope?.event),events:scopeInfo.kind==='named_events'?scopeInfo.eventNames:arr(frame?.scope?.events),year:scopeInfo.year,count:scopeInfo.count,order:scopeInfo.order,base:scopeInfo.base}});draft.pending=null;draft.failure_count=0;v70ScopeFocus(draft,scopeInfo);draft.updated_at=new Date().toISOString();
+    const tables=frame.presentation.table?v70PresentationFromWorking(ws):[],answer=frame.presentation.reasoned?await v70ReasonedAnswer({frame,result,ws,model,flowTrace,externalSignal}):v70CanonicalAnswer(frame,result,ws,scopeInfo),files=[];for(const t of tables.slice(0,6)){const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));files.push({filename:fileSafe(`${t.title}_v3_0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});}const resultContext=v71KernelResultContext(draft),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · COMMIT','OK',`Turno=${turn.turn_class} · domain=${frame.domain} · filas=${Number(ws.row_count)||0} · scope=${scopeInfo.kind}.`);
+    return{ok:true,rejected:false,title:trim(result?.title)||'Respuesta de Zuzu',answer:answer||turn.reply||'He preparado la información solicitada.',warnings:[],charts:[],tables,files,provider:'gemini-query-kernel-v2',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Query Kernel v2 · Semantic Delta + transactional commit',modelTier:policy.tier,interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:['zuzu_turn',trim(result?.name)].filter(Boolean),scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }catch(error){
+    const preserved=JSON.parse(JSON.stringify(base));preserved.failure_count=Math.min(9,(Number(base?.failure_count)||0)+1);const resultContext=v71KernelResultContext(preserved),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel v2 · ROLLBACK','WARN',`${cleanGeminiError(error)}. Ningún cambio de frame, LAST_VIEW o foco se confirma.`);return{ok:true,rejected:false,title:'No pude completar el turno',answer:'No he podido completar esta petición con seguridad. He conservado exactamente el contexto y la última vista anteriores para que el fallo no contamine la conversación.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-query-kernel-v2-rollback',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel v2 · rollback',modelTier:policy.tier,resetInteractionId:true,pendingAction:preserved.pending||null,resultContext,tools:['zuzu_turn'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }
 }
 
@@ -15592,12 +15775,12 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   // SCC 2.0 · los únicos comandos interceptados fuera de Gemini son acciones locales reales
   // sobre la propia conversación (escobita/reset). Las preguntas de ayuda/capacidades vuelven a
   // pasar por Gemini como cualquier otra conversación.
-  zuzuTracePush(flowTrace,'v3_0_exp · ARQUITECTURA QUERY KERNEL','OK',`Gemini compila un único Query Frame semántico; CE ejecuta fuentes canónicas en borrador y solo confirma estado/vista al completar el turno. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo ambiental).`);
+  zuzuTracePush(flowTrace,'v3_0_exp · ARQUITECTURA QUERY KERNEL v2','OK',`Gemini clasifica el turno y emite Semantic Delta; CE valida la compilación antes de BBDD, ejecuta en borrador y confirma estado/vista solo al completar el turno. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo ambiental).`);
   try{
-    return await runZuzuV70QueryKernel({userPrompt,state,selectedEventId,flowTrace,conversationHistory:safeHistory,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,externalSignal});
+    return await runZuzuV71QueryKernel({userPrompt,state,selectedEventId,flowTrace,conversationHistory:safeHistory,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,externalSignal});
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
-    const memory=error?.nativeMemory||v70KernelMemoryFromHistory(safeHistory),resultContext=v70KernelResultContext(memory),currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),origin=trim(error?._ceOrigin)||'controlevent';
+    const memory=error?.nativeMemory||v70KernelMemoryFromHistory(safeHistory),resultContext=v71KernelResultContext(memory),currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),origin=trim(error?._ceOrigin)||'controlevent';
     if(origin==='gemini'){
       zuzuTracePush(flowTrace,'v3_0_exp · Gemini Native · fallo','WARN',`${cleanGeminiError(error)}. CE no ejecuta ninguna interpretación alternativa ni cambia la memoria.`);
       let tables=[];
@@ -18878,6 +19061,14 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
 
 // Exportaciones de prueba estructural. No se usan por la interfaz ni exponen datos por HTTP.
 export const __zuzuStructuralTesting = Object.freeze({
+  v71TurnTool,
+  v71NormalizeTurn,
+  v71ValidateTurn,
+  v71FrameFromQuery,
+  v71FrameFromPatch,
+  v71FrameForTransform,
+  v71RestoreView,
+  v71KernelResultContext,
   v70QueryFrameTool,
   v70KernelMemoryFromHistory,
   v70EntityCandidates,
