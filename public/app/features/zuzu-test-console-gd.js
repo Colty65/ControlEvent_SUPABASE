@@ -18,7 +18,7 @@
 
   let currentAbort=null,currentFetchAbort=null,currentCaseCancel=null,currentReader=null,preview=null,rows=[],lastSummary=null,activeFilter='TODOS',lastMode='FAST';
   let streamWatchdog=null,lastStreamAt=0,currentCase=null,stopRequested=false,uiRunning=false;
-  let batterySeed=0,batteryClock='',currentRunKey='',historyRuns=[],historyStorage='',historicReplayKey='';
+  let batterySeed=0,batteryClock='',currentRunKey='',historyRuns=[],historyStorage='',historicReplayKey='',batterySource='generated',batteryCode='';
   let authEventUser=null;
 
   function renewBatterySeed(){
@@ -134,9 +134,9 @@
 
 
   function modal(){return `<div id="ceZuzuTestOverlay" role="dialog" aria-modal="true" aria-label="ITV de Zuzu"><div class="zt-modal">
-    <div class="zt-head"><h2>🧪 ITV de Zuzu</h2><span class="zt-sub">Batería autogenerada desde tablas reales · SOLO LECTURA · solo GD</span><div class="zt-spacer"></div><div class="zt-head-actions"><button class="zt-action report" id="ztDownload">⬇ INFORME</button><button class="zt-action print" id="ztPrint">🖨 PDF</button><button class="zt-action close" id="ztClose">✕ CERRAR</button></div></div>
+    <div class="zt-head"><h2>🧪 ITV de Zuzu</h2><span class="zt-sub">Baterías autogeneradas o Excel · mismo circuito Zuzu · SOLO LECTURA · solo GD</span><div class="zt-spacer"></div><div class="zt-head-actions"><button class="zt-action report" id="ztDownload">⬇ INFORME</button><button class="zt-action print" id="ztPrint">🖨 PDF</button><button class="zt-action close" id="ztClose">✕ CERRAR</button></div></div>
     <div class="zt-top">
-      <div class="zt-panel"><div class="zt-panel-head"><h3>Datos reales · batería</h3><button id="ztGenerate" class="zt-mini-primary">↻ NUEVA BATERÍA</button></div><div id="ztData" class="zt-data"><span class="zt-pill">Cargando datos…</span></div><div id="ztSeedInfo" class="zt-live zt-seed-strip"></div>
+      <div class="zt-panel"><div class="zt-panel-head"><h3>Datos reales · batería</h3><button id="ztImportExcel" class="zt-mini-primary">📥 CARGAR EXCEL</button><button id="ztGenerate" class="zt-mini-primary">↻ NUEVA BATERÍA</button><input id="ztExcelFile" type="file" accept=".xlsx,.xlsm" style="display:none!important"></div><div id="ztData" class="zt-data"><span class="zt-pill">Cargando datos…</span></div><div id="ztSeedInfo" class="zt-live zt-seed-strip"></div>
         <div class="zt-history-box"><div class="zt-panel-head"><h3>Histórico reproducible</h3><div id="ztHistoryStorage" class="zt-history-note"></div></div><div class="zt-history-grid"><select id="ztHistorySelect"><option value="">Cargando baterías guardadas…</option></select><button id="ztHistoryView">VER</button><button id="ztHistoryReplay">▶ REPETIR</button><button id="ztHistoryDelete" title="Eliminar definitivamente la batería seleccionada">✕ ELIMINAR</button><label class="zt-seed-label">Semilla <input id="ztSeedReplayInput" inputmode="numeric" placeholder="974813527"></label><button id="ztReplaySeed">↻ REGENERAR</button></div></div>
       </div>
       <div class="zt-panel"><div class="zt-panel-head"><h3>Modo de prueba · ejecución</h3></div><div class="zt-modes">
@@ -165,7 +165,7 @@
   function bind(){
     $('ztClose').onclick=close;$('ceZuzuTestOverlay').addEventListener('click',e=>{if(e.target.id==='ceZuzuTestOverlay')close();});
     document.querySelectorAll('.zt-mode').forEach(b=>b.onclick=()=>selectMode(b.dataset.mode));
-    $('ztGenerate').onclick=()=>loadPreview(true);$('ztStart').onclick=()=>run(false);$('ztRetry').onclick=()=>run(true);$('ztNext').onclick=nextMode;$('ztDownload').onclick=downloadReport;$('ztPrint').onclick=printReport;$('ztHistoryView').onclick=loadHistoricalRun;$('ztHistoryReplay').onclick=replayHistoricalRun;$('ztHistoryDelete').onclick=deleteHistoricalRun;$('ztReplaySeed').onclick=replayManualSeed;
+    $('ztGenerate').onclick=()=>loadPreview(true);$('ztImportExcel').onclick=()=>{if(uiRunning){setPhase('Detén la ejecución antes de cargar otro Excel.');return;}$('ztExcelFile').value='';$('ztExcelFile').click();};$('ztExcelFile').onchange=()=>{const f=$('ztExcelFile').files&&$('ztExcelFile').files[0];if(f)importBatteryExcel(f);};$('ztStart').onclick=()=>run(false);$('ztRetry').onclick=()=>run(true);$('ztNext').onclick=nextMode;$('ztDownload').onclick=downloadReport;$('ztPrint').onclick=printReport;$('ztHistoryView').onclick=loadHistoricalRun;$('ztHistoryReplay').onclick=replayHistoricalRun;$('ztHistoryDelete').onclick=deleteHistoricalRun;$('ztReplaySeed').onclick=replayManualSeed;
     // DETENER se escucha en captura y nunca depende del estado disabled de un botón.
     $('ceZuzuTestOverlay').addEventListener('pointerdown',e=>{const b=e.target?.closest?.('#ztStop');if(!b)return;e.preventDefault();e.stopPropagation();stop();},{capture:true});
     renderFilters();renderHistory();renderModeStatuses();
@@ -183,13 +183,28 @@
   async function fetchJson(url,options={},timeoutMs=30000){
     const c=new AbortController(),t=setTimeout(()=>c.abort(),timeoutMs);try{const r=await fetch(url,{...options,signal:c.signal});const d=await r.json();if(!r.ok)throw new Error(d.error||`HTTP ${r.status}`);return d;}finally{clearTimeout(t);}
   }
+  function itvNormHeader(v){return trim(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'');}
+  function itvHash(textValue=''){let h=2166136261>>>0;for(let i=0;i<textValue.length;i++){h^=textValue.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h>>>0;}
+  async function ensureExcelJs(){if(window.ExcelJS)return window.ExcelJS;await new Promise((resolve,reject)=>{const old=document.querySelector('script[data-ce-exceljs="1"]');if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return;}const sc=document.createElement('script');sc.src='/vendor/exceljs.min.js';sc.dataset.ceExceljs='1';sc.onload=resolve;sc.onerror=()=>reject(new Error('No se pudo cargar ExcelJS.'));document.head.appendChild(sc);});if(!window.ExcelJS)throw new Error('ExcelJS no está disponible.');return window.ExcelJS;}
+  async function importBatteryExcel(file){
+    if(uiRunning){setPhase('Detén la ejecución antes de cargar otro Excel.');return;}setPhase('Leyendo preguntas del Excel…');
+    try{const ExcelJS=await ensureExcelJs(),wb=new ExcelJS.Workbook(),buf=await file.arrayBuffer();await wb.xlsx.load(buf);let ws=wb.worksheets.find(x=>itvNormHeader(x.name)==='PREGUNTAS')||wb.worksheets[0];if(!ws)throw new Error('El Excel no contiene hojas.');
+      const headers={};ws.getRow(1).eachCell((cell,col)=>{const h=itvNormHeader(cell.text||cell.value);if(h)headers[h]=col;});const qCol=headers.PREGUNTA||headers.PROMPT||headers.PREGUNTAS;if(!qCol)throw new Error('La primera fila debe contener una columna PREGUNTA.');
+      const seqCol=headers.SECUENCIA||headers.SEQ,groupCol=headers.GRUPO,labelCol=headers.ETIQUETA||headers.LABEL,expCol=headers.ESPERADO||headers.EXPECTED,scenarioCol=headers.ESCENARIO||headers.SCENARIO;const raw=[];
+      ws.eachRow((row,idx)=>{if(idx===1)return;const prompt=trim(row.getCell(qCol).text||row.getCell(qCol).value);if(!prompt)return;raw.push({seq:seqCol?num(row.getCell(seqCol).value)||idx-1:idx-1,prompt,group:groupCol?trim(row.getCell(groupCol).text||row.getCell(groupCol).value):'EXCEL',label:labelCol?trim(row.getCell(labelCol).text||row.getCell(labelCol).value):'',expected:expCol?trim(row.getCell(expCol).text||row.getCell(expCol).value):'',scenario:scenarioCol?trim(row.getCell(scenarioCol).text||row.getCell(scenarioCol).value):''});});
+      raw.sort((a,b)=>a.seq-b.seq);if(!raw.length)throw new Error('No se han encontrado preguntas debajo de la cabecera PREGUNTA.');const signature=raw.map(x=>`${x.seq}|${x.prompt}|${x.expected}`).join('\n'),hash=itvHash(signature)||0x6d2b79f5,binary=hash.toString(36).toUpperCase();batterySeed=hash;batteryCode=`XLS-${binary.slice(0,9)}`;batteryClock=`Excel · ${file.name}`;const defaultScenario=`EXCEL-${batteryCode}`;
+      const cases=raw.map((x,i)=>({id:`excel-${String(i+1).padStart(3,'0')}`,group:x.group||'EXCEL',label:x.label||`Pregunta ${i+1}`,prompt:x.prompt,expected:x.expected||'Respuesta coherente con los datos reales y el hilo conversacional.',scenario:x.scenario||defaultScenario,mode:'FULL-CERT',requireAnswer:true,validationRule:'',meta:{excelRow:x.seq}}));
+      preview={ok:true,source:'excel',batteryCode,replayContractVersion:3,seed:batterySeed,generatedAt:new Date().toISOString(),fileName:file.name,dataCounts:{},tests:{FAST:0,'AI-SMOKE':cases.length,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':cases.map(x=>({...x,scenario:''})),'FULL-CERT':cases}};batterySource='excel';historicReplayKey='';currentRunKey=`excel-${batteryCode}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;lastMode='FULL-CERT';renderPreview();renderModeStatuses();selectMode('FULL-CERT');setPhase(`Excel cargado · ${cases.length} preguntas · código ${batteryCode}. La semilla depende del contenido: si vuelves a cargar el mismo Excel obtendrás la misma semilla.`);
+    }catch(e){setPhase('No se pudo cargar el Excel: '+(e.message||e),true);}
+  }
+
   async function loadPreview(forceNew=false){
     if(uiRunning){setPhase('Hay una ejecución en curso. Pulsa DETENER antes de generar otra batería.');return;}
     if(forceNew||!batterySeed)renewBatterySeed();setPhase('Leyendo tablas reales y generando una batería nueva…');
-    try{historicReplayKey='';preview=await fetchJson(`/api/zuzu-tests/preview?seed=${encodeURIComponent(batterySeed)}`,{cache:'no-store',headers:apiHeaders()},45000);batterySeed=num(preview?.seed)||batterySeed;currentRunKey=`seed-${batterySeed}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);setPhase('Batería nueva preparada. Todavía NO se guarda en el histórico: se guardará automáticamente cuando termines de procesar al menos un modo con esta semilla.');}
+    try{historicReplayKey='';batterySource='generated';batteryCode='';preview=await fetchJson(`/api/zuzu-tests/preview?seed=${encodeURIComponent(batterySeed)}`,{cache:'no-store',headers:apiHeaders()},45000);batterySeed=num(preview?.seed)||batterySeed;currentRunKey=`seed-${batterySeed}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);setPhase('Batería nueva preparada. Todavía NO se guarda en el histórico: se guardará automáticamente cuando termines de procesar al menos un modo con esta semilla.');}
     catch(e){setPhase(e.name==='AbortError'?'La lectura de datos tardó demasiado. Vuelve a pulsar NUEVA BATERÍA.':'No se pudo generar la batería: '+(e.message||e),true);}
   }
-  function renderPreview(){const c=preview?.dataCounts||{},t=preview?.tests||{};$('ztData').innerHTML=[['Eventos',c.events],['Personas',c.people],['Productos',c.products],['Tiendas',c.stores],['Compras',c.purchases],['Ingresos',c.incomes],['DOC',c.documents],['Fototickets',c.ticketImages],['Donaciones',c.donationLines],['Hitos',c.hitos],['LG',c.lgs],['FAST',t.FAST],['AI-SMOKE',t['AI-SMOKE']],['FULL-CERT',t['FULL-CERT']]].map(x=>`<span class="zt-pill">${esc(x[0])}: <strong>${fmtN(x[1])}</strong></span>`).join('');if($('ztSeedInfo'))$('ztSeedInfo').textContent=`Batería ${batteryClock||'reloj local'} · semilla ${batterySeed} · eventos/personas elegidos por índices reproducibles.`;}
+  function renderPreview(){const c=preview?.dataCounts||{},t=preview?.tests||{},isExcel=(preview?.source==='excel'||batterySource==='excel');$('ztData').innerHTML=(isExcel?[['Origen','Excel'],['Código',preview?.batteryCode||batteryCode],['Preguntas',t['FULL-CERT']||t['AI-SMOKE']],['AI-SMOKE',t['AI-SMOKE']],['FULL-CERT',t['FULL-CERT']]]:[['Eventos',c.events],['Personas',c.people],['Productos',c.products],['Tiendas',c.stores],['Compras',c.purchases],['Ingresos',c.incomes],['DOC',c.documents],['Fototickets',c.ticketImages],['Donaciones',c.donationLines],['Hitos',c.hitos],['LG',c.lgs],['FAST',t.FAST],['AI-SMOKE',t['AI-SMOKE']],['FULL-CERT',t['FULL-CERT']]]).map(x=>`<span class="zt-pill">${esc(x[0])}: <strong>${typeof x[1]==='number'?fmtN(x[1]):esc(x[1]||'—')}</strong></span>`).join('');if($('ztSeedInfo'))$('ztSeedInfo').textContent=isExcel?`Batería Excel ${preview?.batteryCode||batteryCode} · semilla estable ${batterySeed} · ${t['FULL-CERT']||0} preguntas · FULL-CERT conserva toda la conversación en el mismo ledger.`:`Batería ${batteryClock||'reloj local'} · semilla ${batterySeed} · eventos/personas elegidos por índices reproducibles.`;}
 
   function setPhase(t,err=false){const e=$('ztPhase');if(e){e.textContent=t;e.style.color=err?'#b91c1c':'#334155';}}
   function setLive(t=''){if($('ztLive'))$('ztLive').textContent=t;}
@@ -233,7 +248,7 @@
   async function run(onlyIssues){
     if(uiRunning){setPhase('Ya hay una ejecución en curso. Usa DETENER si quieres interrumpirla.');return;}if(!preview)await loadPreview();if(!preview)return;
     lastMode=document.querySelector('.zt-mode.active')?.dataset.mode||lastMode;
-    if(lastMode==='FAST') return runFastStream(onlyIssues);
+    if(lastMode==='FAST'){if(preview?.source==='excel'||batterySource==='excel'){setPhase('Las baterías Excel son conversaciones literales: ejecútalas con FULL-CERT (recomendado) o AI-SMOKE. FAST sigue reservado a invariantes autogeneradas de CE.');return;}return runFastStream(onlyIssues);}
     return runPaidCases(onlyIssues);
   }
 
@@ -269,8 +284,9 @@
     const masterAbort=()=>child.abort();currentAbort?.signal?.addEventListener?.('abort',masterAbort,{once:true});
     let timeoutId=null,cancelResolve=null;
     const cancelPromise=new Promise(resolve=>{cancelResolve=()=>resolve({kind:'stopped'});currentCaseCancel=cancelResolve;});
-    const endpoint=historicReplayKey?`/api/zuzu-tests/history/${encodeURIComponent(historicReplayKey)}/run-case`:'/api/zuzu-tests/run-case';
-    const networkPromise=fetch(endpoint,{method:'POST',headers:apiHeaders(),signal:child.signal,body:JSON.stringify({mode:lastMode,caseId:caseDef.id,conversationState:conversationState||{},seed:batterySeed})})
+    const imported=!historicReplayKey&&(preview?.source==='excel'||batterySource==='excel'),endpoint=historicReplayKey?`/api/zuzu-tests/history/${encodeURIComponent(historicReplayKey)}/run-case`:imported?'/api/zuzu-tests/run-custom-case':'/api/zuzu-tests/run-case';
+    const payload=imported?{mode:lastMode,savedCase:caseDef,conversationState:conversationState||{}}:{mode:lastMode,caseId:caseDef.id,conversationState:conversationState||{},seed:batterySeed};
+    const networkPromise=fetch(endpoint,{method:'POST',headers:apiHeaders(),signal:child.signal,body:JSON.stringify(payload)})
       .then(async res=>{let d={};try{d=await res.json();}catch(_){}if(!res.ok)throw new Error(d.error||`HTTP ${res.status}`);return{kind:'ok',data:d};})
       .catch(error=>({kind:'error',error}));
     const timeoutPromise=new Promise(resolve=>{timeoutId=setTimeout(()=>resolve({kind:'timeout'}),timeoutMs);});
@@ -287,7 +303,7 @@
     const fullCases=lastMode==='FULL-CERT'&&onlyIssues&&Array.isArray(preview?.cases?.['FULL-CERT'])?preview.cases['FULL-CERT'].slice():[];
     const fullIndex=new Map(fullCases.map((c,i)=>[String(c?.id||''),i]));
     let fullBlockStart=-1,fullThrough=-1,contextWarmups=0,contextWarmupFailures=0;
-    let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0,budgetStopped=false,conversationState={previousInteractionId:'',history:[],scenario:''};
+    let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0,budgetStopped=false,conversationState={conversationId:'',previousInteractionId:'',history:[],scenario:''};
     setPhase(lastMode==='FULL-CERT'&&onlyIssues?`${lastMode}: ${fmtN(total)} KO/avisos · se reconstruirá automáticamente su contexto conversacional antes de evaluarlos.`:`${lastMode}: ${fmtN(total)} casos · ejecución troceada, una petición corta por caso. Presupuesto máximo ${fmtE(maxCost)}.`);
     let stopLoop=false;
     try{
@@ -305,7 +321,7 @@
           if(targetIdx>=0){
             const blockStart=fullCertScenarioStart(fullCases,targetIdx);
             if(blockStart!==fullBlockStart){
-              conversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};
+              conversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};
               fullBlockStart=blockStart;fullThrough=blockStart-1;
             }
             let contextFailed=false;
@@ -339,7 +355,7 @@
             }
           }
         }else if(lastMode==='FULL-CERT'&&conversationState.scenario&&conversationState.scenario!==c.scenario){
-          conversationState={previousInteractionId:'',history:[],scenario:c.scenario||''};
+          conversationState={conversationId:'',previousInteractionId:'',history:[],scenario:c.scenario||''};
         }
 
         if(costEur>0&&costEur+reserve>maxCost){budgetStopped=true;setPhase(`Presupuesto protegido: no se inicia el caso ${i+1}. Coste acumulado ${fmtE(costEur)}.`);break;}
@@ -355,7 +371,7 @@
           else r=localCaseOutcome(c,'KO',got.error?.message||String(got.error),{calls:0,tokens:0,costEur:0});
         }else{
           r=got.data?.case||localCaseOutcome(c,'KO','Respuesta del servidor sin resultado de prueba.',{});
-          if(lastMode==='FULL-CERT')conversationState=got.data?.conversationState||{previousInteractionId:'',history:[],scenario:c.scenario||''};
+          if(lastMode==='FULL-CERT')conversationState=got.data?.conversationState||{conversationId:'',previousInteractionId:'',history:[],scenario:c.scenario||''};
         }
         if(lastMode==='FULL-CERT'&&onlyIssues){const idx=fullIndex.has(String(c.id))?fullIndex.get(String(c.id)):-1;if(idx>=0){fullThrough=idx;r.contextReplay=true;}}
         r.durationMs=num(r.durationMs)||Date.now()-started;const u=r.usage||{};costEur=Number((costEur+num(u.costEur)).toFixed(6));calls+=num(u.calls);tokens+=num(u.tokens);done++;
@@ -430,14 +446,14 @@
   function countsChanged(a={},b={}){const keys=['events','people','products','stores','purchases','incomes','documents','ticketImages','donationLines','hitos','lgs'];return keys.some(k=>a?.[k]!=null&&b?.[k]!=null&&num(a[k])!==num(b[k]));}
   async function loadHistoricalRun(){
     if(uiRunning){setPhase('Detén la ejecución antes de cargar un histórico.');return;}const d=await selectedHistorical();const run=d?.run;if(!run)return;
-    historicReplayKey='';currentRunKey=run.runKey;batterySeed=num(run.seed);batteryClock=run.batteryClock||'';preview=run.generatedBattery||null;
+    historicReplayKey='';currentRunKey=run.runKey;batterySeed=num(run.seed);batteryClock=run.batteryClock||'';preview=run.generatedBattery||null;batterySource=preview?.source==='excel'?'excel':'generated';batteryCode=preview?.batteryCode||'';
     const rep=run.report||{};for(const mode of MODES){modeCache[mode]={rows:Array.isArray(rep?.modes?.[mode]?.results)?rep.modes[mode].results:[],summary:rep?.modes?.[mode]?.summary||null};}
     renderPreview();renderModeStatuses();restoreMode(lastMode);setPhase(`Histórico cargado · semilla ${batterySeed}. Estás viendo sus preguntas, esperados y respuestas originales; no se ha vuelto a ejecutar nada.`);
   }
   async function replayHistoricalRun(){
     if(uiRunning){setPhase('Detén la ejecución antes de repetir una batería histórica.');return;}const d=await selectedHistorical();const run=d?.run;if(!run)return;
     const saved=run.generatedBattery||null;if(!saved?.cases||num(saved?.replayContractVersion)<2){setPhase('Esta batería histórica es anterior al contrato reproducible exacto v2. Puedes REGENERAR su semilla manualmente; las baterías creadas con esta versión sí podrán repetirse literalmente.',true);return;}
-    historicReplayKey=run.runKey;batterySeed=num(run.seed);{const baseClock=text(run.batteryClock||run.seed).replace(/^(?:repetición exacta\s*·\s*)+/i,'');batteryClock=`repetición exacta · ${baseClock||run.seed}`;}preview=saved;currentRunKey=`exact-${batterySeed}-${Date.now()}`;
+    historicReplayKey=run.runKey;batterySeed=num(run.seed);batterySource=saved?.source==='excel'?'excel':'generated';batteryCode=saved?.batteryCode||'';{const baseClock=text(run.batteryClock||run.seed).replace(/^(?:repetición exacta\s*·\s*)+/i,'');batteryClock=`repetición exacta · ${baseClock||run.seed}`;}preview=saved;currentRunKey=`exact-${batterySeed}-${Date.now()}`;
     for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);
     setPhase(`Batería histórica ${batterySeed} cargada para REPETICIÓN EXACTA. AI-SMOKE y FULL-CERT usarán literalmente las preguntas y esperados guardados; FAST vuelve a comprobar la estructura actual con la misma semilla.`);
   }
@@ -446,7 +462,7 @@
     const raw=trim($('ztSeedReplayInput')?.value),seed=Math.abs(Math.trunc(Number(raw)||0))>>>0;if(!raw||!seed){setPhase('Introduce una semilla numérica válida.');return;}
     setPhase(`Regenerando exactamente la semilla ${seed} contra el código y datos actuales…`);
     try{
-      historicReplayKey='';
+      historicReplayKey='';batterySource='generated';batteryCode='';
       const fresh=await fetchJson(`/api/zuzu-tests/preview?seed=${encodeURIComponent(seed)}`,{cache:'no-store',headers:apiHeaders()},45000);
       batterySeed=seed;batteryClock=`semilla manual ${seed}`;preview=fresh;currentRunKey=`manual-${seed}-${Date.now()}`;
       for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);
@@ -460,7 +476,7 @@
 
   function reportPayload(){
     const modes={};for(const mode of MODES){modes[mode]={summary:modeCache[mode].summary||null,results:modeCache[mode].rows||[]};}
-    return{type:'ControlEvent Zuzu ITV',version:'v3_0_exp',exportedAt:new Date().toISOString(),batterySeed,batteryClock,historicReplayKey:historicReplayKey||'',generatedBattery:preview||null,dataCounts:preview?.dataCounts||{},modes,history:history().slice(0,10)};
+    return{type:'ControlEvent Zuzu ITV',version:'v3_0_exp',exportedAt:new Date().toISOString(),batterySeed,batteryClock,batterySource,batteryCode,historicReplayKey:historicReplayKey||'',generatedBattery:preview||null,dataCounts:preview?.dataCounts||{},modes,history:history().slice(0,10)};
   }
   function modeFileSuffix(mode=lastMode){return mode==='FAST'?'FAST_CE':mode==='AI-SMOKE'?'AI_SMOKE':'FULL_CERT';}
   function downloadReport(){const payload=reportPayload(),has=MODES.some(m=>modeCache[m].rows.length||modeCache[m].summary);if(!has){alert('Todavía no hay resultados que exportar.');return;}const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a'),suffix=modeFileSuffix(lastMode);a.href=url;a.download=`ControlEvent_v3_0_exp_ITV_Zuzu_${new Date().toISOString().replace(/[:.]/g,'-')}-${suffix}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);setPhase(`Informe ${suffix} descargado. Puedes adjuntarlo directamente para analizar este chequeo.`);}

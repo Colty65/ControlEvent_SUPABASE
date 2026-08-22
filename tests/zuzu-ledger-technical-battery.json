@@ -1,0 +1,28 @@
+{
+  "name": "ITV-TECNICA-LEDGER-001",
+  "version": 1,
+  "description": "Batería continua de regresión DATASET/VIEW/REFERENCIAS usada para auditar el ledger inmutable.",
+  "questions": [
+    "Dame el PAN comprado en todos los eventos",
+    "Ahora déjame solo Producto, Unidades e Importe",
+    "Añade Evento como primera columna",
+    "Ordénala de mayor a menor importe",
+    "Quita Unidades",
+    "Saca la tabla completa",
+    "Compras de Vicente",
+    "Solo las de SySA 2026",
+    "Añade Ticket e Importe",
+    "¿Qué me puedes decir de él?",
+    "¿Y sus donaciones?",
+    "Ahora háblame de SySA 2024",
+    "Volvamos a Vicente, ¿en qué eventos aparece?",
+    "Dame otra vez sus compras",
+    "Añade a esa tabla el campo Color del ticket",
+    "Vale, quita ese campo y añade Evento",
+    "Dame la tabla anterior",
+    "Dame el pan comprao en sisa 2026 y enséñame solo Evento, Producto, Tienda e Importe",
+    "Ahora el mismo PAN pero de todos los eventos",
+    "¿Qué estás viendo ahora exactamente?",
+    "Hazme una gráfica con esto"
+  ]
+}

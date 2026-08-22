@@ -339,6 +339,10 @@
     return '<div class="ce-ai-card ce-ai-answer-card"><div class="ce-ai-answer">'+answerDisplayHtml(answer||'Sin respuesta archivada para este turno.')+'</div></div>';
   }
   function archivedTraceHtml(turn){ return withoutGeminiLabel(trim(turn&&turn.archiveTraceHtml||'')||''); }
+  async function fetchArchivedTurnPresentation(turn){
+    turn=turn||{}; if(trim(turn.archiveHtml||'')) return null; var tid=trim(turn.turnId||''); if(!tid||tid.indexOf('ZC_')!==0) return null;
+    try{var res=await fetch('/api/event-ai/conversations/turn',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({turnId:tid,usuarioLogado:loggedUserPayload()})});var raw=await res.text(),obj={};try{obj=raw?JSON.parse(raw):{};}catch(_){}if(!res.ok||!obj||!obj.data)return null;obj.data.__prompt=turn.user||obj.data.__prompt||'';return obj.data;}catch(_){return null;}
+  }
   // En pantalla la traza sigue plegada. Al imprimirla se abren sus <details> para que
   // el PDF capture realmente pasos, consultas, selector/router y diagnóstico.
   function printableArchivedTraceHtml(turn){
@@ -361,24 +365,26 @@
     if(Number(m.tables||0))out.push('<span class="ce-ai-pdf-badge">'+Number(m.tables)+' tabla'+(Number(m.tables)===1?'':'s')+'</span>');
     return out.join('');
   }
-  function printSelectedZuzuTurns(selectedIndexes,includeTrace){
+  async function printSelectedZuzuTurns(selectedIndexes,includeTrace){
     var hist=loadZuzuConversation(),selected=(selectedIndexes||[]).map(function(i){return {idx:Number(i),turn:hist[Number(i)]};}).filter(function(x){return x.turn;});
     if(!selected.length){ setStatus('Selecciona al menos una pregunta/respuesta para el PDF.','err'); return; }
     var now=new Date(),win=null;
     try{document.dispatchEvent(new CustomEvent('ce:zuzu-pdf-print-started'));}catch(_){ }
     try{win=window.open('','_blank');}catch(_){win=null;}
     if(!win){try{document.dispatchEvent(new CustomEvent('ce:zuzu-pdf-print-finished'));}catch(_){ }setStatus('El navegador ha bloqueado la ventana de impresión.','err');return;}
+    try{win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preparando conversación Zuzu…</title></head><body style="font-family:Arial;padding:24px">Recuperando del servidor los turnos seleccionados…</body></html>');win.document.close();}catch(_){ }
     var title=selected.length===1?responsePdfTitle({__prompt:selected[0].turn.user},selected[0].turn.user):('ControlEvent_v3_0_exp-conversacion_Zuzu-'+dateStamp(now)+'.pdf');
-    var userName=loggedUserDisplayName();
-    var body=selected.map(function(item){
-      var turn=item.turn||{},n=item.idx+1;
-      return '<section class="ce-print-turn"><div class="ce-print-turn-head"><strong>Turno '+n+' · Pregunta</strong><div class="ce-print-turn-q">'+esc(turn.user||'')+'</div></div>'+archivedTurnHtml(turn)+(includeTrace?printableArchivedTraceHtml(turn):'')+'</section>';
-    }).join('');
+    var userName=loggedUserDisplayName(),chunks=[];
+    for(var k=0;k<selected.length;k++){
+      var item=selected[k],turn=item.turn||{},n=item.idx+1,serverData=await fetchArchivedTurnPresentation(turn),answerHtml='',trace='';
+      if(serverData){answerHtml=resultCoreHtml(serverData,{includeFiles:false,includeTrace:false});trace=includeTrace?traceHtml(serverData):'';if(trace){try{var h=document.createElement('div');h.innerHTML=trace;[].slice.call(h.querySelectorAll('details')).forEach(function(d){d.setAttribute('open','open');});trace=h.innerHTML;}catch(_){trace=String(trace).replace(/<details(?![^>]*\bopen\b)/ig,'<details open');}}}
+      else{answerHtml=archivedTurnHtml(turn);trace=includeTrace?printableArchivedTraceHtml(turn):'';}
+      chunks.push('<section class="ce-print-turn"><div class="ce-print-turn-head"><strong>Turno '+n+' · Pregunta</strong><div class="ce-print-turn-q">'+esc(turn.user||'')+'</div></div>'+answerHtml+trace+'</section>');
+    }
+    var body=chunks.join('');
     win.document.open();
     win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body><main class="ce-print-wrap"><header class="ce-print-head"><div class="ce-print-top"><div><h1>✨ Conversación Zuzu · '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'</h1><div class="ce-print-meta">Usuario: '+esc(userName)+'</div></div><div class="ce-print-datetime">'+esc(prettyDateTime(now))+'</div></div></header>'+body+'</main><script>window.onload=function(){setTimeout(function(){try{document.querySelectorAll(".ce-ai-trace details").forEach(function(d){d.open=true;d.setAttribute("open","open");});document.title='+JSON.stringify(title)+';window.focus();window.print();}catch(e){}},250)};window.onafterprint=function(){try{window.opener&&window.opener.document&&window.opener.document.dispatchEvent(new CustomEvent("ce:zuzu-pdf-print-finished"));}catch(e){}}<\/script></body></html>');
-    win.document.close();
-    closeZuzuPdfPicker();
-    setStatus('Abierta impresión con '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'.','ok');
+    win.document.close();closeZuzuPdfPicker();setStatus('Abierta impresión con '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'.','ok');
   }
   function openZuzuPdfPicker(){
     closeZuzuPdfPicker();
@@ -393,7 +399,7 @@
     $('ceAiPdfNone').onclick=function(){document.querySelectorAll('#ceAiPdfPicker .ce-ai-pdf-turn-check').forEach(function(x){x.checked=false;});};
     $('ceAiPdfCancel').onclick=closeZuzuPdfPicker;
     $('ceAiPdfPicker').addEventListener('click',function(ev){if(ev.target&&ev.target.id==='ceAiPdfPicker')closeZuzuPdfPicker();});
-    $('ceAiPdfPrint').onclick=function(){var selected=[].slice.call(document.querySelectorAll('#ceAiPdfPicker .ce-ai-pdf-turn-check:checked')).map(function(x){return Number(x.value);});printSelectedZuzuTurns(selected,!!($('ceAiPdfTrace')&&$('ceAiPdfTrace').checked));};
+    $('ceAiPdfPrint').onclick=async function(){var selected=[].slice.call(document.querySelectorAll('#ceAiPdfPicker .ce-ai-pdf-turn-check:checked')).map(function(x){return Number(x.value);});await printSelectedZuzuTurns(selected,!!($('ceAiPdfTrace')&&$('ceAiPdfTrace').checked));};
   }
   function printZuzuPdf(){ openZuzuPdfPicker(); }
 
@@ -408,6 +414,7 @@
     window.__ceLastZuzuResult=null;
     window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
     saveZuzuInteractionId('');
+    saveZuzuServerConversationId('');
     try{ ['ControlEvent_v3_0_exp','ControlEvent_'+'v30'+'_prod','ControlEvent_v29_prod','ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); sessionStorage.removeItem(v+'_zuzu_usage_total'); }); }catch(_){ }
     var r=$('ceAiResult'); if(r){ r.removeAttribute('data-ce-resume-only'); r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     updateConversationMode();
@@ -457,6 +464,7 @@
       pdfBtn.onclick=function(ev){ if(ev){ev.preventDefault();ev.stopPropagation();} printZuzuPdf(); };
     }
     restoreConversationScreen();
+    restoreServerConversationIfNeeded();
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
   function closeModal(){ closeZuzuPdfPicker(); clearZuzuThinkingTimer(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
@@ -496,7 +504,7 @@
     try{ var raw=zuzuMigratedStorageValue('conversation'); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-50):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
     return window.__ceZuzuConversationV26;
   }
-  function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-100))); }catch(_){ } }
+  function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-50))); }catch(_){ } }
   function zuzuContextKey(){ return zuzuStorageKey('context'); }
   function loadZuzuConversationContext(){
     if(window.__ceZuzuConversationContextV26 && typeof window.__ceZuzuConversationContextV26==='object') return window.__ceZuzuConversationContextV26;
@@ -504,6 +512,19 @@
     return window.__ceZuzuConversationContextV26;
   }
   function saveZuzuConversationContext(){ try{ var c=window.__ceZuzuConversationContextV26; if(c&&typeof c==='object')sessionStorage.setItem(zuzuContextKey(),JSON.stringify(c)); else sessionStorage.removeItem(zuzuContextKey()); }catch(_){ } }
+  function zuzuServerConversationIdKey(){ return zuzuStoragePrefix()+'server_conversation_id'; }
+  function loadZuzuServerConversationId(){ try{return String(localStorage.getItem(zuzuServerConversationIdKey())||'').trim();}catch(_){return '';} }
+  function saveZuzuServerConversationId(value){ try{var v=String(value||'').trim();if(v)localStorage.setItem(zuzuServerConversationIdKey(),v);else localStorage.removeItem(zuzuServerConversationIdKey());}catch(_){ } }
+  async function restoreServerConversationIfNeeded(){
+    if(loadZuzuConversation().length) return;
+    var cid=loadZuzuServerConversationId(); if(!cid) return;
+    try{
+      var res=await fetch('/api/event-ai/conversations/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversationId:cid,usuarioLogado:loggedUserPayload(),limit:50})});
+      var data=await res.json(); if(!res.ok||!data||!data.data||!Array.isArray(data.data.turns))return;
+      window.__ceZuzuConversationV26=data.data.turns.map(function(t){var a=String(t.answer||''),u=String(t.userPrompt||'');return{turnId:String(t.turnId||''),user:u.slice(0,700),assistant:a.slice(0,420),assistantTail:a.slice(-300),title:String(t.title||'').slice(0,160),provider:'server-ledger',intent:String(t.actionType||''),tools:[],selectedEventId:'',conversationContext:null,pendingAction:null,resultContext:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:'',archiveMeta:{charts:0,tables:0,files:0}};});
+      saveZuzuConversation(); updateConversationMode(); updateConversationTrail(); var r=$('ceAiResult');if(r)r.innerHTML=conversationResumeHtml();
+    }catch(_){ }
+  }
   function zuzuUsageTotalKey(){ return zuzuStorageKey('usage_total'); }
   function emptyZuzuUsageTotal(){ return {turns:0,calls:0,totalTokens:0,promptTokens:0,outputTokens:0,hiddenOutputTokens:0,costEurApprox:0,costUsdApprox:0}; }
   function loadZuzuUsageTotal(){
@@ -638,7 +659,7 @@
       var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();}
       requestController=typeof AbortController!=='undefined'?new AbortController():null;
       if(requestController)requestWatchdog=setTimeout(function(){try{requestController.abort();}catch(_){}},75000);
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),previousInteractionId:previousInteractionId,conversationHistory:history,conversationDigest:conversationDigestForApi(),conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:conversationContext,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
+      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationId:loadZuzuServerConversationId(),previousInteractionId:'',conversationHistory:[],conversationDigest:'',conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:null,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
@@ -667,23 +688,24 @@
         window.__ceLastZuzuResult=null;
         window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
         saveZuzuInteractionId('');
+    saveZuzuServerConversationId('');
         try{ sessionStorage.removeItem(zuzuConversationKey()); sessionStorage.removeItem(zuzuContextKey()); sessionStorage.removeItem(zuzuInteractionKey()); sessionStorage.removeItem(zuzuUsageTotalKey()); }catch(_){ }
       }
       if(data.meta&&data.meta.resetInteractionId===true) saveZuzuInteractionId('');
       if(returnedInteractionId) saveZuzuInteractionId(returnedInteractionId);
+      var returnedServerConversationId=String(data.conversationId||(data.meta&&data.meta.conversationId)||'').trim(); if(returnedServerConversationId)saveZuzuServerConversationId(returnedServerConversationId);
       var returnedContext=(data.meta&&data.meta.conversationContext)||data.conversationContext||null;
       if(returnedContext&&typeof returnedContext==='object'){ window.__ceZuzuConversationContextV26=returnedContext; saveZuzuConversationContext(); }
       if(!Array.isArray(window.__ceZuzuConversationV26)) window.__ceZuzuConversationV26=[];
       var pendingAction=(data.meta&&data.meta.pendingAction&&typeof data.meta.pendingAction==='object')?data.meta.pendingAction:null;
-      var turnId='zuzu-'+Date.now()+'-'+Math.random().toString(36).slice(2,8);
+      var turnId=String(data.turnId||(data.meta&&data.meta.turnId)||('zuzu-'+Date.now()+'-'+Math.random().toString(36).slice(2,8))).trim();
       if(!data.meta||typeof data.meta!=='object')data.meta={}; // Arquitectura nueva activa: el Router SOMBRA ya no se ejecuta automáticamente.
       recordZuzuUsage(data);
       var fullAnswer=String(data.answer||'');
-      var archiveHtml=resultCoreHtml(data,{includeFiles:false,includeTrace:false});
-      var archiveTraceHtml=traceHtml(data);
       if(!(data.meta&&data.meta.doNotArchiveTurn===true)){
-        window.__ceZuzuConversationV26.push({turnId:turnId,user:prompt,assistant:fullAnswer.slice(0,1200),assistantTail:fullAnswer.slice(-1000),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:returnedContext,pendingAction:pendingAction,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null,routerShadow:null,archiveHtml:archiveHtml,archiveTraceHtml:archiveTraceHtml,archiveMeta:archiveMetaForData(data)});
-        if(window.__ceZuzuConversationV26.length>100)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-100);
+        // Ledger v1: el navegador guarda solo el índice ligero. Tablas, trazas, DATASET y VIEW se recuperan del servidor bajo demanda (PDF/recuerdo).
+        window.__ceZuzuConversationV26.push({turnId:turnId,user:prompt.slice(0,700),assistant:fullAnswer.slice(0,420),assistantTail:fullAnswer.slice(-300),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:[],selectedEventId:selectedEventId(),conversationContext:null,pendingAction:pendingAction,resultContext:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:'',archiveMeta:archiveMetaForData(data)});
+        if(window.__ceZuzuConversationV26.length>50)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-50);
         saveZuzuConversation();
       }
       updateConversationMode();

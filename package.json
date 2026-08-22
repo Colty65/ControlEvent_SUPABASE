@@ -10,7 +10,8 @@
     "test:zuzu-router": "node scripts/zuzu-router-shadow-suite.js",
     "test:zuzu-router:dry": "node scripts/zuzu-router-shadow-suite.js --dry-run",
     "test:zuzu-router:observed": "node scripts/zuzu-router-observed-regressions.js",
-    "test:zuzu-invariants": "node scripts/zuzu-conversation-invariants.js"
+    "test:zuzu-invariants": "node scripts/zuzu-conversation-invariants.js",
+    "test:zuzu-ledger": "node scripts/zuzu-ledger-structural-suite.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

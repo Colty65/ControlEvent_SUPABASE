@@ -77,6 +77,9 @@ function resultHasPerson(result,name){
   const p=trim(c.person || c.subject || c.personName || c.person_name);
   return (p && norm(p)===norm(name)) || answerHasName(result,name);
 }
+function ledgerAuditOf(result){
+  const a=result?.meta?.ledgerAudit||{};return{conversationId:trim(result?.conversationId||result?.meta?.conversationId),turnId:trim(result?.turnId||result?.meta?.turnId),turnSeq:num(result?.turnSeq||result?.meta?.turnSeq),ledgerAction:trim(a?.action),geminiPlan:a?.geminiPlan||{},normalizedPlan:a?.normalizedPlan||{}};
+}
 function usageOf(result){
   const u=result?.meta?.geminiUsageEstimate||{};
   const trace=arr(result?.meta?.debugTrace);
@@ -944,7 +947,7 @@ async function runFast({state,cases,send,signal}){
   return {done,total,ok,warn,ko,failures,costEur:0,calls:0,tokens:0,aborted:!!signal?.aborted};
 }
 
-async function runSmoke({state,cases,send,signal,maxCostEur=0.25,maxCases=24}){
+async function runSmoke({state,cases,send,signal,actor={},maxCostEur=0.25,maxCases=24}){
   const selected=cases.slice(0,Math.max(1,Math.min(80,Number(maxCases)||24))), total=selected.length; let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0; const failures=[];
   const timeoutMs=Math.max(30000,Math.min(120000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000));
   for(let i=0;i<selected.length;i++){
@@ -952,7 +955,7 @@ async function runSmoke({state,cases,send,signal,maxCostEur=0.25,maxCases=24}){
     const reserve=0.012; if(costEur>0 && costEur+reserve>maxCostEur){streamWrite(send,'budget',{message:`Presupuesto protegido: no se inicia otra prueba porque quedan menos de ${reserve.toFixed(3)} € de margen.`,costEur});break;}
     const t0=Date.now(); let r;
     const timed=await runTimedAiCase({caseDef:c,send,parentSignal:signal,index:i+1,total,timeoutMs,task:async externalSignal=>{
-      const result=await analyzeEventPrompt({prompt:c.prompt,stateOverride:state,conversationHistory:[],conversationTurnNumber:1,externalSignal});
+      const result=await analyzeEventPrompt({prompt:c.prompt,stateOverride:state,usuarioLogado:actor,conversationId:'',conversationHistory:[],conversationTurnNumber:1,externalSignal});
       return result;
     }});
     if(signal?.aborted)break;
@@ -963,7 +966,7 @@ async function runSmoke({state,cases,send,signal,maxCostEur=0.25,maxCases=24}){
       r=outcome(c,'KO',timed.error?.message||String(timed.error));
     }else{
       const result=timed.value,u=usageOf(result);costEur=round(costEur+u.costEur,6);calls+=u.calls;tokens+=u.tokens;const verdict=validatePaidCase(c,result);
-      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,260)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons});
+      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,260)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
     }
     r.durationMs=Date.now()-t0;done++;if(r.status==='OK')ok++;else if(r.status==='WARN')warn++;else{ko++;failures.push(r);}streamWrite(send,'case',{case:r,progress:{done,total,ok,warn,ko,percent:total?Math.round(done*100/total):100,costEur,calls,tokens}});
     if(costEur>=maxCostEur){streamWrite(send,'budget',{message:'Se ha alcanzado el presupuesto máximo configurado.',costEur});break;}
@@ -971,27 +974,28 @@ async function runSmoke({state,cases,send,signal,maxCostEur=0.25,maxCases=24}){
   return {done,total,ok,warn,ko,failures,costEur,calls,tokens,aborted:!!signal?.aborted,caseTimeoutMs:timeoutMs};
 }
 
-async function runFull({state,turns,send,signal,maxCostEur=0.50,maxCases=18}){
+async function runFull({state,turns,send,signal,actor={},maxCostEur=0.50,maxCases=18}){
   const selected=turns.slice(0,Math.max(1,Math.min(40,Number(maxCases)||18))),total=selected.length;let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0;const failures=[];
   const timeoutMs=Math.max(45000,Math.min(150000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
-  let previousInteractionId='',history=[],activeScenario='';
+  let previousInteractionId='',history=[],activeScenario='',conversationId='';
   for(let i=0;i<selected.length;i++){
     const c=selected[i]; if(signal?.aborted)break;
-    if(activeScenario && trim(c.scenario)!==activeScenario){ previousInteractionId=''; history=[]; }
+    if(activeScenario && trim(c.scenario)!==activeScenario){ previousInteractionId=''; history=[]; conversationId=''; }
     activeScenario=trim(c.scenario);
     const reserve=0.015;if(costEur>0&&costEur+reserve>maxCostEur){streamWrite(send,'budget',{message:`Presupuesto protegido: no se inicia otro turno porque quedan menos de ${reserve.toFixed(3)} € de margen.`,costEur});break;}
     const t0=Date.now();let r;
-    const timed=await runTimedAiCase({caseDef:c,send,parentSignal:signal,index:i+1,total,timeoutMs,task:async externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,previousInteractionId,conversationHistory:history.slice(-8),conversationTurnNumber:history.length+1,externalSignal})});
+    const timed=await runTimedAiCase({caseDef:c,send,parentSignal:signal,index:i+1,total,timeoutMs,task:async externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,usuarioLogado:actor,conversationId,previousInteractionId,conversationHistory:history.slice(-8),conversationTurnNumber:history.length+1,externalSignal})});
     if(signal?.aborted)break;
     if(timed.timedOut){
-      costEur=round(costEur+reserve,6);calls+=1;previousInteractionId='';
+      costEur=round(costEur+reserve,6);calls+=1;previousInteractionId='';conversationId='';
       r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno superó ${Math.round(timeoutMs/1000)} s. Se abortó el turno, se reinicia la cadena del escenario y la ITV continúa.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});
-    }else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario});previousInteractionId='';}
+    }else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario});previousInteractionId='';conversationId='';}
     else{
       const result=timed.value,u=usageOf(result);costEur=round(costEur+u.costEur,6);calls+=u.calls;tokens+=u.tokens;
       const verdict=validatePaidCase(c,result);
-      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,300)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons});
+      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,300)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
       previousInteractionId=trim(result?.interactionId||result?.meta?.interactionId||'');
+      conversationId=trim(result?.conversationId||result?.meta?.conversationId||conversationId);
       history.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});
     }
     r.durationMs=Date.now()-t0;done++;if(r.status==='OK')ok++;else if(r.status==='WARN')warn++;else{ko++;failures.push(r);}streamWrite(send,'case',{case:r,progress:{done,total,ok,warn,ko,percent:total?Math.round(done*100/total):100,costEur,calls,tokens}});
@@ -1002,10 +1006,10 @@ async function runFull({state,turns,send,signal,maxCostEur=0.50,maxCases=18}){
 
 
 function safeConversationState(raw={}){
-  return {previousInteractionId:trim(raw?.previousInteractionId).slice(0,500),scenario:trim(raw?.scenario).slice(0,160),history:arr(raw?.history).slice(-8).map(h=>({user:trim(h?.user).slice(0,1600),assistant:trim(h?.assistant).slice(0,1200),assistantTail:trim(h?.assistantTail).slice(0,900),title:trim(h?.title).slice(0,240),provider:trim(h?.provider).slice(0,80),selectedEventId:trim(h?.selectedEventId).slice(0,160),pendingAction:h?.pendingAction||null,resultContext:h?.resultContext||null}))};
+  return {conversationId:trim(raw?.conversationId).slice(0,160),previousInteractionId:trim(raw?.previousInteractionId).slice(0,500),scenario:trim(raw?.scenario).slice(0,160),history:arr(raw?.history).slice(-8).map(h=>({user:trim(h?.user).slice(0,1600),assistant:trim(h?.assistant).slice(0,1200),assistantTail:trim(h?.assistantTail).slice(0,900),title:trim(h?.title).slice(0,240),provider:trim(h?.provider).slice(0,80),selectedEventId:trim(h?.selectedEventId).slice(0,160),pendingAction:h?.pendingAction||null,resultContext:h?.resultContext||null}))};
 }
 
-export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationState={},seed,signal}={}){
+export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationState={},seed,signal,actor={}}={}){
   const m=trim(mode).toUpperCase();
   if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('run-case solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
   const state=await getState(),cached=batteryRuntimeGet(seed);
@@ -1016,30 +1020,30 @@ export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationSta
   const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
   let r,nextConversationState=null;
   if(m==='AI-SMOKE'){
-    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,conversationHistory:[],conversationTurnNumber:1,externalSignal})});
+    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,usuarioLogado:actor,conversationId:'',conversationHistory:[],conversationTurnNumber:1,externalSignal})});
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
     if(timed.timedOut) r=outcome(c,'WARN',`TIEMPO MÁXIMO: el caso superó ${Math.round(timeoutMs/1000)} s. Se cancela este caso y el cliente puede continuar con el siguiente.`,{timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});
     else if(timed.error) r=outcome(c,'KO',timed.error?.message||String(timed.error),{usage:{calls:1,tokens:0,costEur:reserve}});
-    else {const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,320)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons});}
+    else {const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,320)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,...ledgerAuditOf(result)});}
   } else {
     let cs=safeConversationState(conversationState);
-    if(cs.scenario!==trim(c.scenario)) cs={previousInteractionId:'',history:[],scenario:trim(c.scenario)};
-    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,previousInteractionId:cs.previousInteractionId,conversationHistory:cs.history,conversationTurnNumber:cs.history.length+1,externalSignal})});
+    if(cs.scenario!==trim(c.scenario)) cs={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};
+    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,usuarioLogado:actor,conversationId:cs.conversationId,previousInteractionId:cs.previousInteractionId,conversationHistory:cs.history,conversationTurnNumber:cs.history.length+1,externalSignal})});
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
-    if(timed.timedOut){r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno superó ${Math.round(timeoutMs/1000)} s. El siguiente turno reiniciará la cadena del escenario.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
-    else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
+    if(timed.timedOut){r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno superó ${Math.round(timeoutMs/1000)} s. El siguiente turno reiniciará la cadena del escenario.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
+    else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
     else {
       const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);
-      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons});
+      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
       const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});
-      nextConversationState={previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};
+      nextConversationState={conversationId:trim(result?.conversationId||result?.meta?.conversationId||cs.conversationId).slice(0,160),previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};
     }
   }
   r.durationMs=Date.now()-started;
   return {ok:true,mode:m,case:r,conversationState:nextConversationState,timeoutMs};
 }
 
-export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},conversationState={},signal}={}){
+export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},conversationState={},signal,actor={}}={}){
   const m=trim(mode||savedCase?.mode).toUpperCase();
   if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('La repetición histórica solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
   const c=restoredHistoricalCase(savedCase,m);if(!c.id||!c.prompt){const e=new Error('La batería histórica no contiene una pregunta ejecutable.');e.status=422;throw e;}
@@ -1047,25 +1051,25 @@ export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},convers
   const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
   let r,nextConversationState=null;
   if(m==='AI-SMOKE'){
-    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,conversationHistory:[],conversationTurnNumber:1,externalSignal})});
+    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,usuarioLogado:actor,conversationId:'',conversationHistory:[],conversationTurnNumber:1,externalSignal})});
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
     if(timed.timedOut)r=outcome(c,'WARN',`TIEMPO MÁXIMO: el caso histórico superó ${Math.round(timeoutMs/1000)} s.`,{timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});
     else if(timed.error)r=outcome(c,'KO',timed.error?.message||String(timed.error),{usage:{calls:1,tokens:0,costEur:reserve}});
     else{const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`
-ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,historicalExact:true});}
+ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,historicalExact:true,...ledgerAuditOf(result)});}
   }else{
-    let cs=safeConversationState(conversationState);if(cs.scenario!==trim(c.scenario))cs={previousInteractionId:'',history:[],scenario:trim(c.scenario)};
-    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,previousInteractionId:cs.previousInteractionId,conversationHistory:cs.history,conversationTurnNumber:cs.history.length+1,externalSignal})});
+    let cs=safeConversationState(conversationState);if(cs.scenario!==trim(c.scenario))cs={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};
+    const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>analyzeEventPrompt({prompt:c.prompt,stateOverride:state,usuarioLogado:actor,conversationId:cs.conversationId,previousInteractionId:cs.previousInteractionId,conversationHistory:cs.history,conversationTurnNumber:cs.history.length+1,externalSignal})});
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
-    if(timed.timedOut){r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno histórico superó ${Math.round(timeoutMs/1000)} s.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
-    else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
+    if(timed.timedOut){r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno histórico superó ${Math.round(timeoutMs/1000)} s.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
+    else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
     else{const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,420)}${verdict.reasons.length?`
-ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,historicalExact:true});const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});nextConversationState={previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};}
+ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,historicalExact:true,...ledgerAuditOf(result)});const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});nextConversationState={conversationId:trim(result?.conversationId||result?.meta?.conversationId||cs.conversationId).slice(0,160),previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};}
   }
   r.durationMs=Date.now()-started;return{ok:true,mode:m,case:r,conversationState:nextConversationState,timeoutMs,historicalExact:true};
 }
 
-export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,caseIds,seed,send,signal}){
+export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,caseIds,seed,send,signal,actor={}}){
   const m=trim(mode).toUpperCase(),normalizedSeed=normalizeSeed(seed);
   // La primera línea sale ANTES de reconstruir casos/oráculos: el usuario ve respuesta inmediata
   // al pulsar INICIAR y el watchdog no confunde preparación con bloqueo.
@@ -1074,7 +1078,7 @@ export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,ca
   const built=cached?{seed:cached.seed,cases:m==='AI-SMOKE'?cached.smoke:m==='FULL-CERT'?cached.full:cached.fast}:await buildCasesForMode(state,m,normalizedSeed);
   const selected=filterCases(built.cases,caseIds);
   streamWrite(send,'start',{mode:m,seed:built.seed,dataCounts:cached?.counts||batteryDataCounts(state),total:selected.length,source:cached?'batería preparada · tablas reales de ControlEvent':'tablas reales de ControlEvent',maxCostEur:m==='FAST'?0:round(maxCostEur,2)});
-  const result=m==='AI-SMOKE'?await runSmoke({state,cases:selected,send,signal,maxCostEur:Math.max(0.02,num(maxCostEur)||0.25),maxCases:maxCases||24}):m==='FULL-CERT'?await runFull({state,turns:selected,send,signal,maxCostEur:Math.max(0.02,num(maxCostEur)||0.50),maxCases:maxCases||18}):await runFast({state,cases:selected,send,signal});
+  const result=m==='AI-SMOKE'?await runSmoke({state,cases:selected,send,signal,actor,maxCostEur:Math.max(0.02,num(maxCostEur)||0.25),maxCases:maxCases||24}):m==='FULL-CERT'?await runFull({state,turns:selected,send,signal,actor,maxCostEur:Math.max(0.02,num(maxCostEur)||0.50),maxCases:maxCases||18}):await runFast({state,cases:selected,send,signal});
   streamWrite(send,'summary',{mode:m,...result,finishedAt:nowIso(),certified:result.ko===0&&!result.aborted&&result.done===selected.length&&result.done>0});
   return result;
 }

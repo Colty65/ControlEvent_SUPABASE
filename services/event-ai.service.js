@@ -8,6 +8,7 @@ import { canonicalAttendanceFromContext, buildCanonicalAttendance } from './zuzu
 import { buildRelevantPeopleContext } from './zuzu-people-context.service.js';
 import { listAllHitosState } from './hitos.service.js';
 import { exportBankData } from './bank-reconciliation.service.js';
+import { ensureZuzuConversation, getZuzuConversationSession, getZuzuTurnBundle, appendZuzuTurn, searchZuzuHistoryCandidates, isRecallPrompt, newDatasetId, newViewId, turnIdFor } from './zuzu-conversation-ledger.service.js';
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -6085,7 +6086,7 @@ HERRAMIENTAS DISPONIBLES:
 - store_purchases: compras realizadas/pendientes de una tienda, por evento, con total general. Resuelve variantes humanas como ALMACEN / El Almacén / almacén.
 - canonical_socios: lista de socios canónicos con el mismo criterio de ColtyLAB. Si el usuario dice «socios canónicos» o «criterio ColtyLAB», NO pidas aclaración.
 - events_catalog: catálogo de eventos con fechas/estado/precio.
-- compare_events: comparación CANÓNICA de 2-6 eventos en una misma matriz de indicadores homogéneos (ingresos, compras realizadas, pendientes, donaciones, saldo, valoración y asistencia canónica). Úsala SIEMPRE para comparativas generales entre eventos. Nunca simules una comparativa usando el dossier de un solo evento.
+- compare_events: comparación CANÓNICA de 2-20 eventos en una misma matriz de indicadores homogéneos (ingresos, compras realizadas, pendientes, donaciones, saldo, valoración y asistencia canónica). Úsala SIEMPRE para comparativas generales entre eventos. Nunca simules una comparativa usando el dossier de un solo evento.
 - events_overview: panorama CANÓNICO de todos los eventos con las mismas métricas económicas y asistencia. Úsala para preguntas globales del tipo «¿ha habido algún evento...?», tendencias, mejores/peores o una lectura transversal de ControlEvent.
 - event_documentation: estado documental de un evento: justificantes de ingresos, tickets/fototickets de compras y documentos DOC. Úsala para «¿está todo justificado?», «dime cuáles faltan», «documentación», «tickets» o una continuación que se refiera a pendientes documentales.
 - people_activity: panorama transversal de implicación de personas/parejas: eventos con participación, compras bajo responsabilidad, donaciones y Hitos/LG. Úsala para «¿quién ha estado más implicado?», «quién participa más» o comparativas globales de actividad humana.
@@ -6840,7 +6841,7 @@ async function v26ToolEventDocumentation(tool,state,selectedEventId=''){
   ].filter(t=>t.rows.length)};
 }
 async function v26ToolCompareEvents(tool,state,selectedEventId=''){
-  const requested=semanticUnique(arr(tool?.events).concat(trim(tool?.event)?[trim(tool.event)]:[])).slice(0,6);if(requested.length<2)throw new Error('La comparación necesita al menos dos eventos.');
+  const requested=semanticUnique(arr(tool?.events).concat(trim(tool?.event)?[trim(tool.event)]:[])).slice(0,20);if(requested.length<2)throw new Error('La comparación necesita al menos dos eventos.');
   const resolved=[];for(const name of requested){let r=semanticResolveEntity(state,'event',name);if(!r.ok){const scored=arr(state?.eventos).map(e=>({e,score:v26EventFragmentScore(name,e?.titulo)})).sort((a,b)=>b.score-a.score);if(scored[0]?.score>=.8)r={ok:true,id:trim(scored[0].e.id),nombre:trim(scored[0].e.titulo)};}if(!r.ok)throw new Error(`No puedo resolver con seguridad el evento «${name}».`);if(!resolved.some(x=>x.id===r.id))resolved.push(r);}
   if(resolved.length<2)throw new Error('La comparación no ha resuelto dos eventos distintos.');
   const attendance=buildCanonicalAttendance(state,resolved.map(x=>x.id));const attMap=new Map(arr(attendance?.porEvento).map(x=>[trim(x.eventId),x]));const rows=[];
@@ -9968,13 +9969,13 @@ function v46CompactWorkingTarget(raw=null){
 }
 function v50CompactWorkingRowCache(raw=null){
   if(!raw||typeof raw!=='object')return null;
-  const srcRows=arr(raw.rows);if(srcRows.length>220)return null;
+  const srcRows=arr(raw.rows);if(srcRows.length>10000)return null;
   const columns=arr(raw.columns).map(x=>trim(x)).filter(Boolean).slice(0,32);if(!columns.length)return null;
   const cleanRows=[];
   for(const row of srcRows){
     if(!row||typeof row!=='object'||Array.isArray(row))continue;
     const clean={};for(const c of columns){let v=row?.[c];if(v==null)continue;if(typeof v==='string')v=trim(v).slice(0,240);else if(typeof v!=='number'&&typeof v!=='boolean')v=trim(String(v)).slice(0,240);clean[c]=v;}
-    cleanRows.push(clean);if(cleanRows.length>=220)break;
+    cleanRows.push(clean);if(cleanRows.length>=10000)break;
   }
   if(srcRows.length&&!cleanRows.length)return null;
   const visible=arr(raw.visible_fields).map(x=>trim(x)).filter(x=>columns.includes(x)).slice(0,24);
@@ -13226,7 +13227,18 @@ function v70CompareValue(a,b){const an=v40MaybeNumber(a),bn=v40MaybeNumber(b);if
 function v70ApplySort(rows=[],sortSpecs=[]){const specs=arr(sortSpecs).map(s=>({key:v70FieldKey(rows,s.field),direction:trim(s.direction)==='desc'?'desc':'asc'})).filter(x=>x.key);if(!specs.length)return rows;return rows.slice().sort((a,b)=>{for(const s of specs){const c=v70CompareValue(a?.[s.key],b?.[s.key]);if(c)return s.direction==='desc'?-c:c;}return 0;});}
 function v70ApplyViewFilters(rows=[],filters=[]){
   let out=rows.slice();
-  for(const spec of arr(filters)){const key=v70FieldKey(out,spec?.field);if(!key)continue;const wanted=trim(spec?.value),mode=trim(spec?.match_mode)||'exact',wn=norm(wanted),wt=new Set((semanticCleanToken(wanted)||'').split(' ').filter(Boolean));out=out.filter(r=>{const raw=trim(r?.[key]),rn=norm(raw);if(mode==='contains')return rn.includes(wn);if(mode==='word'){const rt=new Set((semanticCleanToken(raw)||'').split(' ').filter(Boolean));return [...wt].every(t=>rt.has(t));}if(mode==='semantic')return semanticEntityScore(wanted,raw)>=0.86;return rn===wn;});}
+  for(const spec of arr(filters)){
+    const key=v70FieldKey(out,spec?.field);if(!key)continue;const wanted=trim(spec?.value),mode=trim(spec?.match_mode)||'exact',operator=trim(spec?.operator)||'eq',wn=norm(wanted),wt=new Set((semanticCleanToken(wanted)||'').split(' ').filter(Boolean));
+    out=out.filter(r=>{
+      const raw=trim(r?.[key]),rn=norm(raw);
+      if(['gt','gte','lt','lte'].includes(operator)){
+        const left=v40MaybeNumber(r?.[key]),right=v40MaybeNumber(spec?.value);if(left==null||right==null)return false;
+        if(operator==='gt')return left>right;if(operator==='gte')return left>=right;if(operator==='lt')return left<right;return left<=right;
+      }
+      let equal;if(mode==='contains')equal=rn.includes(wn);else if(mode==='word'){const rt=new Set((semanticCleanToken(raw)||'').split(' ').filter(Boolean));equal=[...wt].every(t=>rt.has(t));}else if(mode==='semantic')equal=semanticEntityScore(wanted,raw)>=0.86;else equal=rn===wn;
+      return operator==='neq'?!equal:equal;
+    });
+  }
   return out;
 }
 function v70ApplyGroup(rows=[],groupFields=[],metrics=[]){
@@ -13870,6 +13882,356 @@ async function runZuzuV72QueryKernelThin({userPrompt,state,selectedEventId,flowT
   }
 }
 
+// ============================================================================
+// v3_0_exp · ZUZU LEDGER INMUTABLE v1
+// Cada turno crea un registro pequeño e inmutable. La continuidad ya no depende
+// de mutar CURRENT_FRAME: Gemini referencia turnos (Tn/Hn/CURRENT) y CE conserva
+// PLAN, DATASET y VIEW en servidor. El navegador recibe solo referencias ligeras.
+// ============================================================================
+function v73TurnTool(){
+  const scope={type:'object',properties:{kind:{type:'string',enum:['screen_event','named_event','named_events','event_series','all_events','year','latest_events']},event:{type:'string'},events:{type:'array',items:{type:'string'}},series:{type:'string'},year:{type:'integer'},count:{type:'integer'},order:{type:'string',enum:['newest','oldest']}},required:['kind']};
+  const product={type:'object',properties:{text:{type:'string'},match:{type:'string',enum:['exact','family','semantic']}},required:['text','match']};
+  const fields={type:'object',properties:{mode:{type:'string',enum:['all','only']},values:{type:'array',items:{type:'string'}}},required:['mode']};
+  const presentation={type:'object',properties:{table:{type:'boolean'},summary:{type:'boolean'},chart:{type:'boolean'}}};
+  const reuse={type:'array',items:{type:'object',properties:{entity:{type:'string',enum:['person','responsible','donor','product','store','event','ticket']},from_ref:{type:'string'},source_field:{type:'string'}},required:['entity','from_ref']}};
+  const operation={type:'object',properties:{type:{type:'string',enum:['set_fields','add_field','add_fields','remove_field','remove_fields','show_all_fields','sort','filter','group','limit','chart']},field:{type:'string'},fields:{type:'array',items:{type:'string'}},value:{type:'string'},operator:{type:'string',enum:['eq','neq','gt','gte','lt','lte']},match_mode:{type:'string',enum:['exact','word','contains','semantic']},direction:{type:'string',enum:['asc','desc']},placement:{type:'string',enum:['first','last']},metrics:{type:'array',items:{type:'string'}},limit:{type:'integer'}},required:['type']};
+  const query={type:'object',properties:{domain:{type:'string',enum:['products','purchases','donations','events','event_summary','people','person','stores','catalog_products','catalog_stores','catalog_people','bank','bank_timeline','documentation','management','weather','comparison']},scope,product,person:{type:'string'},responsible:{type:'string'},donor:{type:'string'},store:{type:'string'},ticket:{type:'string'},purchase_status:{type:'string'},fields,presentation,reuse,operations:{type:'array',items:operation}},required:['domain','scope']};
+  const local={type:'object',properties:{from_ref:{type:'string'},operations:{type:'array',items:operation}},required:['from_ref','operations']};
+  const change={type:'object',properties:{type:{type:'string',enum:['replace_scope','set_fields','add_field','remove_field']},scope,fields:{type:'array',items:{type:'string'}},field:{type:'string'}},required:['type']};
+  const reference={type:'object',properties:{target_ref:{type:'string'},action:{type:'string',enum:['restore_snapshot','reexecute_plan']},changes:{type:'array',items:change}},required:['target_ref','action']};
+  const inspect={type:'object',properties:{target_ref:{type:'string'}}};
+  const clarify={type:'object',properties:{question:{type:'string'},candidate_refs:{type:'array',items:{type:'string'}}},required:['question']};
+  return{type:'function',name:'zuzu_turn_record',description:'Crea un registro inmutable para este turno. QUERY obtiene datos nuevos; LOCAL opera sobre un resultado existente; REFERENCE recupera o reejecuta un turno anterior; INSPECT describe un turno; CONVERSATION conversa; CLARIFY pregunta; RESET inicia un foco nuevo sin borrar el historial persistido.',parameters:{type:'object',properties:{action:{type:'string',enum:['query','local','reference','inspect','conversation','clarify','reset']},query,local,reference,inspect,clarify,reply:{type:'string'}},required:['action']}};
+}
+function v73NormalizeScope(raw={}){
+  const kind=['screen_event','named_event','named_events','event_series','all_events','year','latest_events'].includes(trim(raw?.kind))?trim(raw.kind):'';
+  const out={kind};if(kind==='named_event'&&trim(raw?.event))out.event=trim(raw.event);
+  else if(kind==='named_events'){const events=arr(raw?.events).map(trim).filter(Boolean).slice(0,40);if(events.length)out.events=events;}
+  else if(kind==='event_series'&&trim(raw?.series))out.series=trim(raw.series);
+  else if(kind==='year'&&Number.isFinite(Number(raw?.year)))out.year=Math.trunc(Number(raw.year));
+  else if(kind==='latest_events'){if(raw?.count!=null)out.count=Math.max(1,Math.min(100,Number(raw.count)||1));if(['newest','oldest'].includes(trim(raw?.order)))out.order=trim(raw.order);}
+  return out;
+}
+function v73NormalizeOperations(raw=[]){
+  const ops=[];
+  for(const x of arr(raw).slice(0,16)){
+    const type=trim(x?.type);if(!type)continue;const op={type};
+    if(['add_field','remove_field','sort','filter','group'].includes(type)&&trim(x?.field))op.field=trim(x.field);
+    if(['set_fields','add_fields','remove_fields'].includes(type)){const fields=arr(x?.fields).map(trim).filter(Boolean).slice(0,24);if(fields.length)op.fields=fields;}
+    if(type==='filter'){
+      if(x?.value!=null&&trim(x.value)!=='')op.value=trim(x.value);
+      if(['eq','neq','gt','gte','lt','lte'].includes(trim(x?.operator)))op.operator=trim(x.operator);
+      if(['exact','word','contains','semantic'].includes(trim(x?.match_mode)))op.match_mode=trim(x.match_mode);
+    }
+    if(type==='sort'&&['asc','desc'].includes(trim(x?.direction)))op.direction=trim(x.direction);
+    if(['add_field','add_fields'].includes(type)&&['first','last'].includes(trim(x?.placement)))op.placement=trim(x.placement);
+    if(type==='group'){const metrics=arr(x?.metrics).map(trim).filter(Boolean).slice(0,8);if(metrics.length)op.metrics=metrics;}
+    if(type==='limit'&&x?.limit!=null)op.limit=Math.max(1,Math.min(10000,Number(x.limit)||1));
+    ops.push(op);
+  }
+  return ops;
+}
+function v73NormalizePlan(raw={}){
+  const action=['query','local','reference','inspect','conversation','clarify','reset'].includes(trim(raw?.action))?trim(raw.action):'conversation',out={action};
+  if(action==='query'){
+    const q=raw?.query&&typeof raw.query==='object'?raw.query:{},p=q.product&&typeof q.product==='object'?q.product:null,f=q.fields&&typeof q.fields==='object'?q.fields:null,pres=q.presentation&&typeof q.presentation==='object'?q.presentation:null;
+    out.query={domain:trim(q.domain)};
+    if(q.scope)out.query.scope=v73NormalizeScope(q.scope);
+    if(p&&trim(p.text))out.query.product={text:trim(p.text),match:['exact','family','semantic'].includes(trim(p.match))?trim(p.match):'semantic'};
+    for(const k of ['person','responsible','donor','store','ticket','purchase_status'])if(trim(q?.[k]))out.query[k]=trim(q[k]);
+    if(f){const mode=trim(f.mode)==='only'?'only':'all';out.query.fields={mode};if(mode==='only'){const values=arr(f.values).map(trim).filter(Boolean).slice(0,24);if(values.length)out.query.fields.values=values;}}
+    if(pres){const compact={};if(pres.table===false)compact.table=false;if(pres.summary===false)compact.summary=false;if(pres.chart===true)compact.chart=true;if(Object.keys(compact).length)out.query.presentation=compact;}
+    const reuse=arr(q.reuse).map(x=>{const y={entity:trim(x?.entity),from_ref:trim(x?.from_ref)};if(trim(x?.source_field))y.source_field=trim(x.source_field);return y;}).filter(x=>x.entity&&x.from_ref).slice(0,8);if(reuse.length)out.query.reuse=reuse;
+    const queryOps=v73NormalizeOperations(q.operations);if(queryOps.length)out.query.operations=queryOps;
+  }else if(action==='local'){
+    const l=raw?.local&&typeof raw.local==='object'?raw.local:{};
+    out.local={from_ref:trim(l.from_ref)||'CURRENT',operations:v73NormalizeOperations(l.operations)};
+  }else if(action==='reference'){
+    const r=raw?.reference&&typeof raw.reference==='object'?raw.reference:{},changes=[];
+    for(const x of arr(r.changes).slice(0,10)){const type=trim(x?.type);if(!type)continue;const ch={type};if(type==='replace_scope'&&x?.scope)ch.scope=v73NormalizeScope(x.scope);else if(type==='set_fields'){const fields=arr(x?.fields).map(trim).filter(Boolean).slice(0,24);if(fields.length)ch.fields=fields;}else if(['add_field','remove_field'].includes(type)&&trim(x?.field))ch.field=trim(x.field);changes.push(ch);}
+    out.reference={target_ref:trim(r.target_ref),action:trim(r.action)==='reexecute_plan'?'reexecute_plan':'restore_snapshot'};if(changes.length)out.reference.changes=changes;
+  }else if(action==='inspect')out.inspect={target_ref:trim(raw?.inspect?.target_ref)||'CURRENT'};
+  else if(action==='clarify'){out.clarify={question:trim(raw?.clarify?.question)};const refs=arr(raw?.clarify?.candidate_refs).map(trim).filter(Boolean).slice(0,8);if(refs.length)out.clarify.candidate_refs=refs;}
+  if(trim(raw?.reply))out.reply=trim(raw.reply).slice(0,1800);return out;
+}
+function v73SpanishNumber(n){
+  n=Math.trunc(Number(n)||0);const u=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];if(n>=0&&n<u.length)return u[n];const tens={30:'treinta',40:'cuarenta',50:'cincuenta',60:'sesenta',70:'setenta',80:'ochenta',90:'noventa'};if(n<100){const t=Math.floor(n/10)*10,r=n%10;return r?`${tens[t]} y ${u[r]}`:tens[t];}if(n===100)return'cien';if(n<200)return`ciento ${v73SpanishNumber(n-100)}`;const h={2:'doscientos',3:'trescientos',4:'cuatrocientos',5:'quinientos',6:'seiscientos',7:'setecientos',8:'ochocientos',9:'novecientos'};if(n<1000){const a=h[Math.floor(n/100)],r=n%100;return r?`${a} ${v73SpanishNumber(r)}`:a;}if(n<2000){const r=n-1000;return r?`mil ${v73SpanishNumber(r)}`:'mil';}if(n<3000){const r=n-2000;return r?`dos mil ${v73SpanishNumber(r)}`:'dos mil';}return String(n);
+}
+function v73SpanishDate(iso=''){
+  const d=new Date(iso);if(Number.isNaN(d.getTime()))return'';try{const parts=new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',weekday:'long',day:'numeric',month:'long',year:'numeric'}).formatToParts(d),get=t=>trim(parts.find(x=>x.type===t)?.value);const day=Number(get('day')),year=Number(get('year'));return`${get('weekday')} ${v73SpanishNumber(day)} de ${get('month')} de ${v73SpanishNumber(year)}`;}catch(_){const days=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];return`${days[d.getDay()]} ${v73SpanishNumber(d.getDate())} de ${months[d.getMonth()]} de ${v73SpanishNumber(d.getFullYear())}`;}
+}
+function v73RecentTurnIndex(session={}){return arr(session?.recentTurns).slice(-12).map(t=>({ref:`T${t.seq}`,seq:t.seq,created_at:t.createdAt,prompt:trim(t.userPrompt).slice(0,220),action:t.actionType,domain:trim(t.execution?.domain),scope:t.execution?.scope||{},focus:t.execution?.focus||{},rows:Number(t.execution?.row_count)||0,title:trim(t.title).slice(0,140)}));}
+function v73CurrentSummary(session={}){const t=session?.currentTurn;if(!t)return null;return{ref:'CURRENT',turn_id:t.turnId,seq:t.seq,prompt:trim(t.userPrompt),action:t.actionType,domain:trim(t.execution?.domain),scope:t.execution?.scope||{},focus:t.execution?.focus||{},rows:Number(t.execution?.row_count)||0,dataset_id:t.datasetId,view_id:t.viewId,title:trim(t.title)};}
+function v73PendingHistoryChoices(session={}){return arr(session?.currentTurn?.execution?.pending_candidates).map((c,i)=>({ref:`P${i+1}`,conversation_id:trim(c?.conversation_id),turn_id:trim(c?.turn_id),seq:Number(c?.seq)||0,created_at:trim(c?.created_at),prompt:trim(c?.prompt),title:trim(c?.title),domain:trim(c?.domain),scope:c?.scope||{},focus:c?.focus||{},row_count:Number(c?.row_count)||0,summary:trim(c?.summary),score:Number(c?.score)||0,same_conversation:!!c?.same_conversation})).filter(c=>c.turn_id).slice(0,8);}
+function v73KernelInstruction(state={},selectedEventId='',display='usuario'){
+  const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'ninguno';
+  return`Eres el intérprete semántico de Zuzu para ControlEvent. Emite EXACTAMENTE una llamada a zuzu_turn_record y nada más. El usuario es ${display}.
+
+MODELO DE CONVERSACIÓN
+No existe un estado semántico gigante que debas reconstruir. Cada turno anterior es un registro INMUTABLE referenciable por Tn, CURRENT, Hn o Pn. El mensaje actual manda.
+- query: necesita datos nuevos. Incluye SOLO los datos necesarios para esa consulta. No rellenes campos vacíos ni arrastres entidades antiguas.
+- local: trabaja SOLO sobre un DATASET ya existente y no consulta BBDD. Usa from_ref y una o varias operations.
+- reference: recupera un snapshot anterior o reejecuta su plan. restore_snapshot muestra exactamente lo antiguo; reexecute_plan repite la consulta contra datos actuales y puede aplicar changes.
+- inspect: describe un turno/resultados existentes.
+- conversation: charla sin datos nuevos.
+- clarify: solo si existen varias referencias/candidatos materialmente plausibles.
+- reset: empieza un foco nuevo; NO borra el historial persistido.
+
+REFERENCIAS HUMANAS
+RECENT_TURNS contiene la conversación actual. HISTORY_CANDIDATES aparece cuando el usuario dice cosas como «te acuerdas», «hablamos de», «aquella conversación» o similar. Si una referencia pasada es inequívoca usa reference directamente. Si dos o más candidatos son razonablemente posibles, usa clarify y candidate_refs. Si PENDING_HISTORY_CHOICES contiene opciones porque el turno anterior pidió elegir y el usuario responde con un número/nombre, usa Pn para la opción seleccionada. No inventes un recuerdo.
+Para pronombres («él», «ella», «sus») y expresiones como «lo mismo», usa query.reuse para indicar de qué turno sale la entidad cuando resulte útil, en lugar de copiar todo el estado anterior.
+
+CONSULTAS
+products=productos agregados; purchases=líneas físicas de compra; donations=donaciones; person=dossier de persona; event_summary=dossier de evento; people=asistencia/personas; comparison=comparación multievento mediante un extractor común, aunque los eventos sean de naturaleza diferente. TODA query debe incluir scope explícito. El evento visible «${screen}» es solo ambiente: usa screen_event únicamente si el usuario dice «este evento», «el actual» o equivalente. Si pregunta por una persona/producto sin mencionar evento ni referirse al visible, usa all_events. Si nombra un evento, usa named_event; si enumera varios, named_events.
+Un término de producto genérico se expresa con query.product {text,match}. family para familia léxica; exact para producto exacto; semantic cuando el término no sea literal.
+En una consulta sin columnas explícitas, fields.mode=all. Si el usuario enumera columnas, fields.mode=only con exactamente esas columnas. Para «eventos de la serie X» usa scope.kind=event_series y scope.series=X; ControlEvent/SCC certificará la serie contra el catálogo y guardará después la lista canónica concreta. Para comparar eventos explícitos usa comparison con named_events.
+Si la MISMA pregunta pide además ordenar, agrupar, limitar, filtrar, graficar o retocar columnas sobre el resultado recién extraído, añade query.operations. Esas operaciones se ejecutan localmente DESPUÉS de crear el DATASET; no cambian la extracción ni provocan una segunda consulta. Para rankings suele ser útil group con métricas como «sum:Importe», después sort y limit.
+
+OPERACIONES LOCALES
+set_fields deja solo esas columnas. add_field/add_fields añade. remove_field/remove_fields quita. show_all_fields recupera todos los campos de negocio. sort, filter, group, limit y chart operan sobre from_ref. Pueden existir VARIAS operations en el mismo turno.
+
+REUTILIZACIÓN
+«Dame otra vez aquello» suele ser reference restore_snapshot. «Vuelve a mirar/consulta otra vez» suele ser reexecute_plan. «Ahora el mismo X pero de todos los eventos» puede ser reexecute_plan de CURRENT con replace_scope=all_events.
+
+MEMORIA PASADA
+Si HISTORY_CANDIDATES contiene una conversación pasada y la referencia es inequívoca, selecciónala sin preguntar. Si es ambigua, pregunta al usuario mostrando las alternativas. Cuando recuperes una conversación pasada, ControlEvent añadirá de forma determinista el recordatorio humano de fecha/tema. No menciones JSON, herramientas, SQL ni nombres internos.`;
+}
+function v73KernelInput(userPrompt='',session={},entityCandidates={},historyCandidates=[]){
+  const current=v73CurrentSummary(session),recent=v73RecentTurnIndex(session),pending=v73PendingHistoryChoices(session),cand={events:arr(entityCandidates?.events).slice(0,8),people:arr(entityCandidates?.people).slice(0,8),stores:arr(entityCandidates?.stores).slice(0,8),products:arr(entityCandidates?.products).slice(0,12)};
+  const hist=arr(historyCandidates).map(x=>({ref:x.ref,conversation_id:x.conversation_id,turn_id:x.turn_id,seq:x.seq,created_at:x.created_at,prompt:trim(x.prompt).slice(0,220),title:trim(x.title).slice(0,140),domain:x.domain,scope:x.scope,focus:x.focus,row_count:x.row_count,summary:trim(x.summary).slice(0,180),score:x.score,same_conversation:x.same_conversation}));
+  return`CURRENT_USER:\n${trim(userPrompt)}\n\nCURRENT:\n${JSON.stringify(current)}\n\nRECENT_TURNS:\n${JSON.stringify(recent)}\n\nPENDING_HISTORY_CHOICES:\n${JSON.stringify(pending)}\n\nHISTORY_CANDIDATES:\n${JSON.stringify(hist)}\n\nENTITY_CANDIDATES:\n${JSON.stringify(cand)}`;
+}
+async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal}){
+  const instruction=v73KernelInstruction(state,selectedEventId,display),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates),tool=v73TurnTool();let model=policy.model,payload;
+  const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools:[tool],flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_turn_record']}},externalSignal,maxCalls:1,maxOutputTokens:1300});
+  try{payload=await call('v3_0_exp · Ledger · IA interpreta',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Lite no emitió JSON utilizable (${cleanGeminiError(error)}). Flash recibe exactamente la misma petición; no hay reparación semántica.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash interpreta',model);}else{error._ceOrigin='gemini';throw error;}}
+  const calls=v261FunctionCalls(payload).filter(c=>trim(c?.name)==='zuzu_turn_record');if(!calls.length){const e=new Error('Gemini no emitió zuzu_turn_record.');e._ceOrigin='gemini';throw e;}if(calls.length>1)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · protocolo','WARN',`Gemini emitió ${calls.length} registros en un turno; se conserva literalmente el último y no se hace reparación.`);
+  const raw=calls[calls.length-1]?.arguments||{},plan=v73NormalizePlan(raw);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · JSON GEMINI BRUTO','INFO',JSON.stringify(raw).slice(0,5000));zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO','OK',JSON.stringify(plan).slice(0,5000));return{raw,plan,model};
+}
+function v73RowsForStored(dataset=null,view=null){
+  if(!dataset)return[];let rows=arr(dataset.rows).map(r=>({...r}));const v=view||{};rows=v70ApplyViewFilters(rows,arr(v.rowFilters));const grouped=v70ApplyGroup(rows,arr(v.groupBy),arr(v.metrics));if(grouped)rows=grouped;rows=v70ApplySort(rows,arr(v.sort));if(Number(v.rowLimit)>0)rows=rows.slice(0,Number(v.rowLimit));return rows;
+}
+function v73WorkingFromBundle(bundle=null){
+  if(!bundle?.dataset)return null;const ds=bundle.dataset,v=bundle.view||{},rows=v73RowsForStored(ds,v),rowColumns=[...new Set(rows.flatMap(r=>Object.keys(r||{})))],baseColumns=arr(ds.columns).map(trim).filter(Boolean),columns=arr(v.groupBy).length?(rowColumns.length?rowColumns:baseColumns):[...new Set([...baseColumns,...rowColumns])],visible=arr(v.visibleFields).length?arr(v.visibleFields).filter(f=>columns.includes(f)):v70BusinessVisibleColumns(columns),cache=v50CompactWorkingRowCache({table_key:'ledger_view',title:trim(v.title)||trim(bundle.turn?.title)||'Datos',source_tool:trim(ds.provenance?.source_tool)||'ledger',primary_field:visible[0]||columns[0]||'',visible_fields:visible,sort_field:trim(v.sort?.[0]?.field),sort_direction:trim(v.sort?.[0]?.direction)||'none',columns,rows,complete:true});
+  return v42CompactWorkingSet({frame_id:trim(bundle.turn?.turnId)||trim(ds.datasetId),kind:trim(ds.domain),event:trim(ds.scope?.event),scope:trim(ds.scope?.kind)||'none',domain:trim(ds.domain),requested_object:trim(ds.domain),tool:trim(ds.provenance?.source_tool)||'ledger',table_key:'ledger_view',row_count:rows.length,record_count:rows.length,empty:rows.length===0,filter_summary:trim(bundle.turn?.execution?.filter_summary),aggregate:bundle.turn?.execution?.aggregate||{},metrics:bundle.turn?.execution?.metrics||{},provenance:ds.provenance||{},row_cache:cache});
+}
+function v73BundleEntity(bundle=null,sourceField=''){
+  const t=bundle?.turn||{},p=t.normalizedPlan||{},q=p.query||{},focus=t.execution?.focus||{},s=norm(sourceField);
+  const candidates={person:q.person||focus.person,responsible:q.responsible||focus.person,donor:q.donor||focus.person,product:q.product?.text||focus.product,store:q.store||focus.store,event:q.scope?.event||focus.event,ticket:q.ticket||''};
+  if(s){for(const [k,v] of Object.entries(candidates))if(norm(k)===s&&trim(v))return trim(v);}return trim(candidates.person||candidates.responsible||candidates.donor||candidates.product||candidates.store||candidates.event||candidates.ticket);
+}
+async function v73ResolveRef(ref='',session={},historyCandidates=[],actor={}){
+  const r=trim(ref)||'CURRENT';if(r==='CURRENT'){if(!session?.currentTurn)return null;return getZuzuTurnBundle({turnId:session.currentTurn.turnId,actor});}
+  const mt=r.match(/^T(\d+)$/i);if(mt&&session?.conversation?.conversationId)return getZuzuTurnBundle({turnId:turnIdFor(session.conversation.conversationId,Number(mt[1])),actor});
+  const mh=r.match(/^H(\d+)$/i);if(mh){const c=arr(historyCandidates)[Number(mh[1])-1];if(c?.turn_id)return getZuzuTurnBundle({turnId:c.turn_id,actor});}
+  const mp=r.match(/^P(\d+)$/i);if(mp){const c=v73PendingHistoryChoices(session)[Number(mp[1])-1];if(c?.turn_id)return getZuzuTurnBundle({turnId:c.turn_id,actor});}
+  return getZuzuTurnBundle({turnId:r,actor});
+}
+async function v73ApplyReuse(query={},session={},historyCandidates=[],actor={}){
+  const q=JSON.parse(JSON.stringify(query||{}));for(const item of arr(q.reuse)){const b=await v73ResolveRef(item.from_ref,session,historyCandidates,actor);if(!b)continue;const value=v73BundleEntity(b,item.source_field||item.entity);if(!value)continue;if(item.entity==='product')q.product={text:value,match:q.product?.match||'semantic'};else q[item.entity]=value;}delete q.reuse;return q;
+}
+
+function v73CanonicalEventName(state={},value=''){
+  const rr=semanticResolveEntity(state,'event',value);if(rr.ok)return{ok:true,name:rr.nombre,id:rr.id,score:rr.score};
+  return{ok:false,ambiguous:!!rr.ambiguous,value:trim(value),candidates:arr(rr.candidates).map(x=>trim(x.nombre)).filter(Boolean)};
+}
+function v73ExpandEventSeries(state={},series=''){
+  const raw=trim(series),wanted=semanticCleanToken(raw,'event'),tokens=wanted.split(' ').filter(t=>t.length>=2);if(!raw||!tokens.length)return[];
+  const rows=arr(state?.eventos).map(e=>({id:trim(e?.id),name:trim(e?.titulo),clean:semanticCleanToken(e?.titulo,'event')})).filter(e=>e.id&&e.name);
+  let matches=rows.filter(e=>{const ct=new Set(e.clean.split(' ').filter(Boolean));return tokens.every(t=>ct.has(t));});
+  if(matches.length<2){matches=rows.map(e=>({...e,score:semanticEntityScore(raw,e.name,'event')})).filter(e=>e.score>=0.80).sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name,'es',{numeric:true}));}
+  const seen=new Set(),out=[];for(const e of matches){if(seen.has(e.id))continue;seen.add(e.id);out.push({id:e.id,name:e.name});}
+  return out.sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true,sensitivity:'base'})).slice(0,40);
+}
+function v73CertifyQuery(query={},state={},flowTrace=[]){
+  const q=JSON.parse(JSON.stringify(query||{}));if(!q.scope)return{query:q,warnings:[],error:''};const s=v73NormalizeScope(q.scope),warnings=[];
+  if(s.kind==='event_series'){
+    const found=v73ExpandEventSeries(state,s.series);if(!found.length)return{query:q,warnings,error:`SCC no ha encontrado eventos que formen la serie «${trim(s.series)}».`};
+    q.scope={kind:'named_events',events:found.map(x=>x.name)};
+    zuzuTracePush(flowTrace,'v3_0_exp · Ledger · SCC serie de eventos','OK',`«${trim(s.series)}» → ${found.map(x=>x.name).join(' / ')}. El registro ejecutable queda congelado con estos eventos canónicos.`);
+  }else if(s.kind==='named_event'){
+    if(!trim(s.event))return{query:q,warnings,error:'scope named_event requiere event.'};const r=v73CanonicalEventName(state,s.event);if(!r.ok)return{query:q,warnings,error:r.ambiguous?`El evento «${s.event}» es ambiguo: ${r.candidates.join(' / ')}.`:`No puedo certificar el evento «${s.event}».`};q.scope={kind:'named_event',event:r.name};if(norm(r.name)!==norm(s.event))zuzuTracePush(flowTrace,'v3_0_exp · Ledger · SCC evento','OK',`«${s.event}» → «${r.name}».`);
+  }else if(s.kind==='named_events'){
+    if(!arr(s.events).length)return{query:q,warnings,error:'scope named_events requiere events.'};const names=[],seen=new Set();for(const raw of arr(s.events)){const r=v73CanonicalEventName(state,raw);if(!r.ok)return{query:q,warnings,error:r.ambiguous?`El evento «${raw}» es ambiguo: ${r.candidates.join(' / ')}.`:`No puedo certificar el evento «${raw}».`};if(!seen.has(r.id)){seen.add(r.id);names.push(r.name);}}q.scope={kind:'named_events',events:names};zuzuTracePush(flowTrace,'v3_0_exp · Ledger · SCC conjunto de eventos','OK',`${names.length} evento(s) certificados: ${names.join(' / ')}.`);
+  }
+  if(trim(q.domain)==='comparison'&&q.scope?.kind==='named_events'&&arr(q.scope.events).length<2)return{query:q,warnings,error:'Una comparación necesita al menos dos eventos canónicos distintos.'};
+  return{query:q,warnings,error:''};
+}
+function v73ComparisonAnswer(rows=[],fallback=''){
+  const list=arr(rows);if(list.length<2)return fallback||'He preparado la comparación solicitada.';const names=list.map(r=>trim(r?.Evento)).filter(Boolean),parts=[`He comparado ${list.length} eventos${names.length?`: ${names.join(', ')}`:''}.`];
+  const describeMax=(field,label,formatter)=>{const vals=list.map(r=>({name:trim(r?.Evento),value:v26ParseLocalizedDisplayNumber(r?.[field])})).filter(x=>x.name&&Number.isFinite(x.value));if(vals.length<2)return;vals.sort((a,b)=>b.value-a.value);if(Math.abs(vals[0].value-vals[1].value)<1e-9)return;parts.push(`${vals[0].name} presenta ${label} (${formatter(vals[0].value)}).`);};
+  describeMax('Compras realizadas','el mayor importe de compras realizadas',v=>v26FormatEuro(v));
+  describeMax('Ingresos','el mayor volumen de ingresos',v=>v26FormatEuro(v));
+  describeMax('Asistentes canónicos','la mayor asistencia canónica',v=>`${round(v,3)} personas`);
+  return parts.slice(0,4).join(' ');
+}
+function v73ScopeValid(scope={}){const k=trim(scope?.kind);if(!k)return false;if(k==='named_event')return!!trim(scope.event);if(k==='named_events')return arr(scope.events).length>0;if(k==='event_series')return false;if(k==='year')return Number.isInteger(Number(scope.year));if(k==='latest_events')return Number(scope.count)>0;return['screen_event','all_events'].includes(k);}
+function v73FrameFromQuery(query={}){
+  const q=query||{},d=trim(q.domain),scope=v73NormalizeScope(q.scope||{}),product=q.product||{},filters={product_text:trim(product.text),product_mode:trim(product.text)?trim(product.match)||'semantic':'none',resolved_products:[],store:trim(q.store),donor:trim(q.donor),donor_type:trim(q.donor)?'person':'auto',person:trim(q.person),responsible:trim(q.responsible),ticket:trim(q.ticket),purchase_status:trim(q.purchase_status),event_status:'',inherit_filters:false,reset_filters:false};
+  // Capacidades tipadas de fuente: una persona en compras significa responsabilidad;
+  // una persona en donaciones significa donante. No depende del nombre concreto.
+  if(d==='purchases'&&filters.person&&!filters.responsible){filters.responsible=filters.person;filters.person='';}
+  if(d==='donations'&&filters.person&&!filters.donor){filters.donor=filters.person;filters.donor_type='person';filters.person='';}
+  if(d==='person'&&!filters.person){filters.person=filters.responsible||filters.donor;filters.responsible='';filters.donor='';}
+  const project=q.fields?.mode==='only'?arr(q.fields.values).map(trim).filter(Boolean):[],pres=q.presentation||{};
+  return v70NormalizeFrame({mode:'query',domain:d,source:'fresh',granularity:v71DefaultGranularity(d),scope,filters,transform:{navigation:'none',view_filters:[],project,sort:[],group_by:[],metrics:[],row_limit:null},presentation:{table:pres.table!==false,summary:pres.summary!==false,reasoned:false,chart:pres.chart===true,exhaustive:false},freshness:'fresh'});
+}
+function v73ViewObjectFromFrame(datasetId='',frame={},viewData={},title=''){return{datasetId,visibleFields:arr(viewData.visible),sort:arr(frame?.transform?.sort),rowFilters:arr(frame?.transform?.view_filters),groupBy:arr(frame?.transform?.group_by),metrics:arr(frame?.transform?.metrics),rowLimit:frame?.transform?.row_limit??null,presentation:frame?.presentation||{},title:trim(title)||trim(viewData.title)};}
+function v73DatasetObject(frame={},viewData={},result={},scopeInfo={}){
+  const scope={kind:trim(scopeInfo.kind)};if(scopeInfo.eventNames?.length===1)scope.event=scopeInfo.eventNames[0];else if(scopeInfo.eventNames?.length>1)scope.events=scopeInfo.eventNames.slice();if(scopeInfo.year!=null)scope.year=scopeInfo.year;if(scopeInfo.count!=null)scope.count=scopeInfo.count;if(trim(scopeInfo.order)&&trim(scopeInfo.kind)==='latest_events')scope.order=trim(scopeInfo.order);
+  return{domain:trim(frame.domain),scope,rowCount:arr(viewData.rows).length,columns:arr(viewData.columns),rows:arr(viewData.rows),facts:result?.facts||{},provenance:{source_tool:trim(result?.name)||v70SourceTool(frame),source_scope:scopeInfo.kind,source_events:scopeInfo.eventNames,source_args:{frame:v70PublicFrame(frame)}}};
+}
+function v73ScopeInfoFromDataset(ds={}){const s=ds.scope||{},names=arr(s.events).length?arr(s.events):(trim(s.event)?[trim(s.event)]:[]),kind=trim(s.kind)||'none',label=kind==='all_events'?'todos los eventos':kind==='year'?`eventos de ${s.year}`:names.length===1?names[0]:names.length?`${names.length} eventos`:'';return{kind,eventNames:names,year:s.year??null,count:s.count??null,order:s.order||'newest',base:'all',label};}
+function v73FrameForStoredTurn(bundle={}){const p=bundle?.turn?.normalizedPlan||{},q=p.query||{},e=bundle?.turn?.execution||{};if(q.domain)return v73FrameFromQuery(q);return v70NormalizeFrame({mode:'transform',domain:trim(e.domain)||trim(bundle?.dataset?.domain),source:'last_view',granularity:v71DefaultGranularity(trim(e.domain)||trim(bundle?.dataset?.domain)),scope:bundle?.dataset?.scope||{kind:'none'},filters:{product_mode:'none'},transform:{navigation:'none'},presentation:{table:true,summary:true,reasoned:false,chart:false},freshness:'cache'});}
+function v73BusinessFields(columns=[]){return v70BusinessVisibleColumns(arr(columns));}
+function v73ApplyLocalOperations(bundle={},operations=[],flowTrace=[]){
+  const ds=bundle.dataset;if(!ds)return{error:'El turno referenciado no conserva un DATASET.',warnings:[]};
+  const ops=arr(operations).filter(x=>trim(x?.type));if(!ops.length){const msg='Gemini clasificó el turno como LOCAL pero no emitió ninguna operación. DATASET y VIEW permanecen intactos y no se consulta BBDD.';v72LabWarn(flowTrace,msg);return{error:msg,warnings:[msg],unchanged:true,view:bundle.view||null,rows:v73RowsForStored(ds,bundle.view||{})};}
+  const base=bundle.view||{visibleFields:v73BusinessFields(ds.columns),sort:[],rowFilters:[],groupBy:[],metrics:[],rowLimit:null,presentation:{table:true,summary:true,chart:false},title:bundle.turn?.title||'Datos'},v=JSON.parse(JSON.stringify(base));if(!arr(v.visibleFields).length)v.visibleFields=v73BusinessFields(ds.columns);const columns=arr(ds.columns),warnings=[];
+  const warn=msg=>{warnings.push(msg);v72LabWarn(flowTrace,msg);};
+  const resolve=f=>{let available=columns.slice();if(arr(v.groupBy).length){const grouped=v70ApplyGroup(arr(ds.rows),arr(v.groupBy),arr(v.metrics));if(grouped?.length)available=[...new Set([...available,...Object.keys(grouped[0]||{})])];}const k=v70FieldKey([Object.fromEntries(available.map(c=>[c,'']))],f)||available.find(c=>norm(c)===norm(f));return k||'';};
+  for(const op of ops){
+    const type=trim(op.type);
+    if(type==='set_fields'){
+      const wanted=arr(op.fields).map(resolve).filter(Boolean),missing=arr(op.fields).filter(f=>!resolve(f));if(missing.length)warn(`Campos no disponibles ignorados: ${missing.join(', ')}.`);if(wanted.length)v.visibleFields=[...new Set(wanted)];else if(arr(op.fields).length)warn('SET_FIELDS no encontró ninguna columna válida; la VIEW anterior se conserva.');
+    }else if(type==='add_field'||type==='add_fields'){
+      const requested=type==='add_field'?[op.field]:arr(op.fields),ok=requested.map(resolve).filter(Boolean),missing=requested.filter(f=>!resolve(f));if(missing.length)warn(`Campos no disponibles ignorados: ${missing.join(', ')}. DATASET y VIEW anterior permanecen intactos para esos campos.`);for(const f of ok){if(v.visibleFields.includes(f))continue;if(op.placement==='first')v.visibleFields.unshift(f);else v.visibleFields.push(f);}
+    }else if(type==='remove_field'||type==='remove_fields'){
+      const requested=type==='remove_field'?[op.field]:arr(op.fields);for(const f of requested){const k=resolve(f);if(!k){warn(`No puedo quitar «${trim(f)}»: ese campo no existe en el DATASET.`);continue;}if(!v.visibleFields.some(x=>norm(x)===norm(k))){warn(`El campo «${k}» ya no estaba visible; la VIEW no cambia por esa operación.`);continue;}v.visibleFields=v.visibleFields.filter(x=>norm(x)!==norm(k));}
+    }else if(type==='show_all_fields')v.visibleFields=v73BusinessFields(columns);
+    else if(type==='sort'){
+      const k=resolve(op.field);if(!k)warn(`Ordenación ignorada: el campo «${trim(op.field)}» no existe en el DATASET.`);else v.sort=[{field:k,direction:op.direction==='desc'?'desc':'asc'}];
+    }else if(type==='filter'){
+      const k=resolve(op.field);if(!k)warn(`Filtro local ignorado: el campo «${trim(op.field)}» no existe en el DATASET.`);else v.rowFilters=[...arr(v.rowFilters),{field:k,value:trim(op.value),operator:trim(op.operator)||'eq',match_mode:trim(op.match_mode)||'exact'}];
+    }else if(type==='group'){
+      const k=resolve(op.field);if(!k)warn(`Agrupación ignorada: el campo «${trim(op.field)}» no existe en el DATASET.`);else{v.groupBy=[k];v.metrics=arr(op.metrics);const derived=[k];for(const spec of (v.metrics.length?v.metrics:['count'])){const [opRaw,fieldRaw]=trim(spec).split(':',2),mop=norm(opRaw),mf=fieldRaw?resolve(fieldRaw):'';if(mop==='count')derived.push('Nº registros');else if(mop==='sum'&&mf)derived.push(`Suma ${mf}`);else if(mop==='distinct'&&mf)derived.push(`Distintos ${mf}`);}v.visibleFields=[...new Set(derived)];}
+    }else if(type==='limit')v.rowLimit=op.limit==null?null:Number(op.limit);
+    else if(type==='chart')v.presentation={...(v.presentation||{}),chart:true,table:v.presentation?.table!==false};
+    else warn(`Operación LOCAL desconocida «${type}» ignorada; DATASET intacto.`);
+  }
+  const rows=v73RowsForStored(ds,v);return{view:v,rows,warnings};
+}
+function v73TableFromBundle(bundle={}){const ws=v73WorkingFromBundle(bundle);return ws?v70PresentationFromWorking(ws):[];}
+function v73MaterializeQueryResult(frame={},query={},ex={},flowTrace=[]){
+  const baseViewData=v70ApplyView(frame,ex.result,ex.scopeInfo,ex.state||{},ex.productNames),dataset=v73DatasetObject(frame,baseViewData,ex.result,ex.scopeInfo),title=trim(ex.result?.title)||trim(baseViewData.title)||'Respuesta de Zuzu';
+  let view=v73ViewObjectFromFrame('',frame,baseViewData,title),warnings=[];
+  const ops=arr(query?.operations);
+  if(ops.length){
+    const applied=v73ApplyLocalOperations({turn:{title},dataset:{...dataset,datasetId:'PENDING'},view:{...view,datasetId:'PENDING'}},ops,flowTrace);
+    if(applied.error)warnings=[...arr(applied.warnings),applied.error];
+    else{view={...applied.view,datasetId:'',title:applied.view?.title||title};warnings=arr(applied.warnings);}
+  }
+  const bundle={turn:{title},dataset:{...dataset,datasetId:'PENDING'},view:{...view,datasetId:'PENDING',title:view.title||title}},ws=v73WorkingFromBundle(bundle),tables=view.presentation?.table===false?[]:v70PresentationFromWorking(ws),charts=view.presentation?.chart?v72ChartFromWorking(ws,flowTrace):[];
+  const canonical=trim(frame.domain)==='comparison'?v73ComparisonAnswer(v73RowsForStored(dataset,view),v70CanonicalAnswer(frame,ex.result,ws,ex.scopeInfo)):v70CanonicalAnswer(frame,ex.result,ws,ex.scopeInfo);
+  return{dataset,view,ws,tables,charts,title,canonical,warnings};
+}
+function v73LightContext(conversation={},turn={},dataset=null,view=null){return{domain:'zuzu_turn_ledger',ledger:{version:'immutable-v1',conversation_id:trim(conversation?.conversationId),current_turn_id:trim(turn?.turnId),current_seq:Number(turn?.seq)||0,action:trim(turn?.actionType),dataset:dataset?{dataset_id:trim(dataset.datasetId),domain:trim(dataset.domain),scope:dataset.scope||{},row_count:Number(dataset.rowCount)||0,available_fields:arr(dataset.columns).slice(0,40)}:null,view:view?{view_id:trim(view.viewId),dataset_id:trim(view.datasetId),displayed_fields:arr(view.visibleFields).slice(0,32),sort:arr(view.sort),filters:arr(view.rowFilters),title:trim(view.title)}:null,updated_at:new Date().toISOString()}};}
+function v73RecallPreamble(display='',bundle=null){const d=v73SpanishDate(bundle?.turn?.createdAt),summary=trim(bundle?.turn?.title)||trim(bundle?.turn?.userPrompt)||'esa información';return`Ahora recuerdo **${trim(display)||'usuario'}**, el pasado ${d||'día que hablamos'}, conversamos sobre ${summary}.`;}
+function v73ShouldRecallPreamble(userPrompt='',bundle=null,currentConversationId=''){return!!bundle?.turn&&(isRecallPrompt(userPrompt)||trim(bundle?.conversation?.conversationId)!==trim(currentConversationId));}
+async function v73RecallPreambleForReuse(query={},session={},historyCandidates=[],actor={},display='',userPrompt=''){
+  if(!isRecallPrompt(userPrompt))return'';for(const item of arr(query?.reuse)){const b=await v73ResolveRef(item?.from_ref,session,historyCandidates,actor);if(b)return v73RecallPreamble(display,b);}return'';
+}
+function v73CandidateChoices(historyCandidates=[]){return arr(historyCandidates).map(c=>`${c.ref} · ${v73SpanishDate(c.created_at)} · ${trim(c.title)||trim(c.summary)||trim(c.prompt)}`).slice(0,8);}
+function v73ExecutionMeta(frame=null,scopeInfo=null,ws=null,summary=''){
+  const scope=scopeInfo?{kind:trim(scopeInfo.kind)}:{...(frame?.scope||{})};if(scopeInfo?.eventNames?.length===1)scope.event=scopeInfo.eventNames[0];else if(scopeInfo?.eventNames?.length>1)scope.events=scopeInfo.eventNames.slice();if(scopeInfo?.year!=null)scope.year=scopeInfo.year;
+  const out={domain:trim(frame?.domain),scope,focus:v72FocusFromFrame(frame,{}),row_count:Number(ws?.row_count)||0,summary:trim(summary)};if(ws?.aggregate&&Object.keys(ws.aggregate).length)out.aggregate=ws.aggregate;if(ws?.metrics&&Object.keys(ws.metrics).length)out.metrics=ws.metrics;if(trim(ws?.filter_summary))out.filter_summary=trim(ws.filter_summary);return out;
+}
+function v73ApplyReferenceChanges(query={},changes=[]){const q=JSON.parse(JSON.stringify(query||{}));for(const ch of arr(changes)){if(ch.type==='replace_scope'&&ch.scope)q.scope=v73NormalizeScope(ch.scope);else if(ch.type==='set_fields')q.fields={mode:'only',values:arr(ch.fields)};else if(ch.type==='add_field'){const cur=q.fields?.mode==='only'?arr(q.fields.values):[];if(cur.length&&!cur.includes(ch.field))q.fields={mode:'only',values:[...cur,ch.field]};}else if(ch.type==='remove_field'&&q.fields?.mode==='only')q.fields={mode:'only',values:arr(q.fields.values).filter(x=>norm(x)!==norm(ch.field))};}return q;}
+async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,externalSignal=null,conversationId=''}){
+  const actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{};
+  const display=zuzuLoggedUserDisplayName({usuarioLogado:actor});
+  const conversation=await ensureZuzuConversation({conversationId,actor,selectedEventId});
+  const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:false,recentLimit:24});
+  const entityCandidates=v70EntityCandidates(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session);
+  const historyCandidates=pendingHistory.length?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
+  const policy=v332InteractionPolicy(userPrompt);
+  zuzuTracePush(flowTrace,'v3_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
+
+  let compiled;
+  try{compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal});}
+  catch(error){
+    zuzuTracePush(flowTrace,'v3_0_exp · Ledger · fallo de compilación Gemini','WARN',`${cleanGeminiError(error)}. El fallo se registra como turno inmutable y no altera el turno anterior.`);
+    const answer='Gemini no llegó a emitir un registro ejecutable en este turno. He conservado intacta la conversación anterior y he guardado el fallo para auditoría.';
+    const execution={summary:cleanGeminiError(error),error:cleanGeminiError(error),debug_trace:arr(flowTrace).slice(0,160)};
+    const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'},execution,datasetId:session?.currentTurn?.datasetId||'',viewId:session?.currentTurn?.viewId||'',parentTurnId:session?.currentTurn?.turnId||'',status:'WARN',title:'Gemini no pudo interpretar el turno',answer,selectedEventId});
+    const resultContext=v73LightContext(saved.conversation,saved.turn,session?.dataset||null,session?.view||null),usage=summarizeGeminiUsageFromTrace(flowTrace);
+    return{ok:true,rejected:false,title:'Gemini no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Ledger Inmutable v1 · fallo compilación registrado',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  }
+
+  const raw=compiled.raw,plan=compiled.plan,model=compiled.model,parentTurnId=session?.currentTurn?.turnId||'';
+  let title='Zuzu',answer='',tables=[],charts=[],files=[],status='OK',dataset=null,view=null,datasetId='',viewId='',referencedTurnId='',execution={},finalBundle=null,turnWarnings=[];
+  try{
+    if(plan.action==='reset'){
+      answer=plan.reply||'Empezamos un foco nuevo. La conversación anterior sigue guardada y puedes volver a ella cuando quieras.';execution={summary:'Reinicio de foco sin borrar ledger.'};
+    }else if(plan.action==='conversation'){
+      answer=plan.reply||'De acuerdo.';execution={summary:'Conversación general sin consulta de datos.'};
+    }else if(plan.action==='clarify'){
+      const requested=arr(plan.clarify?.candidate_refs),chosen=historyCandidates.filter(c=>!requested.length||requested.includes(c.ref)),base=chosen.length?chosen:historyCandidates,choices=v73CandidateChoices(base);
+      title='Necesito una precisión';answer=`${trim(plan.clarify?.question)||'He encontrado más de una conversación que podría encajar.'}${choices.length?`\n\nAquí tienes las conversaciones a las que te puedes referir, elige una de ellas:\n${choices.map((x,i)=>`${i+1}. ${x}`).join('\n')}`:''}`;status='WARN';
+      execution={summary:'Referencia histórica ambigua.',pending_candidates:base.map(c=>({ref:c.ref,turn_id:c.turn_id,conversation_id:c.conversation_id,seq:c.seq,created_at:c.created_at,prompt:c.prompt,title:c.title,domain:c.domain,scope:c.scope||{},focus:c.focus||{},row_count:c.row_count,summary:c.summary,score:c.score,same_conversation:c.same_conversation}))};
+    }else if(plan.action==='inspect'){
+      const target=await v73ResolveRef(plan.inspect?.target_ref||'CURRENT',session,historyCandidates,actor);
+      if(!target){status='WARN';answer='No encuentro el turno al que te refieres.';execution={summary:'INSPECT sin referencia resoluble.'};}
+      else{referencedTurnId=target.turn.turnId;const ws=v73WorkingFromBundle(target),fields=arr(target.view?.visibleFields),scope=target.dataset?.scope||{},core=`Estoy viendo ${trim(target.dataset?.domain)||trim(target.turn?.execution?.domain)||'datos'}${scope.kind==='named_event'&&scope.event?` de ${scope.event}`:scope.kind==='named_events'&&arr(scope.events).length?` de ${scope.events.join(', ')}`:scope.kind==='all_events'?' de todos los eventos':''}; el resultado tiene ${Number(ws?.row_count)||0} filas${fields.length?`; la vista muestra ${fields.join(', ')}`:''}.`,preamble=v73ShouldRecallPreamble(userPrompt,target,conversation.conversationId)?v73RecallPreamble(display,target):'';title='Contexto actual';answer=[preamble,core].filter(Boolean).join('\n\n');execution={...target.turn.execution,summary:'Inspección de turno.',row_count:Number(ws?.row_count)||0};datasetId=target.turn.datasetId;viewId=target.turn.viewId;finalBundle=target;}
+    }else if(plan.action==='local'){
+      const target=await v73ResolveRef(plan.local?.from_ref||'CURRENT',session,historyCandidates,actor);
+      if(!target?.dataset){status='WARN';answer='No encuentro un resultado anterior sobre el que aplicar ese cambio.';execution={summary:'LOCAL sin DATASET referenciado.'};}
+      else{
+        referencedTurnId=target.turn.turnId;const preamble=v73ShouldRecallPreamble(userPrompt,target,conversation.conversationId)?v73RecallPreamble(display,target):'',applied=v73ApplyLocalOperations(target,plan.local.operations,flowTrace);
+        if(applied.error){status='WARN';turnWarnings=arr(applied.warnings);datasetId=target.turn.datasetId;viewId=target.turn.viewId;finalBundle=target;tables=v73TableFromBundle(target);title=trim(target.turn.title)||'Datos';answer=[preamble,applied.error].filter(Boolean).join('\n\n');execution={...target.turn.execution,summary:applied.error};}
+        else{
+          if(applied.warnings?.length){status='WARN';turnWarnings=applied.warnings.slice();}
+          datasetId=target.dataset.datasetId;view={datasetId,visibleFields:applied.view.visibleFields,sort:applied.view.sort,rowFilters:applied.view.rowFilters,groupBy:applied.view.groupBy,metrics:applied.view.metrics,rowLimit:applied.view.rowLimit,presentation:applied.view.presentation,title:applied.view.title||target.turn.title};
+          const temp={conversation:target.conversation,turn:target.turn,dataset:target.dataset,view:{...applied.view,datasetId,title:view.title}},ws=v73WorkingFromBundle(temp),frame=v73FrameForStoredTurn(target),scopeInfo=v73ScopeInfoFromDataset(target.dataset);
+          tables=applied.view.presentation?.table===false?[]:v70PresentationFromWorking(ws);charts=applied.view.presentation?.chart?v72ChartFromWorking(ws,flowTrace):[];title=trim(view.title)||trim(target.turn.title)||'Datos';const canonical=trim(target.dataset.domain)==='comparison'?v73ComparisonAnswer(applied.rows,v70CanonicalAnswer(frame,{title,facts:target.dataset.facts||{}},ws,scopeInfo)):v70CanonicalAnswer(frame,{title,facts:target.dataset.facts||{}},ws,scopeInfo);answer=[preamble,canonical].filter(Boolean).join('\n\n');execution=v73ExecutionMeta(frame,scopeInfo,ws,`Operaciones locales sobre ${target.turn.turnId}.${turnWarnings.length?` ${turnWarnings.join(' ')}`:''}`);finalBundle={...target,view:{...applied.view,datasetId,title:view.title}};
+        }
+      }
+    }else if(plan.action==='reference'){
+      const target=await v73ResolveRef(plan.reference?.target_ref,session,historyCandidates,actor);
+      if(!target){status='WARN';answer='No encuentro la conversación o turno al que te refieres.';execution={summary:'REFERENCE sin destino resoluble.'};}
+      else{
+        referencedTurnId=target.turn.turnId;const preamble=v73ShouldRecallPreamble(userPrompt,target,conversation.conversationId)?v73RecallPreamble(display,target):'';
+        if(plan.reference.action==='restore_snapshot'){
+          datasetId=target.turn.datasetId;viewId=target.turn.viewId;finalBundle=target;tables=v73TableFromBundle(target);const ws=v73WorkingFromBundle(target),frame=v73FrameForStoredTurn(target),scopeInfo=target.dataset?v73ScopeInfoFromDataset(target.dataset):{kind:'none',eventNames:[],label:''};title=trim(target.turn.title)||'Conversación recuperada';answer=[preamble,target.turn.answer||v70CanonicalAnswer(frame,{title,facts:target.dataset?.facts||{}},ws,scopeInfo)].filter(Boolean).join('\n\n');execution={...target.turn.execution,summary:`Snapshot recuperado de ${target.turn.turnId}.`};
+        }else{
+          let basePlan=target.turn.normalizedPlan||{};
+          if(basePlan.action!=='query'){
+            let cursor=target,guard=0;while(cursor&&cursor.turn&&cursor.turn.normalizedPlan?.action!=='query'&&guard++<24){const pid=cursor.turn.referencedTurnId||cursor.turn.parentTurnId;if(!pid)break;cursor=await getZuzuTurnBundle({turnId:pid,actor});}if(cursor?.turn?.normalizedPlan?.action==='query')basePlan=cursor.turn.normalizedPlan;
+          }
+          if(basePlan.action!=='query'){status='WARN';answer='Ese turno no conserva una consulta base que pueda volver a ejecutarse.';execution={summary:'No existe QUERY base reejecutable.'};}
+          else{
+            const changed=v73ApplyReferenceChanges(basePlan.query,plan.reference.changes),reused=await v73ApplyReuse(changed,session,historyCandidates,actor),cert=v73CertifyQuery(reused,state,flowTrace);
+            if(cert.error){status='WARN';answer=`La consulta recordada no se puede ejecutar: ${cert.error} No he ampliado el ámbito ni inventado otro.`;execution={summary:cert.error};}
+            else{const resolved=cert.query,frame=v73FrameFromQuery(resolved);if(v72ScopeIsStructurallyInvalid(frame.scope)||!v73ScopeValid(frame.scope)){status='WARN';answer='La consulta recordada no tiene un ámbito ejecutable completo. No he ampliado el ámbito ni inventado otro.';execution={summary:'Reejecución con scope incompleto.'};}
+            else{const ex=await v70ExecuteCanonicalSource(frame,{},state,selectedEventId,flowTrace),built=v73MaterializeQueryResult(frame,resolved,{...ex,state},flowTrace);dataset=built.dataset;view=built.view;tables=built.tables;charts=built.charts;title=built.title||'Consulta repetida';if(built.warnings.length){status='WARN';turnWarnings.push(...built.warnings);}answer=[preamble,built.canonical].filter(Boolean).join('\n\n');execution=v73ExecutionMeta(frame,ex.scopeInfo,built.ws,`Plan ${target.turn.turnId} reejecutado.${built.warnings.length?` ${built.warnings.join(' ')}`:''}`);plan.reference.resolved_query=resolved;}}
+          }
+        }
+      }
+    }else if(plan.action==='query'){
+      const preamble=await v73RecallPreambleForReuse(plan.query,session,historyCandidates,actor,display,userPrompt),reused=await v73ApplyReuse(plan.query,session,historyCandidates,actor),cert=v73CertifyQuery(reused,state,flowTrace);
+      if(cert.error){status='WARN';answer=`No puedo ejecutar todavía esta consulta: ${cert.error} He conservado el historial y no he ampliado la petición.`;execution={summary:cert.error};}
+      else{
+        const resolved=cert.query,frame=v73FrameFromQuery(resolved);plan.query=resolved;
+        if(!trim(frame.domain)){status='WARN';answer='Gemini no indicó qué objeto de información consultar. No he inventado uno.';execution={summary:'QUERY sin domain.'};}
+        else if(v72ScopeIsStructurallyInvalid(frame.scope)||!v73ScopeValid(frame.scope)){status='WARN';answer='La consulta quedó sin un ámbito ejecutable completo. He conservado el historial y no he ampliado la consulta a otros eventos.';execution={domain:frame.domain,scope:frame.scope,focus:v72FocusFromFrame(frame,{}),summary:'QUERY con scope incompleto.'};}
+        else{const ex=await v70ExecuteCanonicalSource(frame,{},state,selectedEventId,flowTrace),built=v73MaterializeQueryResult(frame,resolved,{...ex,state},flowTrace);dataset=built.dataset;view=built.view;tables=built.tables;charts=built.charts;title=built.title||'Respuesta de Zuzu';if(built.warnings.length){status='WARN';turnWarnings.push(...built.warnings);}answer=[preamble,built.canonical].filter(Boolean).join('\n\n');execution=v73ExecutionMeta(frame,ex.scopeInfo,built.ws,`${title}${built.warnings.length?` · ${built.warnings.join(' ')}`:''}`);}
+      }
+    }
+  }catch(error){status='KO';zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ejecución CE','KO',cleanGeminiError(error));answer='ControlEvent no pudo ejecutar este registro. El historial anterior permanece intacto y este fallo queda guardado para auditoría.';execution={summary:cleanGeminiError(error),error:cleanGeminiError(error)};}
+
+  execution={...(execution||{}),debug_trace:arr(flowTrace).slice(0,160)};
+  const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:plan.action,geminiPlan:raw,normalizedPlan:plan,execution,dataset,view,datasetId,viewId,parentTurnId,referencedTurnId,status,title,answer,selectedEventId});
+  let savedDataset=dataset?{...dataset,datasetId:saved.datasetId}:finalBundle?.dataset||session?.dataset||null,savedView=view?{...view,viewId:saved.viewId,datasetId:saved.datasetId||view.datasetId}:finalBundle?.view||session?.view||null;
+  if(saved.datasetId&&!savedDataset){const b=await getZuzuTurnBundle({turnId:saved.turn.turnId,actor});savedDataset=b?.dataset||null;savedView=b?.view||savedView;}
+  const resultContext=v73LightContext(saved.conversation,saved.turn,savedDataset,savedView),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMMIT INMUTABLE','OK',`turn=${saved.turn.turnId} · action=${plan.action} · dataset=${saved.datasetId||'—'} · view=${saved.viewId||'—'} · status=${status}. El turno anterior no se modifica.`);
+  const responseWarnings=status==='KO'?[execution.summary||'Fallo de ejecución.']:status==='WARN'?(turnWarnings.length?turnWarnings:[execution.summary||'Aviso de interpretación.']):[];
+  return{ok:true,rejected:false,title,answer,warnings:responseWarnings,charts,tables,files,provider:'gemini-zuzu-ledger-immutable',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · PLAN/DATASET/VIEW server-side',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:plan.action,geminiPlan:raw,normalizedPlan:plan},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+}
+
+export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){
+  const bundle=await getZuzuTurnBundle({turnId,actor});if(!bundle)return null;const ws=v73WorkingFromBundle(bundle),frame=v73FrameForStoredTurn(bundle),scopeInfo=bundle.dataset?v73ScopeInfoFromDataset(bundle.dataset):{kind:'none',eventNames:[],label:''},tables=bundle.view?.presentation?.table===false?[]:v73TableFromBundle(bundle),trace=arr(bundle.turn?.execution?.debug_trace);
+  const charts=bundle.view?.presentation?.chart&&ws?v72ChartFromWorking(ws,[]):[];return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),warnings:bundle.turn.status==='OK'?[]:[trim(bundle.turn.execution?.summary)||bundle.turn.status],charts,tables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
+}
 function v66SoftFailureResult({flowTrace=[],model='',voiceConversation=false,memory={},reason='No he podido completar este turno con seguridad',answer=''}={}){
   const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),txt=trim(answer)||'No he podido completar esta petición, pero he conservado intacto el contexto anterior. Reformúlala o repítela con un poco más de detalle.';
   zuzuTracePush(flowTrace,'v3_0_exp · Recuperación segura','WARN',`${reason}. El contexto se conserva; NO se ejecuta SAFE_RESET porque no hay evidencia de corrupción de memoria.`);
@@ -16088,7 +16450,7 @@ async function v281TryDirectRoute({userPrompt,state,selectedEventId,conversation
 }
 
 
-export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, voiceConversation, clientNowIso, clientLocalDateTime, clientTimeZone, externalSignal } = {}) {
+export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverride, usuarioLogado, user, authUser, ce_acceso, previousInteractionId, conversationHistory, conversationContext, conversationDigest, conversationTurnNumber, conversationId, voiceConversation, clientNowIso, clientLocalDateTime, clientTimeZone, externalSignal } = {}) {
   const flowTrace = [];
   const userPrompt = trim(prompt);
   zuzuTracePush(flowTrace, 'Inicio', 'OK', `Prompt recibido (${userPrompt.length} caracteres). Evento activo=${trim(selectedEventId || '') || 'sin evento activo'}.`);
@@ -16123,9 +16485,9 @@ export async function analyzeEventPrompt({ prompt, selectedEventId, stateOverrid
   // SCC 2.0 · los únicos comandos interceptados fuera de Gemini son acciones locales reales
   // sobre la propia conversación (escobita/reset). Las preguntas de ayuda/capacidades vuelven a
   // pasar por Gemini como cualquier otra conversación.
-  zuzuTracePush(flowTrace,'v3_0_exp · ARQUITECTURA QUERY KERNEL THIN · LAB PERMISIVO · DELTA TIPADO','OK',`Gemini interpreta una sola vez y emite consulta nueva, DELTA tipado o transformación de VIEW. CE no repara semántica ni bloquea por incoherencias: registra WARN; TRANSFORM_VIEW trabaja solo sobre DATASET local y las entidades nuevas pueden reemplazar el foco viejo sin arrastrarlo. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo ambiental).`);
+  zuzuTracePush(flowTrace,'v3_0_exp · ARQUITECTURA ZUZU LEDGER INMUTABLE','OK',`Cada turno crea un PLAN inmutable y referencias a DATASET/VIEW persistidos en servidor. El navegador conserva solo conversation_id y la presentación visible. evento de pantalla=${trim(selectedEventId)||'ninguno'} (solo ambiental).`);
   try{
-    return await runZuzuV72QueryKernelThin({userPrompt,state,selectedEventId,flowTrace,conversationHistory:safeHistory,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,externalSignal});
+    return await runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace,voiceConversation:voiceConversation===true,usuarioLogado,user,authUser,ce_acceso,externalSignal,conversationId:trim(conversationId)});
   }catch(error){
     if(externalSignal?.aborted){const e=new Error('Ejecución de prueba ITV cancelada o excedió el tiempo máximo.');e.name='AbortError';e.status=499;throw e;}
     const memory=error?.nativeMemory||v70KernelMemoryFromHistory(safeHistory),resultContext=v72KernelResultContext(memory),currentTurnResults=arr(error?.canonicalResults).filter(r=>r?.ok!==false),origin=trim(error?._ceOrigin)||'controlevent';
@@ -19409,6 +19771,19 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
 
 // Exportaciones de prueba estructural. No se usan por la interfaz ni exponen datos por HTTP.
 export const __zuzuStructuralTesting = Object.freeze({
+  v73TurnTool,
+  v73NormalizeScope,
+  v73NormalizePlan,
+  v73NormalizeOperations,
+  v73SpanishDate,
+  v73RecallPreamble,
+  v73CandidateChoices,
+  v73PendingHistoryChoices,
+  v73ExpandEventSeries,
+  v73CertifyQuery,
+  v73FrameFromQuery,
+  v73ApplyLocalOperations,
+  v73ComparisonAnswer,
   v72TurnTool,
   v72NormalizeTurn,
   v72ValidateTurn,

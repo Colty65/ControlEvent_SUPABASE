@@ -33,13 +33,13 @@ router.delete('/zuzu-tests/history/:runKey', asyncHandler(async (req,res)=>{
 
 router.post('/zuzu-tests/history/:runKey/run-case', async (req,res,next)=>{
   try{
-    await assertGdActor(actorFromRequest(req));
+    const actor=await assertGdActor(actorFromRequest(req));
     const hist=await getZuzuTestRun(req.params.runKey),run=hist?.run||{},mode=String(req.body?.mode||'').toUpperCase();
     const cases=run?.generatedBattery?.cases?.[mode];
     const savedCase=Array.isArray(cases)?cases.find(c=>String(c?.id||'')===String(req.body?.caseId||'')):null;
     if(!savedCase){const e=new Error('La pregunta histórica no está disponible en esta batería.');e.status=404;throw e;}
     const controller=new AbortController();req.on('aborted',()=>controller.abort());res.on('close',()=>{if(!res.writableEnded)controller.abort();});
-    const result=await runSavedZuzuTestCase({mode,savedCase,conversationState:req.body?.conversationState||{},signal:controller.signal});
+    const result=await runSavedZuzuTestCase({mode,savedCase,conversationState:req.body?.conversationState||{},signal:controller.signal,actor});
     if(!res.writableEnded)res.json(result);
   }catch(error){if(error?.name==='AbortError'&&res.headersSent)return;next(error);}
 });
@@ -49,20 +49,32 @@ router.get('/zuzu-tests/preview', asyncHandler(async (req,res)=>{
   res.json(await previewZuzuBattery({seed:req.query?.seed}));
 }));
 
+
+router.post('/zuzu-tests/run-custom-case', async (req,res,next)=>{
+  try{
+    const actor=await assertGdActor(actorFromRequest(req));
+    const controller=new AbortController();req.on('aborted',()=>controller.abort());res.on('close',()=>{if(!res.writableEnded)controller.abort();});
+    const savedCase=req.body?.savedCase||{};const mode=String(req.body?.mode||'FULL-CERT').toUpperCase();
+    if(!String(savedCase?.prompt||'').trim()){const e=new Error('La pregunta importada está vacía.');e.status=422;throw e;}
+    const result=await runSavedZuzuTestCase({mode,savedCase,conversationState:req.body?.conversationState||{},signal:controller.signal,actor});
+    if(!res.writableEnded)res.json(result);
+  }catch(error){if(error?.name==='AbortError'&&res.headersSent)return;next(error);}
+});
+
 router.post('/zuzu-tests/run-case', async (req,res,next)=>{
   try{
-    await assertGdActor(actorFromRequest(req));
+    const actor=await assertGdActor(actorFromRequest(req));
     const controller=new AbortController();
     req.on('aborted',()=>controller.abort());
     res.on('close',()=>{if(!res.writableEnded)controller.abort();});
-    const result=await runZuzuTestCase({mode:req.body?.mode,caseId:req.body?.caseId,conversationState:req.body?.conversationState||{},seed:req.body?.seed,signal:controller.signal});
+    const result=await runZuzuTestCase({mode:req.body?.mode,caseId:req.body?.caseId,conversationState:req.body?.conversationState||{},seed:req.body?.seed,signal:controller.signal,actor});
     if(!res.writableEnded)res.json(result);
   }catch(error){if(error?.name==='AbortError'&&res.headersSent)return;next(error);}
 });
 
 router.post('/zuzu-tests/run-stream', async (req,res,next)=>{
   try{
-    await assertGdActor(actorFromRequest(req));
+    const actor=await assertGdActor(actorFromRequest(req));
     res.status(200);
     res.setHeader('Content-Type','application/x-ndjson; charset=utf-8');
     res.setHeader('Cache-Control','no-store, no-cache, must-revalidate');
@@ -80,7 +92,8 @@ router.post('/zuzu-tests/run-stream', async (req,res,next)=>{
         caseIds:req.body?.caseIds,
         seed:req.body?.seed,
         send,
-        signal:controller.signal
+        signal:controller.signal,
+        actor
       });
     }finally{clearInterval(keepAlive);}
     if(!res.writableEnded)res.end();
