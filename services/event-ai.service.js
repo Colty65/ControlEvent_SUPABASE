@@ -13258,6 +13258,7 @@ function v70ApplyView(frame={},result={},scopeInfo={},state={},productNames=[]){
   const table=v70PreferredTable(frame,result);if(!table)return{rows:[],columns:[],title:trim(result?.title)||'Datos',tableKey:'kernel_view'};let rows=arr(table.rows).map(r=>({...r}));
   if(scopeInfo.eventNames.length&&rows.some(r=>Object.prototype.hasOwnProperty.call(r,'Evento'))){const allowed=new Set(scopeInfo.eventNames.map(norm));rows=rows.filter(r=>allowed.has(norm(r?.Evento)));}
   if(productNames.length&&rows.some(r=>Object.prototype.hasOwnProperty.call(r,'Producto'))){const allowed=new Set(productNames.map(norm));rows=rows.filter(r=>allowed.has(norm(r?.Producto)));}
+  rows=v73ApplyTypedEntityFilters(frame,rows);
   const requestedFields=[...arr(frame?.transform?.project),...arr(frame?.transform?.sort).map(x=>x?.field),...arr(frame?.transform?.group_by),...arr(frame?.transform?.view_filters).map(x=>x?.field),...(trim(frame?.filters?.event_status)?['Estado']:[])];if(requestedFields.some(f=>norm(f)===norm('Evento'))&&scopeInfo.eventNames.length===1&&!rows.some(r=>Object.prototype.hasOwnProperty.call(r,'Evento')))rows=rows.map(r=>({Evento:scopeInfo.eventNames[0],...r}));rows=v70EnrichRows(rows,requestedFields,state);
   if(trim(frame?.filters?.event_status)&&rows.some(r=>Object.prototype.hasOwnProperty.call(r,'Estado')))rows=rows.filter(r=>nameMatches(r?.Estado,frame.filters.event_status));
   rows=v70ApplyViewFilters(rows,frame?.transform?.view_filters);
@@ -13895,7 +13896,7 @@ function v73TurnTool(){
   const fields={type:'object',properties:{mode:{type:'string',enum:['all','only']},values:{type:'array',items:{type:'string'}}},required:['mode']};
   const presentation={type:'object',properties:{table:{type:'boolean'},summary:{type:'boolean'},chart:{type:'boolean'}}};
   const reuse={type:'array',items:{type:'object',properties:{entity:{type:'string',enum:['person','responsible','donor','product','store','event','ticket']},from_ref:{type:'string'},source_field:{type:'string'}},required:['entity','from_ref']}};
-  const operation={type:'object',properties:{type:{type:'string',enum:['set_fields','add_field','add_fields','remove_field','remove_fields','show_all_fields','sort','filter','group','rank','compare','limit','chart']},field:{type:'string'},group_field:{type:'string'},metric:{type:'string'},reference:{type:'string'},values:{type:'array',items:{type:'string'}},fields:{type:'array',items:{type:'string'}},value:{type:'string'},operator:{type:'string',enum:['eq','neq','gt','gte','lt','lte']},match_mode:{type:'string',enum:['exact','word','contains','semantic']},direction:{type:'string',enum:['asc','desc']},placement:{type:'string',enum:['first','last']},metrics:{type:'array',items:{type:'string'}},limit:{type:'integer'}},required:['type']};
+  const operation={type:'object',properties:{type:{type:'string',enum:['set_fields','add_field','add_fields','remove_field','remove_fields','show_all_fields','sort','filter','group','rank','compare','limit','chart']},field:{type:'string'},group_field:{type:'string'},group_role:{type:'string',enum:['person','responsible','donor','product','event','store','ticket']},metric:{type:'string'},metric_role:{type:'string',enum:['amount','units','count']},reference:{type:'string'},values:{type:'array',items:{type:'string'}},fields:{type:'array',items:{type:'string'}},value:{type:'string'},operator:{type:'string',enum:['eq','neq','gt','gte','lt','lte']},match_mode:{type:'string',enum:['exact','word','contains','semantic']},direction:{type:'string',enum:['asc','desc']},placement:{type:'string',enum:['first','last']},metrics:{type:'array',items:{type:'string'}},limit:{type:'integer'}},required:['type']};
   const query={type:'object',properties:{domain:{type:'string',enum:['products','purchases','donations','events','event_summary','people','person','stores','catalog_products','catalog_stores','catalog_people','bank','bank_timeline','documentation','management','weather','comparison']},scope,product,person:{type:'string'},responsible:{type:'string'},donor:{type:'string'},store:{type:'string'},ticket:{type:'string'},purchase_status:{type:'string'},fields,presentation,reuse,operations:{type:'array',items:operation}},required:['domain','scope']};
   const local={type:'object',properties:{from_ref:{type:'string'},operations:{type:'array',items:operation}},required:['from_ref','operations']};
   const change={type:'object',properties:{type:{type:'string',enum:['replace_scope','set_fields','add_field','remove_field']},scope,fields:{type:'array',items:{type:'string'}},field:{type:'string'}},required:['type']};
@@ -13926,9 +13927,9 @@ function v73NormalizeOperations(raw=[]){
     }
     if(type==='sort'&&['asc','desc'].includes(trim(x?.direction)))op.direction=trim(x.direction);
     if(['add_field','add_fields'].includes(type)&&['first','last'].includes(trim(x?.placement)))op.placement=trim(x.placement);
-    if(type==='group'){const metrics=arr(x?.metrics).map(trim).filter(Boolean).slice(0,8);if(metrics.length)op.metrics=metrics;}
-    if(type==='rank'){if(trim(x?.group_field))op.group_field=trim(x.group_field);if(trim(x?.metric))op.metric=trim(x.metric);if(trim(x?.reference))op.reference=trim(x.reference);if(['gt','gte','lt','lte','eq','neq'].includes(trim(x?.operator)))op.operator=trim(x.operator);if(['asc','desc'].includes(trim(x?.direction)))op.direction=trim(x.direction);if(x?.limit!=null)op.limit=Math.max(1,Math.min(10000,Number(x.limit)||1));}
-    if(type==='compare'){if(trim(x?.group_field))op.group_field=trim(x.group_field);if(trim(x?.metric))op.metric=trim(x.metric);const values=arr(x?.values).map(trim).filter(Boolean).slice(0,12);if(values.length)op.values=values;}
+    if(type==='group'){const metrics=arr(x?.metrics).map(trim).filter(Boolean).slice(0,8);if(metrics.length)op.metrics=metrics;if(['person','responsible','donor','product','event','store','ticket'].includes(trim(x?.group_role)))op.group_role=trim(x.group_role);if(['amount','units','count'].includes(trim(x?.metric_role)))op.metric_role=trim(x.metric_role);}
+    if(type==='rank'){if(trim(x?.group_field))op.group_field=trim(x.group_field);if(['person','responsible','donor','product','event','store','ticket'].includes(trim(x?.group_role)))op.group_role=trim(x.group_role);if(trim(x?.metric))op.metric=trim(x.metric);if(['amount','units','count'].includes(trim(x?.metric_role)))op.metric_role=trim(x.metric_role);if(trim(x?.reference))op.reference=trim(x.reference);if(['gt','gte','lt','lte','eq','neq'].includes(trim(x?.operator)))op.operator=trim(x.operator);if(['asc','desc'].includes(trim(x?.direction)))op.direction=trim(x.direction);if(x?.limit!=null)op.limit=Math.max(1,Math.min(10000,Number(x.limit)||1));}
+    if(type==='compare'){if(trim(x?.group_field))op.group_field=trim(x.group_field);if(['person','responsible','donor','product','event','store','ticket'].includes(trim(x?.group_role)))op.group_role=trim(x.group_role);if(trim(x?.metric))op.metric=trim(x.metric);if(['amount','units','count'].includes(trim(x?.metric_role)))op.metric_role=trim(x.metric_role);const values=arr(x?.values).map(trim).filter(Boolean).slice(0,12);if(values.length)op.values=values;}
     if(type==='limit'&&x?.limit!=null)op.limit=Math.max(1,Math.min(10000,Number(x.limit)||1));
     ops.push(op);
   }
@@ -13971,6 +13972,13 @@ function v73RecentTurnIndex(session={}){return arr(session?.recentTurns).slice(-
 });}
 function v73CurrentSummary(session={}){const t=session?.currentTurn;if(!t)return null;return{ref:'CURRENT',turn_id:t.turnId,seq:t.seq,prompt:trim(t.userPrompt),action:t.actionType,domain:trim(t.execution?.domain),scope:t.execution?.scope||{},focus:t.execution?.focus||{},rows:Number(t.execution?.row_count)||0,dataset_id:t.datasetId,view_id:t.viewId,title:trim(t.title)};}
 function v73PendingHistoryChoices(session={}){return arr(session?.currentTurn?.execution?.pending_candidates).map((c,i)=>({ref:`P${i+1}`,conversation_id:trim(c?.conversation_id),turn_id:trim(c?.turn_id),seq:Number(c?.seq)||0,created_at:trim(c?.created_at),prompt:trim(c?.prompt),title:trim(c?.title),domain:trim(c?.domain),scope:c?.scope||{},focus:c?.focus||{},row_count:Number(c?.row_count)||0,summary:trim(c?.summary),score:Number(c?.score)||0,same_conversation:!!c?.same_conversation})).filter(c=>c.turn_id).slice(0,8);}
+function v73IsPendingHistoryChoiceReply(prompt='',choices=[]){
+  const p=trim(prompt),n=norm(p),opts=arr(choices);if(!p||!opts.length)return false;
+  const m=p.match(/^(?:p\s*)?(\d{1,2})$/i);if(m)return Number(m[1])>=1&&Number(m[1])<=opts.length;
+  if(/^(?:la\s+)?(?:primera|segunda|tercera|cuarta|quinta|sexta|s[eé]ptima|octava)\b/i.test(p))return true;
+  if(/^(?:esa|ese|aquella|aquel|la\s+de|el\s+de)\b/i.test(p))return true;
+  return opts.some(c=>norm(c.ref)===n);
+}
 function v73KernelInstruction(state={},selectedEventId='',display='usuario'){
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'ninguno';
   return`Eres el intérprete semántico de Zuzu para ControlEvent. Emite EXACTAMENTE una llamada a zuzu_turn_record y nada más. El usuario es ${display}.
@@ -13988,12 +13996,13 @@ No existe un estado semántico gigante que debas reconstruir. Cada turno anterio
 REFERENCIAS HUMANAS
 RECENT_TURNS contiene la conversación actual. HISTORY_CANDIDATES aparece cuando el usuario dice cosas como «te acuerdas», «hablamos de», «aquella conversación» o similar. Si una referencia pasada es inequívoca usa reference directamente. Si dos o más candidatos son razonablemente posibles, usa clarify y candidate_refs. Si PENDING_HISTORY_CHOICES contiene opciones porque el turno anterior pidió elegir y el usuario responde con un número/nombre, usa Pn para la opción seleccionada. No inventes un recuerdo.
 Para pronombres («él», «ella», «sus») y expresiones como «lo mismo», usa query.reuse para indicar de qué turno sale la entidad cuando resulte útil, en lugar de copiar todo el estado anterior. Si el dominio/rol gramatical ya determina el tipo de entidad, NO pidas aclaración entre tipos incompatibles: por ejemplo, en asistencia «¿Vicente fue?» busca PERSONA; no preguntes si es tienda o evento. Solo aclara entre candidatos plausibles del MISMO tipo o entre recuerdos realmente equivalentes.
+PRIORIDAD DE CONTINUIDAD: si CURRENT ya contiene el dominio y ámbito compatibles con una frase corta («¿Vicente fue?», «¿Y Pocholo?», «¿qué compró?»), reutiliza CURRENT antes de buscar HISTORY_CANDIDATES. La memoria histórica global solo debe ganar cuando el usuario expresa recuerdo/retorno («te acuerdas», «vuelve a», «aquello que vimos», «el otro día») o cuando CURRENT no puede resolver la referencia.
 
 CONSULTAS
-products=productos agregados; purchases=líneas físicas de compra; donations=donaciones; person=dossier de persona; event_summary=dossier de evento; people=asistencia/personas; comparison=comparación multievento mediante un extractor común, aunque los eventos sean de naturaleza diferente. TODA query debe incluir scope explícito. El evento visible «${screen}» es solo ambiente: usa screen_event únicamente si el usuario dice «este evento», «el actual» o equivalente. Si pregunta por una persona/producto sin mencionar evento ni referirse al visible, usa all_events. Si nombra un evento, usa named_event; si enumera varios, named_events.
+products=productos agregados; purchases=líneas físicas de compra; donations=donaciones; person=dossier de persona; event_summary=dossier de evento; people=asistencia/personas; comparison=comparación multievento mediante un extractor común, aunque los eventos sean de naturaleza diferente. Para preguntas sobre la implicación global de una persona (si puso dinero, si donó cosas, o ambas), usa person porque su dossier reúne ingresos, compras bajo responsabilidad y donaciones; no heredes purchases solo porque el turno anterior tratase de compras. TODA query debe incluir scope explícito. El evento visible «${screen}» es solo ambiente: usa screen_event únicamente si el usuario dice «este evento», «el actual» o equivalente. Si pregunta por una persona/producto sin mencionar evento ni referirse al visible, usa all_events. Si nombra un evento, usa named_event; si enumera varios, named_events.
 Un término de producto genérico se expresa con query.product {text,match}. family para familia léxica; exact para producto exacto; semantic cuando el término no sea literal.
 En una consulta sin columnas explícitas, fields.mode=all. Si el usuario enumera columnas, fields.mode=only con exactamente esas columnas. Para «eventos de la serie X» usa scope.kind=event_series y scope.series=X; ControlEvent/SCC certificará la serie contra el catálogo y guardará después la lista canónica concreta. Para comparar eventos explícitos usa comparison con named_events.
-Si la MISMA pregunta pide además ordenar, agrupar, limitar, filtrar, graficar o retocar columnas sobre el resultado recién extraído, añade query.operations. Esas operaciones se ejecutan localmente DESPUÉS de crear el DATASET; no cambian la extracción ni provocan una segunda consulta. Para rankings usa rank: group_field identifica la dimensión (p.ej. Responsable), metric una métrica como sum:Importe, reference opcional permite comparar contra una entidad concreta, operator puede ser gt/gte/lt/lte y limit devuelve el top solicitado. Para comparar explícitamente dos o más valores de una misma dimensión usa compare con group_field, metric y values; CE agrupa una sola vez y conserva únicamente esos valores.
+Si la MISMA pregunta pide además ordenar, agrupar, limitar, filtrar, graficar o retocar columnas sobre el resultado recién extraído, añade query.operations. Esas operaciones se ejecutan localmente DESPUÉS de crear el DATASET; no cambian la extracción ni provocan una segunda consulta. Para rankings usa rank. PREFIERE group_role y metric_role frente a inventar nombres de columnas: group_role puede ser person/responsible/donor/product/event/store/ticket y metric_role amount/units/count. CE traducirá esos roles a los campos físicos del DATASET. Usa group_field/metric solo cuando RECENT_TURNS/VIEW muestre explícitamente el nombre real del campo. reference opcional permite comparar contra una entidad concreta, operator puede ser gt/gte/lt/lte y limit devuelve el top solicitado. Para comparar dos o más valores usa compare con el mismo criterio de roles; CE agrupa una sola vez y conserva únicamente esos valores.
 
 OPERACIONES LOCALES
 set_fields deja solo esas columnas. add_field/add_fields añade. remove_field/remove_fields quita. show_all_fields recupera todos los campos de negocio. sort, filter, group, rank, limit y chart operan sobre from_ref. Pueden existir VARIAS operations en el mismo turno.
@@ -14095,12 +14104,43 @@ function v73DatasetObject(frame={},viewData={},result={},scopeInfo={}){
 function v73ScopeInfoFromDataset(ds={}){const s=ds.scope||{},names=arr(s.events).length?arr(s.events):(trim(s.event)?[trim(s.event)]:[]),kind=trim(s.kind)||'none',label=kind==='all_events'?'todos los eventos':kind==='year'?`eventos de ${s.year}`:names.length===1?names[0]:names.length?`${names.length} eventos`:'';return{kind,eventNames:names,year:s.year??null,count:s.count??null,order:s.order||'newest',base:'all',label};}
 function v73FrameForStoredTurn(bundle={}){const p=bundle?.turn?.normalizedPlan||{},q=p.query||{},e=bundle?.turn?.execution||{};if(q.domain)return v73FrameFromQuery(q);return v70NormalizeFrame({mode:'transform',domain:trim(e.domain)||trim(bundle?.dataset?.domain),source:'last_view',granularity:v71DefaultGranularity(trim(e.domain)||trim(bundle?.dataset?.domain)),scope:bundle?.dataset?.scope||{kind:'none'},filters:{product_mode:'none'},transform:{navigation:'none'},presentation:{table:true,summary:true,reasoned:false,chart:false},freshness:'cache'});}
 function v73BusinessFields(columns=[]){return v70BusinessVisibleColumns(arr(columns));}
+function v73DatasetCapabilities(domain=''){
+  const d=trim(domain),maps={
+    purchases:{roles:{person:['Responsable'],responsible:['Responsable'],product:['Producto'],event:['Evento'],store:['Tienda'],ticket:['Ticket u otros gastos']},metrics:{amount:['Importe'],units:['Unidades']}},
+    donations:{roles:{person:['Donante'],donor:['Donante'],responsible:['Responsable'],product:['Producto'],event:['Evento'],store:['Tienda'],ticket:['Tipo de donación']},metrics:{amount:['Valor','Importe'],units:['Unidades']}},
+    people:{roles:{person:['Asistente','Persona'],event:['Evento']},metrics:{amount:['Importe total'],units:['Personas','Número']}},
+    products:{roles:{person:['Responsables','Responsable'],responsible:['Responsables','Responsable'],product:['Producto'],event:['Evento'],store:['Tiendas','Tienda'],ticket:['Tickets','Ticket']},metrics:{amount:['Importe'],units:['Unidades']}},
+    person:{roles:{person:['Persona','Registrado como','Responsable','Donante'],responsible:['Responsable'],donor:['Donante'],product:['Producto'],event:['Evento']},metrics:{amount:['Importe','Compras bajo responsabilidad','Donaciones vinculadas'],units:['Número de cuota registrado']}},
+    events:{roles:{event:['Evento']},metrics:{amount:['Importe','Ingresos','Compras realizadas'],units:['Asistentes canónicos']}},
+    event_summary:{roles:{event:['Evento']},metrics:{amount:['Importe','Ingresos','Compras realizadas'],units:['Asistentes canónicos']}},
+    comparison:{roles:{event:['Evento']},metrics:{amount:['Compras realizadas','Ingresos','Donaciones valoradas','Saldo operativo','Valoración del evento'],units:['Asistentes canónicos']}}
+  };return maps[d]||{roles:{},metrics:{}};
+}
+function v73RoleFromLabel(raw='',domain=''){
+  const n=norm(raw);if(!n)return'';
+  const aliases={person:['person','persona','socio','asistente','nombre persona'],responsible:['responsable','responsible','comprador','compradora','buyer','purchaser'],donor:['donante','donor'],product:['producto','product'],event:['evento','event'],store:['tienda','store'],ticket:['ticket','tk'],amount:['amount','importe','valor','coste','costo','gasto','total'],units:['units','unidades','uds','cantidad']};
+  for(const [role,vals] of Object.entries(aliases))if(vals.some(v=>n===norm(v)))return role;
+  if(n==='person'&&trim(domain)==='purchases')return'responsible';if(n==='person'&&trim(domain)==='donations')return'donor';return'';
+}
+function v73FieldFromCapability(dataset={},raw='',kind='role',roleHint=''){
+  const columns=arr(dataset?.columns).map(trim).filter(Boolean),rows=arr(dataset?.rows),direct=v70FieldKey(rows.length?rows:[Object.fromEntries(columns.map(c=>[c,'']))],raw);if(direct)return direct;
+  const caps=v73DatasetCapabilities(dataset?.domain),role=trim(roleHint)||v73RoleFromLabel(raw,dataset?.domain),pool=kind==='metric'?caps.metrics:caps.roles,candidates=arr(pool?.[role]);
+  for(const name of candidates){const k=v70FieldKey(rows.length?rows:[Object.fromEntries(columns.map(c=>[c,'']))],name)||columns.find(c=>norm(c)===norm(name));if(k)return k;}return'';
+}
+function v73ApplyTypedEntityFilters(frame={},rows=[]){
+  const d=trim(frame?.domain),f=frame?.filters||{},dataset={domain:d,columns:[...new Set(arr(rows).flatMap(r=>Object.keys(r||{})))],rows},specs=[];
+  const add=(role,value,mode='semantic')=>{if(!trim(value))return;const field=v73FieldFromCapability(dataset,role,'role',role);if(field)specs.push({field,value:trim(value),mode});};
+  if(d==='purchases'){add('responsible',f.responsible||f.person);add('store',f.store);if(trim(f.ticket))add('ticket',f.ticket,'contains');}
+  else if(d==='donations'){add('donor',f.donor||f.person);add('responsible',f.responsible);}
+  else if(d==='people')add('person',f.person||f.responsible||f.donor);
+  let out=arr(rows).slice();for(const spec of specs){out=out.filter(r=>{const raw=trim(r?.[spec.field]);if(spec.mode==='contains')return norm(raw).includes(norm(spec.value));return norm(raw)===norm(spec.value)||semanticEntityScore(spec.value,raw)>=0.88||nameMatches(raw,spec.value);});}return out;
+}
 function v73ApplyLocalOperations(bundle={},operations=[],flowTrace=[]){
   const ds=bundle.dataset;if(!ds)return{error:'El turno referenciado no conserva un DATASET.',warnings:[]};
   const ops=arr(operations).filter(x=>trim(x?.type));if(!ops.length){const msg='Gemini clasificó el turno como LOCAL pero no emitió ninguna operación. DATASET y VIEW permanecen intactos y no se consulta BBDD.';v72LabWarn(flowTrace,msg);return{error:msg,warnings:[msg],unchanged:true,view:bundle.view||null,rows:v73RowsForStored(ds,bundle.view||{})};}
   const base=bundle.view||{visibleFields:v73BusinessFields(ds.columns),sort:[],rowFilters:[],groupBy:[],metrics:[],rowLimit:null,presentation:{table:true,summary:true,chart:false},title:bundle.turn?.title||'Datos'},v=JSON.parse(JSON.stringify(base));if(!arr(v.visibleFields).length)v.visibleFields=v73BusinessFields(ds.columns);const columns=arr(ds.columns),warnings=[];
   const warn=msg=>{warnings.push(msg);v72LabWarn(flowTrace,msg);};
-  const resolve=f=>{let available=columns.slice();if(arr(v.groupBy).length){const grouped=v70ApplyGroup(arr(ds.rows),arr(v.groupBy),arr(v.metrics));if(grouped?.length)available=[...new Set([...available,...Object.keys(grouped[0]||{})])];}const k=v70FieldKey([Object.fromEntries(available.map(c=>[c,'']))],f)||available.find(c=>norm(c)===norm(f));return k||'';};
+  const resolve=(f,roleHint='',kind='role')=>{let available=columns.slice();if(arr(v.groupBy).length){const grouped=v70ApplyGroup(arr(ds.rows),arr(v.groupBy),arr(v.metrics));if(grouped?.length)available=[...new Set([...available,...Object.keys(grouped[0]||{})])];}const k=v70FieldKey([Object.fromEntries(available.map(c=>[c,'']))],f)||available.find(c=>norm(c)===norm(f));if(k)return k;return v73FieldFromCapability({...ds,columns:available},f,kind,roleHint)||'';};
   for(const op of ops){
     const type=trim(op.type);
     if(type==='set_fields'){
@@ -14115,17 +14155,17 @@ function v73ApplyLocalOperations(bundle={},operations=[],flowTrace=[]){
     }else if(type==='filter'){
       const k=resolve(op.field);if(!k)warn(`Filtro local ignorado: el campo «${trim(op.field)}» no existe en el DATASET.`);else v.rowFilters=[...arr(v.rowFilters),{field:k,value:trim(op.value),operator:trim(op.operator)||'eq',match_mode:trim(op.match_mode)||'exact'}];
     }else if(type==='group'){
-      const k=resolve(op.field);if(!k)warn(`Agrupación ignorada: el campo «${trim(op.field)}» no existe en el DATASET.`);else{v.groupBy=[k];v.metrics=arr(op.metrics);const derived=[k];for(const spec of (v.metrics.length?v.metrics:['count'])){const [opRaw,fieldRaw]=trim(spec).split(':',2),mop=norm(opRaw),mf=fieldRaw?resolve(fieldRaw):'';if(mop==='count')derived.push('Nº registros');else if(mop==='sum'&&mf)derived.push(`Suma ${mf}`);else if(mop==='distinct'&&mf)derived.push(`Distintos ${mf}`);}v.visibleFields=[...new Set(derived)];}
+      const k=resolve(op.field||op.group_role,op.group_role,'role');if(!k)warn(`Agrupación ignorada: no hay una dimensión ejecutable para «${trim(op.field||op.group_role)}».`);else{v.groupBy=[k];v.metrics=arr(op.metrics);if(!v.metrics.length&&trim(op.metric_role)==='amount'){const mf=resolve('amount','amount','metric');if(mf)v.metrics=[`sum:${mf}`];}const derived=[k];for(const spec of (v.metrics.length?v.metrics:['count'])){const [opRaw,fieldRaw]=trim(spec).split(':',2),mop=norm(opRaw),mf=fieldRaw?resolve(fieldRaw,op.metric_role,'metric'):'';if(mop==='count')derived.push('Nº registros');else if(mop==='sum'&&mf)derived.push(`Suma ${mf}`);else if(mop==='distinct'&&mf)derived.push(`Distintos ${mf}`);}v.visibleFields=[...new Set(derived)];}
     }else if(type==='rank'){
-      const groupKey=resolve(op.group_field||op.field),metricSpec=trim(op.metric)||'count';if(!groupKey){warn(`Ranking ignorado: el campo de agrupación «${trim(op.group_field||op.field)}» no existe en el DATASET.`);continue;}
-      const [metricOpRaw,metricFieldRaw]=metricSpec.split(':',2),metricOp=norm(metricOpRaw),metricField=metricFieldRaw?resolve(metricFieldRaw):'',canonicalMetric=metricOp==='sum'&&metricField?`sum:${metricField}`:metricOp==='distinct'&&metricField?`distinct:${metricField}`:'count',metricColumn=metricOp==='sum'&&metricField?`Suma ${metricField}`:metricOp==='distinct'&&metricField?`Distintos ${metricField}`:'Nº registros';
+      const groupKey=resolve(op.group_field||op.group_role||op.field,op.group_role,'role'),metricSpec=trim(op.metric)||(trim(op.metric_role)==='amount'?'sum:amount':trim(op.metric_role)==='units'?'sum:units':'count');if(!groupKey){warn(`Ranking ignorado: no hay una dimensión ejecutable para «${trim(op.group_field||op.group_role||op.field)}».`);continue;}
+      const [metricOpRaw,metricFieldRaw]=metricSpec.split(':',2),metricOp=norm(metricOpRaw),metricField=metricFieldRaw?resolve(metricFieldRaw,op.metric_role,'metric'):'',canonicalMetric=metricOp==='sum'&&metricField?`sum:${metricField}`:metricOp==='distinct'&&metricField?`distinct:${metricField}`:'count',metricColumn=metricOp==='sum'&&metricField?`Suma ${metricField}`:metricOp==='distinct'&&metricField?`Distintos ${metricField}`:'Nº registros';
       v.groupBy=[groupKey];v.metrics=[canonicalMetric];v.visibleFields=[groupKey,metricColumn];v.sort=[{field:metricColumn,direction:op.direction==='asc'?'asc':'desc'}];if(op.limit!=null)v.rowLimit=Number(op.limit);
       if(trim(op.reference)){
         const grouped=v70ApplyGroup(arr(ds.rows),[groupKey],[canonicalMetric])||[],ref=grouped.find(r=>norm(r?.[groupKey])===norm(op.reference))||grouped.find(r=>semanticEntityScore(op.reference,r?.[groupKey])>=0.90);if(!ref)warn(`Ranking: no encuentro «${trim(op.reference)}» en ${groupKey}; se mantiene el ranking sin comparación contra esa referencia.`);else{const threshold=ref?.[metricColumn],operator=['gt','gte','lt','lte','eq','neq'].includes(trim(op.operator))?trim(op.operator):'gt';v.rowFilters=[...arr(v.rowFilters).filter(f=>trim(f?.stage)!=='post_group'),{field:metricColumn,value:String(threshold),operator,match_mode:'exact',stage:'post_group'}];}
       }
     }else if(type==='compare'){
-      const groupKey=resolve(op.group_field||op.field),metricSpec=trim(op.metric)||'count',values=arr(op.values).map(trim).filter(Boolean);if(!groupKey){warn(`Comparación ignorada: el campo de agrupación «${trim(op.group_field||op.field)}» no existe en el DATASET.`);continue;}if(values.length<2){warn('La comparación necesita al menos dos valores explícitos.');continue;}
-      const [metricOpRaw,metricFieldRaw]=metricSpec.split(':',2),metricOp=norm(metricOpRaw),metricField=metricFieldRaw?resolve(metricFieldRaw):'',canonicalMetric=metricOp==='sum'&&metricField?`sum:${metricField}`:metricOp==='distinct'&&metricField?`distinct:${metricField}`:'count',metricColumn=metricOp==='sum'&&metricField?`Suma ${metricField}`:metricOp==='distinct'&&metricField?`Distintos ${metricField}`:'Nº registros';
+      const groupKey=resolve(op.group_field||op.group_role||op.field,op.group_role,'role'),metricSpec=trim(op.metric)||(trim(op.metric_role)==='amount'?'sum:amount':trim(op.metric_role)==='units'?'sum:units':'count'),values=arr(op.values).map(trim).filter(Boolean);if(!groupKey){warn(`Comparación ignorada: no hay una dimensión ejecutable para «${trim(op.group_field||op.group_role||op.field)}».`);continue;}if(values.length<2){warn('La comparación necesita al menos dos valores explícitos.');continue;}
+      const [metricOpRaw,metricFieldRaw]=metricSpec.split(':',2),metricOp=norm(metricOpRaw),metricField=metricFieldRaw?resolve(metricFieldRaw,op.metric_role,'metric'):'',canonicalMetric=metricOp==='sum'&&metricField?`sum:${metricField}`:metricOp==='distinct'&&metricField?`distinct:${metricField}`:'count',metricColumn=metricOp==='sum'&&metricField?`Suma ${metricField}`:metricOp==='distinct'&&metricField?`Distintos ${metricField}`:'Nº registros';
       v.groupBy=[groupKey];v.metrics=[canonicalMetric];v.visibleFields=[groupKey,metricColumn];v.sort=[{field:metricColumn,direction:'desc'}];v.rowLimit=null;v.rowFilters=[...arr(v.rowFilters).filter(f=>trim(f?.stage)!=='post_group'),{field:groupKey,operator:'one_of',values,stage:'post_group'}];
     }else if(type==='limit')v.rowLimit=op.limit==null?null:Number(op.limit);
     else if(type==='chart')v.presentation={...(v.presentation||{}),chart:true,table:v.presentation?.table!==false};
@@ -14168,26 +14208,51 @@ function v73UniqueValues(rows=[],preferred=[]){for(const f of preferred){const k
 function v73AnswerForKind(kind='',canonical='',ws=null,dataset=null,view=null){
   const k=trim(kind),rows=arr(ws?.row_cache?.rows);if(!k||k==='auto'||k==='summary'||k==='table')return canonical;
   if(k==='amount'){const total=v73FirstNumericTotal(ws,dataset);return total!=null?`El importe es ${v26FormatEuro(v26Money(total))}.`:canonical;}
-  if(k==='who'){const u=v73UniqueValues(rows,['Responsable','Donante','Persona','Nombre','Socio']);if(u.values.length)return u.values.length===1?`Fue ${u.values[0]}.`:`Son ${u.values.slice(0,8).join(', ')}${u.values.length>8?'…':''}.`;return canonical;}
+  if(k==='who'){const u=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Nombre','Socio']);if(u.values.length)return u.values.length===1?`Fue ${u.values[0]}.`:`Son ${u.values.slice(0,8).join(', ')}${u.values.length>8?'…':''}.`;return canonical;}
   if(k==='what'){const u=v73UniqueValues(rows,['Producto','Concepto','Descripción']);if(u.values.length)return u.values.length===1?`Fue ${u.values[0]}.`:`Encontré ${u.values.slice(0,8).join(', ')}${u.values.length>8?'…':''}.`;return canonical;}
-  if(k==='whether')return Number(ws?.row_count)>0?`Sí. ${canonical}`:`No. ${canonical}`;
+  if(k==='whether'){
+    const frame=dataset?.provenance?.source_args?.frame||{},f=frame?.filters||{},domain=trim(dataset?.domain||frame?.domain),scope=dataset?.scope||{},event=trim(scope?.event),yes=Number(ws?.row_count)>0;
+    const person=trim(f.person||f.responsible||f.donor),product=trim(f.product_text);
+    if(domain==='people'&&person)return yes?`Sí. ${person} figura en la relación de asistencia${event?` de ${event}`:''}.`:`No. ${person} no figura en la relación de asistencia${event?` de ${event}`:''}.`;
+    if(domain==='purchases'&&person)return yes?`Sí. Hay compras bajo responsabilidad de ${person}${event?` en ${event}`:''}.`:`No. No hay compras bajo responsabilidad de ${person}${event?` en ${event}`:''}.`;
+    if(domain==='donations'&&person)return yes?`Sí. ${person} figura como donante${event?` en ${event}`:''}.`:`No. ${person} no figura como donante${event?` en ${event}`:''}.`;
+    if(product)return yes?`Sí. Hay registros de ${product}${event?` en ${event}`:''}.`:`No. No hay registros de ${product}${event?` en ${event}`:''}.`;
+    return yes?`Sí. ${canonical}`:`No. ${canonical}`;
+  }
   if(k==='which_event'){const u=v73UniqueValues(rows,['Evento']);if(u.values.length)return u.values.length===1?`Fue en ${u.values[0]}.`:`Aparece en ${u.values.join(', ')}.`;return canonical;}
-  if(k==='compare'){const labels=v73UniqueValues(rows,['Responsable','Donante','Persona','Evento','Producto','Tienda']);const numericKey=rows.length?Object.keys(rows[0]||{}).find(key=>key!==labels.field&&rows.some(r=>v40MaybeNumber(r?.[key])!=null)):'';if(labels.values.length>=2&&numericKey){const ranked=rows.map(r=>({label:trim(r?.[labels.field]),value:v40MaybeNumber(r?.[numericKey])})).filter(x=>x.label&&x.value!=null).sort((a,b)=>b.value-a.value);if(ranked.length>=2)return`${ranked.map(x=>`${x.label}: ${v26FormatPlainNumber(x.value,2)}`).join('; ')}. ${ranked[0].label} queda por encima en ${numericKey}.`;}return canonical;}
+  if(k==='compare'){const labels=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Evento','Producto','Tienda']);const numericKey=rows.length?Object.keys(rows[0]||{}).find(key=>key!==labels.field&&rows.some(r=>v40MaybeNumber(r?.[key])!=null)):'';if(labels.values.length>=2&&numericKey){const ranked=rows.map(r=>({label:trim(r?.[labels.field]),value:v40MaybeNumber(r?.[numericKey])})).filter(x=>x.label&&x.value!=null).sort((a,b)=>b.value-a.value);if(ranked.length>=2)return`${ranked.map(x=>`${x.label}: ${v26FormatPlainNumber(x.value,2)}`).join('; ')}. ${ranked[0].label} queda por encima en ${numericKey}.`;}return canonical;}
   return canonical;
+}
+function v73HumanTheme(turn={}){
+  const p=turn?.normalizedPlan||{},q=p.query||{},e=turn?.execution||{},scope=q.scope||e.scope||{},focus=e.focus||{},domain=trim(q.domain||e.domain),event=trim(scope.event||focus.event),person=trim(q.person||q.responsible||q.donor||focus.person),product=trim(q.product?.text||focus.product),store=trim(q.store||focus.store);
+  const suffix=event?` en ${event}`:'';
+  if(domain==='donations')return`las donaciones${person?` de ${person}`:''}${suffix}`;
+  if(domain==='purchases')return`las compras${person?` de ${person}`:''}${product?` relacionadas con ${product}`:''}${suffix}`;
+  if(domain==='products')return`los productos${product?` de ${product}`:''}${suffix}`;
+  if(domain==='person')return person?`la actividad de ${person}${suffix}`:`la actividad de una persona${suffix}`;
+  if(domain==='people')return`la asistencia${person?` de ${person}`:''}${suffix}`;
+  if(domain==='event_summary'||domain==='bank'||domain==='management')return`la situación${event?` de ${event}`:' del evento'}`;
+  if(domain==='comparison')return`una comparación de eventos`;
+  if(domain==='stores')return`las compras por tienda${store?` en ${store}`:''}${suffix}`;
+  return trim(turn?.title)||trim(turn?.userPrompt)||'';
 }
 function v73ConversationSummary(session={}){
   const turns=arr(session?.recentTurns);if(!turns.length)return'No hay turnos anteriores que resumir en esta conversación.';
-  const useful=turns.filter(t=>['query','local','reference','inspect'].includes(trim(t?.actionType))&&trim(t?.status)!=='KO');const themes=[];
-  for(const t of useful){const e=t.execution||{},focus=e.focus||{},scope=e.scope||{},parts=[];if(trim(e.domain))parts.push(trim(e.domain));for(const v of [focus.person,focus.product,focus.store,focus.event])if(trim(v)&&!parts.some(x=>norm(x)===norm(v)))parts.push(trim(v));if(trim(scope.event)&&!parts.some(x=>norm(x)===norm(scope.event)))parts.push(trim(scope.event));const label=parts.filter(Boolean).join(' · ')||trim(t.title)||trim(t.userPrompt);if(label&&!themes.some(x=>norm(x)===norm(label)))themes.push(label);}
-  const recent=themes.slice(-8);return`En esta conversación hemos ido averiguando ${recent.length?recent.join('; '):'varios datos de ControlEvent'}. He conservado cada turno por separado, así que puedo volver a cualquiera de esos resultados sin reconstruir los anteriores.`;
+  const useful=turns.filter(t=>['query','reference'].includes(trim(t?.actionType))&&trim(t?.status)!=='KO'),themes=[];
+  for(const t of useful){const label=v73HumanTheme(t);if(label&&!themes.some(x=>norm(x)===norm(label)))themes.push(label);}
+  const chosen=themes.slice(0,7);if(!chosen.length)return'Hemos ido consultando distintos datos de ControlEvent y cada resultado ha quedado guardado por separado para poder retomarlo.';
+  if(chosen.length===1)return`En esta conversación hemos estado revisando ${chosen[0]}. Ese resultado ha quedado guardado y puedo retomarlo cuando quieras.`;
+  const first=chosen[0],last=chosen[chosen.length-1],middle=chosen.slice(1,-1);let text=`En esta conversación empezamos revisando ${first}.`;
+  if(middle.length)text+=` Después vimos ${middle.slice(0,4).join(', ')}${middle.length>4?' y otros datos relacionados':''}.`;
+  text+=` Finalmente terminamos con ${last}. Cada turno ha quedado guardado por separado, así que puedo volver a cualquiera de esos resultados sin reconstruir los anteriores.`;return text;
 }
 async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,externalSignal=null,conversationId=''}){
   const actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{};
   const display=zuzuLoggedUserDisplayName({usuarioLogado:actor});
   const conversation=await ensureZuzuConversation({conversationId,actor,selectedEventId});
   const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:false,recentLimit:80});
-  const entityCandidates=v70EntityCandidates(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session);
-  const historyCandidates=pendingHistory.length?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
+  const entityCandidates=v70EntityCandidates(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session),usePending=v73IsPendingHistoryChoiceReply(userPrompt,pendingHistory);
+  const historyCandidates=usePending?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v3_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
 
@@ -14273,7 +14338,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(saved.datasetId&&!savedDataset){const b=await getZuzuTurnBundle({turnId:saved.turn.turnId,actor});savedDataset=b?.dataset||null;savedView=b?.view||savedView;}
   const resultContext=v73LightContext(saved.conversation,saved.turn,savedDataset,savedView),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMMIT INMUTABLE','OK',`turn=${saved.turn.turnId} · action=${plan.action} · dataset=${saved.datasetId||'—'} · view=${saved.viewId||'—'} · status=${status}. El turno anterior no se modifica.`);
   const responseWarnings=status==='KO'?[execution.summary||'Fallo de ejecución.']:status==='WARN'?(turnWarnings.length?turnWarnings:[execution.summary||'Aviso de interpretación.']):[];
-  return{ok:true,rejected:false,title,answer,warnings:responseWarnings,charts,tables,files,provider:'gemini-zuzu-ledger-immutable',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · PLAN/DATASET/VIEW server-side',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:plan.action,geminiPlan:raw,normalizedPlan:plan},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,warnings:responseWarnings,charts,tables,files,provider:'gemini-zuzu-ledger-immutable',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · PLAN/DATASET/VIEW server-side',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:plan.action,geminiPlan:raw,normalizedPlan:plan,execution:{domain:trim(execution?.domain),scope:execution?.scope||{},focus:execution?.focus||{},row_count:Number(execution?.row_count)||0,status}},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){
@@ -19831,6 +19896,12 @@ export const __zuzuStructuralTesting = Object.freeze({
   v73CertifyQuery,
   v73FrameFromQuery,
   v73ApplyLocalOperations,
+  v73DatasetCapabilities,
+  v73FieldFromCapability,
+  v73ApplyTypedEntityFilters,
+  v73IsPendingHistoryChoiceReply,
+  v73ConversationSummary,
+  v73AnswerForKind,
   v73ComparisonAnswer,
   v72TurnTool,
   v72NormalizeTurn,

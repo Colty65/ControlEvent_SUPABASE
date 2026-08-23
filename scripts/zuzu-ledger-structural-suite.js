@@ -7,7 +7,7 @@ const eq=(a,b,label)=>ok(JSON.stringify(a)===JSON.stringify(b),label,`esperado=$
 
 const {
   v73TurnTool,v73NormalizeScope,v73NormalizePlan,v73NormalizeOperations,v73SpanishDate,v73RecallPreamble,v73CandidateChoices,v73ExpandEventSeries,v73CertifyQuery,
-  v73FrameFromQuery,v73ApplyLocalOperations,v73ComparisonAnswer,v50CompactWorkingRowCache
+  v73FrameFromQuery,v73ApplyLocalOperations,v73DatasetCapabilities,v73FieldFromCapability,v73ApplyTypedEntityFilters,v73IsPendingHistoryChoiceReply,v73ConversationSummary,v73AnswerForKind,v73ComparisonAnswer,v50CompactWorkingRowCache
 }=z;
 
 // 1) Contrato: el registro normalizado es pseudocódigo disperso, sin campos vacíos heredados.
@@ -88,6 +88,31 @@ const remembered={turn:{createdAt:'2026-08-19T10:00:00Z',title:'Compras de FUNCI
 const pre=v73RecallPreamble('Colty',remembered);ok(pre.includes('Ahora recuerdo **Colty**')&&pre.includes('diecinueve de agosto de dos mil veintiséis')&&pre.includes('Compras de FUNCION 2026'),'Preambulo histórico humano');
 const choices=v73CandidateChoices([{ref:'H1',created_at:'2026-08-19T10:00:00Z',title:'Compras de FUNCION 2026'},{ref:'H2',created_at:'2026-08-20T10:00:00Z',title:'Comparativa SySA'}]);ok(choices.length===2&&choices[0].includes('H1')&&choices[1].includes('H2'),'Alternativas históricas materializadas');
 ok(isRecallPrompt('Ahora recuérdame qué me dijiste al principio')&&isRecallPrompt('Oye, ¿te acuerdas que hablamos de aquello?'),'Detección genérica de recuerdo humano');
+
+
+// 12) Roles semánticos -> campos físicos. Gemini no necesita adivinar columnas.
+let capDs={datasetId:'DR',domain:'purchases',columns:['Evento','Producto','Unidades','Importe','Responsable'],rows:[{Evento:'A',Producto:'X',Unidades:1,Importe:10,Responsable:'Vicente'},{Evento:'B',Producto:'Y',Unidades:1,Importe:20,Responsable:'Otro'}]};
+eq(v73FieldFromCapability(capDs,'Comprador','role',''),'Responsable','Rol Comprador -> Responsable en purchases');
+eq(v73FieldFromCapability(capDs,'amount','metric',''),'Importe','Métrica amount -> Importe');
+applied=v73ApplyLocalOperations({dataset:capDs,view:{visibleFields:['Evento','Producto','Unidades','Importe','Responsable'],sort:[],rowFilters:[],groupBy:[],metrics:[],rowLimit:null,presentation:{table:true,summary:true,chart:false},title:'T'}},[{type:'rank',group_field:'Comprador',metric:'sum:amount',reference:'Vicente',operator:'gt'}],[]);
+ok(!applied.warnings.length,'Ranking semántico no necesita columna inventada');
+eq(applied.view.groupBy,['Responsable'],'Ranking agrupa por campo físico certificado');
+
+// 13) Filtrado tipado de entidad sobre DATASET de asistencia.
+const attRows=[{Asistente:'Vicente',Rango:'SOCIO',Personas:1},{Asistente:'Pocholo',Rango:'SOCIO',Personas:1}];
+const attFrame=v73FrameFromQuery({domain:'people',scope:{kind:'named_event',event:'SySA 2026'},person:'Vicente'});
+eq(v73ApplyTypedEntityFilters(attFrame,attRows).map(r=>r.Asistente),['Vicente'],'people + person filtra el asistente concreto');
+
+// 14) Una aclaración histórica pendiente no secuestra una pregunta nueva.
+ok(v73IsPendingHistoryChoiceReply('2',[{ref:'P1'},{ref:'P2'}]),'Respuesta numérica selecciona recuerdo pendiente');
+ok(!v73IsPendingHistoryChoiceReply('¿Y Pocholo?',[{ref:'P1',title:'Compras'},{ref:'P2',title:'Donaciones'}]),'Pregunta nueva no se trata como elección pendiente');
+
+// 15) Respuesta sí/no y resumen humano usan el resultado concreto, no el agregado genérico.
+const attDataset={domain:'people',scope:{kind:'named_event',event:'SySA 2026'},provenance:{source_args:{frame:{domain:'people',filters:{person:'Vicente'}}}},rows:attRows,columns:['Asistente','Rango','Personas']};
+const attWs={row_count:1,row_cache:{rows:[attRows[0]]}};
+ok(v73AnswerForKind('whether','Hay 29 asistentes.',attWs,attDataset,{}).startsWith('Sí. Vicente'),'whether de asistencia responde sobre Vicente');
+const summary=v73ConversationSummary({recentTurns:[{actionType:'query',status:'OK',normalizedPlan:{query:{domain:'donations',person:'Pocholo',scope:{kind:'all_events'}}},execution:{domain:'donations',focus:{person:'Pocholo'},scope:{kind:'all_events'}}},{actionType:'query',status:'OK',normalizedPlan:{query:{domain:'purchases',responsible:'Vicente',scope:{kind:'all_events'}}},execution:{domain:'purchases',focus:{person:'Vicente'},scope:{kind:'all_events'}}}]});
+ok(/empezamos revisando las donaciones de Pocholo/i.test(summary)&&/compras de Vicente/i.test(summary),'Resumen de conversación en lenguaje humano');
 
 if(failures.length){
   console.error(`ZUZU LEDGER STRUCTURAL SUITE: ${failures.length} fallo(s)`);

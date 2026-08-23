@@ -60,7 +60,17 @@
     const scoped = arr('tiendas').filter(t => !ev || txt(t.eventId || t.event_id) === ev);
     return (scoped.length ? scoped : arr('tiendas')).slice().sort((a,b)=>txt(a.nombre).localeCompare(txt(b.nombre),'es'));
   };
-  const socios = () => eventPeople().filter(p => txt(p.rango).toUpperCase() === 'SOCIO');
+  const socios = () => {
+    // Mismo origen que el Responsable de alta: TODOS los registros SOCIO generales,
+    // incluidos nombres individuales y parejas registradas como SOCIO.
+    try{
+      if(typeof window.socioResponsableOptions === 'function'){
+        const opts = window.socioResponsableOptions();
+        if(Array.isArray(opts) && opts.length) return opts.map(o=>({id:txt(o.value),nombre:txt(o.label),rango:'SOCIO'})).filter(o=>o.id&&o.nombre);
+      }
+    }catch(_){ }
+    return arr('personas').filter(p => txt(p.rango).toUpperCase() === 'SOCIO').slice().sort((a,b)=>txt(a.nombre).localeCompare(txt(b.nombre),'es'));
+  };
   function donorOptions(){
     const out = [], seen = new Set();
     function add(value,label){ const key = txt(label).toLowerCase(); if(!label || seen.has(key)) return; seen.add(key); out.push({value,label}); }
@@ -113,15 +123,17 @@
     });
     return rows;
   }
-  function optionsHtml(items, selected, labelFn, valueFn){
-    return items.map(item => {
-      const value = txt(valueFn ? valueFn(item) : item.id);
-      return `<option value="${esc(value)}" ${value===txt(selected)?'selected':''}>${esc(labelFn ? labelFn(item) : item.nombre)}</option>`;
-    }).join('');
+  function optionsHtml(items, selected, labelFn, valueFn, fallbackLabel=''){
+    const sel=txt(selected),list=Array.isArray(items)?items:[],seen=new Set(),out=[];
+    for(const item of list){const value=txt(valueFn ? valueFn(item) : item.id);if(!value||seen.has(value))continue;seen.add(value);out.push(`<option value="${esc(value)}" ${value===sel?'selected':''}>${esc(labelFn ? labelFn(item) : item.nombre)}</option>`);}
+    // Si el registro guarda un valor que no está en la lista actual (snapshot, catálogo
+    // cambiado, etc.), lo mostramos igualmente para que EDITAR nunca aparezca vacío.
+    if(sel&&!seen.has(sel))out.unshift(`<option value="${esc(sel)}" selected>${esc(txt(fallbackLabel)||sel)}</option>`);
+    return out.join('');
   }
   function ticketOptionsHtml(kind, selected){
-    const opts = kind === 'donacion' ? DONATION_TICKETS : PURCHASE_TICKETS;
-    return opts.map(v => `<option value="${esc(v)}" ${v===txt(selected)?'selected':''}>${v === '' ? '-- Pte.Compra u otros gastos --' : esc(v)}</option>`).join('');
+    const opts = kind === 'donacion' ? DONATION_TICKETS : PURCHASE_TICKETS,sel=txt(selected),all=opts.includes(sel)?opts:[sel,...opts].filter((v,i,a)=>a.indexOf(v)===i);
+    return all.map(v => `<option value="${esc(v)}" ${v===sel?'selected':''}>${v === '' ? '-- Pte.Compra u otros gastos --' : esc(v)}</option>`).join('');
   }
 
   function ensureFix41CompactStyles(){
@@ -171,28 +183,32 @@
         </div>
         <div class="ce-fix23-amount">${money(i.amount)}</div>
         <div class="ce-fix23-actions">
-          ${writable ? `<button type="button" class="outline small" data-action="ce-fix23-edit-compra" data-kind="${kind}" data-id="${esc(r.id)}">Editar</button><button type="button" class="danger small" data-action="delete-compra" data-id="${esc(r.id)}">Eliminar</button>` : ''}
+          ${writable ? `<button type="button" class="outline small" data-action="ce-fix23-edit-compra" data-kind="${kind}" data-id="${esc(r.id)}">Editar</button><button type="button" class="danger small" data-action="${kind==='donacion'?'delete-donacion':'delete-compra'}" data-id="${esc(r.id)}">Eliminar</button>` : ''}
         </div>
       </div>
     </div>`;
   }
   function renderEditCard(r, kind){
-    const producto = r.producto || {};
+    const productoId=txt(r.productoId || r.producto_id || r.producto?.id || ''),producto = r.producto || productFor(productoId) || {};
     const tiendaId = txt(r.tiendaId || r.tienda_id || r.tienda?.id || producto?.tiendaId || producto?.tienda_id || '');
-    const responsableId = txt(r.responsableId || r.responsable_id || '');
-    const precio = Number(r.precio ?? r.precioCalc ?? producto.precio ?? 0);
-    const amount = kind === 'donacion' ? r.valor : r.importe;
-    return `<div class="itemcard ce-fix23-edit-row ${kind !== 'donacion' && !txt(r.ticketDonacion)?'red-row':''}" id="compraRow_${esc(r.id)}" data-ce-fix23-kind="${kind}" data-id="${esc(r.id)}">
+    const responsableId = txt(r.responsableId || r.responsable_id || r.responsable?.id || '');
+    const donorRef=txt(r.donorRef || r.donor_ref || r.donante || '');
+    const ticket=txt(r.ticketDonacion || r.ticket_donacion || '');
+    const precio = Number(r.precio ?? r.precioCalc ?? producto.precio ?? producto.defaultPrecio ?? 0),unidades=Number(r.unidades||0);
+    const amount = Number(kind === 'donacion' ? (r.valor ?? (precio*unidades)) : (r.importe ?? r.valor ?? (precio*unidades)));
+    const prefix=kind==='donacion'?'edit-donacion':'edit-compra',saveAction=kind==='donacion'?'save-donacion':'save-compra',deleteAction=kind==='donacion'?'delete-donacion':'delete-compra';
+    const productFallback=txt(productFor(productoId)?.nombre||producto?.nombre||productoId),storeFallback=txt(storeFor(tiendaId)?.nombre||r.tienda?.nombre||tiendaId),respFallback=txt(personFor(responsableId)?.nombre||r.responsable?.nombre||responsableId),donorFallback=donorHuman(donorRef)||donorRef;
+    return `<div class="itemcard ce-fix23-edit-row ${kind !== 'donacion' && !ticket?'red-row':''}" id="compraRow_${esc(r.id)}" data-ce-fix23-kind="${kind}" data-id="${esc(r.id)}">
       <div class="rowline compra">
-        <div class="field"><label>Producto</label><select data-action="edit-compra-producto" data-id="${esc(r.id)}">${optionsHtml(eventProducts(), r.productoId || r.producto_id, p => p.nombre, p => p.id)}</select></div>
-        <div class="field"><label>Unidades</label><input type="number" min="0" step="0.01" value="${Number(r.unidades||0)}" data-action="edit-compra-unidades" data-id="${esc(r.id)}" /></div>
-        <div class="field"><label>Precio</label><input class="money-text" type="text" value="${esc(euroInput(precio))}" data-action="edit-compra-precio" data-id="${esc(r.id)}" /></div>
+        <div class="field"><label>Producto</label><select data-action="${prefix}-producto" data-id="${esc(r.id)}">${optionsHtml(eventProducts(), productoId, p => p.nombre, p => p.id, productFallback)}</select></div>
+        <div class="field"><label>Unidades</label><input type="number" min="0" step="0.01" value="${unidades}" data-action="${prefix}-unidades" data-id="${esc(r.id)}" /></div>
+        <div class="field"><label>Precio</label><input class="money-text" type="text" value="${esc(euroInput(precio))}" data-action="${prefix}-precio" data-id="${esc(r.id)}" /></div>
         <div class="field"><label>${kind==='donacion'?'Valor':'Importe'}</label><input class="soft-readonly" readonly value="${esc(money(amount))}" /></div>
-        <div class="field"><label>${kind==='donacion'?'Tipo donación':'Ticket u Otros gastos'}</label><select data-action="edit-compra-ticket" data-id="${esc(r.id)}">${ticketOptionsHtml(kind, r.ticketDonacion)}</select></div>
-        <div class="field"><label>Tienda</label><select data-action="edit-compra-tienda" data-id="${esc(r.id)}"><option value="" ${!tiendaId?'selected':''}>-- elige tienda --</option>${optionsHtml(eventStores(), tiendaId, t => t.nombre, t => t.id)}</select></div>
-        <div class="field"><label>Donante</label><select data-action="edit-compra-donante" data-id="${esc(r.id)}"><option value="" ${!txt(r.donorRef)?'selected':''}>-- sin donante --</option>${optionsHtml(donorOptions(), r.donorRef || '', d => d.label, d => d.value)}</select></div>
-        <div class="field"><label>Responsable</label><select data-action="edit-compra-responsable" data-id="${esc(r.id)}"><option value="" ${!responsableId?'selected':''}>-- sin responsable --</option>${optionsHtml(socios(), responsableId, p => p.nombre, p => p.id)}</select></div>
-        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><button type="button" class="modify small" data-action="save-compra" data-id="${esc(r.id)}">Modificar</button><button type="button" class="outline small" data-action="ce-fix23-cancel-compra" data-kind="${kind}" data-id="${esc(r.id)}">Cancelar</button><button type="button" class="danger small" data-action="delete-compra" data-id="${esc(r.id)}">Eliminar</button></div>
+        <div class="field"><label>${kind==='donacion'?'Tipo donación':'Ticket u Otros gastos'}</label><select data-action="${prefix}-ticket" data-id="${esc(r.id)}">${ticketOptionsHtml(kind, ticket)}</select></div>
+        <div class="field"><label>Tienda</label><select data-action="${prefix}-tienda" data-id="${esc(r.id)}"><option value="" ${!tiendaId?'selected':''}>-- elige tienda --</option>${optionsHtml(eventStores(), tiendaId, t => t.nombre, t => t.id, storeFallback)}</select></div>
+        <div class="field"><label>Donante</label><select data-action="${prefix}-donante" data-id="${esc(r.id)}"><option value="" ${!donorRef?'selected':''}>-- sin donante --</option>${optionsHtml(donorOptions(), donorRef, d => d.label, d => d.value, donorFallback)}</select></div>
+        <div class="field"><label>Responsable</label><select data-action="${prefix}-responsable" data-id="${esc(r.id)}"><option value="" ${!responsableId?'selected':''}>-- sin responsable --</option>${optionsHtml(socios(), responsableId, p => p.nombre, p => p.id, respFallback)}</select></div>
+        <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><button type="button" class="modify small" data-action="${saveAction}" data-id="${esc(r.id)}">Modificar</button><button type="button" class="outline small" data-action="ce-fix23-cancel-compra" data-kind="${kind}" data-id="${esc(r.id)}">Cancelar</button><button type="button" class="danger small" data-action="${deleteAction}" data-id="${esc(r.id)}">Eliminar</button></div>
       </div>
     </div>`;
   }
@@ -250,7 +266,7 @@
         renderCompraKind(t.dataset.kind === 'donacion' ? 'donacion' : 'compra');
         return false;
       }
-      if(action === 'save-compra'){
+      if(action === 'save-compra' || action === 'save-donacion'){
         // Tras guardar, el render normal vuelve a compactar. Cerramos la edición por seguridad.
         setTimeout(() => { window.__ceFix23EditCompraId=''; window.__ceFix23EditDonacionId=''; }, 0);
       }

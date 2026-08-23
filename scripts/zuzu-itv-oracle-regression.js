@@ -24,14 +24,16 @@ const validateOracle=()=>({ok:true,reasons:[]});
 ${names.map(extract).join('\n')}
 return {validatePaidCase};`;
 const {validatePaidCase:validate}=Function(body)();
-const ledger=(plan={},dataset=null,view=null)=>({ok:true,title:'Respuesta',answer:'Correcto',warnings:[],charts:[],meta:{ledgerAudit:{action:plan.action,normalizedPlan:plan},resultContext:{ledger:{dataset,view}}}});
+const ledger=(plan={},dataset=null,view=null,execution={})=>({ok:true,title:'Respuesta',answer:'Correcto',warnings:[],charts:[],meta:{ledgerAudit:{action:plan.action,normalizedPlan:plan,execution},resultContext:{ledger:{dataset,view}}}});
 const cases=[
   ['OK estructural',{oracle:{kind:'ledger-structural',action:'query',domain:'purchases',entity:'PAN',rows:34}},ledger({action:'query',query:{domain:'purchases',product:{text:'PAN',match:'family'}}},{domain:'purchases',row_count:34},{displayed_fields:['Evento','Producto']}),'OK'],
   ['KO semántico',{oracle:{kind:'ledger-structural',action:'query',domain:'purchases',entity:'Vicente',rows:1}},ledger({action:'query',query:{domain:'purchases',product:{text:'PAN',match:'family'}}},{domain:'purchases',row_count:923},{displayed_fields:['Evento','Producto']}),'KO'],
   ['WARN aclaración',{}, {ok:true,title:'Necesito una precisión',answer:'¿A qué persona te refieres?',warnings:[],meta:{}},'WARN'],
   ['KO ejecución',{}, {ok:true,title:'Zuzu',answer:'ControlEvent no pudo ejecutar este registro.',warnings:[],meta:{}},'KO'],
   ['WARN total vacío',{}, {ok:true,title:'Detalle',answer:'He preparado 34 registros, por .',warnings:[],meta:{}},'WARN'],
-  ['OK alternativas',{oracle:{kind:'ledger-structural',action:'reference|query',domain:'purchases'}},ledger({action:'reference',reference:{target_ref:'T1',action:'reexecute_plan'}},{domain:'purchases',row_count:34},{displayed_fields:['Producto']}),'OK']
+  ['OK alternativas',{oracle:{kind:'ledger-structural',action:'reference|query',domain:'purchases'}},ledger({action:'reference',reference:{target_ref:'T1',action:'reexecute_plan'}},{domain:'purchases',row_count:34},{displayed_fields:['Producto']}),'OK'],
+  ['KO plan correcto pero dataset equivocado',{oracle:{kind:'ledger-structural',action:'query',domain:'purchases',event:'SySA 2026',rows:5}},ledger({action:'query',query:{domain:'purchases',scope:{kind:'named_event',event:'SySA 2026'}}},{domain:'products',scope:{kind:'named_event',event:'SySA 2024'},row_count:4},{displayed_fields:['Evento','Producto']},{domain:'products',scope:{kind:'named_event',event:'SySA 2024'},row_count:4}),'KO'],
+  ['KO amount sin importe',{oracle:{kind:'ledger-structural',action:'query',domain:'purchases',responseKind:'amount'}},{ok:true,title:'Detalle',answer:'He preparado 34 registros.',warnings:[],charts:[],meta:{ledgerAudit:{action:'query',normalizedPlan:{action:'query',response_kind:'amount',query:{domain:'purchases'}},execution:{domain:'purchases'}},resultContext:{ledger:{dataset:{domain:'purchases',row_count:34},view:{displayed_fields:['Producto']}}}}},'KO']
 ];
 let ko=0;for(const [name,def,result,expected] of cases){const got=validate(def,result);const ok=got.status===expected;console.log(`${ok?'OK':'KO'} ${name} · ${got.status} · ${got.reasons.join(' | ')||'sin incidencias'}`);if(!ok)ko++;}
 if(ko){console.error(`ITV ORACLE REGRESSION: ${ko} KO`);process.exit(1);}console.log('ITV ORACLE REGRESSION: OK');
