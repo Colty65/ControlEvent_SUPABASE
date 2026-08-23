@@ -5,6 +5,11 @@
   if(window.__ceZuzuTestConsoleGd) return;
   window.__ceZuzuTestConsoleGd=true;
 
+  const ITV_CONTRACT_VERSION=4;
+  const ITV_BUILD='20260823-ITV4-CERT1';
+  window.__CE_ZUZU_ITV_BUILD__=ITV_BUILD;
+  window.__CE_ZUZU_ITV_CONTRACT_VERSION__=ITV_CONTRACT_VERSION;
+
   const $=id=>document.getElementById(id);
   const text=v=>v==null?'':String(v);
   const trim=v=>text(v).trim();
@@ -134,7 +139,7 @@
 
 
   function modal(){return `<div id="ceZuzuTestOverlay" role="dialog" aria-modal="true" aria-label="ITV de Zuzu"><div class="zt-modal">
-    <div class="zt-head"><h2>🧪 ITV de Zuzu</h2><span class="zt-sub">Baterías autogeneradas o Excel · mismo circuito Zuzu · SOLO LECTURA · solo GD</span><div class="zt-spacer"></div><div class="zt-head-actions"><button class="zt-action report" id="ztDownload">⬇ INFORME</button><button class="zt-action print" id="ztPrint">🖨 PDF</button><button class="zt-action close" id="ztClose">✕ CERRAR</button></div></div>
+    <div class="zt-head"><h2>🧪 ITV de Zuzu</h2><span class="zt-sub">Baterías autogeneradas o Excel · contrato v${ITV_CONTRACT_VERSION} · build ${ITV_BUILD} · SOLO LECTURA · solo GD</span><div class="zt-spacer"></div><div class="zt-head-actions"><button class="zt-action report" id="ztDownload">⬇ INFORME</button><button class="zt-action print" id="ztPrint">🖨 PDF</button><button class="zt-action close" id="ztClose">✕ CERRAR</button></div></div>
     <div class="zt-top">
       <div class="zt-panel"><div class="zt-panel-head"><h3>Datos reales · batería</h3><button id="ztImportExcel" class="zt-mini-primary">📥 CARGAR EXCEL</button><button id="ztGenerate" class="zt-mini-primary">↻ NUEVA BATERÍA</button><input id="ztExcelFile" type="file" accept=".xlsx,.xlsm" style="display:none!important"></div><div id="ztData" class="zt-data"><span class="zt-pill">Cargando datos…</span></div><div id="ztSeedInfo" class="zt-live zt-seed-strip"></div>
         <div class="zt-history-box"><div class="zt-panel-head"><h3>Histórico reproducible</h3><div id="ztHistoryStorage" class="zt-history-note"></div></div><div class="zt-history-grid"><select id="ztHistorySelect"><option value="">Cargando baterías guardadas…</option></select><button id="ztHistoryView">VER</button><button id="ztHistoryReplay">▶ REPETIR</button><button id="ztHistoryDelete" title="Eliminar definitivamente la batería seleccionada">✕ ELIMINAR</button><label class="zt-seed-label">Semilla <input id="ztSeedReplayInput" inputmode="numeric" placeholder="974813527"></label><button id="ztReplaySeed">↻ REGENERAR</button></div></div>
@@ -206,7 +211,7 @@
       if(!raw.length)throw new Error('No se han encontrado preguntas debajo de la cabecera PREGUNTA.');
       const signature=raw.map(x=>`${x.seq}|${x.prompt}|${x.expected}`).join('\n'),hash=itvHash(signature)||0x6d2b79f5,binary=hash.toString(36).toUpperCase();batterySeed=hash;batteryCode=`XLS-${binary.slice(0,9)}`;batteryClock=`Excel · ${file.name}`;const defaultScenario=`EXCEL-${batteryCode}`;
       const cases=raw.map((x,i)=>({id:`excel-${String(i+1).padStart(3,'0')}`,group:x.group||'EXCEL',label:x.label||`Pregunta ${i+1}`,prompt:x.prompt,expected:x.expected||'Respuesta coherente con los datos reales y el hilo conversacional.',scenario:x.scenario||defaultScenario,mode:'FULL-CERT',oracle:x.oracle&&typeof x.oracle==='object'?x.oracle:null,requireAnswer:true,validationRule:'',meta:{excelRow:x.seq}}));
-      preview={ok:true,source:'excel',batteryCode,replayContractVersion:4,seed:batterySeed,generatedAt:new Date().toISOString(),fileName:file.name,sheetName:trim(imported?.sheetName),dataCounts:{},tests:{FAST:0,'AI-SMOKE':cases.length,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':cases.map(x=>({...x,scenario:''})),'FULL-CERT':cases}};batterySource='excel';historicReplayKey='';currentRunKey=`excel-${batteryCode}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;lastMode='FULL-CERT';renderPreview();renderModeStatuses();selectMode('FULL-CERT');setPhase(`Excel cargado · ${cases.length} preguntas · código ${batteryCode}. La semilla depende del contenido: si vuelves a cargar el mismo Excel obtendrás la misma semilla.`);
+      preview={ok:true,source:'excel',batteryCode,replayContractVersion:ITV_CONTRACT_VERSION,seed:batterySeed,generatedAt:new Date().toISOString(),fileName:file.name,sheetName:trim(imported?.sheetName),dataCounts:{},tests:{FAST:0,'AI-SMOKE':cases.length,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':cases.map(x=>({...x,scenario:''})),'FULL-CERT':cases}};batterySource='excel';historicReplayKey='';currentRunKey=`excel-${batteryCode}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;lastMode='FULL-CERT';renderPreview();renderModeStatuses();selectMode('FULL-CERT');setPhase(`Excel cargado · ${cases.length} preguntas · código ${batteryCode}. La semilla depende del contenido: si vuelves a cargar el mismo Excel obtendrás la misma semilla.`);
     }catch(e){setPhase('No se pudo cargar el Excel: '+(e.message||e),true);}
   }
 
@@ -488,16 +493,19 @@
 
 
   function itvVersionToken(){
-    let raw=trim(window.ControlEventVersion?.version||window.ControlEventVersion?.versionFile||window.__ceVersion||document.querySelector?.('[data-ce-version-label]')?.textContent||'v3_0_exp');
-    raw=raw.replace(/^ControlEvent[\s_]+/i,'').replace(/\s+/g,'_');
-    const match=raw.match(/v\d+(?:[._]\d+)*(?:(?:_exp)+)?/i);let v=match?match[0]:'v3_0_exp';
-    v=v.replace(/(?:_exp){2,}/ig,'_exp');
-    return v;
+    const candidates=[window.ControlEventVersion?.version,window.ControlEventVersion?.versionFile,window.__ceVersion,document.querySelector?.('[data-ce-version-label]')?.textContent,'v3_0_exp'];
+    for(const candidate of candidates){
+      let raw=trim(candidate);if(!raw)continue;
+      raw=raw.replace(/^ControlEvent[\s_-]+/i,'').replace(/\s+/g,'_');
+      const match=raw.match(/v\d+(?:[._]\d+)*(?:(?:_exp)+)?/i);if(!match)continue;
+      return match[0].replace(/\./g,'_').replace(/(?:_exp){2,}/ig,'_exp');
+    }
+    return 'v3_0_exp';
   }
   function itvFilePrefix(){return `ControlEvent_${itvVersionToken()}`;}
   function reportPayload(){
     const modes={};for(const mode of MODES){modes[mode]={summary:modeCache[mode].summary||null,results:modeCache[mode].rows||[]};}
-    return{type:'ControlEvent Zuzu ITV',version:itvVersionToken(),exportedAt:new Date().toISOString(),batterySeed,batteryClock,batterySource,batteryCode,historicReplayKey:historicReplayKey||'',generatedBattery:preview||null,dataCounts:preview?.dataCounts||{},modes,history:history().slice(0,10)};
+    return{type:'ControlEvent Zuzu ITV',version:itvVersionToken(),itvContractVersion:ITV_CONTRACT_VERSION,itvBuild:ITV_BUILD,exportedAt:new Date().toISOString(),batterySeed,batteryClock,batterySource,batteryCode,historicReplayKey:historicReplayKey||'',generatedBattery:preview||null,dataCounts:preview?.dataCounts||{},modes,history:history().slice(0,10)};
   }
   function modeFileSuffix(mode=lastMode){return mode==='FAST'?'FAST_CE':mode==='AI-SMOKE'?'AI_SMOKE':'FULL_CERT';}
   function downloadReport(){const payload=reportPayload(),has=MODES.some(m=>modeCache[m].rows.length||modeCache[m].summary);if(!has){alert('Todavía no hay resultados que exportar.');return;}const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a'),suffix=modeFileSuffix(lastMode);a.href=url;a.download=`${itvFilePrefix()}_ITV_Zuzu_${new Date().toISOString().replace(/[:.]/g,'-')}-${suffix}.json`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);setPhase(`Informe ${suffix} descargado. Puedes adjuntarlo directamente para analizar este chequeo.`);}
