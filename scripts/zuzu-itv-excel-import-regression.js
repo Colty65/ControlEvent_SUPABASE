@@ -14,7 +14,7 @@ for(const c of cases){
   try{
     const full=path.join(root,c.file),dataBase64=fs.readFileSync(full).toString('base64');
     const r=await parseZuzuBatteryExcel({dataBase64,fileName:path.basename(full)});
-    const ok=r.questions.length===c.count&&r.questions[0]?.prompt===c.first&&r.questions.at(-1)?.prompt===c.last;
+    const ok=r.questions.length===c.count&&r.questions[0]?.prompt===c.first&&r.questions.at(-1)?.prompt===c.last&&r.questions.every(q=>q?.oracle?.kind==='ledger-structural');
     console.log(`${ok?'OK':'KO'} ${c.file} · ${r.questions.length} preguntas · hoja=${r.sheetName}`);
     if(!ok)ko++;
   }catch(e){ko++;console.error(`KO ${c.file} · ${e?.message||e}`);}

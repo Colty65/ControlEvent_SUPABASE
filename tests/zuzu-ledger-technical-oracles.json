@@ -1,0 +1,185 @@
+{
+  "battery": "ITV-TECNICA-LEDGER-001",
+  "oracles": [
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "purchases",
+      "scopeKind": "all_events",
+      "entity": "PAN",
+      "rows": 34
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "set_fields"
+      ],
+      "fields": [
+        "Producto",
+        "Unidades",
+        "Importe"
+      ],
+      "rows": 34
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "add_field:Evento"
+      ],
+      "fields": [
+        "Evento",
+        "Producto",
+        "Unidades",
+        "Importe"
+      ],
+      "rows": 34
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "sort:Importe:desc"
+      ],
+      "rows": 34
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "remove_field:Unidades"
+      ],
+      "absentFields": [
+        "Unidades"
+      ],
+      "rows": 34
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "show_all_fields"
+      ],
+      "rows": 34
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "purchases",
+      "entity": "Vicente",
+      "forbiddenEntities": [
+        "PAN"
+      ],
+      "rows": 1
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local|query",
+      "domain": "purchases"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "add_field",
+        "add_fields"
+      ],
+      "fields": [
+        "Importe"
+      ]
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "person",
+      "entity": "Vicente",
+      "minRows": 1,
+      "responseKind": "summary"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "donations",
+      "entity": "Vicente",
+      "scopeKind": "all_events"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "event_summary",
+      "scopeKind": "named_event",
+      "event": "SySA 2024",
+      "responseKind": "summary"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "person",
+      "entity": "Vicente",
+      "scopeKind": "all_events"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference|query",
+      "domain": "purchases",
+      "rows": 1
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "add_field:Color del ticket"
+      ],
+      "expectedStatus": "WARN"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "remove_field:Color del ticket",
+        "add_field:Evento"
+      ],
+      "expectedStatus": "WARN"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "purchases",
+      "scopeKind": "named_event",
+      "event": "SySA 2026",
+      "entity": "PAN",
+      "rows": 5,
+      "fields": [
+        "Evento",
+        "Producto",
+        "Tienda",
+        "Importe"
+      ]
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference|query",
+      "domain": "purchases",
+      "scopeKind": "all_events",
+      "rows": 34
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "inspect",
+      "responseKind": "context"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "chart"
+      ],
+      "chart": true
+    }
+  ]
+}

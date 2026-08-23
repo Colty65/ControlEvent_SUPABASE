@@ -436,9 +436,66 @@ function validateOracle(caseDef,result){
   }
   return reasons.length?oracleFail(reasons):oraclePass();
 }
+function vItvLedgerPlan(result={}){return result?.meta?.ledgerAudit?.normalizedPlan||{};}
+function vItvLedgerDataset(result={}){return result?.meta?.resultContext?.ledger?.dataset||null;}
+function vItvLedgerView(result={}){return result?.meta?.resultContext?.ledger?.view||null;}
+function vItvPlanEntityValues(plan={}){
+  const q=plan?.query||{},vals=[];
+  if(q.product?.text)vals.push(q.product.text);
+  for(const k of ['person','responsible','donor','store','ticket','purchase_status'])if(trim(q?.[k]))vals.push(q[k]);
+  for(const x of arr(q?.reuse)){if(trim(x?.entity))vals.push(`${trim(x.entity)}@${trim(x.from_ref)}`);}
+  return vals;
+}
+function vItvPlanOperations(plan={}){
+  const ops=plan?.action==='local'?arr(plan?.local?.operations):plan?.action==='query'?arr(plan?.query?.operations):[];
+  return ops.map(op=>{
+    const t=trim(op?.type);if(!t)return'';
+    if(t==='sort')return`${t}:${trim(op.field)}:${trim(op.direction)}`;
+    if(t==='filter')return`${t}:${trim(op.field)}:${trim(op.operator)||'eq'}:${trim(op.value)}`;
+    if(t==='rank')return`${t}:${trim(op.group_field)}:${trim(op.metric)}:${trim(op.reference)}`;
+    if(t==='compare')return`${t}:${trim(op.group_field)}:${trim(op.metric)}:${arr(op.values).map(trim).filter(Boolean).join(',')}`;
+    if(['add_field','remove_field'].includes(t))return`${t}:${trim(op.field)}`;
+    if(['set_fields','add_fields','remove_fields'].includes(t))return`${t}:${arr(op.fields).map(trim).filter(Boolean).join(',')}`;
+    return t;
+  }).filter(Boolean);
+}
+function validateLedgerStructural(caseDef,result){
+  const o=caseDef?.oracle;if(!o||trim(o.kind)!=='ledger-structural')return{status:'OK',reasons:[]};
+  const reasons=[],plan=vItvLedgerPlan(result),ds=vItvLedgerDataset(result),view=vItvLedgerView(result),action=trim(result?.meta?.ledgerAudit?.action||plan?.action);
+  const oneOf=(actual,expected)=>String(expected||'').split('|').map(trim).filter(Boolean).some(x=>norm(actual)===norm(x));
+  const expectedAction=trim(o.action||o.expectedAction);if(expectedAction&&!oneOf(action,expectedAction))reasons.push(`acción ledger ${action||'—'} != ${expectedAction}`);
+  const expectedDomain=trim(o.domain||o.expectedDomain),domain=trim(plan?.query?.domain||ds?.domain);if(expectedDomain&&!oneOf(domain,expectedDomain))reasons.push(`dominio ${domain||'—'} != ${expectedDomain}`);
+  const scope=plan?.query?.scope||ds?.scope||{},scopeKind=trim(scope?.kind),expectedScope=trim(o.scopeKind||o.expectedScopeKind);if(expectedScope&&norm(scopeKind)!==norm(expectedScope))reasons.push(`scope ${scopeKind||'—'} != ${expectedScope}`);
+  const expectedEvent=trim(o.event||o.expectedEvent);if(expectedEvent){const names=[trim(scope?.event),...arr(scope?.events).map(trim)].filter(Boolean);if(!names.some(x=>norm(x)===norm(expectedEvent)))reasons.push(`evento esperado «${expectedEvent}» no materializado`);}
+  const expectedRef=trim(o.ref||o.expectedRef);if(expectedRef){const got=trim(plan?.local?.from_ref||plan?.reference?.target_ref||plan?.inspect?.target_ref);if(!oneOf(got,expectedRef))reasons.push(`referencia ${got||'—'} != ${expectedRef}`);}
+  const expectedEntity=trim(o.entity||o.expectedEntity);if(expectedEntity){const vals=vItvPlanEntityValues(plan);if(!vals.some(x=>norm(x).includes(norm(expectedEntity))))reasons.push(`entidad «${expectedEntity}» no aparece en el plan`);}
+  const forbidden=arr(o.forbiddenEntities||o.forbiddenEntity).flatMap(x=>String(x||'').split('|')).map(trim).filter(Boolean);if(forbidden.length){const blob=norm(JSON.stringify(plan));for(const x of forbidden)if(blob.includes(norm(x)))reasons.push(`entidad prohibida arrastrada: ${x}`);}
+  if(o.rows!=null&&Number(ds?.row_count)!==Number(o.rows))reasons.push(`filas ${Number(ds?.row_count)||0} != ${Number(o.rows)}`);
+  if(o.minRows!=null&&Number(ds?.row_count)<Number(o.minRows))reasons.push(`filas ${Number(ds?.row_count)||0} < ${Number(o.minRows)}`);
+  if(o.maxRows!=null&&Number(ds?.row_count)>Number(o.maxRows))reasons.push(`filas ${Number(ds?.row_count)||0} > ${Number(o.maxRows)}`);
+  const expectedFields=arr(o.fields||o.expectedFields).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean);if(expectedFields.length){const got=arr(view?.displayed_fields).map(trim);for(const f of expectedFields)if(!got.some(x=>norm(x)===norm(f)))reasons.push(`campo visible esperado «${f}» no aparece`);}
+  const absentFields=arr(o.absentFields).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean);if(absentFields.length){const got=arr(view?.displayed_fields).map(trim);for(const f of absentFields)if(got.some(x=>norm(x)===norm(f)))reasons.push(`campo «${f}» debería estar ausente`);}
+  const expectedOps=arr(o.operations||o.expectedOperations).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean),gotOps=vItvPlanOperations(plan);for(const e of expectedOps)if(!gotOps.some(g=>norm(g).startsWith(norm(e))))reasons.push(`operación esperada «${e}» no aparece (${gotOps.join(', ')||'sin operaciones'})`);
+  const responseKind=trim(o.responseKind||o.expectedResponseKind);if(responseKind&&norm(trim(plan?.response_kind))!==norm(responseKind))reasons.push(`response_kind ${trim(plan?.response_kind)||'—'} != ${responseKind}`);
+  const mustChart=o.chart===true;if(mustChart&&!arr(result?.charts).length)reasons.push('se esperaba gráfica y no se generó');
+  const expectedStatus=trim(o.expectedStatus).toUpperCase();if(expectedStatus==='WARN'&&reasons.length===0)return{status:'WARN',reasons:['aviso esperado por contrato de prueba']};
+  return{status:reasons.length?'KO':'OK',reasons};
+}
+function vItvGenericHealth(result={}){
+  const blob=`${trim(result?.title)}\n${trim(result?.answer)}`,warnings=arr(result?.warnings).map(trim).filter(Boolean),reasons=[];
+  if(result?.ok===false)return{status:'KO',reasons:['result.ok=false']};
+  if(/ControlEvent no pudo ejecutar|Gemini no (?:pudo|llegó a) interpretar|No puedo ejecutar todavía|scope\s+\w+\s+requiere|No puedo certificar el evento|fallo técnico real/i.test(blob))reasons.push('respuesta de fallo/no ejecución');
+  if(reasons.length)return{status:'KO',reasons};
+  if(/Necesito una precisión|No encuentro (?:la conversación|un resultado anterior|el turno)|¿A qué .* te refieres|Which .* do you want|Could you specify/i.test(blob))reasons.push('turno aplazado por aclaración/referencia no resuelta');
+  if(/(?:por|total de|valor total de)\s*\./i.test(blob))reasons.push('importe/total vacío en respuesta canónica');
+  if(warnings.length)reasons.push(`warnings CE: ${warnings.join(' | ')}`);
+  return{status:reasons.length?'WARN':'OK',reasons};
+}
 function validatePaidCase(caseDef,result){
-  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result);
-  return{ok:base&&oracle.ok,reasons:[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons]};
+  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result),ledger=validateLedgerStructural(caseDef,result),health=vItvGenericHealth(result);
+  const reasons=[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons,...ledger.reasons,...health.reasons];
+  let status='OK';if(!base||!oracle.ok||ledger.status==='KO'||health.status==='KO')status='KO';else if(ledger.status==='WARN'||health.status==='WARN')status='WARN';
+  return{ok:status==='OK',status,reasons};
 }
 
 async function buildRealFastCases(state,seed){
@@ -966,7 +1023,7 @@ async function runSmoke({state,cases,send,signal,actor={},maxCostEur=0.25,maxCas
       r=outcome(c,'KO',timed.error?.message||String(timed.error));
     }else{
       const result=timed.value,u=usageOf(result);costEur=round(costEur+u.costEur,6);calls+=u.calls;tokens+=u.tokens;const verdict=validatePaidCase(c,result);
-      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,260)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
+      r=outcome(c,verdict.status|| (verdict.ok?'OK':'KO'),`${result?.title||''} · ${trim(result?.answer).slice(0,260)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
     }
     r.durationMs=Date.now()-t0;done++;if(r.status==='OK')ok++;else if(r.status==='WARN')warn++;else{ko++;failures.push(r);}streamWrite(send,'case',{case:r,progress:{done,total,ok,warn,ko,percent:total?Math.round(done*100/total):100,costEur,calls,tokens}});
     if(costEur>=maxCostEur){streamWrite(send,'budget',{message:'Se ha alcanzado el presupuesto máximo configurado.',costEur});break;}
@@ -993,7 +1050,7 @@ async function runFull({state,turns,send,signal,actor={},maxCostEur=0.50,maxCase
     else{
       const result=timed.value,u=usageOf(result);costEur=round(costEur+u.costEur,6);calls+=u.calls;tokens+=u.tokens;
       const verdict=validatePaidCase(c,result);
-      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,300)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
+      r=outcome(c,verdict.status|| (verdict.ok?'OK':'KO'),`${result?.title||''} · ${trim(result?.answer).slice(0,300)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
       previousInteractionId=trim(result?.interactionId||result?.meta?.interactionId||'');
       conversationId=trim(result?.conversationId||result?.meta?.conversationId||conversationId);
       history.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});
@@ -1024,7 +1081,7 @@ export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationSta
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
     if(timed.timedOut) r=outcome(c,'WARN',`TIEMPO MÁXIMO: el caso superó ${Math.round(timeoutMs/1000)} s. Se cancela este caso y el cliente puede continuar con el siguiente.`,{timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});
     else if(timed.error) r=outcome(c,'KO',timed.error?.message||String(timed.error),{usage:{calls:1,tokens:0,costEur:reserve}});
-    else {const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,320)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,...ledgerAuditOf(result)});}
+    else {const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.status|| (verdict.ok?'OK':'KO'),`${result?.title||''} · ${trim(result?.answer).slice(0,320)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,...ledgerAuditOf(result)});}
   } else {
     let cs=safeConversationState(conversationState);
     if(cs.scenario!==trim(c.scenario)) cs={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};
@@ -1034,7 +1091,7 @@ export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationSta
     else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
     else {
       const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);
-      r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
+      r=outcome(c,verdict.status|| (verdict.ok?'OK':'KO'),`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`\nORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,...ledgerAuditOf(result)});
       const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});
       nextConversationState={conversationId:trim(result?.conversationId||result?.meta?.conversationId||cs.conversationId).slice(0,160),previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};
     }
@@ -1055,7 +1112,7 @@ export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},convers
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
     if(timed.timedOut)r=outcome(c,'WARN',`TIEMPO MÁXIMO: el caso histórico superó ${Math.round(timeoutMs/1000)} s.`,{timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});
     else if(timed.error)r=outcome(c,'KO',timed.error?.message||String(timed.error),{usage:{calls:1,tokens:0,costEur:reserve}});
-    else{const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`
+    else{const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.status|| (verdict.ok?'OK':'KO'),`${result?.title||''} · ${trim(result?.answer).slice(0,360)}${verdict.reasons.length?`
 ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),oracleReasons:verdict.reasons,historicalExact:true,...ledgerAuditOf(result)});}
   }else{
     let cs=safeConversationState(conversationState);if(cs.scenario!==trim(c.scenario))cs={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};
@@ -1063,7 +1120,7 @@ ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
     if(timed.timedOut){r=outcome(c,'WARN',`TIEMPO MÁXIMO: este turno histórico superó ${Math.round(timeoutMs/1000)} s.`,{scenario:c.scenario,timeout:true,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
     else if(timed.error){r=outcome(c,'KO',timed.error?.message||String(timed.error),{scenario:c.scenario,usage:{calls:1,tokens:0,costEur:reserve}});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
-    else{const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.ok?'OK':'KO',`${result?.title||''} · ${trim(result?.answer).slice(0,420)}${verdict.reasons.length?`
+    else{const result=timed.value,u=usageOf(result),verdict=validatePaidCase(c,result);r=outcome(c,verdict.status|| (verdict.ok?'OK':'KO'),`${result?.title||''} · ${trim(result?.answer).slice(0,420)}${verdict.reasons.length?`
 ORÁCULO: ${verdict.reasons.join(' | ')}`:''}`,{usage:u,tools:arr(result?.meta?.tools),scenario:c.scenario,oracleReasons:verdict.reasons,historicalExact:true,...ledgerAuditOf(result)});const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});nextConversationState={conversationId:trim(result?.conversationId||result?.meta?.conversationId||cs.conversationId).slice(0,160),previousInteractionId:trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500),history:hist,scenario:trim(c.scenario)};}
   }
   r.durationMs=Date.now()-started;return{ok:true,mode:m,case:r,conversationState:nextConversationState,timeoutMs,historicalExact:true};
@@ -1082,3 +1139,7 @@ export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,ca
   streamWrite(send,'summary',{mode:m,...result,finishedAt:nowIso(),certified:result.ko===0&&!result.aborted&&result.done===selected.length&&result.done>0});
   return result;
 }
+
+// Solo para regresión automatizada del propio ITV: permite verificar que el semáforo
+// distingue resultado correcto, advertencia conversacional y fallo real.
+export function __validateZuzuItvCaseForRegression(caseDef={},result={}){return validatePaidCase(caseDef,result);}

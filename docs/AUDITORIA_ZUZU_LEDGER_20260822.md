@@ -76,3 +76,57 @@ Resultado de auditoría con los mismos archivos que daban el error:
 - `ITV_Zuzu_Bateria_Tecnica_21.xlsx`: 21/21 preguntas leídas correctamente.
 - `ITV_Zuzu_Bateria_Humana_33.xlsx`: 33/33 preguntas leídas correctamente.
 - Sintaxis JS global: 234 archivos OK.
+
+## Auditoría posterior a las baterías reales · 23/08/2026
+
+Se analizaron las cuatro ejecuciones ITV entregadas (AI-SMOKE/FULL-CERT, técnica/humana). Se confirmó que el semáforo anterior podía marcar OK aunque la respuesta fuese una aclaración, una referencia perdida o un fallo de ejecución. Esta versión cambia el criterio de certificación.
+
+### ITV: OK / WARN / KO reales
+
+- Las baterías Excel admiten un `ORACULO_JSON` por fila o columnas `EXPECTED_*`.
+- El oráculo de ledger comprueba, cuando se declara: acción, dominio, ámbito, evento, referencia, entidad, entidades prohibidas, filas, campos, operaciones, tipo de respuesta y gráfica.
+- Un resultado de ejecución fallida (`ControlEvent no pudo ejecutar`, scope incompleto, evento no certificable, etc.) es KO aunque la llamada HTTP haya terminado correctamente.
+- Una aclaración o una referencia no resuelta es WARN, no OK.
+- Una respuesta canónica con total vacío (`por .`, `total de .`) es WARN.
+- Las dos baterías Excel incluidas llevan ahora oráculos estructurales por turno; ya no dependen del texto genérico «respuesta coherente».
+- El informe muestra en `ORÁCULO:` la razón concreta del WARN/KO.
+
+Regresiones nuevas:
+- `npm run test:zuzu-itv-excel`: 21/21 + 33/33 preguntas, todas con oráculo estructural leído.
+- `npm run test:zuzu-itv-oracle`: verifica que un caso correcto da OK, una respuesta semánticamente equivocada da KO, una aclaración da WARN, un fallo CE da KO y un total vacío da WARN.
+
+### Memoria histórica
+
+El índice histórico almacena ahora etiquetas semánticas del PLAN inmutable (acción, dominio, entidades, ámbito y operaciones), además del título/foco derivado. El ranking pondera:
+
+1. entidad/tema citado literalmente en la pregunta original del turno;
+2. entidades explícitas del PLAN;
+3. foco derivado;
+4. título/resumen.
+
+Los turnos QUERY/REFERENCE reciben prioridad sobre aclaraciones/inspecciones, y expresiones genéricas como «al principio» favorecen los primeros turnos sin codificar nombres concretos. La tokenización incorpora normalización plural genérica para que «donación/donaciones» o «compra/compras» compitan como el mismo concepto.
+
+Regresión nueva: `npm run test:zuzu-history-ranking` comprueba que:
+- «vuelve a Vicente» prefiere el turno que nombra a Vicente frente a un foco derivado posterior;
+- «lo del principio de Pocholo» favorece el turno inicial;
+- «la donación de Pocholo» favorece el recuerdo de donaciones frente al de compras.
+
+### Conversación y análisis
+
+- El contrato de turno incorpora `response_kind`: amount, who, what, whether, which_event, compare, summary, table, context y conversation_summary.
+- CE puede responder determinísticamente según el tipo de pregunta en vez de usar siempre «He preparado N registros».
+- `INSPECT conversation_summary` resume el ledger de la conversación completa, no solo el último DATASET.
+- Se incorpora la operación `rank`, ejecutada localmente sobre el DATASET, con dimensión, métrica, referencia, operador y límite. Permite expresar preguntas del tipo «quién ha comprado más que X» sin hard-code de personas.
+- `RECENT_TURNS` incluye un resumen semántico del PLAN para que pronombres y referencias cortas apunten a la cápsula correcta sin reconstruir un estado global.
+
+### Totales
+
+Se corrige la plantilla canónica para que `null` no se trate como un total numérico válido. Si no hay total materializado, CE omite la cláusula económica en vez de producir `por .` o `con un total de .`. El ITV detecta además cualquier reaparición de esa salida como WARN.
+
+### Limitación de esta auditoría
+
+La construcción local no dispone de las dependencias/credenciales necesarias para ejecutar una nueva batería E2E pagada contra Gemini. Por eso la certificación final de interpretación se hace en la ITV desplegada. Sí se han ejecutado localmente la sintaxis global y las regresiones autocontenidas de Excel, oráculo y ranking histórico antes de empaquetar.
+
+### Comparación explícita de entidades
+
+Se añade `compare` como operación analítica genérica junto a `rank`. Recibe `group_field`, `metric` y una lista `values`, agrupa una sola vez sobre el DATASET y filtra localmente los valores solicitados con operador interno `one_of`. Esto permite expresar comparaciones como dos personas, tiendas, productos o eventos sin codificar nombres concretos y sin duplicar consultas.

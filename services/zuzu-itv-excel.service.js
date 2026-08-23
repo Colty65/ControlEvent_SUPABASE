@@ -62,7 +62,22 @@ export async function parseZuzuBatteryExcel({dataBase64='',fileName=''}={}){
   const shared=sharedStringsFromXml(zipText(buffer,entries,'xl/sharedStrings.xml')),rows=worksheetRowsFromXml(sheetXml,shared),headerRow=rows.find(x=>x.rowNo===1)||rows[0];if(!headerRow){const e=new Error('La hoja de preguntas está vacía.');e.status=422;throw e;}
   const headers={};for(const [col,val] of Object.entries(headerRow.cells)){const h=excelHeader(val);if(h)headers[h]=num(col);}const qCol=headers.PREGUNTA||headers.PROMPT||headers.PREGUNTAS;if(!qCol){const e=new Error('La primera fila debe contener una columna PREGUNTA.');e.status=422;throw e;}
   const seqCol=headers.SECUENCIA||headers.SEQ,groupCol=headers.GRUPO,labelCol=headers.ETIQUETA||headers.LABEL,expCol=headers.ESPERADO||headers.EXPECTED,scenarioCol=headers.ESCENARIO||headers.SCENARIO,questions=[];
-  for(const r of rows){if(r.rowNo===headerRow.rowNo)continue;const prompt=trim(r.cells[qCol]);if(!prompt)continue;questions.push({seq:seqCol?(num(r.cells[seqCol])||r.rowNo-1):r.rowNo-1,prompt,group:groupCol?trim(r.cells[groupCol]):'EXCEL',label:labelCol?trim(r.cells[labelCol]):'',expected:expCol?trim(r.cells[expCol]):'',scenario:scenarioCol?trim(r.cells[scenarioCol]):''});}
+  const col=(...names)=>{for(const n of names){const k=headers[excelHeader(n)];if(k)return k;}return 0;};
+  const oracleCols={
+    action:col('EXPECTED_ACTION','ACCION_ESPERADA'),domain:col('EXPECTED_DOMAIN','DOMINIO_ESPERADO'),ref:col('EXPECTED_REF','REFERENCIA_ESPERADA'),
+    scopeKind:col('EXPECTED_SCOPE_KIND','SCOPE_ESPERADO','AMBITO_ESPERADO'),event:col('EXPECTED_EVENT','EVENTO_ESPERADO'),entity:col('EXPECTED_ENTITY','ENTIDAD_ESPERADA'),
+    forbiddenEntity:col('FORBIDDEN_ENTITY','ENTIDAD_PROHIBIDA'),rows:col('EXPECTED_ROWS','FILAS_ESPERADAS'),minRows:col('MIN_ROWS','FILAS_MIN'),maxRows:col('MAX_ROWS','FILAS_MAX'),
+    fields:col('EXPECTED_FIELDS','CAMPOS_ESPERADOS'),absentFields:col('ABSENT_FIELDS','CAMPOS_AUSENTES'),operations:col('EXPECTED_OPERATION','EXPECTED_OPERATIONS','OPERACION_ESPERADA'),
+    responseKind:col('EXPECTED_RESPONSE_KIND','RESPUESTA_ESPERADA'),expectedStatus:col('EXPECTED_STATUS','ESTADO_ESPERADO'),chart:col('EXPECTED_CHART','GRAFICA_ESPERADA')
+  };
+  const jsonCol=col('ORACLE_JSON','ORACULO_JSON');
+  for(const r of rows){
+    if(r.rowNo===headerRow.rowNo)continue;const prompt=trim(r.cells[qCol]);if(!prompt)continue;
+    let oracle=null;
+    if(jsonCol&&trim(r.cells[jsonCol])){try{const parsed=JSON.parse(trim(r.cells[jsonCol]));if(parsed&&typeof parsed==='object')oracle=parsed;}catch(_){/* El validador de la batería mostrará que no hay oráculo estructural. */}}
+    if(!oracle){const o={kind:'ledger-structural'};let has=false;for(const [k,c] of Object.entries(oracleCols)){if(!c)continue;let v=trim(r.cells[c]);if(!v)continue;has=true;if(['rows','minRows','maxRows'].includes(k))o[k]=Number(v);else if(k==='chart')o[k]=/^(?:1|true|si|sí|yes)$/i.test(v);else if(['fields','absentFields','operations','forbiddenEntity'].includes(k))o[k]=v.split(/\s*\|\s*/).filter(Boolean);else o[k]=v;}if(has)oracle=o;}
+    const q={seq:seqCol?(num(r.cells[seqCol])||r.rowNo-1):r.rowNo-1,prompt,group:groupCol?trim(r.cells[groupCol]):'EXCEL',label:labelCol?trim(r.cells[labelCol]):'',expected:expCol?trim(r.cells[expCol]):'',scenario:scenarioCol?trim(r.cells[scenarioCol]):''};if(oracle)q.oracle=oracle;questions.push(q);
+  }
   questions.sort((a,b)=>num(a.seq)-num(b.seq));if(!questions.length){const e=new Error('No se han encontrado preguntas debajo de la cabecera PREGUNTA.');e.status=422;throw e;}
   return {ok:true,fileName:trim(fileName),sheetName:trim(chosen.name||'PREGUNTAS'),questions};
 }

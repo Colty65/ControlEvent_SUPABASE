@@ -45,3 +45,9 @@ Se incluye `sql/ce_zuzu_conversation_ledger.sql` para crear las tablas dedicadas
 ## Multievento
 
 `comparison` acepta `named_events` explícitos o `event_series`. SCC certifica primero el conjunto real de eventos y después CE ejecuta el mismo extractor comparativo para todos ellos. El mecanismo no exige que los eventos pertenezcan a la misma serie ni que sean del mismo tipo.
+
+## Oráculos ITV por Excel
+
+Las dos baterías incluidas contienen una columna `ORACULO_JSON`. Cada fila puede declarar solo lo que deba certificarse: `action`, `domain`, `scopeKind`, `event`, `entity`, `forbiddenEntities`, `rows`, `fields`, `absentFields`, `operations`, `responseKind`, `chart` o `expectedStatus`.
+
+ITV ya no considera éxito que la petición simplemente termine. La respuesta se clasifica como OK/WARN/KO comparando el PLAN/ledger y el resultado real contra el oráculo de esa fila. Las aclaraciones/referencias no resueltas son WARN; los fallos de ejecución y contradicciones con el oráculo son KO.

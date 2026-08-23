@@ -1,0 +1,211 @@
+{
+  "battery": "ITV-HUMANA-LEDGER-001",
+  "oracles": [
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "donations",
+      "entity": "Pocholo",
+      "responseKind": "whether"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference|local|query",
+      "domain": "donations",
+      "responseKind": "amount"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "purchases",
+      "entity": "Vicente",
+      "responseKind": "whether",
+      "rows": 1
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference|query|local",
+      "domain": "purchases",
+      "responseKind": "what",
+      "rows": 1
+    },
+    {
+      "kind": "ledger-structural",
+      "responseKind": "which_event"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|local",
+      "domain": "purchases",
+      "operations": [
+        "rank"
+      ],
+      "responseKind": "who"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local|query",
+      "domain": "purchases",
+      "responseKind": "who"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "entity": "Pocholo",
+      "responseKind": "summary"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|reference",
+      "entity": "Celes"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|local",
+      "operations": [
+        "compare"
+      ],
+      "responseKind": "compare"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local|reference|query",
+      "domain": "purchases",
+      "responseKind": "whether"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local|query",
+      "responseKind": "whether"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|reference",
+      "domain": "purchases",
+      "entity": "PAN",
+      "scopeKind": "all_events",
+      "responseKind": "amount",
+      "rows": 34
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference|query|local",
+      "domain": "purchases",
+      "scopeKind": "all_events",
+      "responseKind": "amount"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|local",
+      "domain": "purchases",
+      "operations": [
+        "rank"
+      ],
+      "responseKind": "which_event"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|local",
+      "domain": "purchases",
+      "event": "SySA 2026",
+      "responseKind": "amount"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|local",
+      "domain": "purchases",
+      "event": "SySA 2026",
+      "responseKind": "who"
+    },
+    {
+      "kind": "ledger-structural",
+      "expectedStatus": "WARN"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "event_summary|bank",
+      "event": "SySA 2026",
+      "forbiddenEntities": [
+        "PAN"
+      ],
+      "responseKind": "summary"
+    },
+    {
+      "kind": "ledger-structural",
+      "responseKind": "whether"
+    },
+    {
+      "kind": "ledger-structural",
+      "responseKind": "who"
+    },
+    {
+      "kind": "ledger-structural",
+      "responseKind": "whether"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query",
+      "domain": "people",
+      "event": "SySA 2026"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|local|reference",
+      "entity": "Vicente",
+      "responseKind": "whether"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|local|reference",
+      "entity": "Pocholo",
+      "responseKind": "whether"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "query|local",
+      "operations": [
+        "compare"
+      ],
+      "responseKind": "compare"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference|query",
+      "domain": "donations",
+      "entity": "Pocholo"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local|reference",
+      "domain": "donations",
+      "fields": [
+        "Evento"
+      ]
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "local",
+      "operations": [
+        "add_field"
+      ]
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "reference|local"
+    },
+    {
+      "kind": "ledger-structural",
+      "action": "inspect",
+      "responseKind": "conversation_summary"
+    }
+  ]
+}

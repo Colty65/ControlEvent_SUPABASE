@@ -201,7 +201,7 @@
     try{
       const dataBase64=await fileToBase64(file);
       const imported=await fetchJson('/api/zuzu-tests/import-excel',{method:'POST',headers:apiHeaders(),body:JSON.stringify({fileName:file.name,dataBase64})},45000);
-      const raw=(Array.isArray(imported?.questions)?imported.questions:[]).map((x,i)=>({seq:num(x?.seq)||i+1,prompt:trim(x?.prompt),group:trim(x?.group)||'EXCEL',label:trim(x?.label),expected:trim(x?.expected),scenario:trim(x?.scenario)})).filter(x=>x.prompt);
+      const raw=(Array.isArray(imported?.questions)?imported.questions:[]).map((x,i)=>({seq:num(x?.seq)||i+1,prompt:trim(x?.prompt),group:trim(x?.group)||'EXCEL',label:trim(x?.label),expected:trim(x?.expected),scenario:trim(x?.scenario),oracle:x?.oracle&&typeof x.oracle==='object'?x.oracle:null})).filter(x=>x.prompt);
       raw.sort((a,b)=>a.seq-b.seq);
       if(!raw.length)throw new Error('No se han encontrado preguntas debajo de la cabecera PREGUNTA.');
       const signature=raw.map(x=>`${x.seq}|${x.prompt}|${x.expected}`).join('\n'),hash=itvHash(signature)||0x6d2b79f5,binary=hash.toString(36).toUpperCase();batterySeed=hash;batteryCode=`XLS-${binary.slice(0,9)}`;batteryClock=`Excel · ${file.name}`;const defaultScenario=`EXCEL-${batteryCode}`;

@@ -107,15 +107,43 @@ export async function appendZuzuTurn({conversation,actor={},userPrompt='',action
   return{conversation:savedConv,turn:publicTurn(trow),datasetId,viewId};
 }
 
+function semanticTagsFromTurn(turn={}){
+  const plan=turn.normalizedPlan||{},q=plan.query||{},scope=q.scope||{},exec=turn.execution||{};
+  const entity=(name,value)=>trim(value)?{role:name,value:trim(value)}:null;
+  const entities=[
+    entity('person',q.person),entity('responsible',q.responsible),entity('donor',q.donor),entity('store',q.store),
+    entity('ticket',q.ticket),entity('product',q.product?.text||q.product_text),entity('event',scope.event)
+  ].filter(Boolean);
+  for(const e of arr(scope.events))if(trim(e?.name||e))entities.push({role:'event',value:trim(e?.name||e)});
+  return{
+    action:trim(plan.action||turn.actionType),domain:trim(q.domain||exec.domain),responseKind:trim(plan.response_kind),
+    entities,scopeKind:trim(scope.kind||exec.scope?.kind),scopeEvent:trim(scope.event||exec.scope?.event),
+    operations:arr(plan.local?.operations).map(o=>({type:trim(o?.type),field:trim(o?.field||o?.group_field),value:trim(o?.value||o?.reference)})).filter(o=>o.type)
+  };
+}
+
 async function updateHistoryIndex({conversation,turn,actor}={}){
   const uid=actorId(actor);if(!uid||!turn)return;const key=mkey('index',uid),old=arr(await metaGet(key));const exec=turn.execution||{};
-  const item={conversationId:conversation.conversationId,turnId:turn.turnId,seq:turn.seq,createdAt:turn.createdAt,userPrompt:turn.userPrompt,title:turn.title,actionType:turn.actionType,domain:trim(exec.domain),scope:exec.scope||{},focus:exec.focus||{},rowCount:Number(exec.row_count)||0,summary:trim(exec.summary)||trim(turn.title)||trim(turn.userPrompt)};
+  const item={conversationId:conversation.conversationId,turnId:turn.turnId,seq:turn.seq,createdAt:turn.createdAt,userPrompt:turn.userPrompt,title:turn.title,actionType:turn.actionType,domain:trim(exec.domain),scope:exec.scope||{},focus:exec.focus||{},semanticTags:semanticTagsFromTurn(turn),rowCount:Number(exec.row_count)||0,summary:trim(exec.summary)||trim(turn.title)||trim(turn.userPrompt)};
   const next=[item,...old.filter(x=>trim(x?.turnId)!==turn.turnId)].slice(0,400);await metaSet(key,next);
 }
 
 const STOP=new Set('ahora antes despues luego este esta esto esa ese esos esas aquel aquella aquellos aquellas te acuerdas recuerdas recordar hablamos conversacion conversaciones sobre cosa cosas algo aquello volver vuelve dame dime lo la los las un una unos unas de del al en y o que me nos se si por para con ya fue era es son'.split(' '));
-function tokens(v=''){return norm(v).split(' ').filter(x=>x.length>2&&!STOP.has(x));}
-function historyScore(prompt='',item={}){const q=tokens(prompt),h=tokens(`${item.userPrompt||''} ${item.title||''} ${item.summary||''} ${JSON.stringify(item.focus||{})} ${JSON.stringify(item.scope||{})}`);if(!q.length||!h.length)return 0;const hs=new Set(h);let hit=0;for(const t of q)if(hs.has(t))hit+=t.length>=6?2:1;const unique=new Set(q).size;return hit/Math.max(1,unique);}
+function tokens(v=''){return norm(v).split(' ').filter(x=>x.length>2&&!STOP.has(x)).map(x=>x.length>5&&x.endsWith('es')?x.slice(0,-2):x.length>4&&x.endsWith('s')?x.slice(0,-1):x); }
+function tokenHitScore(q,source,weight=1){const set=new Set(tokens(source));let n=0;for(const t of q)if(set.has(t))n+=(t.length>=6?2:1)*weight;return n;}
+function historyScore(prompt='',item={}){
+  const q=tokens(prompt);if(!q.length)return 0;
+  const direct=tokenHitScore(q,item.userPrompt||'',5);
+  const semantic=tokenHitScore(q,JSON.stringify(item.semanticTags||{}),4);
+  const focus=tokenHitScore(q,JSON.stringify(item.focus||{}),2);
+  const descriptive=tokenHitScore(q,`${item.title||''} ${item.summary||''} ${JSON.stringify(item.scope||{})}`,1);
+  let score=(direct+semantic+focus+descriptive)/Math.max(1,new Set(q).size);
+  const action=norm(item.actionType||item.semanticTags?.action);
+  if(['query','reference'].includes(action))score+=0.35;
+  if(['clarify','inspect','conversation'].includes(action))score-=0.45;
+  if(/\b(?:principio|comienzo|inicio|primer[oa]?)\b/i.test(trim(prompt)))score+=1/Math.max(1,Number(item.seq)||1);
+  return Math.max(0,score);
+}
 export function isRecallPrompt(prompt=''){return /\b(?:te\s+acuerdas|recuerdas|recu[eé]rdame|recu[eé]rdanos|recuerda|acu[eé]rdate|recordamos|hablamos|conversaci[oó]n\s+(?:pasada|anterior)|aquella\s+(?:tabla|conversaci[oó]n)|aquel\s+(?:tema|d[ií]a)|lo\s+que\s+vimos|lo\s+de\s+(?:antes|otro\s+d[ií]a)|(?:vuelve|volvamos|volver|retoma)\s+a(?:\s+lo\s+de)?)\b/i.test(trim(prompt));}
 export async function searchZuzuHistoryCandidates({actor={},prompt='',conversationId='',limit=8}={}){
   const uid=actorId(actor);if(!uid)return[];let items=arr(await metaGet(mkey('index',uid)));
@@ -123,12 +151,12 @@ export async function searchZuzuHistoryCandidates({actor={},prompt='',conversati
   if(!items.length){
     try{
       const {data:convs,error:ce}=await db().from(T_CONV).select('conversation_id').eq('user_id',uid).limit(300);if(ce)throw ce;const ids=arr(convs).map(x=>trim(x?.conversation_id)).filter(Boolean);
-      if(ids.length){const {data,error}=await db().from(T_TURN).select('turn_id,conversation_id,seq,user_prompt,action_type,execution,title,created_at').in('conversation_id',ids).order('created_at',{ascending:false}).limit(400);if(error)throw error;items=arr(data).map(r=>({conversationId:r.conversation_id,turnId:r.turn_id,seq:r.seq,createdAt:r.created_at,userPrompt:r.user_prompt,title:r.title,actionType:r.action_type,domain:trim(r.execution?.domain),scope:r.execution?.scope||{},focus:r.execution?.focus||{},rowCount:Number(r.execution?.row_count)||0,summary:trim(r.execution?.summary)||trim(r.title)||trim(r.user_prompt)}));}
+      if(ids.length){const {data,error}=await db().from(T_TURN).select('turn_id,conversation_id,seq,user_prompt,action_type,execution,normalized_plan,title,created_at').in('conversation_id',ids).order('created_at',{ascending:false}).limit(400);if(error)throw error;items=arr(data).map(r=>{const turn=publicTurn(r);return{conversationId:r.conversation_id,turnId:r.turn_id,seq:r.seq,createdAt:r.created_at,userPrompt:r.user_prompt,title:r.title,actionType:r.action_type,domain:trim(r.execution?.domain),scope:r.execution?.scope||{},focus:r.execution?.focus||{},semanticTags:semanticTagsFromTurn(turn),rowCount:Number(r.execution?.row_count)||0,summary:trim(r.execution?.summary)||trim(r.title)||trim(r.user_prompt)}});}
     }catch(error){if(!isMissingTable(error))throw error;}
   }
   const scored=items.map(x=>({...x,score:historyScore(prompt,x)})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score||text(b.createdAt).localeCompare(text(a.createdAt)));
   const out=[];const seen=new Set();for(const x of scored){const k=x.turnId;if(seen.has(k))continue;seen.add(k);out.push(x);if(out.length>=Math.max(1,Math.min(12,Number(limit)||8)))break;}
-  return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,row_count:x.rowCount,summary:x.summary,score:Number(x.score.toFixed(3)),same_conversation:trim(x.conversationId)===trim(conversationId)}));
+  return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,semantic_tags:x.semanticTags||{},row_count:x.rowCount,summary:x.summary,score:Number(x.score.toFixed(3)),same_conversation:trim(x.conversationId)===trim(conversationId)}));
 }
 
 export async function listZuzuConversations({actor={},limit=40}={}){
