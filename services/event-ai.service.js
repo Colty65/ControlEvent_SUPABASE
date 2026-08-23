@@ -13903,7 +13903,8 @@ function v73TurnTool(){
   const reference={type:'object',properties:{target_ref:{type:'string'},action:{type:'string',enum:['restore_snapshot','reexecute_plan']},changes:{type:'array',items:change}},required:['target_ref','action']};
   const inspect={type:'object',properties:{target_ref:{type:'string'},kind:{type:'string',enum:['current','conversation_summary']}}};
   const clarify={type:'object',properties:{question:{type:'string'},candidate_refs:{type:'array',items:{type:'string'}}},required:['question']};
-  return{type:'function',name:'zuzu_turn_record',description:'Crea un registro inmutable para este turno. QUERY obtiene datos nuevos; LOCAL opera sobre un resultado existente; REFERENCE recupera o reejecuta un turno anterior; INSPECT describe un turno o resume la conversación; CONVERSATION conversa; CLARIFY pregunta; RESET inicia un foco nuevo sin borrar el historial persistido.',parameters:{type:'object',properties:{action:{type:'string',enum:['query','local','reference','inspect','conversation','clarify','reset']},response_kind:{type:'string',enum:['auto','amount','who','what','whether','which_event','compare','summary','table','context','conversation_summary']},query,local,reference,inspect,clarify,reply:{type:'string'}},required:['action']}};
+  const answer_blueprint={type:'object',description:'Molde verbal breve para que ControlEvent inserte DESPUÉS los hechos reales. No pongas cifras ni hechos no conocidos; usa solo placeholders permitidos.',properties:{template:{type:'string'},yes_template:{type:'string'},no_template:{type:'string'},empty_template:{type:'string'},voice_template:{type:'string'}}};
+  return{type:'function',name:'zuzu_turn_record',description:'Crea un registro inmutable para este turno. QUERY obtiene datos nuevos; LOCAL opera sobre un resultado existente; REFERENCE recupera o reejecuta un turno anterior; INSPECT describe un turno o resume la conversación; CONVERSATION conversa; CLARIFY pregunta; RESET inicia un foco nuevo sin borrar el historial persistido. En la MISMA llamada puede proponer answer_blueprint: solo redacción con placeholders; CE conserva la verdad factual.',parameters:{type:'object',properties:{action:{type:'string',enum:['query','local','reference','inspect','conversation','clarify','reset']},response_kind:{type:'string',enum:['auto','amount','who','what','whether','which_event','compare','summary','table','context','conversation_summary']},answer_blueprint,query,local,reference,inspect,clarify,reply:{type:'string'}},required:['action']}};
 }
 function v73NormalizeScope(raw={}){
   const kind=['screen_event','named_event','named_events','event_series','all_events','year','latest_events'].includes(trim(raw?.kind))?trim(raw.kind):'';
@@ -13935,8 +13936,17 @@ function v73NormalizeOperations(raw=[]){
   }
   return ops;
 }
+const V73_ANSWER_PLACEHOLDERS=Object.freeze(['amount','count','person','product','event','scope_text','people','items','events','subject','winner','winner_value','runner_up','runner_up_value','difference','metric','summary','detail']);
+function v73NormalizeAnswerBlueprint(raw={},responseKind=''){
+  if(!raw||typeof raw!=='object')return undefined;const out={},allowed=new Set(V73_ANSWER_PLACEHOLDERS),rk=trim(responseKind),factKinds=new Set(['amount','who','what','whether','which_event','compare','summary','table','context','conversation_summary']),required={amount:['amount'],who:['people'],what:['items'],which_event:['event','events'],compare:['winner','summary','detail'],summary:['summary','detail'],table:['summary','detail'],context:['summary','detail'],conversation_summary:['summary','detail']}[rk]||[];
+  const cleanTemplate=(value)=>{let t=trim(value).replace(/\s+/g,' ').slice(0,420);if(!t)return'';const vars=[...t.matchAll(/\{([a-z_]+)\}/gi)].map(m=>m[1].toLowerCase());if(vars.some(v=>!allowed.has(v)))return'';if(/\b(?:json|sql|gemini|tool|herramienta interna|prompt interno)\b/i.test(t))return'';if(/[€%]|\d/.test(t))return'';if(factKinds.has(rk)&&!vars.length)return'';if(required.length&&!required.some(v=>vars.includes(v)))return'';return t;};
+  for(const key of ['template','yes_template','no_template','empty_template','voice_template']){const v=cleanTemplate(raw?.[key]);if(v)out[key]=v;}
+  if(rk==='whether'&&!out.yes_template&&!out.no_template&&!out.template)return undefined;
+  return Object.keys(out).length?out:undefined;
+}
 function v73NormalizePlan(raw={}){
   const action=['query','local','reference','inspect','conversation','clarify','reset'].includes(trim(raw?.action))?trim(raw.action):'conversation',out={action};const rk=trim(raw?.response_kind);if(['amount','who','what','whether','which_event','compare','summary','table','context','conversation_summary'].includes(rk))out.response_kind=rk;
+  const blueprint=v73NormalizeAnswerBlueprint(raw?.answer_blueprint,out.response_kind||rk);if(blueprint)out.answer_blueprint=blueprint;
   if(action==='query'){
     const q=raw?.query&&typeof raw.query==='object'?raw.query:{},p=q.product&&typeof q.product==='object'?q.product:null,f=q.fields&&typeof q.fields==='object'?q.fields:null,pres=q.presentation&&typeof q.presentation==='object'?q.presentation:null;
     out.query={domain:trim(q.domain)};
@@ -14022,7 +14032,9 @@ OPERACIONES LOCALES
 set_fields deja solo esas columnas. add_field/add_fields añade. remove_field/remove_fields quita. show_all_fields recupera todos los campos de negocio. sort, filter, group, rank, limit y chart operan sobre from_ref. Pueden existir VARIAS operations en el mismo turno.
 
 RESPUESTA AL USUARIO
-Indica response_kind según lo que realmente pregunta: amount=cuánto; who=quién; what=qué; whether=sí/no; which_event=en qué evento; compare=comparación; table=petición explícita de tabla; summary=resumen breve; context=qué estás viendo; conversation_summary=resumen de toda la conversación. No conviertas automáticamente cualquier pregunta en «he preparado N registros». ControlEvent redactará de forma determinista según response_kind.
+Indica response_kind según lo que realmente pregunta: amount=cuánto; who=quién; what=qué; whether=sí/no; which_event=en qué evento; compare=comparación; table=petición explícita de tabla; summary=resumen breve; context=qué estás viendo; conversation_summary=resumen de toda la conversación. No conviertas automáticamente cualquier pregunta en «he preparado N registros».
+En ESTA MISMA llamada puedes añadir answer_blueprint para que la respuesta final suene humana. Es solo un MOLDE VERBAL: Gemini NO conoce todavía el resultado de CE y no puede inventar cifras, sí/no, ganadores, nombres obtenidos de datos ni valoraciones del resultado. Usa exclusivamente estos placeholders: {amount}, {count}, {person}, {product}, {event}, {scope_text}, {people}, {items}, {events}, {subject}, {winner}, {winner_value}, {runner_up}, {runner_up_value}, {difference}, {metric}, {summary}, {detail}. Para whether prefiere yes_template y no_template; CE elegirá la rama cuando ya conozca el dato. Para summary/context/conversation_summary usa {summary}. Una o dos frases breves, naturales y directas; nada de «voy a consultar», «he analizado», ni introducciones vacías. No escribas dígitos, euros o porcentajes en el molde: esos hechos los insertará CE. Si no puedes crear un molde seguro, omite answer_blueprint y CE usará su redacción determinista.
+La tabla, cuando exista, es apoyo: la frase principal debe contestar primero a la pregunta.
 
 REUTILIZACIÓN
 «Dame otra vez aquello» suele ser reference restore_snapshot. «Vuelve a mirar/consulta otra vez» suele ser reexecute_plan. «Ahora el mismo X pero de todos los eventos» debe ser reexecute_plan de CURRENT con SOLO replace_scope=all_events: no copies ni borres producto, persona, tienda, columnas u otros datos del plan base. En una REFERENCE con changes, cada change modifica exclusivamente esa propiedad y todo lo demás permanece inmutable.
@@ -14038,10 +14050,10 @@ function v73KernelInput(userPrompt='',session={},entityCandidates={},historyCand
 }
 async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal}){
   const instruction=v73KernelInstruction(state,selectedEventId,display),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates),tool=v73TurnTool();let model=policy.model,payload;
-  const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools:[tool],flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_turn_record']}},externalSignal,maxCalls:1,maxOutputTokens:1300});
+  const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools:[tool],flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_turn_record']}},externalSignal,maxCalls:1,maxOutputTokens:1650});
   try{payload=await call('v3_0_exp · Ledger · IA interpreta',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Lite no emitió JSON utilizable (${cleanGeminiError(error)}). Flash recibe exactamente la misma petición; no hay reparación semántica.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash interpreta',model);}else{error._ceOrigin='gemini';throw error;}}
   const calls=v261FunctionCalls(payload).filter(c=>trim(c?.name)==='zuzu_turn_record');if(!calls.length){const e=new Error('Gemini no emitió zuzu_turn_record.');e._ceOrigin='gemini';throw e;}if(calls.length>1)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · protocolo','WARN',`Gemini emitió ${calls.length} registros en un turno; se conserva literalmente el último y no se hace reparación.`);
-  const raw=calls[calls.length-1]?.arguments||{},normalized=v73NormalizePlan(raw),plan=v73PrepareAnalyticPlan(normalized,session);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · JSON GEMINI BRUTO','INFO',JSON.stringify(raw).slice(0,5000));zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO','OK',JSON.stringify(plan).slice(0,5000));return{raw,plan,model};
+  const raw=calls[calls.length-1]?.arguments||{},normalized=v73NormalizePlan(raw),plan=v73PrepareAnalyticPlan(normalized,session);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · JSON GEMINI BRUTO','INFO',JSON.stringify(raw).slice(0,5000));zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO','OK',JSON.stringify(plan).slice(0,5000));if(plan.answer_blueprint)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ANSWER_BLUEPRINT','OK',`Gemini aporta solo el molde verbal (${Object.keys(plan.answer_blueprint).join(', ')}); CE insertará después los hechos desde ANSWER_PAYLOAD.`);return{raw,plan,model};
 }
 function v73RowsForStored(dataset=null,view=null){
   if(!dataset)return[];let rows=arr(dataset.rows).map(r=>({...r}));const v=view||{},filters=arr(v.rowFilters),pre=filters.filter(f=>trim(f?.stage)!=='post_group'),post=filters.filter(f=>trim(f?.stage)==='post_group');rows=v70ApplyViewFilters(rows,pre);const grouped=v70ApplyGroup(rows,arr(v.groupBy),arr(v.metrics));if(grouped)rows=grouped;if(post.length)rows=v70ApplyViewFilters(rows,post);rows=v70ApplySort(rows,arr(v.sort));if(Number(v.rowLimit)>0)rows=rows.slice(0,Number(v.rowLimit));return rows;
@@ -14237,14 +14249,53 @@ function v73FirstNumericTotal(ws=null,dataset=null){
   for(const f of fields){const key=v70FieldKey(rows,f);if(!key)continue;const vals=rows.map(r=>v40MaybeNumber(r?.[key])).filter(v=>v!=null);if(vals.length)return vals.reduce((a,b)=>a+b,0);}return null;
 }
 function v73UniqueValues(rows=[],preferred=[]){for(const f of preferred){const key=v70FieldKey(rows,f);if(!key)continue;const vals=[...new Set(rows.map(r=>trim(r?.[key])).filter(Boolean))];if(vals.length)return{field:key,values:vals};}return{field:'',values:[]};}
+function v73ScopeText(scope={}){
+  const k=trim(scope?.kind);if(k==='all_events')return'todos los eventos';if(k==='named_event'&&trim(scope?.event))return trim(scope.event);if(k==='named_events'&&arr(scope?.events).length)return arr(scope.events).map(trim).filter(Boolean).join(', ');if(k==='year'&&scope?.year!=null)return`el año ${scope.year}`;if(k==='latest_events'&&scope?.count)return`los ${scope.count} eventos indicados`;if(k==='screen_event')return'el evento actual';return'';
+}
+function v73JoinHuman(values=[]){const v=arr(values).map(trim).filter(Boolean);if(!v.length)return'';if(v.length===1)return v[0];if(v.length===2)return`${v[0]} y ${v[1]}`;return`${v.slice(0,-1).join(', ')} y ${v[v.length-1]}`;}
+function v73BuildAnswerPayload(kind='',canonical='',ws=null,dataset=null,view=null,plan={}){
+  const k=trim(kind)||'auto',rows=arr(ws?.row_cache?.rows),frame=dataset?.provenance?.source_args?.frame||{},filters=frame?.filters||{},scope=dataset?.scope||frame?.scope||plan?.query?.scope||{},focus=plan?.query||{};
+  const person=trim(focus.person||focus.responsible||focus.donor||filters.person||filters.responsible||filters.donor),product=trim(focus.product?.text||filters.product_text),event=trim(scope?.event),count=Number(ws?.row_count)||0,total=v73FirstNumericTotal(ws,dataset),who=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Nombre','Socio']),what=v73UniqueValues(rows,['Producto','Concepto','Descripción']),events=v73UniqueValues(rows,['Evento']);
+  const payload={kind:k,count,person,product,event,scope_text:v73ScopeText(scope),subject:person||product||event,summary:trim(canonical),detail:trim(canonical),empty:count===0};
+  if(total!=null){payload.amount_value=v26Money(total);payload.amount=v26FormatEuro(v26Money(total));}
+  if(who.values.length){payload.people_values=who.values.slice(0,12);payload.people=v73JoinHuman(payload.people_values);}
+  if(what.values.length){payload.item_values=what.values.slice(0,12);payload.items=v73JoinHuman(payload.item_values);}
+  if(events.values.length){payload.event_values=events.values.slice(0,12);payload.events=v73JoinHuman(payload.event_values);if(!payload.event&&payload.event_values.length===1)payload.event=payload.event_values[0];}
+  if(k==='whether'){
+    let value=count>0,matchedCount=count;
+    if(person){const field=v73FieldFromCapability(dataset||{},'person','role','person');if(field){matchedCount=rows.filter(r=>{const raw=trim(r?.[field]);return norm(raw)===norm(person)||semanticEntityScore(person,raw)>=0.88||nameMatches(raw,person);}).length;value=matchedCount>0;}}
+    else if(product){const field=v73FieldFromCapability(dataset||{},'product','role','product');if(field){matchedCount=rows.filter(r=>{const raw=trim(r?.[field]);return norm(raw)===norm(product)||semanticEntityScore(product,raw)>=0.82||nameMatches(raw,product);}).length;value=matchedCount>0;}}
+    payload.value=value;payload.matched_count=matchedCount;
+  }
+  if(k==='compare'){
+    const labels=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Evento','Producto','Tienda']),numericKey=rows.length?Object.keys(rows[0]||{}).find(key=>key!==labels.field&&rows.some(r=>v40MaybeNumber(r?.[key])!=null)):'';
+    if(labels.field&&numericKey){const ranked=rows.map(r=>({label:trim(r?.[labels.field]),value:v40MaybeNumber(r?.[numericKey])})).filter(x=>x.label&&x.value!=null).sort((a,b)=>b.value-a.value);if(ranked.length){payload.metric=numericKey;payload.winner=ranked[0].label;payload.winner_value=v26FormatPlainNumber(ranked[0].value,2);if(ranked.length>1){payload.runner_up=ranked[1].label;payload.runner_up_value=v26FormatPlainNumber(ranked[1].value,2);payload.difference=v26FormatPlainNumber(ranked[0].value-ranked[1].value,2);}}}
+  }
+  Object.keys(payload).forEach(key=>{if(payload[key]===''||payload[key]===undefined||payload[key]===null)delete payload[key];});return payload;
+}
+function v73RenderAnswerBlueprint(blueprint={},payload={},fallback='',options={}){
+  const bp=blueprint&&typeof blueprint==='object'?blueprint:{},voice=!!options?.voice;let template='';
+  if(voice&&trim(bp.voice_template))template=trim(bp.voice_template);
+  if(!template&&payload?.kind==='whether'&&typeof payload?.value==='boolean')template=trim(payload.value?bp.yes_template:bp.no_template)||trim(bp.template);
+  if(!template&&payload?.empty&&trim(bp.empty_template))template=trim(bp.empty_template);
+  if(!template)template=trim(bp.template);if(!template)return trim(fallback);
+  let missing=false,rendered=template.replace(/\{([a-z_]+)\}/gi,(m,key)=>{const v=payload?.[String(key).toLowerCase()];if(v===undefined||v===null||v===''){missing=true;return'';}return Array.isArray(v)?v73JoinHuman(v):String(v);});
+  if(missing||/[{}]/.test(rendered))return trim(fallback);rendered=rendered.replace(/\s+([,.;:!?])/g,'$1').replace(/\s{2,}/g,' ').trim();return rendered||trim(fallback);
+}
+function v73ComposeAnswer(plan={},canonical='',ws=null,dataset=null,view=null,{preamble='',voice=false}={}){
+  const fallback=v73AnswerForKind(plan?.response_kind,canonical,ws,dataset,view),payload=v73BuildAnswerPayload(plan?.response_kind,canonical,ws,dataset,view,plan),body=v73RenderAnswerBlueprint(plan?.answer_blueprint,payload,fallback,{voice}),used=!!(plan?.answer_blueprint&&body&&body!==fallback);
+  return{text:[trim(preamble),trim(body)].filter(Boolean).join('\n\n'),payload,used_blueprint:used,fallback};
+}
+function v73StripRecallPreamble(answer=''){
+  let a=trim(answer);if(!a)return'';const pattern=/^(?:Ahora recuerdo\s+\*\*[^*]+\*\*,\s*el pasado[^.]+,\s*conversamos sobre[^.]+\.\s*)+/i;return trim(a.replace(pattern,''));
+}
 function v73AnswerForKind(kind='',canonical='',ws=null,dataset=null,view=null){
   const k=trim(kind),rows=arr(ws?.row_cache?.rows);if(!k||k==='auto'||k==='summary'||k==='table')return canonical;
   if(k==='amount'){const total=v73FirstNumericTotal(ws,dataset);return total!=null?`El importe es ${v26FormatEuro(v26Money(total))}.`:canonical;}
   if(k==='who'){const u=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Nombre','Socio']);if(u.values.length)return u.values.length===1?`Fue ${u.values[0]}.`:`Son ${u.values.slice(0,8).join(', ')}${u.values.length>8?'…':''}.`;return canonical;}
   if(k==='what'){const u=v73UniqueValues(rows,['Producto','Concepto','Descripción']);if(u.values.length)return u.values.length===1?`Fue ${u.values[0]}.`:`Encontré ${u.values.slice(0,8).join(', ')}${u.values.length>8?'…':''}.`;return canonical;}
   if(k==='whether'){
-    const frame=dataset?.provenance?.source_args?.frame||{},f=frame?.filters||{},domain=trim(dataset?.domain||frame?.domain),scope=dataset?.scope||{},event=trim(scope?.event),yes=Number(ws?.row_count)>0;
-    const person=trim(f.person||f.responsible||f.donor),product=trim(f.product_text);
+    const p=v73BuildAnswerPayload('whether',canonical,ws,dataset,view,{}),yes=!!p.value,frame=dataset?.provenance?.source_args?.frame||{},f=frame?.filters||{},domain=trim(dataset?.domain||frame?.domain),scope=dataset?.scope||{},event=trim(scope?.event),person=trim(p.person||f.person||f.responsible||f.donor),product=trim(p.product||f.product_text);
     if(domain==='people'&&person)return yes?`Sí. ${person} figura en la relación de asistencia${event?` de ${event}`:''}.`:`No. ${person} no figura en la relación de asistencia${event?` de ${event}`:''}.`;
     if(domain==='purchases'&&person)return yes?`Sí. Hay compras bajo responsabilidad de ${person}${event?` en ${event}`:''}.`:`No. No hay compras bajo responsabilidad de ${person}${event?` en ${event}`:''}.`;
     if(domain==='donations'&&person)return yes?`Sí. ${person} figura como donante${event?` en ${event}`:''}.`:`No. ${person} no figura como donante${event?` en ${event}`:''}.`;
@@ -14300,7 +14351,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   }
 
   const raw=compiled.raw,plan=compiled.plan,model=compiled.model,parentTurnId=session?.currentTurn?.turnId||'';
-  let title='Zuzu',answer='',tables=[],charts=[],files=[],status='OK',dataset=null,view=null,datasetId='',viewId='',referencedTurnId='',execution={},finalBundle=null,turnWarnings=[];
+  let title='Zuzu',answer='',tables=[],charts=[],files=[],status='OK',dataset=null,view=null,datasetId='',viewId='',referencedTurnId='',execution={},finalBundle=null,turnWarnings=[],answerPayload={},answerBlueprintUsed=false;
   try{
     if(plan.action==='reset'){
       answer=plan.reply||'Empezamos un foco nuevo. La conversación anterior sigue guardada y puedes volver a ella cuando quieras.';execution={summary:'Reinicio de foco sin borrar ledger.'};
@@ -14312,11 +14363,11 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
       execution={summary:'Referencia histórica ambigua.',pending_candidates:base.map(c=>({ref:c.ref,turn_id:c.turn_id,conversation_id:c.conversation_id,seq:c.seq,created_at:c.created_at,prompt:c.prompt,title:c.title,domain:c.domain,scope:c.scope||{},focus:c.focus||{},row_count:c.row_count,summary:c.summary,score:c.score,same_conversation:c.same_conversation}))};
     }else if(plan.action==='inspect'){
       if(plan.inspect?.kind==='conversation_summary'||plan.response_kind==='conversation_summary'){
-        title='Resumen de la conversación';answer=v73ConversationSummary(session);execution={summary:'Resumen determinista del ledger completo.',turn_count:arr(session?.recentTurns).length};
+        title='Resumen de la conversación';const canonicalSummary=v73ConversationSummary(session),payload={kind:'conversation_summary',summary:canonicalSummary,detail:canonicalSummary,count:arr(session?.recentTurns).length,empty:!arr(session?.recentTurns).length},body=v73RenderAnswerBlueprint(plan.answer_blueprint,payload,canonicalSummary,{voice:voiceConversation});answer=body;answerPayload=payload;answerBlueprintUsed=!!(plan.answer_blueprint&&body!==canonicalSummary);execution={summary:'Resumen determinista del ledger completo.',turn_count:arr(session?.recentTurns).length};
       }else{
         const target=await v73ResolveRef(plan.inspect?.target_ref||'CURRENT',session,historyCandidates,actor);
         if(!target){status='WARN';answer='No encuentro el turno al que te refieres.';execution={summary:'INSPECT sin referencia resoluble.'};}
-        else{referencedTurnId=target.turn.turnId;const ws=v73WorkingFromBundle(target),fields=arr(target.view?.visibleFields),scope=target.dataset?.scope||{},core=`Estoy viendo ${trim(target.dataset?.domain)||trim(target.turn?.execution?.domain)||'datos'}${scope.kind==='named_event'&&scope.event?` de ${scope.event}`:scope.kind==='named_events'&&arr(scope.events).length?` de ${scope.events.join(', ')}`:scope.kind==='all_events'?' de todos los eventos':''}; el resultado tiene ${Number(ws?.row_count)||0} filas${fields.length?`; la vista muestra ${fields.join(', ')}`:''}.`,preamble=v73ShouldRecallPreamble(userPrompt,target,conversation.conversationId)?v73RecallPreamble(display,target):'';title='Contexto actual';answer=[preamble,core].filter(Boolean).join('\n\n');execution={...target.turn.execution,summary:'Inspección de turno.',row_count:Number(ws?.row_count)||0};datasetId=target.turn.datasetId;viewId=target.turn.viewId;finalBundle=target;}
+        else{referencedTurnId=target.turn.turnId;const ws=v73WorkingFromBundle(target),fields=arr(target.view?.visibleFields),scope=target.dataset?.scope||{},core=`Estoy viendo ${trim(target.dataset?.domain)||trim(target.turn?.execution?.domain)||'datos'}${scope.kind==='named_event'&&scope.event?` de ${scope.event}`:scope.kind==='named_events'&&arr(scope.events).length?` de ${scope.events.join(', ')}`:scope.kind==='all_events'?' de todos los eventos':''}; el resultado tiene ${Number(ws?.row_count)||0} filas${fields.length?`; la vista muestra ${fields.join(', ')}`:''}.`,preamble=v73ShouldRecallPreamble(userPrompt,target,conversation.conversationId)?v73RecallPreamble(display,target):'',payload={kind:'context',summary:core,detail:core,count:Number(ws?.row_count)||0,event:trim(scope?.event),scope_text:v73ScopeText(scope),empty:!Number(ws?.row_count)},body=v73RenderAnswerBlueprint(plan.answer_blueprint,payload,core,{voice:voiceConversation});title='Contexto actual';answer=[preamble,body].filter(Boolean).join('\n\n');answerPayload=payload;answerBlueprintUsed=!!(plan.answer_blueprint&&body!==core);execution={...target.turn.execution,summary:'Inspección de turno.',row_count:Number(ws?.row_count)||0};datasetId=target.turn.datasetId;viewId=target.turn.viewId;finalBundle=target;}
       }
     }else if(plan.action==='local'){
       const target=await v73ResolveRef(plan.local?.from_ref||'CURRENT',session,historyCandidates,actor);
@@ -14328,7 +14379,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
           if(applied.warnings?.length){status='WARN';turnWarnings=applied.warnings.slice();}
           datasetId=target.dataset.datasetId;view={datasetId,visibleFields:applied.view.visibleFields,sort:applied.view.sort,rowFilters:applied.view.rowFilters,groupBy:applied.view.groupBy,metrics:applied.view.metrics,rowLimit:applied.view.rowLimit,presentation:applied.view.presentation,title:applied.view.title||target.turn.title};
           const temp={conversation:target.conversation,turn:target.turn,dataset:target.dataset,view:{...applied.view,datasetId,title:view.title}},ws=v73WorkingFromBundle(temp),frame=v73FrameForStoredTurn(target),scopeInfo=v73ScopeInfoFromDataset(target.dataset);
-          tables=applied.view.presentation?.table===false?[]:v70PresentationFromWorking(ws);charts=applied.view.presentation?.chart?v72ChartFromWorking(ws,flowTrace):[];title=trim(view.title)||trim(target.turn.title)||'Datos';const canonical=trim(target.dataset.domain)==='comparison'?v73ComparisonAnswer(applied.rows,v70CanonicalAnswer(frame,{title,facts:target.dataset.facts||{}},ws,scopeInfo)):v70CanonicalAnswer(frame,{title,facts:target.dataset.facts||{}},ws,scopeInfo);answer=[preamble,v73AnswerForKind(plan.response_kind,canonical,ws,target.dataset,view)].filter(Boolean).join('\n\n');execution=v73ExecutionMeta(frame,scopeInfo,ws,`Operaciones locales sobre ${target.turn.turnId}.${turnWarnings.length?` ${turnWarnings.join(' ')}`:''}`);finalBundle={...target,view:{...applied.view,datasetId,title:view.title}};
+          tables=applied.view.presentation?.table===false?[]:v70PresentationFromWorking(ws);charts=applied.view.presentation?.chart?v72ChartFromWorking(ws,flowTrace):[];title=trim(view.title)||trim(target.turn.title)||'Datos';const canonical=trim(target.dataset.domain)==='comparison'?v73ComparisonAnswer(applied.rows,v70CanonicalAnswer(frame,{title,facts:target.dataset.facts||{}},ws,scopeInfo)):v70CanonicalAnswer(frame,{title,facts:target.dataset.facts||{}},ws,scopeInfo),composed=v73ComposeAnswer(plan,canonical,ws,target.dataset,view,{preamble,voice:voiceConversation});answer=composed.text;answerPayload=composed.payload;answerBlueprintUsed=composed.used_blueprint;execution=v73ExecutionMeta(frame,scopeInfo,ws,`Operaciones locales sobre ${target.turn.turnId}.${turnWarnings.length?` ${turnWarnings.join(' ')}`:''}`);finalBundle={...target,view:{...applied.view,datasetId,title:view.title}};
         }
       }
     }else if(plan.action==='reference'){
@@ -14337,7 +14388,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
       else{
         referencedTurnId=target.turn.turnId;const preamble=v73ShouldRecallPreamble(userPrompt,target,conversation.conversationId)?v73RecallPreamble(display,target):'';
         if(plan.reference.action==='restore_snapshot'){
-          datasetId=target.turn.datasetId;viewId=target.turn.viewId;finalBundle=target;tables=v73TableFromBundle(target);const ws=v73WorkingFromBundle(target),frame=v73FrameForStoredTurn(target),scopeInfo=target.dataset?v73ScopeInfoFromDataset(target.dataset):{kind:'none',eventNames:[],label:''};title=trim(target.turn.title)||'Conversación recuperada';const restoredCanonical=target.turn.answer||v70CanonicalAnswer(frame,{title,facts:target.dataset?.facts||{}},ws,scopeInfo);answer=[preamble,v73AnswerForKind(plan.response_kind,restoredCanonical,ws,target.dataset,target.view)].filter(Boolean).join('\n\n');execution={...target.turn.execution,summary:`Snapshot recuperado de ${target.turn.turnId}.`};
+          datasetId=target.turn.datasetId;viewId=target.turn.viewId;finalBundle=target;tables=v73TableFromBundle(target);const ws=v73WorkingFromBundle(target),frame=v73FrameForStoredTurn(target),scopeInfo=target.dataset?v73ScopeInfoFromDataset(target.dataset):{kind:'none',eventNames:[],label:''};title=trim(target.turn.title)||'Conversación recuperada';const restoredCanonical=target.dataset?v70CanonicalAnswer(frame,{title,facts:target.dataset?.facts||{}},ws,scopeInfo):(v73StripRecallPreamble(target.turn.answer)||target.turn.answer),composed=v73ComposeAnswer(plan,restoredCanonical,ws,target.dataset,target.view,{preamble,voice:voiceConversation});answer=composed.text;answerPayload=composed.payload;answerBlueprintUsed=composed.used_blueprint;execution={...target.turn.execution,summary:`Snapshot recuperado de ${target.turn.turnId}.`};
         }else{
           let basePlan=target.turn.normalizedPlan||{};
           if(basePlan.action!=='query'){
@@ -14348,7 +14399,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
             const changed=v73ApplyReferenceChanges(basePlan.query,plan.reference.changes),reused=await v73ApplyReuse(changed,session,historyCandidates,actor),cert=v73CertifyQuery(reused,state,flowTrace);
             if(cert.error){status='WARN';answer=`La consulta recordada no se puede ejecutar: ${cert.error} No he ampliado el ámbito ni inventado otro.`;execution={summary:cert.error};}
             else{const resolved=cert.query,frame=v73FrameFromQuery(resolved);if(v72ScopeIsStructurallyInvalid(frame.scope)||!v73ScopeValid(frame.scope)){status='WARN';answer='La consulta recordada no tiene un ámbito ejecutable completo. No he ampliado el ámbito ni inventado otro.';execution={summary:'Reejecución con scope incompleto.'};}
-            else{const ex=await v70ExecuteCanonicalSource(frame,{},state,selectedEventId,flowTrace),built=v73MaterializeQueryResult(frame,resolved,{...ex,state},flowTrace);dataset=built.dataset;view=built.view;tables=built.tables;charts=built.charts;title=built.title||'Consulta repetida';if(built.warnings.length){status='WARN';turnWarnings.push(...built.warnings);}answer=[preamble,v73AnswerForKind(plan.response_kind,built.canonical,built.ws,built.dataset,built.view)].filter(Boolean).join('\n\n');execution=v73ExecutionMeta(frame,ex.scopeInfo,built.ws,`Plan ${target.turn.turnId} reejecutado.${built.warnings.length?` ${built.warnings.join(' ')}`:''}`);plan.reference.resolved_query=resolved;}}
+            else{const ex=await v70ExecuteCanonicalSource(frame,{},state,selectedEventId,flowTrace),built=v73MaterializeQueryResult(frame,resolved,{...ex,state},flowTrace);dataset=built.dataset;view=built.view;tables=built.tables;charts=built.charts;title=built.title||'Consulta repetida';if(built.warnings.length){status='WARN';turnWarnings.push(...built.warnings);}const composed=v73ComposeAnswer(plan,built.canonical,built.ws,built.dataset,built.view,{preamble,voice:voiceConversation});answer=composed.text;answerPayload=composed.payload;answerBlueprintUsed=composed.used_blueprint;execution=v73ExecutionMeta(frame,ex.scopeInfo,built.ws,`Plan ${target.turn.turnId} reejecutado.${built.warnings.length?` ${built.warnings.join(' ')}`:''}`);plan.reference.resolved_query=resolved;}}
           }
         }
       }
@@ -14359,17 +14410,19 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
         const resolved=cert.query,frame=v73FrameFromQuery(resolved);plan.query=resolved;
         if(!trim(frame.domain)){status='WARN';answer='Gemini no indicó qué objeto de información consultar. No he inventado uno.';execution={summary:'QUERY sin domain.'};}
         else if(v72ScopeIsStructurallyInvalid(frame.scope)||!v73ScopeValid(frame.scope)){status='WARN';answer='La consulta quedó sin un ámbito ejecutable completo. He conservado el historial y no he ampliado la consulta a otros eventos.';execution={domain:frame.domain,scope:frame.scope,focus:v72FocusFromFrame(frame,{}),summary:'QUERY con scope incompleto.'};}
-        else{const ex=await v70ExecuteCanonicalSource(frame,{},state,selectedEventId,flowTrace),built=v73MaterializeQueryResult(frame,resolved,{...ex,state},flowTrace);dataset=built.dataset;view=built.view;tables=built.tables;charts=built.charts;title=built.title||'Respuesta de Zuzu';if(built.warnings.length){status='WARN';turnWarnings.push(...built.warnings);}answer=[preamble,v73AnswerForKind(plan.response_kind,built.canonical,built.ws,built.dataset,built.view)].filter(Boolean).join('\n\n');execution=v73ExecutionMeta(frame,ex.scopeInfo,built.ws,`${title}${built.warnings.length?` · ${built.warnings.join(' ')}`:''}`);}
+        else{const ex=await v70ExecuteCanonicalSource(frame,{},state,selectedEventId,flowTrace),built=v73MaterializeQueryResult(frame,resolved,{...ex,state},flowTrace);dataset=built.dataset;view=built.view;tables=built.tables;charts=built.charts;title=built.title||'Respuesta de Zuzu';if(built.warnings.length){status='WARN';turnWarnings.push(...built.warnings);}const composed=v73ComposeAnswer(plan,built.canonical,built.ws,built.dataset,built.view,{preamble,voice:voiceConversation});answer=composed.text;answerPayload=composed.payload;answerBlueprintUsed=composed.used_blueprint;execution=v73ExecutionMeta(frame,ex.scopeInfo,built.ws,`${title}${built.warnings.length?` · ${built.warnings.join(' ')}`:''}`);}
       }
     }
   }catch(error){status='KO';zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ejecución CE','KO',cleanGeminiError(error));answer='ControlEvent no pudo ejecutar este registro. El historial anterior permanece intacto y este fallo queda guardado para auditoría.';execution={summary:cleanGeminiError(error),error:cleanGeminiError(error)};}
 
+  if(answerPayload&&Object.keys(answerPayload).length)execution={...(execution||{}),answer_payload:answerPayload};
+  if(plan?.answer_blueprint)execution={...(execution||{}),answer_blueprint:plan.answer_blueprint,answer_blueprint_used:!!answerBlueprintUsed};
   execution={...(execution||{}),debug_trace:arr(flowTrace).slice(0,160)};
   const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:plan.action,geminiPlan:raw,normalizedPlan:plan,execution,dataset,view,datasetId,viewId,parentTurnId,referencedTurnId,status,title,answer,selectedEventId});
   let savedDataset=dataset?{...dataset,datasetId:saved.datasetId}:finalBundle?.dataset||session?.dataset||null,savedView=view?{...view,viewId:saved.viewId,datasetId:saved.datasetId||view.datasetId}:finalBundle?.view||session?.view||null;
   if(saved.datasetId&&!savedDataset){const b=await getZuzuTurnBundle({turnId:saved.turn.turnId,actor});savedDataset=b?.dataset||null;savedView=b?.view||savedView;}
   const resultContext=v73LightContext(saved.conversation,saved.turn,savedDataset,savedView),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMMIT INMUTABLE','OK',`turn=${saved.turn.turnId} · action=${plan.action} · dataset=${saved.datasetId||'—'} · view=${saved.viewId||'—'} · status=${status}. El turno anterior no se modifica.`);
-  const physicalRows=savedDataset?v73RowsForStored(savedDataset,savedView||{}):[],physical={domain:trim(savedDataset?.domain||execution?.domain),scope:savedDataset?.scope||execution?.scope||{},focus:execution?.focus||{},row_count:savedDataset?physicalRows.length:(Number(execution?.row_count)||0),dataset_row_count:Number(savedDataset?.rowCount)||0,visible_fields:arr(savedView?.visibleFields),available_fields:arr(savedDataset?.columns),table_row_counts:arr(tables).map(t=>arr(t?.rows).length),chart_count:arr(charts).length,dataset_id:trim(savedDataset?.datasetId),view_id:trim(savedView?.viewId),status};
+  const physicalRows=savedDataset?v73RowsForStored(savedDataset,savedView||{}):[],physical={domain:trim(savedDataset?.domain||execution?.domain),scope:savedDataset?.scope||execution?.scope||{},focus:execution?.focus||{},row_count:savedDataset?physicalRows.length:(Number(execution?.row_count)||0),dataset_row_count:Number(savedDataset?.rowCount)||0,visible_fields:arr(savedView?.visibleFields),available_fields:arr(savedDataset?.columns),table_row_counts:arr(tables).map(t=>arr(t?.rows).length),chart_count:arr(charts).length,dataset_id:trim(savedDataset?.datasetId),view_id:trim(savedView?.viewId),status,response_kind:trim(plan?.response_kind),answer_payload:execution?.answer_payload||{},answer_blueprint:plan?.answer_blueprint||{},answer_blueprint_used:!!execution?.answer_blueprint_used};
   const responseWarnings=status==='KO'?[execution.summary||'Fallo de ejecución.']:status==='WARN'?(turnWarnings.length?turnWarnings:[execution.summary||'Aviso de interpretación.']):[];
   return{ok:true,rejected:false,title,answer,warnings:responseWarnings,charts,tables,files,provider:'gemini-zuzu-ledger-immutable',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · PLAN/DATASET/VIEW server-side',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:plan.action,geminiPlan:raw,normalizedPlan:plan,execution:physical},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
@@ -19921,6 +19974,11 @@ export const __zuzuStructuralTesting = Object.freeze({
   v73NormalizeScope,
   v73NormalizePlan,
   v73NormalizeOperations,
+  v73NormalizeAnswerBlueprint,
+  v73BuildAnswerPayload,
+  v73RenderAnswerBlueprint,
+  v73ComposeAnswer,
+  v73StripRecallPreamble,
   v73SpanishDate,
   v73RecallPreamble,
   v73CandidateChoices,

@@ -99,3 +99,9 @@ Comprueba entre otros:
 - comparación de eventos heterogéneos;
 - memoria histórica y preámbulo humano;
 - contrato de la tool única `zuzu_turn_record`.
+
+## ANSWER_BLUEPRINT + ANSWER_PAYLOAD (23/08/2026)
+
+La misma llamada Gemini que compila el turno puede incluir un `answer_blueprint` breve. Ese molde no contiene hechos: solo texto y placeholders. Después de ejecutar, CE genera un `ANSWER_PAYLOAD` con los hechos reales y rellena el molde. Si el molde no es seguro o le falta un dato, se ignora y se usa la redacción determinista.
+
+Invariante: **Gemini redacta el molde; ControlEvent posee los hechos.** No existe una segunda llamada Gemini para redactar.

@@ -16,7 +16,8 @@
     "test:zuzu-itv-oracle": "node scripts/zuzu-itv-oracle-regression.js",
     "test:zuzu-history-ranking": "node scripts/zuzu-history-ranking-regression.js",
     "test:compras-donaciones-maintenance": "node scripts/compras-donaciones-maintenance-regression.js",
-    "test:zuzu-ledger-fixes": "node scripts/zuzu-ledger-fixes-regression.js"
+    "test:zuzu-ledger-fixes": "node scripts/zuzu-ledger-fixes-regression.js",
+    "test:zuzu-answer-blueprint": "node scripts/zuzu-answer-blueprint-regression.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

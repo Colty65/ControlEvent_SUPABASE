@@ -78,7 +78,7 @@ function resultHasPerson(result,name){
   return (p && norm(p)===norm(name)) || answerHasName(result,name);
 }
 function ledgerAuditOf(result){
-  const a=result?.meta?.ledgerAudit||{};return{conversationId:trim(result?.conversationId||result?.meta?.conversationId),turnId:trim(result?.turnId||result?.meta?.turnId),turnSeq:num(result?.turnSeq||result?.meta?.turnSeq),ledgerAction:trim(a?.action),geminiPlan:a?.geminiPlan||{},normalizedPlan:a?.normalizedPlan||{}};
+  const a=result?.meta?.ledgerAudit||{},ex=a?.execution||{};return{conversationId:trim(result?.conversationId||result?.meta?.conversationId),turnId:trim(result?.turnId||result?.meta?.turnId),turnSeq:num(result?.turnSeq||result?.meta?.turnSeq),ledgerAction:trim(a?.action),geminiPlan:a?.geminiPlan||{},normalizedPlan:a?.normalizedPlan||{},answerPayload:ex?.answer_payload||{},answerBlueprintUsed:!!ex?.answer_blueprint_used};
 }
 function usageOf(result){
   const u=result?.meta?.geminiUsageEstimate||{};
@@ -478,8 +478,19 @@ function validateLedgerStructural(caseDef,result){
   const expectedFields=arr(o.fields||o.expectedFields).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean);if(expectedFields.length){const got=arr(auditExec?.visible_fields).length?arr(auditExec.visible_fields).map(trim):arr(view?.displayed_fields).map(trim);for(const f of expectedFields)if(!got.some(x=>norm(x)===norm(f)))reasons.push(`campo visible esperado «${f}» no aparece`);}
   const absentFields=arr(o.absentFields).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean);if(absentFields.length){const got=arr(view?.displayed_fields).map(trim);for(const f of absentFields)if(got.some(x=>norm(x)===norm(f)))reasons.push(`campo «${f}» debería estar ausente`);}
   const expectedOps=arr(o.operations||o.expectedOperations).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean),gotOps=vItvPlanOperations(plan);for(const e of expectedOps)if(!gotOps.some(g=>norm(g).startsWith(norm(e))))reasons.push(`operación esperada «${e}» no aparece (${gotOps.join(', ')||'sin operaciones'})`);
-  const responseKind=trim(o.responseKind||o.expectedResponseKind);if(responseKind&&norm(trim(plan?.response_kind))!==norm(responseKind))reasons.push(`response_kind ${trim(plan?.response_kind)||'—'} != ${responseKind}`);
-  if(responseKind){const answer=trim(result?.answer);if(responseKind==='amount'&&!/[-+]?\d[\d.]*,\d{2}\s*€/.test(answer))reasons.push('respuesta amount sin importe monetario explícito');if(responseKind==='whether'&&!/^(?:Ahora recuerdo[^\n]*\n\n)?\s*(?:Sí|No)\b/i.test(answer))reasons.push('respuesta whether no comienza por Sí/No');if(responseKind==='context'&&!/Estoy viendo|Contexto actual/i.test(`${trim(result?.title)} ${answer}`))reasons.push('respuesta context no describe el contexto actual');if(responseKind==='conversation_summary'&&!/Resumen de la conversación|En esta conversación/i.test(`${trim(result?.title)} ${answer}`))reasons.push('respuesta conversation_summary no resume la conversación');}
+  const responseKind=trim(o.responseKind||o.expectedResponseKind),answerPayload=auditExec?.answer_payload||{};if(responseKind&&norm(trim(plan?.response_kind))!==norm(responseKind))reasons.push(`response_kind ${trim(plan?.response_kind)||'—'} != ${responseKind}`);
+  if(responseKind){
+    const answer=trim(result?.answer),pk=trim(answerPayload?.kind);if(pk&&norm(pk)!==norm(responseKind))reasons.push(`ANSWER_PAYLOAD.kind ${pk} != ${responseKind}`);
+    if(responseKind==='amount'){if(answerPayload?.amount_value==null||!Number.isFinite(Number(answerPayload.amount_value)))reasons.push('ANSWER_PAYLOAD amount sin valor numérico factual');if(!/[-+]?\d[\d.]*,\d{2}\s*€/.test(answer))reasons.push('respuesta amount sin importe monetario explícito');}
+    if(responseKind==='whether'){if(typeof answerPayload?.value!=='boolean')reasons.push('ANSWER_PAYLOAD whether sin booleano factual');if(!/^(?:Ahora recuerdo[^\n]*\n\n)?\s*(?:Sí|No)\b/i.test(answer))reasons.push('respuesta whether no comienza por Sí/No');if(expectedEntity&&trim(answerPayload?.subject)&&!norm(answerPayload.subject).includes(norm(expectedEntity)))reasons.push(`ANSWER_PAYLOAD sujeto ${answerPayload.subject} != ${expectedEntity}`);}
+    if(responseKind==='who'&&!(arr(answerPayload?.people_values).length||trim(answerPayload?.people))&&actualRows>0)reasons.push('ANSWER_PAYLOAD who sin personas materializadas');
+    if(responseKind==='what'&&!(arr(answerPayload?.item_values).length||trim(answerPayload?.items))&&actualRows>0)reasons.push('ANSWER_PAYLOAD what sin elementos materializados');
+    if(responseKind==='which_event'&&!(arr(answerPayload?.event_values).length||trim(answerPayload?.event))&&actualRows>0)reasons.push('ANSWER_PAYLOAD which_event sin evento materializado');
+    if(responseKind==='compare'&&!trim(answerPayload?.winner))reasons.push('ANSWER_PAYLOAD compare sin ganador materializado');
+    if(responseKind==='context'&&!trim(answerPayload?.summary))reasons.push('ANSWER_PAYLOAD context sin resumen factual');
+    if(responseKind==='conversation_summary'&&!trim(answerPayload?.summary))reasons.push('ANSWER_PAYLOAD conversation_summary sin resumen factual');
+    if(responseKind==='context'&&!/Estoy viendo|Contexto actual/i.test(`${trim(result?.title)} ${answer}`))reasons.push('respuesta context no describe el contexto actual');if(responseKind==='conversation_summary'&&!/Resumen de la conversación|En esta conversación/i.test(`${trim(result?.title)} ${answer}`))reasons.push('respuesta conversation_summary no resume la conversación');
+  }
   const mustChart=o.chart===true;if(mustChart&&!(Number(auditExec?.chart_count)>0)&&!arr(result?.charts).length)reasons.push('se esperaba gráfica y no se generó');
   const expectedStatus=trim(o.expectedStatus).toUpperCase();if(expectedStatus==='WARN'&&reasons.length===0)return{status:'WARN',reasons:['aviso esperado por contrato de prueba']};
   return{status:reasons.length?'KO':'OK',reasons};
