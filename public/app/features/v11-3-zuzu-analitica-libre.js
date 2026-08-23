@@ -674,7 +674,7 @@
         }
       }
       data.__prompt = prompt;
-      data.answer=withoutGeminiLabel(ensureZuzuUserPreface(data.answer||''));
+      data.answer=String(data.answer==null?'':data.answer); // ESCAPE LIBRE: respuesta Gemini literal, sin retoque del cliente.
       if(data.title) data.title=withoutGeminiLabel(data.title);
       if(Array.isArray(data.warnings)) data.warnings=data.warnings.map(withoutGeminiLabel);
       if(!voiceConversation&&(!Array.isArray(data.charts)||!data.charts.length)&&wantsChart(prompt))data.charts=autoChartsFromTables(data.tables||[]);

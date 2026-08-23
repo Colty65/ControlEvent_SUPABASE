@@ -14101,6 +14101,69 @@ async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCa
   const calls=v261FunctionCalls(payload).filter(c=>trim(c?.name)==='zuzu_turn_record');if(!calls.length){const e=new Error('Gemini no emitió zuzu_turn_record.');e._ceOrigin='gemini';throw e;}if(calls.length>1)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · protocolo','WARN',`Gemini emitió ${calls.length} registros en un turno; se conserva literalmente el último y no se hace reparación.`);
   const raw=calls[calls.length-1]?.arguments||{},plan=v73NormalizePlan(raw);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · JSON GEMINI BRUTO','INFO',JSON.stringify(raw).slice(0,5000));zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO','OK',JSON.stringify(plan).slice(0,5000));if(plan.answer_blueprint)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ANSWER_BLUEPRINT','OK',`Gemini aporta acompañamiento verbal (${Object.keys(plan.answer_blueprint).join(', ')}). CE no sustituye la interpretación: ejecuta el PLAN y añade después la respuesta factual desde ANSWER_PAYLOAD.`);return{raw,plan,model};
 }
+
+// v3_0_exp · ESCAPE LIBRE: después de ejecutar literalmente el plan de Gemini, CE devuelve
+// los datos resultantes a Gemini para que redacte la respuesta final. Esa respuesta se guarda y
+// se entrega SIN pulido, reparación, prefacios, plantillas ni reescrituras de ControlEvent.
+function v73RawFinalRecentTurns(session={}){
+  return arr(session?.recentTurns).slice(-12).map(t=>({
+    seq:Number(t?.seq)||0,
+    user:trim(t?.userPrompt||t?.prompt||t?.user).slice(0,700),
+    answer:text(t?.answer||t?.assistant).slice(0,1400),
+    title:trim(t?.title).slice(0,180),
+    action:trim(t?.actionType||t?.action),
+    domain:trim(t?.execution?.domain||t?.domain),
+    scope:t?.execution?.scope||t?.scope||{},
+    focus:t?.execution?.focus||t?.focus||{}
+  }));
+}
+function v73RawFinalDataset(dataset=null,view=null){
+  if(!dataset)return null;
+  const rows=v73RowsForStored(dataset,view||{}),limit=220;
+  return{
+    domain:trim(dataset?.domain),scope:dataset?.scope||{},facts:dataset?.facts||{},
+    row_count:rows.length,columns:arr(dataset?.columns),visible_fields:arr(view?.visibleFields),
+    rows:rows.slice(0,limit),truncated:rows.length>limit
+  };
+}
+function v73RawFinalInstruction({voice=false}={}){
+  return `Eres Zuzu. Estás en la fase FINAL de un turno de ControlEvent. Gemini ya interpretó la pregunta y ControlEvent ejecutó EXACTAMENTE ese plan. Ahora solo debes redactar la contestación final al usuario con los datos que recibes.
+
+REGLAS DE ESCAPE LIBRE
+- NO vuelvas a decidir otra consulta, NO corrijas el plan anterior y NO pidas herramientas.
+- NO inventes datos que no estén en RESULTADO_CE. Si el plan fue erróneo o los datos no responden bien a la pregunta, responde con lo que realmente permiten concluir; ese posible error debe quedar visible para diagnóstico.
+- Habla en español natural, directo y humano. Responde a la forma de la pregunta: sí/no, quién, qué, cuánto, comparación, resumen, etc.
+- NO menciones JSON, PLAN, DATASET, VIEW, herramientas, oráculo, pruebas ni capas internas salvo que el usuario lo pregunte expresamente.
+- No uses frases de proceso como «he preparado N registros» salvo que eso sea realmente lo que el usuario pidió.
+- No añadas saludos, «Te comento» ni ofertas mecánicas al final.
+${voice?'- Es conversación oral: normalmente 1 a 4 frases, sin tablas Markdown ni listas largas.':''}
+
+El campo answer del JSON debe contener EXACTAMENTE el texto que debe ver/oir el usuario. ControlEvent no lo modificará después.`;
+}
+function v73RawFinalParse(payload){
+  const envelope=v261OutputText(payload);if(!envelope)return{title:'Zuzu',answer:'',envelope:''};
+  try{
+    const parsed=parsePlanJsonLenientHf37(envelope).parsed||{};
+    const answer=typeof parsed?.answer==='string'?parsed.answer:envelope;
+    const title=typeof parsed?.title==='string'&&parsed.title?parsed.title:'Zuzu';
+    return{title,answer,envelope};
+  }catch(_){return{title:'Zuzu',answer:envelope,envelope};}
+}
+async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation=false}){
+  const activeDataset=dataset||finalBundle?.dataset||null,activeView=view||finalBundle?.view||null;
+  const reference=finalBundle?.turn?{turn_id:trim(finalBundle.turn.turnId),user:trim(finalBundle.turn.userPrompt),answer:text(finalBundle.turn.answer),title:trim(finalBundle.turn.title)}:null;
+  const packet={
+    current_user:userPrompt,
+    gemini_plan_raw:rawPlan||{},
+    plan_executed:plan||{},
+    resultado_ce:{status,execution:execution||{},dataset:v73RawFinalDataset(activeDataset,activeView),reference_snapshot:reference},
+    recent_conversation:v73RawFinalRecentTurns(session)
+  };
+  const payload=await v261CallInteraction({input:`PREGUNTA Y RESULTADO REAL DEL TURNO:
+${JSON.stringify(packet)}`,previousInteractionId:'',model,systemInstruction:v73RawFinalInstruction({voice:voiceConversation}),tools:[],flowTrace,stage:'v3_0_exp · ESCAPE LIBRE · Gemini redacta respuesta FINAL',toolChoice:'none',externalSignal,maxCalls:2,maxOutputTokens:voiceConversation?1200:2200});
+  const final=v73RawFinalParse(payload);if(!trim(final.answer)){const e=new Error('Gemini no devolvió texto en la redacción final de escape libre.');e._ceOrigin='gemini';throw e;}
+  return final;
+}
 function v73RowsForStored(dataset=null,view=null){
   if(!dataset)return[];let rows=arr(dataset.rows).map(r=>({...r}));const v=view||{},filters=arr(v.rowFilters),pre=filters.filter(f=>trim(f?.stage)!=='post_group'),post=filters.filter(f=>trim(f?.stage)==='post_group');rows=v70ApplyViewFilters(rows,pre);const grouped=v70ApplyGroup(rows,arr(v.groupBy),arr(v.metrics));if(grouped)rows=grouped;if(post.length)rows=v70ApplyViewFilters(rows,post);rows=v70ApplySort(rows,arr(v.sort));if(Number(v.rowLimit)>0)rows=rows.slice(0,Number(v.rowLimit));return rows;
 }
@@ -14519,6 +14582,21 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     }
   }catch(error){status='KO';zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ejecución CE','KO',cleanGeminiError(error));answer='ControlEvent no pudo ejecutar este registro. El historial anterior permanece intacto y este fallo queda guardado para auditoría.';execution={summary:cleanGeminiError(error),error:cleanGeminiError(error)};}
 
+  // ESCAPE LIBRE: la contestación que ve el usuario sale de Gemini DESPUÉS de recibir el resultado CE.
+  // La redacción determinista calculada arriba sirve solo como dato interno de ejecución y jamás se
+  // usa para sustituir, corregir o pulir el texto final de Gemini.
+  try{
+    const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation});
+    title=rawFinal.title||title;answer=rawFinal.answer;
+    execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:rawFinal.answer,response_mode:'gemini_raw_escape_free'};
+    zuzuTracePush(flowTrace,'v3_0_exp · ESCAPE LIBRE · RESPUESTA GEMINI SIN RETOQUE','OK',`La respuesta final (${text(rawFinal.answer).length} caracteres) se entrega literalmente. CE no aplica plantillas, repairs ni pulido posterior.`);
+  }catch(finalError){
+    status=status==='KO'?'KO':'WARN';
+    answer=`Gemini no pudo emitir la respuesta final de este turno: ${cleanGeminiError(finalError)}`;
+    execution={...(execution||{}),gemini_final_error:cleanGeminiError(finalError),response_mode:'gemini_raw_escape_free_failed'};
+    zuzuTracePush(flowTrace,'v3_0_exp · ESCAPE LIBRE · fallo redacción final','WARN',cleanGeminiError(finalError));
+  }
+
   if(answerPayload&&Object.keys(answerPayload).length)execution={...(execution||{}),answer_payload:answerPayload};
   if(plan?.answer_blueprint)execution={...(execution||{}),answer_blueprint:plan.answer_blueprint,answer_blueprint_used:!!answerBlueprintUsed};
   execution={...(execution||{}),debug_trace:arr(flowTrace).slice(0,160)};
@@ -14526,10 +14604,13 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   let savedDataset=dataset?{...dataset,datasetId:saved.datasetId}:finalBundle?.dataset||session?.dataset||null,savedView=view?{...view,viewId:saved.viewId,datasetId:saved.datasetId||view.datasetId}:finalBundle?.view||session?.view||null;
   if(saved.datasetId&&!savedDataset){const b=await getZuzuTurnBundle({turnId:saved.turn.turnId,actor});savedDataset=b?.dataset||null;savedView=b?.view||savedView;}
   const resultContext=v73LightContext(saved.conversation,saved.turn,savedDataset,savedView),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMMIT INMUTABLE','OK',`turn=${saved.turn.turnId} · action=${plan.action} · dataset=${saved.datasetId||'—'} · view=${saved.viewId||'—'} · status=${status}. El turno anterior no se modifica.`);
-  const physicalRows=savedDataset?v73RowsForStored(savedDataset,savedView||{}):[],physical={domain:trim(savedDataset?.domain||execution?.domain),scope:savedDataset?.scope||execution?.scope||{},focus:execution?.focus||{},row_count:savedDataset?physicalRows.length:(Number(execution?.row_count)||0),dataset_row_count:Number(savedDataset?.rowCount)||0,visible_fields:arr(savedView?.visibleFields),available_fields:arr(savedDataset?.columns),table_row_counts:arr(tables).map(t=>arr(t?.rows).length),chart_count:arr(charts).length,dataset_id:trim(savedDataset?.datasetId),view_id:trim(savedView?.viewId),status,response_kind:trim(normalizedPlan?.response_kind),answer_payload:execution?.answer_payload||{},answer_blueprint:normalizedPlan?.answer_blueprint||{},answer_blueprint_used:!!execution?.answer_blueprint_used,interpreted_plan:plan};
+  const physicalRows=savedDataset?v73RowsForStored(savedDataset,savedView||{}):[],physical={domain:trim(savedDataset?.domain||execution?.domain),scope:savedDataset?.scope||execution?.scope||{},focus:execution?.focus||{},row_count:savedDataset?physicalRows.length:(Number(execution?.row_count)||0),dataset_row_count:Number(savedDataset?.rowCount)||0,visible_fields:arr(savedView?.visibleFields),available_fields:arr(savedDataset?.columns),table_row_counts:arr(tables).map(t=>arr(t?.rows).length),chart_count:arr(charts).length,dataset_id:trim(savedDataset?.datasetId),view_id:trim(savedView?.viewId),status,response_kind:trim(normalizedPlan?.response_kind),answer_payload:execution?.answer_payload||{},answer_blueprint:normalizedPlan?.answer_blueprint||{},answer_blueprint_used:!!execution?.answer_blueprint_used,interpreted_plan:plan,response_mode:trim(execution?.response_mode),gemini_final_raw:text(execution?.gemini_final_raw),gemini_final_answer:text(execution?.gemini_final_answer)};
   const responseWarnings=status==='KO'?[execution.summary||'Fallo de ejecución.']:status==='WARN'?(turnWarnings.length?turnWarnings:[execution.summary||'Aviso de interpretación.']):[];
-  return{ok:true,rejected:false,title,answer,warnings:responseWarnings,charts,tables,files,provider:'gemini-zuzu-ledger-immutable',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · PLAN/DATASET/VIEW server-side',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,warnings:responseWarnings,charts,tables,files,provider:'gemini-zuzu-ledger-escape-free',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · ESCAPE LIBRE · Gemini redacta tras datos CE y CE no retoca answer',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
+
+// Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
+export async function runZuzuUserTurn(input={}){return analyzeEventPrompt(input);}
 
 export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){
   const bundle=await getZuzuTurnBundle({turnId,actor});if(!bundle)return null;const ws=v73WorkingFromBundle(bundle),frame=v73FrameForStoredTurn(bundle),scopeInfo=bundle.dataset?v73ScopeInfoFromDataset(bundle.dataset):{kind:'none',eventNames:[],label:''},tables=bundle.view?.presentation?.table===false?[]:v73TableFromBundle(bundle),trace=arr(bundle.turn?.execution?.debug_trace);

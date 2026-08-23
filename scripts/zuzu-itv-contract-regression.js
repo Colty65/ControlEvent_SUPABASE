@@ -15,7 +15,7 @@ c('Replay exacto rechaza contrato histórico distinto',/savedContract!==ITV_CONT
 c('Index captura click nativo antes de hardlocks legacy',/__CE_NATIVE_ANCHOR_CLICK__=HTMLAnchorElement\.prototype\.click/.test(index));
 c('Descarga ITV usa click nativo y evita wrappers legacy',/nativeClick=window\.__CE_NATIVE_ANCHOR_CLICK__/.test(ui)&&/nativeClick\.call\(a\)/.test(ui));
 c('JSON declara contrato real de la batería',/batteryReplayContractVersion:num\(preview\?\.replayContractVersion\)\|\|0/.test(ui));
-c('Index fuerza carga de la build ITV4 actual',/zuzu-test-console-gd\.js\?v=20260823-ITV4-CERT2/.test(index)&&/controlevent-itv-build\" content=\"20260823-ITV4-CERT2/.test(index));
+c('Index fuerza carga de la build ESCAPE LIBRE actual',/zuzu-test-console-gd\.js\?v=20260823-ESCAPE-LIBRE-1/.test(index)&&/controlevent-itv-build\" content=\"20260823-ESCAPE-LIBRE-1/.test(index));
 c('named_events conserva event singleton como events[]',/kind==='named_events'[\s\S]{0,220}const single=trim\(raw\?\.event\)[\s\S]{0,120}out\.events=\[single\]/.test(svc));
 c('Gemini recibe regla contexto candidatos no filtros',/CONTEXTO = CANDIDATOS, NO FILTROS/.test(svc));
 c('Gemini recibe regla respuesta por forma interrogativa',/TIPO DE RESPUESTA: la forma interrogativa manda/.test(svc));
