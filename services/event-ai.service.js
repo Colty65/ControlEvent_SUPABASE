@@ -4910,19 +4910,22 @@ function semanticCatalogRows(state, type) {
   return [];
 }
 function semanticEditDistance(a, b) {
+  // Distancia Damerau-Levenshtein restringida (OSA): además de inserción/borrado/sustitución,
+  // una transposición adyacente cuenta como UN error. Es importante para dictado y tecleo humano
+  // (p. ej. letras intercambiadas) sin introducir alias hard-code de nombres concretos.
   const x = trim(a), y = trim(b);
   if (x === y) return 0;
   if (!x.length) return y.length;
   if (!y.length) return x.length;
-  let prev = Array.from({ length: y.length + 1 }, (_, i) => i);
-  for (let i = 1; i <= x.length; i++) {
-    const cur = [i];
-    for (let j = 1; j <= y.length; j++) {
-      cur[j] = Math.min(cur[j - 1] + 1, prev[j] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
-    }
-    prev = cur;
+  const d=Array.from({length:x.length+1},()=>Array(y.length+1).fill(0));
+  for(let i=0;i<=x.length;i++)d[i][0]=i;
+  for(let j=0;j<=y.length;j++)d[0][j]=j;
+  for(let i=1;i<=x.length;i++)for(let j=1;j<=y.length;j++){
+    const cost=x[i-1]===y[j-1]?0:1;
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+cost);
+    if(i>1&&j>1&&x[i-1]===y[j-2]&&x[i-2]===y[j-1])d[i][j]=Math.min(d[i][j],d[i-2][j-2]+1);
   }
-  return prev[y.length];
+  return d[x.length][y.length];
 }
 function semanticTokenNear(a, b) {
   if (a === b) return 1;
@@ -13083,8 +13086,12 @@ function v70CatalogNgrams(value=''){
 }
 function v70CandidateRows(state={},type='',prompt='',limit=12){
   const grams=v70CatalogNgrams(prompt),rows=semanticCatalogRows(state,type),scored=[];
-  for(const row of rows){let best=0,bestQuery='';for(const g of grams){const s=semanticEntityScore(g,row.nombre,type);if(s>best){best=s;bestQuery=g;}}if(best>=0.72)scored.push({id:row.id,name:row.nombre,score:round(best,3),matched:bestQuery});}
-  return scored.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name,'es',{numeric:true,sensitivity:'base'})).slice(0,limit);
+  for(const row of rows){let best=0,bestQuery='',exact=false;for(const g of grams){const s=semanticEntityScore(g,row.nombre,type),isExact=semanticCleanToken(g,type)===semanticCleanToken(row.nombre,type);if(s>best||(s===best&&isExact&&!exact)){best=s;bestQuery=g;exact=isExact;}}if(best>=0.72)scored.push({id:row.id,name:row.nombre,score:round(best,3),matched:bestQuery,match_kind:exact?'exact':best>=0.93?'strong':best>=0.84?'fuzzy':'weak'});}
+  const sorted=scored.sort((a,b)=>(a.match_kind==='exact'?0:1)-(b.match_kind==='exact'?0:1)||b.score-a.score||a.name.localeCompare(b.name,'es',{numeric:true,sensitivity:'base'}));
+  // Si una locución concreta tiene coincidencia exacta dentro del MISMO tipo, las coincidencias
+  // parciales de esa misma locución dejan de ser candidatas de aclaración. No se cruza entre tipos.
+  const exactMatched=new Set(sorted.filter(x=>x.match_kind==='exact').map(x=>norm(x.matched)));
+  return sorted.filter(x=>x.match_kind==='exact'||!exactMatched.has(norm(x.matched))).slice(0,limit);
 }
 function v70EntityCandidates(state={},prompt=''){
   return{events:v70CandidateRows(state,'event',prompt,14),people:v70CandidateRows(state,'person',prompt,14),stores:v70CandidateRows(state,'store',prompt,14),products:v70CandidateRows(state,'product',prompt,28)};
@@ -13115,7 +13122,7 @@ ENTIDADES / SAANE-LITE
 - ENTITY_CANDIDATES son candidatos recuperados mecánicamente del catálogo; NO son decisiones. Tú decides el TIPO correcto y eliges el nombre canónico cuando corresponda.
 - No confundas EVENTO, PERSONA, TIENDA y PRODUCTO. Un nombre personal en una consulta de donaciones va en donor/person, no en event.
 - Para producto individual usa product_mode=exact. Para familia usa family y deja product_text con la familia; resolved_products puede contener candidatos canónicos pertinentes. ControlEvent certificará el catálogo y aplicará coincidencia por tokens, no substring ciego.
-- Si una entidad escrita/dictada se parece claramente a un candidato de su tipo, usa su nombre canónico. Si hay dos candidatos realmente equivalentes y no se puede decidir por contexto, mode=clarify.
+- RESOLUCIÓN ROBUSTA DE ENTIDADES: exacto tipado > candidato fuzzy claro > contexto reciente del MISMO tipo > aclaración. Si ENTITY_CANDIDATES contiene match_kind=exact para la locución pedida, ESA coincidencia domina y candidatos parciales/más largos del mismo tipo no justifican aclarar. Si no hay exacta, acepta una variante ortográfica o de dictado cuando un candidato fuzzy/strong destaque claramente; no exijas que el usuario pronuncie o escriba el nombre perfecto. CURRENT y RECENT_TURNS pueden desempatar entre candidatos del MISMO tipo. Solo usa clarify cuando queden dos o más candidatos del mismo tipo realmente plausibles y cercanos después de aplicar similitud y contexto.
 
 TRANSFORMACIONES
 - Ordenar/proyectar/agrupar una vista existente: mode=transform, source=last_view, domain=inherit. No cambies de objeto.
@@ -14097,7 +14104,7 @@ CONTEXTO = CANDIDATOS, NO FILTROS: CURRENT, RECENT_TURNS y RECENT_HOMOGENEOUS te
 TIPO DE RESPUESTA: la forma interrogativa manda. Preguntas sí/no («¿X fue?», «¿hay...?», «¿queda...?») usan whether. «¿quién/quiénes?» usa who; «¿qué?» usa what; «¿cuánto?» usa amount; «¿en qué evento?» usa which_event. No conviertas una pregunta whether en table por el mero hecho de que vaya a existir una tabla de apoyo.
 
 CONSULTAS
-products=productos agregados; purchases=líneas físicas de compra; donations=donaciones; person=dossier transversal de UNA persona; event_summary=dossier de UN evento; people=asistencia/listado de personas DENTRO DE UN ÚNICO evento; catalog_people=catálogo global de personas; comparison=comparación tipada. Una expresión colectiva de categoría (por ejemplo socios, asistentes o socios canónicos) NO es el nombre literal de una persona: para catálogo global usa catalog_people y para asistencia de un evento usa people. Una pregunta amplia por el estado de un evento nombrado (cómo va, situación general, resumen del evento, datos importantes) usa event_summary y NO hereda la persona/dominio del turno anterior. Si el usuario enumera varias personas para un resumen o comparación conjunta, conserva TODAS en comparison + group_role=person + values; nunca elijas solo la última. CAPACIDADES: person admite all_events o named_event; people necesita un único evento (screen_event o named_event) y NO debe usarse con all_events; catalog_people sirve para listados/catálogos globales, no para explicar la actividad de una persona concreta. Para comparar EVENTOS usa comparison + group_role=event; para comparar PERSONAS usa comparison + group_role=person + values explícitos y CE obedecerá esa dimensión, sin convertir personas en eventos. Para preguntas amplias sobre una persona concreta («qué fue de X», «háblame de X», «qué sabes de X», si puso dinero, compró o donó), usa person porque su dossier reúne dimensiones personales y puede buscar en todos los eventos; no uses people solo porque la palabra sea una persona ni heredes purchases porque el turno anterior tratase de compras. El dossier de evento/event_summary expone ingresos recibidos/pendientes y personas con ingreso pendiente: preguntas del tipo «¿queda gente por pagar?», «¿quién está pendiente de ingreso?» pertenecen al estado económico del evento, NO a purchases ni a una persona literal llamada «gente». TODA query debe incluir scope explícito. El evento visible «${screen}» es solo ambiente: usa screen_event únicamente si el usuario dice «este evento», «el actual» o equivalente. Si pregunta por una persona/producto sin mencionar evento ni referirse al visible, usa all_events. Si nombra un evento, usa named_event; si enumera varios, named_events.
+products=productos agregados; purchases=líneas físicas de compra; donations=donaciones; person=dossier transversal de UNA O VARIAS personas (person para una, people para varias); event_summary=dossier de UN evento; people como DOMINIO=asistencia/listado de personas DENTRO DE UN ÚNICO evento; catalog_people=catálogo global de personas; comparison=comparación tipada. Una expresión colectiva de categoría (por ejemplo socios, asistentes o socios canónicos) NO es el nombre literal de una persona: para catálogo global usa catalog_people y para asistencia de un evento usa people. Una pregunta amplia por el estado de un evento nombrado (cómo va, situación general, resumen del evento, datos importantes) usa event_summary y NO hereda la persona/dominio del turno anterior. Si el usuario enumera varias personas para conocer/hablar de todas ellas, usa domain=person + query.people con TODAS y CE devolverá un único DATASET multientidad. Usa comparison + group_role=person + values solo cuando el usuario PIDA comparar. Nunca elijas solo la última. CAPACIDADES: person admite all_events o named_event; people necesita un único evento (screen_event o named_event) y NO debe usarse con all_events; catalog_people sirve para listados/catálogos globales, no para explicar la actividad de una persona concreta. Para comparar EVENTOS usa comparison + group_role=event; para comparar PERSONAS usa comparison + group_role=person + values explícitos y CE obedecerá esa dimensión, sin convertir personas en eventos. Para preguntas amplias sobre una persona concreta («qué fue de X», «háblame de X», «qué sabes de X», si puso dinero, compró o donó), usa person porque su dossier reúne dimensiones personales y puede buscar en todos los eventos; no uses people solo porque la palabra sea una persona ni heredes purchases porque el turno anterior tratase de compras. El dossier de evento/event_summary expone ingresos recibidos/pendientes y personas con ingreso pendiente: preguntas del tipo «¿queda gente por pagar?», «¿quién está pendiente de ingreso?» pertenecen al estado económico del evento, NO a purchases ni a una persona literal llamada «gente». TODA query debe incluir scope explícito. El evento visible «${screen}» es solo ambiente: usa screen_event únicamente si el usuario dice «este evento», «el actual» o equivalente. Si pregunta por una persona/producto sin mencionar evento ni referirse al visible, usa all_events. Si nombra un evento, usa named_event; si enumera varios, named_events.
 Un término de producto genérico se expresa con query.product {text,match}. family para familia léxica; exact para producto exacto; semantic cuando el término no sea literal.
 En una consulta sin columnas explícitas, fields.mode=all. Si el usuario enumera columnas, fields.mode=only con exactamente esas columnas. Para «eventos de la serie X» usa scope.kind=event_series y scope.series=X; ControlEvent/SCC certificará la serie contra el catálogo y guardará después la lista canónica concreta. Para comparar eventos explícitos usa comparison con named_events.
 Si la MISMA pregunta pide además ordenar, agrupar, limitar, filtrar, graficar o retocar columnas sobre el resultado recién extraído, añade query.operations. Esas operaciones se ejecutan localmente DESPUÉS de crear el DATASET; no cambian la extracción ni provocan una segunda consulta. Para rankings usa rank. PREFIERE group_role y metric_role frente a inventar nombres de columnas: group_role puede ser person/responsible/donor/product/event/store/ticket y metric_role amount/units/count. CE traducirá esos roles a los campos físicos del DATASET. Usa group_field/metric solo cuando RECENT_TURNS/VIEW muestre explícitamente el nombre real del campo. reference permite comparar contra una entidad concreta, operator puede ser gt/gte/lt/lte y limit devuelve el top solicitado. Si la frase contiene una comparación relativa como «más que X», «menos que X», «igual o mayor que X», reference y operator son OBLIGATORIOS: no dejes a CE deducir la relación desde el lenguaje humano. Para comparar dos o más valores usa compare con el mismo criterio de roles; CE agrupa una sola vez y conserva únicamente esos valores.
@@ -14213,7 +14220,7 @@ async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,d
     recent_conversation:v73RawFinalRecentTurns(session)
   };
   const finalTool=v73FinalPresentationTool();
-  const payload=await v261CallInteraction({input:`PREGUNTA Y RESULTADO REAL DEL TURNO:\n${JSON.stringify(packet)}`,previousInteractionId:'',model,systemInstruction:v73RawFinalInstruction(),tools:[finalTool],flowTrace,stage:'v3_0_exp · PRESENTACIÓN · Gemini redacta pantalla + voz',toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_final_presentation']}},externalSignal,maxCalls:1,maxOutputTokens:1800});
+  const payload=await v261CallInteraction({input:`PREGUNTA Y RESULTADO REAL DEL TURNO:\n${JSON.stringify(packet)}`,previousInteractionId:'',model,systemInstruction:v73RawFinalInstruction(),tools:[finalTool],flowTrace,stage:'v3_0_exp · PRESENTACIÓN · Gemini redacta pantalla + voz',toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_final_presentation']}},externalSignal,maxCalls:2,maxOutputTokens:1800});
   const final=v73RawFinalParse(payload);if(!trim(final.written)){const e=new Error('Gemini no devolvió redacción escrita en la fase final.');e._ceOrigin='gemini';throw e;}
   return final;
 }
@@ -14275,6 +14282,17 @@ function v73ExpandEventSeries(state={},series=''){
   const seen=new Set(),out=[];for(const e of matches){if(seen.has(e.id))continue;seen.add(e.id);out.push({id:e.id,name:e.name});}
   return out.sort((a,b)=>a.name.localeCompare(b.name,'es',{numeric:true,sensitivity:'base'})).slice(0,40);
 }
+function v73CertifyTypedEntities(query={},state={},flowTrace=[]){
+  const q=query,warnings=[];
+  const resolveOne=(type,value,label)=>{const raw=trim(value);if(!raw)return{ok:true,value:''};const r=(type==='person'?v26ResolvePersonFamily(state,raw):semanticResolveEntity(state,type,raw));if(!r.ok)return{ok:false,error:r.ambiguous?`${label} «${raw}» es ambiguo: ${arr(r.candidates).map(x=>trim(x?.nombre)).filter(Boolean).join(' / ')}.`:`No puedo resolver ${label.toLowerCase()} «${raw}» con suficiente seguridad.`};if(norm(r.nombre)!==norm(raw)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ENTIDAD TIPADA','OK',`${label}: «${raw}» → «${r.nombre}» (${r.score>=0.995?'exacta':'variante/fuzzy'}).`);}return{ok:true,value:r.nombre};};
+  const singles=[['person','person','Persona'],['responsible','person','Responsable'],['donor','person','Donante'],['store','store','Tienda']];
+  for(const [field,type,label] of singles){if(!trim(q?.[field]))continue;const r=resolveOne(type,q[field],label);if(!r.ok)return{query:q,warnings,error:r.error};q[field]=r.value;}
+  const plurals=[['people','person','Persona'],['responsibles','person','Responsable'],['donors','person','Donante'],['stores','store','Tienda']];
+  for(const [field,type,label] of plurals){if(!arr(q?.[field]).length)continue;const vals=[],seen=new Set();for(const raw of arr(q[field])){const r=resolveOne(type,raw,label);if(!r.ok)return{query:q,warnings,error:r.error};const k=norm(r.value);if(k&&!seen.has(k)){seen.add(k);vals.push(r.value);}}q[field]=vals;}
+  if(q?.product&&trim(q.product.text)&&trim(q.product.match)==='exact'){const r=resolveOne('product',q.product.text,'Producto');if(!r.ok)return{query:q,warnings,error:r.error};q.product.text=r.value;}
+  for(const item of arr(q?.products)){if(!item||typeof item!=='object'||trim(item.match)!=='exact'||!trim(item.text))continue;const r=resolveOne('product',item.text,'Producto');if(!r.ok)return{query:q,warnings,error:r.error};item.text=r.value;}
+  return{query:q,warnings,error:''};
+}
 function v73CertifyQuery(query={},state={},flowTrace=[]){
   const q=JSON.parse(JSON.stringify(query||{}));if(!q.scope)return{query:q,warnings:[],error:''};const s=v73NormalizeScope(q.scope),warnings=[];
   if(s.kind==='event_series'){
@@ -14286,6 +14304,7 @@ function v73CertifyQuery(query={},state={},flowTrace=[]){
   }else if(s.kind==='named_events'){
     if(!arr(s.events).length)return{query:q,warnings,error:'scope named_events requiere events.'};const names=[],seen=new Set();for(const raw of arr(s.events)){const r=v73CanonicalEventName(state,raw);if(!r.ok)return{query:q,warnings,error:r.ambiguous?`El evento «${raw}» es ambiguo: ${r.candidates.join(' / ')}.`:`No puedo certificar el evento «${raw}».`};if(!seen.has(r.id)){seen.add(r.id);names.push(r.name);}}q.scope={kind:'named_events',events:names};zuzuTracePush(flowTrace,'v3_0_exp · Ledger · SCC conjunto de eventos','OK',`${names.length} evento(s) certificados: ${names.join(' / ')}.`);
   }
+  const typed=v73CertifyTypedEntities(q,state,flowTrace);if(typed.error)return{query:q,warnings,error:typed.error};
   if(trim(q.domain)==='comparison'){
     const cmp=arr(q.operations).find(op=>trim(op?.type)==='compare'),role=trim(cmp?.group_role)||v73RoleFromLabel(cmp?.group_field,'comparison');
     if(role==='person'){
@@ -14653,9 +14672,9 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const responseWarnings=status==='KO'?[execution.summary||'Fallo de ejecución.']:status==='WARN'?(turnWarnings.length?turnWarnings:[execution.summary||'Aviso de interpretación.']):[];physical.warnings=responseWarnings.slice();
   const baseArtifactIntent=v73PlanArtifactIntent(normalizedPlan,savedView),artifactIntent={table:finalPresentation&&typeof finalPresentation.table==='boolean'?finalPresentation.table:baseArtifactIntent.table,chart:finalPresentation&&typeof finalPresentation.chart==='boolean'?finalPresentation.chart:baseArtifactIntent.chart,chart_type:trim(finalPresentation?.chart_type)||baseArtifactIntent.chart_type};let visibleTables=[],visibleCharts=[];
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
-  if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),baseCharts=trim(savedDataset?.domain)==='weather'?v73WeatherChartFromResult({title:savedView?.title||title,tables:v73TableFromBundle(pseudo)}):(ws?v72ChartFromWorking(ws,flowTrace):[]);visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0];if(a&&!visibleCharts.some(x=>trim(x?.title)===trim(a?.title)))visibleCharts.push(a);}}
+  if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],baseCharts=weatherSupplement?[]:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromResult({title:savedView?.title||title,tables:v73TableFromBundle(pseudo)}):(ws?v72ChartFromWorking(ws,flowTrace):[]));visibleCharts=v73ApplyRequestedChartType(weatherCharts.length?weatherCharts:baseCharts,artifactIntent);for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0];if(a&&!visibleCharts.some(x=>trim(x?.title)===trim(a?.title)))visibleCharts.push(a);}}
   zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Gemini decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW5 · MULTIENTIDAD + METEO + PRESENTACIÓN DUAL',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW6 · ENTIDADES ROBUSTAS + MULTIENTIDAD + METEO',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
