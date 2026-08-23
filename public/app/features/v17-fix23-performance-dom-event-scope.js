@@ -72,10 +72,19 @@
     return arr('personas').filter(p => txt(p.rango).toUpperCase() === 'SOCIO').slice().sort((a,b)=>txt(a.nombre).localeCompare(txt(b.nombre),'es'));
   };
   function donorOptions(){
+    // MISMA fuente que el desplegable Donante de [Añadir]. No reconstruimos aquí
+    // un catálogo distinto por evento: alta y mantenimiento deben ver exactamente
+    // las mismas personas/tiendas y los mismos value P:/T:.
+    try{
+      if(typeof window.donorOptions === 'function'){
+        const opts=window.donorOptions();
+        if(Array.isArray(opts) && opts.length) return opts.map(o=>({value:txt(o.value),label:txt(o.label),kind:txt(o.kind)})).filter(o=>o.value&&o.label);
+      }
+    }catch(_){ }
     const out = [], seen = new Set();
     function add(value,label){ const key = txt(label).toLowerCase(); if(!label || seen.has(key)) return; seen.add(key); out.push({value,label}); }
-    eventPeople().forEach(p => add('P:'+p.id, txt(p.nombre)));
-    eventStores().forEach(t => add('T:'+t.id, txt(t.nombre)));
+    arr('personas').forEach(p => add('P:'+p.id, txt(p.nombre)));
+    arr('tiendas').forEach(t => add('T:'+t.id, txt(t.nombre)));
     return out.sort((a,b)=>a.label.localeCompare(b.label,'es'));
   }
   function compraRows(){
@@ -205,8 +214,9 @@
         <div class="field"><label>Precio</label><input class="money-text" type="text" value="${esc(euroInput(precio))}" data-action="${prefix}-precio" data-id="${esc(r.id)}" /></div>
         <div class="field"><label>${kind==='donacion'?'Valor':'Importe'}</label><input class="soft-readonly" readonly value="${esc(money(amount))}" /></div>
         <div class="field"><label>${kind==='donacion'?'Tipo donación':'Ticket u Otros gastos'}</label><select data-action="${prefix}-ticket" data-id="${esc(r.id)}">${ticketOptionsHtml(kind, ticket)}</select></div>
-        <div class="field"><label>Tienda</label><select data-action="${prefix}-tienda" data-id="${esc(r.id)}"><option value="" ${!tiendaId?'selected':''}>-- elige tienda --</option>${optionsHtml(eventStores(), tiendaId, t => t.nombre, t => t.id, storeFallback)}</select></div>
-        <div class="field"><label>Donante</label><select data-action="${prefix}-donante" data-id="${esc(r.id)}"><option value="" ${!donorRef?'selected':''}>-- sin donante --</option>${optionsHtml(donorOptions(), donorRef, d => d.label, d => d.value, donorFallback)}</select></div>
+        ${kind==='donacion'
+          ? `<div class="field ce-maint-donante"><label>Donante</label><select data-action="edit-donacion-donante" data-id="${esc(r.id)}"><option value="" ${!donorRef?'selected':''}>-- sin donante --</option>${optionsHtml(donorOptions(), donorRef, d => d.label, d => d.value, donorFallback)}</select></div>`
+          : `<div class="field ce-maint-tienda"><label>Tienda</label><select data-action="edit-compra-tienda" data-id="${esc(r.id)}"><option value="" ${!tiendaId?'selected':''}>-- elige tienda --</option>${optionsHtml(eventStores(), tiendaId, t => t.nombre, t => t.id, storeFallback)}</select></div>`}
         <div class="field ce-maint-responsable"><label>Responsable</label><select data-action="${prefix}-responsable" data-id="${esc(r.id)}"><option value="" ${!responsableId?'selected':''}>-- sin responsable --</option>${optionsHtml(socios(), responsableId, p => p.nombre, p => p.id, respFallback)}</select></div>
         <div class="ce-maint-actions" style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><button type="button" class="modify small" data-action="${saveAction}" data-id="${esc(r.id)}">Modificar</button><button type="button" class="outline small" data-action="ce-fix23-cancel-compra" data-kind="${kind}" data-id="${esc(r.id)}">Cancelar</button><button type="button" class="danger small" data-action="${deleteAction}" data-id="${esc(r.id)}">Eliminar</button></div>
       </div>

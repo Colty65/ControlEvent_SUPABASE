@@ -1715,7 +1715,7 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
    y ocupa ancho suficiente para socios individuales y parejas. */
 @media (min-width: 901px){
   .ce-fix23-edit-row .rowline.compra{
-    grid-template-columns:minmax(230px,1.65fr) minmax(80px,.42fr) minmax(100px,.54fr) minmax(105px,.58fr) minmax(160px,.88fr) minmax(175px,1fr) minmax(190px,1.08fr) !important;
+    grid-template-columns:minmax(240px,1.75fr) minmax(80px,.42fr) minmax(100px,.54fr) minmax(105px,.58fr) minmax(170px,.95fr) minmax(220px,1.28fr) !important;
     gap:10px !important;
     align-items:end;
   }

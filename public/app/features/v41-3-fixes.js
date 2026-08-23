@@ -88,11 +88,11 @@
     if(action === 'edit-compra-producto' || action === 'edit-donacion-producto') row.productoId = el.value;
     if(action === 'edit-compra-unidades' || action === 'edit-donacion-unidades') row.unidades = Number(el.value || 0);
     if(action === 'edit-compra-ticket' || action === 'edit-donacion-ticket') row.ticketDonacion = el.value;
-    if(action === 'edit-compra-donante' || action === 'edit-donacion-donante') row.donorRef = el.value;
+    if(action === 'edit-donacion-donante') row.donorRef = el.value;
     if(action === 'edit-compra-responsable' || action === 'edit-donacion-responsable') row.responsableId = el.value;
     if(action === 'edit-compra-tienda') row.tiendaId = el.value;
     if(action === 'edit-compra-precio' || action === 'edit-donacion-precio') row.precio = parseEuro(el.value || 0);
-    if(donationContext && !row.donorRef) row.donorRef = valueForAny(['edit-donacion-donante','edit-compra-donante'], id, scope, row.donorRef || '');
+    if(donationContext && !row.donorRef) row.donorRef = valueFor('edit-donacion-donante', id, scope, row.donorRef || '');
     return true;
   }
 
@@ -109,12 +109,13 @@
       const unidades = Number(valueForAny(['edit-donacion-unidades','edit-compra-unidades'], id, scope, row.unidades || 0) || 0);
       const precio = parseEuro(valueForAny(['edit-donacion-precio','edit-compra-precio'], id, scope, row.precio || 0) || 0);
       const responsableId = valueForAny(['edit-donacion-responsable','edit-compra-responsable'], id, scope, row.responsableId || '');
-      const donorRef = valueForAny(['edit-donacion-donante','edit-compra-donante'], id, scope, row.donorRef || '');
+      const donorRef = valueFor('edit-donacion-donante', id, scope, row.donorRef || '');
       row.productoId = productoId;
       row.unidades = Number.isFinite(unidades) ? unidades : 0;
       row.precio = Number.isFinite(precio) ? precio : 0;
       row.ticketDonacion = ticket;
       row.donorRef = donorRef;
+      row.tiendaId = '';
       row.responsableId = responsableId;
       const p = productObj(productoId);
       if(p && Number.isFinite(precio)){ p.precio = precio; p.defaultPrecio = precio; }
@@ -128,14 +129,13 @@
     const unidades = Number(valueFor('edit-compra-unidades', id, scope, row.unidades || 0) || 0);
     const precio = parseEuro(valueFor('edit-compra-precio', id, scope, row.precio || 0) || 0);
     const responsableId = valueFor('edit-compra-responsable', id, scope, row.responsableId || '');
-    const donorRef = valueFor('edit-compra-donante', id, scope, row.donorRef || '');
     const tiendaId = valueFor('edit-compra-tienda', id, scope, row.tiendaId || '');
     row.productoId = productoId;
     row.unidades = Number.isFinite(unidades) ? unidades : 0;
     if(precio) row.precio = precio;
     row.ticketDonacion = ticket;
     row.tiendaId = tiendaId;
-    row.donorRef = donorRef;
+    row.donorRef = '';
     row.responsableId = responsableId;
     const p = productObj(productoId);
     if(p && precio){ p.precio = precio; p.defaultPrecio = precio; }

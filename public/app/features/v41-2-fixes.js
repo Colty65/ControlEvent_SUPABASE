@@ -235,7 +235,7 @@
     const precio = parseEuro(fieldValue('edit-compra-precio', id, scope, c.precio || 0) || 0);
     const ticket = fieldValue('edit-compra-ticket', id, scope, c.ticketDonacion || '');
     const responsableId = fieldValue('edit-compra-responsable', id, scope, c.responsableId || '');
-    const donorRef = fieldValue(['edit-compra-donante','edit-donacion-donante'], id, scope, c.donorRef || '');
+    const donorRef = fieldValue('edit-donacion-donante', id, scope, c.donorRef || '');
     const donation = isDonationTicket(ticket) || isDonationTicket(c.ticketDonacion || '') || !!scope?.closest?.('#donacionesList');
     if(donation){
       // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
@@ -245,6 +245,7 @@
       if(precio) c.precio = precio;
       c.ticketDonacion = ticket;
       c.donorRef = donorRef;
+      c.tiendaId = '';
       c.responsableId = responsableId;
     }else{
       const tiendaId = fieldValue('edit-compra-tienda', id, scope, c.tiendaId || '');
@@ -255,7 +256,7 @@
       if(precio) c.precio = precio;
       c.ticketDonacion = ticket;
       c.tiendaId = tiendaId;
-      c.donorRef = donorRef;
+      c.donorRef = '';
       c.responsableId = responsableId;
     }
     const p = productById(productoId);
@@ -272,7 +273,7 @@
     const unidades = Number(fieldValue(['edit-donacion-unidades','edit-compra-unidades'], id, scope, c.unidades || 0) || 0);
     const precio = parseEuro(fieldValue(['edit-donacion-precio','edit-compra-precio'], id, scope, c.precio || 0) || 0);
     const ticket = fieldValue(['edit-donacion-ticket','edit-compra-ticket'], id, scope, c.ticketDonacion || '');
-    const donorRef = fieldValue(['edit-donacion-donante','edit-compra-donante'], id, scope, c.donorRef || '');
+    const donorRef = fieldValue('edit-donacion-donante', id, scope, c.donorRef || '');
     const responsableId = fieldValue(['edit-donacion-responsable','edit-compra-responsable'], id, scope, c.responsableId || '');
     // v43.7: en modificación no se bloquea por duplicidad; solo se valida al crear una ficha nueva.
     const found = null; // duplicateDonacion(productoId, donorRef, id);
@@ -281,6 +282,7 @@
     if(precio) c.precio = precio;
     c.ticketDonacion = ticket;
     c.donorRef = donorRef;
+    c.tiendaId = '';
     c.responsableId = responsableId;
     const p = productById(productoId);
     if(p && precio){ p.defaultPrecio = precio; p.precio = precio; }

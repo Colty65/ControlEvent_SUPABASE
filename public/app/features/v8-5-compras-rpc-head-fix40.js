@@ -82,7 +82,7 @@
       unidades:num(val('edit-compra-unidades',id,old.unidades||0)),
       precio: rawPrecio!=='' ? num(rawPrecio) : num(old.precio ?? old.precioCalc ?? p.precio ?? p.defaultPrecio ?? 0),
       ticketDonacion:text(val('edit-compra-ticket',id,old.ticketDonacion||'')),
-      donorRef:text(val('edit-compra-donante',id,old.donorRef||'')),
+      donorRef:'',
       tiendaId:text(val('edit-compra-tienda',id,old.tiendaId||p.tiendaId||p.defaultTiendaId||'')),
       responsableId:text(val('edit-compra-responsable',id,old.responsableId||''))
     };
