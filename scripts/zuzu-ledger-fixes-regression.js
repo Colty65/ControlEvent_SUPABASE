@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+const here=path.dirname(fileURLToPath(import.meta.url));
+const root=path.resolve(here,'..');
+const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const oracle=fs.readFileSync(path.join(root,'services/zuzu-test-lab.service.js'),'utf8');
+const css=fs.readFileSync(path.join(root,'public/app/styles/app.css'),'utf8');
+const tests=[];const check=(n,c)=>{tests.push([n,!!c]);console.log(`${c?'OK':'KO'} ${n}`)};
+check('ID evento canónico evita recertificación SCC', /const direct=arr\(state\?\.eventos\)\.find\(e=>trim\(e\?\.id\)===raw\)/.test(svc));
+check('Rank/compare no prefiltro por entidad de referencia', /En rank\/compare, los valores de la dimensión son REFERENCIAS analíticas/.test(svc) && /matches\(filters\.responsible\)/.test(svc));
+check('Analítica completa roles por dominio', /purchases:\{group_role:'responsible',metric_role:'amount'\}/.test(svc) && /donations:\{group_role:'donor',metric_role:'amount'\}/.test(svc));
+check('Compare recupera dos focos homogéneos recientes', /v73RecentDistinctEntities\(session,role,2\)/.test(svc));
+check('LedgerAudit expone ejecución física', /table_row_counts:arr\(tables\)/.test(svc) && /visible_fields:arr\(savedView\?\.visibleFields\)/.test(svc));
+check('Oráculo prioriza ejecución física', /actualDomain=trim\(auditExec\?\.domain\|\|ds\?\.domain/.test(oracle) && /filas EJECUTADAS/.test(oracle));
+check('Oráculo contrasta filas de presentación', /presentación materializada/.test(oracle));
+check('Compras y donaciones proporcionales', /minmax\(220px,1\.75fr\)/.test(css) && /minmax\(210px,1\.32fr\)/.test(css));
+const ko=tests.filter(([,ok])=>!ok);if(ko.length){console.error(`ZUZU LEDGER FIXES: ${ko.length} KO`);process.exit(1);}console.log('ZUZU LEDGER FIXES: OK');

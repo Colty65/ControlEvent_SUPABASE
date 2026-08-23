@@ -1691,3 +1691,20 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
 .plan-product-grid.replica-grid label{font-size:11px!important;line-height:1.05!important}
 .plan-product-grid.replica-grid input,.plan-product-grid.replica-grid select{min-height:34px!important;padding:6px 8px!important;border-radius:10px!important;font-size:13px!important}
 .plan-reason{display:none!important}
+
+/* v3_0_exp · COMPRAS/DONACIONES · proporciones de mantenimiento y alta
+   Producto y responsables ganan ancho; cantidades/importes quedan compactos.
+   En móvil se mantiene la composición vertical existente. */
+@media (min-width: 901px){
+  .row-purchase-form,
+  .rowline.compra{
+    grid-template-columns:minmax(220px,1.75fr) minmax(78px,.44fr) minmax(96px,.56fr) minmax(100px,.60fr) minmax(150px,.90fr) minmax(170px,1.05fr) minmax(210px,1.32fr) auto !important;
+    align-items:end;
+  }
+  .row-purchase-form .field,
+  .rowline.compra .field{min-width:0}
+  .row-purchase-form select,
+  .rowline.compra select,
+  .row-purchase-form input,
+  .rowline.compra input{width:100%;min-width:0}
+}

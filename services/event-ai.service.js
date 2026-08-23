@@ -13958,6 +13958,20 @@ function v73NormalizePlan(raw={}){
   else if(action==='clarify'){out.clarify={question:trim(raw?.clarify?.question)};const refs=arr(raw?.clarify?.candidate_refs).map(trim).filter(Boolean).slice(0,8);if(refs.length)out.clarify.candidate_refs=refs;}
   if(trim(raw?.reply))out.reply=trim(raw.reply).slice(0,1800);return out;
 }
+function v73RecentDistinctEntities(session={},role='person',limit=2){
+  const out=[],seen=new Set(),want=trim(role);for(const t of arr(session?.recentTurns).slice().reverse()){
+    if(out.length>=limit)break;const b={turn:t},value=v73BundleEntity(b,want);if(!trim(value))continue;const k=norm(value);if(seen.has(k))continue;seen.add(k);out.push(trim(value));
+  }return out;
+}
+function v73PrepareAnalyticPlan(plan={},session={}){
+  const p=JSON.parse(JSON.stringify(plan||{})),domain=trim(p?.query?.domain||session?.currentTurn?.execution?.domain||session?.dataset?.domain),ops=p.action==='query'?arr(p?.query?.operations):p.action==='local'?arr(p?.local?.operations):[];
+  const defaults={purchases:{group_role:'responsible',metric_role:'amount'},donations:{group_role:'donor',metric_role:'amount'},people:{group_role:'person',metric_role:'count'},products:{group_role:'product',metric_role:'amount'},comparison:{group_role:'event',metric_role:'amount'}}[domain]||{};
+  for(const op of ops){const type=trim(op?.type);if(!['rank','compare'].includes(type))continue;if(!trim(op.group_role)&&!trim(op.group_field)&&defaults.group_role)op.group_role=defaults.group_role;if(!trim(op.metric_role)&&!trim(op.metric)&&defaults.metric_role)op.metric_role=defaults.metric_role;
+    if(type==='rank'&&!op.limit&&!trim(op.reference))op.limit=3;
+    if(type==='compare'&&arr(op.values).length<2){const role=trim(op.group_role)||defaults.group_role||'person',recent=v73RecentDistinctEntities(session,role,2);if(recent.length>=2)op.values=recent.reverse();}
+  }
+  return p;
+}
 function v73SpanishNumber(n){
   n=Math.trunc(Number(n)||0);const u=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];if(n>=0&&n<u.length)return u[n];const tens={30:'treinta',40:'cuarenta',50:'cincuenta',60:'sesenta',70:'setenta',80:'ochenta',90:'noventa'};if(n<100){const t=Math.floor(n/10)*10,r=n%10;return r?`${tens[t]} y ${u[r]}`:tens[t];}if(n===100)return'cien';if(n<200)return`ciento ${v73SpanishNumber(n-100)}`;const h={2:'doscientos',3:'trescientos',4:'cuatrocientos',5:'quinientos',6:'seiscientos',7:'setecientos',8:'ochocientos',9:'novecientos'};if(n<1000){const a=h[Math.floor(n/100)],r=n%100;return r?`${a} ${v73SpanishNumber(r)}`:a;}if(n<2000){const r=n-1000;return r?`mil ${v73SpanishNumber(r)}`:'mil';}if(n<3000){const r=n-2000;return r?`dos mil ${v73SpanishNumber(r)}`:'dos mil';}return String(n);
 }
@@ -14011,7 +14025,8 @@ RESPUESTA AL USUARIO
 Indica response_kind según lo que realmente pregunta: amount=cuánto; who=quién; what=qué; whether=sí/no; which_event=en qué evento; compare=comparación; table=petición explícita de tabla; summary=resumen breve; context=qué estás viendo; conversation_summary=resumen de toda la conversación. No conviertas automáticamente cualquier pregunta en «he preparado N registros». ControlEvent redactará de forma determinista según response_kind.
 
 REUTILIZACIÓN
-«Dame otra vez aquello» suele ser reference restore_snapshot. «Vuelve a mirar/consulta otra vez» suele ser reexecute_plan. «Ahora el mismo X pero de todos los eventos» puede ser reexecute_plan de CURRENT con replace_scope=all_events.
+«Dame otra vez aquello» suele ser reference restore_snapshot. «Vuelve a mirar/consulta otra vez» suele ser reexecute_plan. «Ahora el mismo X pero de todos los eventos» debe ser reexecute_plan de CURRENT con SOLO replace_scope=all_events: no copies ni borres producto, persona, tienda, columnas u otros datos del plan base. En una REFERENCE con changes, cada change modifica exclusivamente esa propiedad y todo lo demás permanece inmutable.
+Cuando ya has elegido compare y el usuario dice «los dos»/«ambos», prioriza las dos entidades homogéneas más recientes de RECENT_TURNS; no conviertas personas recientes en eventos ni busques memoria histórica si CURRENT/RECENT_TURNS las resuelven.
 
 MEMORIA PASADA
 Si HISTORY_CANDIDATES contiene una conversación pasada y la referencia es inequívoca, selecciónala sin preguntar. Si es ambigua, pregunta al usuario mostrando las alternativas. Cuando recuperes una conversación pasada, ControlEvent añadirá de forma determinista el recordatorio humano de fecha/tema. No menciones JSON, herramientas, SQL ni nombres internos.`;
@@ -14026,7 +14041,7 @@ async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCa
   const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools:[tool],flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_turn_record']}},externalSignal,maxCalls:1,maxOutputTokens:1300});
   try{payload=await call('v3_0_exp · Ledger · IA interpreta',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Lite no emitió JSON utilizable (${cleanGeminiError(error)}). Flash recibe exactamente la misma petición; no hay reparación semántica.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash interpreta',model);}else{error._ceOrigin='gemini';throw error;}}
   const calls=v261FunctionCalls(payload).filter(c=>trim(c?.name)==='zuzu_turn_record');if(!calls.length){const e=new Error('Gemini no emitió zuzu_turn_record.');e._ceOrigin='gemini';throw e;}if(calls.length>1)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · protocolo','WARN',`Gemini emitió ${calls.length} registros en un turno; se conserva literalmente el último y no se hace reparación.`);
-  const raw=calls[calls.length-1]?.arguments||{},plan=v73NormalizePlan(raw);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · JSON GEMINI BRUTO','INFO',JSON.stringify(raw).slice(0,5000));zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO','OK',JSON.stringify(plan).slice(0,5000));return{raw,plan,model};
+  const raw=calls[calls.length-1]?.arguments||{},normalized=v73NormalizePlan(raw),plan=v73PrepareAnalyticPlan(normalized,session);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · JSON GEMINI BRUTO','INFO',JSON.stringify(raw).slice(0,5000));zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO','OK',JSON.stringify(plan).slice(0,5000));return{raw,plan,model};
 }
 function v73RowsForStored(dataset=null,view=null){
   if(!dataset)return[];let rows=arr(dataset.rows).map(r=>({...r}));const v=view||{},filters=arr(v.rowFilters),pre=filters.filter(f=>trim(f?.stage)!=='post_group'),post=filters.filter(f=>trim(f?.stage)==='post_group');rows=v70ApplyViewFilters(rows,pre);const grouped=v70ApplyGroup(rows,arr(v.groupBy),arr(v.metrics));if(grouped)rows=grouped;if(post.length)rows=v70ApplyViewFilters(rows,post);rows=v70ApplySort(rows,arr(v.sort));if(Number(v.rowLimit)>0)rows=rows.slice(0,Number(v.rowLimit));return rows;
@@ -14052,8 +14067,12 @@ async function v73ApplyReuse(query={},session={},historyCandidates=[],actor={}){
 }
 
 function v73CanonicalEventName(state={},value=''){
-  const rr=semanticResolveEntity(state,'event',value);if(rr.ok)return{ok:true,name:rr.nombre,id:rr.id,score:rr.score};
-  return{ok:false,ambiguous:!!rr.ambiguous,value:trim(value),candidates:arr(rr.candidates).map(x=>trim(x.nombre)).filter(Boolean)};
+  // Un ID canónico ya certificado por SCC/ledger NO vuelve a pasar por resolución lingüística.
+  // Esto evita convertir ids persistidos en nombres ambiguos o imposibles de recertificar.
+  const raw=trim(value);if(!raw)return{ok:false,ambiguous:false,value:'',candidates:[]};
+  const direct=arr(state?.eventos).find(e=>trim(e?.id)===raw);if(direct)return{ok:true,name:trim(direct?.titulo)||raw,id:raw,score:1,resolution:'canonical_id'};
+  const rr=semanticResolveEntity(state,'event',raw);if(rr.ok)return{ok:true,name:rr.nombre,id:rr.id,score:rr.score,resolution:'scc'};
+  return{ok:false,ambiguous:!!rr.ambiguous,value:raw,candidates:arr(rr.candidates).map(x=>trim(x.nombre)).filter(Boolean)};
 }
 function v73ExpandEventSeries(state={},series=''){
   const raw=trim(series),wanted=semanticCleanToken(raw,'event'),tokens=wanted.split(' ').filter(t=>t.length>=2);if(!raw||!tokens.length)return[];
@@ -14093,6 +14112,19 @@ function v73FrameFromQuery(query={}){
   if(d==='purchases'&&filters.person&&!filters.responsible){filters.responsible=filters.person;filters.person='';}
   if(d==='donations'&&filters.person&&!filters.donor){filters.donor=filters.person;filters.donor_type='person';filters.person='';}
   if(d==='person'&&!filters.person){filters.person=filters.responsible||filters.donor;filters.responsible='';filters.donor='';}
+  // En rank/compare, los valores de la dimensión son REFERENCIAS analíticas, no filtros previos.
+  // Si Gemini incluye la misma entidad como filtro y como referencia/valor, se elimina solo el
+  // filtro de esa dimensión para que CE pueda construir el universo comparativo completo.
+  for(const op of arr(q.operations)){
+    if(!['rank','compare'].includes(trim(op?.type)))continue;const role=trim(op?.group_role)||v73RoleFromLabel(op?.group_field,d);if(!role)continue;
+    const refs=[trim(op?.reference),...arr(op?.values).map(trim)].filter(Boolean),matches=v=>trim(v)&&refs.some(r=>norm(r)===norm(v)||semanticEntityScore(r,v)>=0.94);
+    if(role==='responsible'||(role==='person'&&d==='purchases')){if(matches(filters.responsible))filters.responsible='';if(matches(filters.person))filters.person='';}
+    else if(role==='donor'||(role==='person'&&d==='donations')){if(matches(filters.donor))filters.donor='';if(matches(filters.person))filters.person='';}
+    else if(role==='person'){if(matches(filters.person))filters.person='';if(matches(filters.responsible))filters.responsible='';if(matches(filters.donor))filters.donor='';}
+    else if(role==='product'&&refs.some(r=>norm(r)===norm(filters.product_text))) {filters.product_text='';filters.product_mode='none';}
+    else if(role==='store'&&matches(filters.store))filters.store='';
+    else if(role==='ticket'&&matches(filters.ticket))filters.ticket='';
+  }
   const project=q.fields?.mode==='only'?arr(q.fields.values).map(trim).filter(Boolean):[],pres=q.presentation||{};
   return v70NormalizeFrame({mode:'query',domain:d,source:'fresh',granularity:v71DefaultGranularity(d),scope,filters,transform:{navigation:'none',view_filters:[],project,sort:[],group_by:[],metrics:[],row_limit:null},presentation:{table:pres.table!==false,summary:pres.summary!==false,reasoned:false,chart:pres.chart===true,exhaustive:false},freshness:'fresh'});
 }
@@ -14337,8 +14369,9 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   let savedDataset=dataset?{...dataset,datasetId:saved.datasetId}:finalBundle?.dataset||session?.dataset||null,savedView=view?{...view,viewId:saved.viewId,datasetId:saved.datasetId||view.datasetId}:finalBundle?.view||session?.view||null;
   if(saved.datasetId&&!savedDataset){const b=await getZuzuTurnBundle({turnId:saved.turn.turnId,actor});savedDataset=b?.dataset||null;savedView=b?.view||savedView;}
   const resultContext=v73LightContext(saved.conversation,saved.turn,savedDataset,savedView),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMMIT INMUTABLE','OK',`turn=${saved.turn.turnId} · action=${plan.action} · dataset=${saved.datasetId||'—'} · view=${saved.viewId||'—'} · status=${status}. El turno anterior no se modifica.`);
+  const physicalRows=savedDataset?v73RowsForStored(savedDataset,savedView||{}):[],physical={domain:trim(savedDataset?.domain||execution?.domain),scope:savedDataset?.scope||execution?.scope||{},focus:execution?.focus||{},row_count:savedDataset?physicalRows.length:(Number(execution?.row_count)||0),dataset_row_count:Number(savedDataset?.rowCount)||0,visible_fields:arr(savedView?.visibleFields),available_fields:arr(savedDataset?.columns),table_row_counts:arr(tables).map(t=>arr(t?.rows).length),chart_count:arr(charts).length,dataset_id:trim(savedDataset?.datasetId),view_id:trim(savedView?.viewId),status};
   const responseWarnings=status==='KO'?[execution.summary||'Fallo de ejecución.']:status==='WARN'?(turnWarnings.length?turnWarnings:[execution.summary||'Aviso de interpretación.']):[];
-  return{ok:true,rejected:false,title,answer,warnings:responseWarnings,charts,tables,files,provider:'gemini-zuzu-ledger-immutable',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · PLAN/DATASET/VIEW server-side',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:plan.action,geminiPlan:raw,normalizedPlan:plan,execution:{domain:trim(execution?.domain),scope:execution?.scope||{},focus:execution?.focus||{},row_count:Number(execution?.row_count)||0,status}},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,warnings:responseWarnings,charts,tables,files,provider:'gemini-zuzu-ledger-immutable',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · PLAN/DATASET/VIEW server-side',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:plan.action,geminiPlan:raw,normalizedPlan:plan,execution:physical},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){

@@ -8,6 +8,7 @@ const active=fs.readFileSync(path.join(root,'public/app/features/v17-fix23-perfo
 const rpc=fs.readFileSync(path.join(root,'public/app/features/v8-5-compras-rpc-head-fix40.js'),'utf8');
 const legacy=fs.readFileSync(path.join(root,'public/app/legacy/legacy-bundle-before-modules-v30.7.js'),'utf8');
 const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+const css=fs.readFileSync(path.join(root,'public/app/styles/app.css'),'utf8');
 
 const tests=[];
 function check(name,cond){tests.push([name,!!cond]);console.log(`${cond?'OK':'KO'} ${name}`);}
@@ -22,6 +23,7 @@ check('Donación usa save-donacion y delete-donacion', /saveAction=kind==='donac
 check('RPC espera exactamente edit-donacion-responsable', /edit-donacion-responsable/.test(rpc));
 check('RPC procesa save-donacion', /save-donacion/.test(rpc));
 check('Renderer activo carga después del RPC', html.indexOf('v8-5-compras-rpc-head-fix40.js')>=0 && html.indexOf('v17-fix23-performance-dom-event-scope.js')>html.indexOf('v8-5-compras-rpc-head-fix40.js'));
+check('Compras/Donaciones usan columnas proporcionales en escritorio', /row-purchase-form,[\s\S]*rowline\.compra[\s\S]*grid-template-columns:minmax\(220px,1\.75fr\)[\s\S]*minmax\(210px,1\.32fr\)/.test(css));
 
 const ko=tests.filter(([,ok])=>!ok);
 if(ko.length){console.error(`COMPRAS/DONACIONES MAINTENANCE: ${ko.length} KO`);process.exit(1);}
