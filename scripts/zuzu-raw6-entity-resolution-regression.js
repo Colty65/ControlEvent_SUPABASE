@@ -9,7 +9,7 @@ const tests=[
  ['canonizador tipado fuzzy post-Gemini',/function v73CertifyTypedEntities[\s\S]*ENTIDAD TIPADA[\s\S]*variante\/fuzzy/],
  ['segunda llamada Gemini permitida',/Gemini redacta pantalla \+ voz'[\s\S]{0,300}maxCalls:2/],
  ['weather supplement prioridad gráfica',/weatherSupplement=arr\(normalizedPlan\?\.query\?\.supplements\)[\s\S]*weatherCharts=weatherSupplement/],
- ['RAW6 identificado',/RAW6 · ENTIDADES ROBUSTAS \+ MULTIENTIDAD \+ METEO/]
+ ['RAW6/RAW7 evolución identificada',/RAW(?:6 · ENTIDADES ROBUSTAS \+ MULTIENTIDAD \+ METEO|7 · COMPILADOR SEMÁNTICO TIPADO)/]
 ];
 let ko=0;for(const [n,re] of tests){if(re.test(src))console.log('OK · '+n);else{ko++;console.error('KO · '+n)}}
 if(ko){console.error(`RAW6 REGRESSION: ${ko} KO`);process.exit(1)}console.log('RAW6 REGRESSION: OK');

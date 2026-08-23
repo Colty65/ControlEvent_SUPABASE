@@ -17,7 +17,7 @@ const tests=[
   ['CURRENT máxima prioridad',/ANTECEDENTE INMEDIATO = MÁXIMA PRIORIDAD/],
   ['salida final estructurada',/name:'zuzu_final_presentation'/],
   ['presentación fuerza function call',/tools:\[finalTool\][\s\S]*zuzu_final_presentation/],
-  ['arquitectura RAW5+ identificada',/RAW(?:5 · MULTIENTIDAD \+ METEO \+ PRESENTACIÓN DUAL|6 · ENTIDADES ROBUSTAS \+ MULTIENTIDAD \+ METEO)/]
+  ['arquitectura RAW5+ identificada',/RAW(?:5 · MULTIENTIDAD \+ METEO \+ PRESENTACIÓN DUAL|6 · ENTIDADES ROBUSTAS \+ MULTIENTIDAD \+ METEO|7 · COMPILADOR SEMÁNTICO TIPADO)/]
 ];
 let ko=0;
 for(const [name,re] of tests){if(re.test(src)) console.log('OK · '+name); else {ko++; console.error('KO · '+name);}}

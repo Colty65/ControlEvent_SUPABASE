@@ -13096,6 +13096,28 @@ function v70CandidateRows(state={},type='',prompt='',limit=12){
 function v70EntityCandidates(state={},prompt=''){
   return{events:v70CandidateRows(state,'event',prompt,14),people:v70CandidateRows(state,'person',prompt,14),stores:v70CandidateRows(state,'store',prompt,14),products:v70CandidateRows(state,'product',prompt,28)};
 }
+// RAW7: Gemini no necesita los catálogos completos ni una bolsa heterogénea de coincidencias.
+// CE hace únicamente recuperación mecánica Top-K y entrega evidencia TIPADA y compacta.
+// La decisión semántica (qué tipo representa cada mención y cuál candidato usar) sigue siendo de Gemini.
+function v74TypedCandidateList(rows=[],limit=5){
+  const ranked=arr(rows).filter(Boolean),good=ranked.filter(x=>['exact','strong','fuzzy'].includes(trim(x?.match_kind))),source=good.length?good:ranked.filter(x=>Number(x?.score)>=0.72).slice(0,2),out=[],seen=new Set();
+  for(const x of source){const canonical=trim(x?.name),matched=trim(x?.matched),key=`${norm(canonical)}|${norm(matched)}`;if(!canonical||seen.has(key))continue;seen.add(key);out.push({canonical,matched,match:trim(x?.match_kind)||'weak',score:Number(x?.score)||0});if(out.length>=limit)break;}
+  return out;
+}
+function v74TypedCandidateEvidence(list=[]){
+  const rows=arr(list),exact=[...new Set(rows.filter(x=>x.match==='exact').map(x=>trim(x.matched)).filter(Boolean))],strong=[...new Set(rows.filter(x=>x.match==='strong').map(x=>trim(x.matched)).filter(Boolean))],fuzzy=[...new Set(rows.filter(x=>x.match==='fuzzy').map(x=>trim(x.matched)).filter(Boolean))];
+  return{exact_mentions:exact,strong_mentions:strong,fuzzy_mentions:fuzzy,best_score:rows.reduce((m,x)=>Math.max(m,Number(x?.score)||0),0),candidate_count:rows.length};
+}
+function v74EntityCandidatePacket(state={},prompt=''){
+  const typed={
+    PERSON:v74TypedCandidateList(v70CandidateRows(state,'person',prompt,12),5),
+    EVENT:v74TypedCandidateList(v70CandidateRows(state,'event',prompt,12),5),
+    STORE:v74TypedCandidateList(v70CandidateRows(state,'store',prompt,10),4),
+    PRODUCT:v74TypedCandidateList(v70CandidateRows(state,'product',prompt,16),6)
+  };
+  const evidence={};for(const [type,list] of Object.entries(typed))evidence[type]=v74TypedCandidateEvidence(list);
+  return{typed,evidence};
+}
 function v70KernelInstruction(state={},selectedEventId='',display='usuario'){
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'ninguno';
   return `Eres el compilador semántico de Zuzu para ControlEvent. Debes emitir EXACTAMENTE una llamada a zuzu_query_frame y nada más. El usuario es ${display}.
@@ -14093,6 +14115,16 @@ No existe un estado semántico gigante que debas reconstruir. Cada turno anterio
 - clarify: solo si existen varias referencias/candidatos materialmente plausibles.
 - reset: empieza un foco nuevo; NO borra el historial persistido.
 
+PROTOCOLO OBLIGATORIO PARA ELEGIR ENTIDADES
+Antes de emitir el JSON, resuelve las entidades en este orden mental:
+1) Decide primero el TIPO/ROL por el significado de CURRENT_USER y, solo si hace falta, por CURRENT. Los candidatos NO deciden el tipo. PERSON, EVENT, STORE y PRODUCT son mundos distintos.
+2) Una vez elegido el tipo, mira SOLO los candidatos de ese tipo. Una coincidencia de otro tipo no compite salvo que la frase admita realmente ambas lecturas.
+3) Canoniza: exact > strong > fuzzy. ENTITY_CANDIDATES_TYPED_TOPK.evidence resume cuántas menciones cubre cada tipo. Si un tipo compatible con la frase cubre todas las menciones nominales con exact/strong, NO aclares por coincidencias fuzzy de otros tipos.
+4) Si el usuario nombra varias entidades homogéneas, conserva TODAS en el array plural correspondiente. No emitas varios registros ni selecciones solo la última.
+5) El contexto reciente solo desempata candidatos del MISMO tipo o resuelve pronombres/omisiones. Nunca convierte una PERSON en EVENT, STORE o PRODUCT.
+6) KNOWN_IDENTITIES.logged_user es siempre una identidad de tipo PERSON para la conversación. No lo trates como evento, tienda o producto por semejanza de texto.
+7) Usa clarify únicamente cuando, después de elegir el tipo, quedan dos o más candidatos DEL MISMO TIPO con plausibilidad parecida y el contexto no permite escoger. En una aclaración de entidad escribe los nombres canónicos en la pregunta; candidate_refs se reserva para referencias T/H/P de historial, no para IDs opacos de catálogo.
+
 REFERENCIAS HUMANAS
 RECENT_TURNS contiene la conversación actual. HISTORY_CANDIDATES aparece cuando el usuario dice cosas como «te acuerdas», «hablamos de», «aquella conversación» o similar. Si una referencia pasada es inequívoca usa reference directamente. Si dos o más candidatos son razonablemente posibles, usa clarify y candidate_refs. Si PENDING_HISTORY_CHOICES contiene opciones porque el turno anterior pidió elegir y el usuario responde con un número/nombre, usa Pn para la opción seleccionada. No inventes un recuerdo.
 Para pronombres («él», «ella», «sus») y expresiones como «lo mismo», usa query.reuse para indicar de qué turno sale la entidad cuando resulte útil, en lugar de copiar todo el estado anterior. REGLA DE PROCEDENCIA: person/responsible/donor/product/store/event/ticket escritos como literales en query deben proceder del CURRENT_USER. Si proceden de CURRENT/RECENT_TURNS/HISTORY, exprésalos mediante reuse/from_ref; NO copies una entidad histórica como literal. Si el CURRENT_USER nombra explícitamente una entidad, esa entidad tiene autoridad y ningún reuse puede sustituirla. Si el dominio/rol gramatical ya determina el tipo de entidad, NO pidas aclaración entre tipos incompatibles: por ejemplo, en asistencia «¿Vicente fue?» busca PERSONA; no preguntes si es tienda o evento. Solo aclara entre candidatos plausibles del MISMO tipo o entre recuerdos realmente equivalentes.
@@ -14100,7 +14132,7 @@ PRIORIDAD DE CONTINUIDAD: si CURRENT ya contiene el dominio, ámbito y response_
 ANTECEDENTE INMEDIATO = MÁXIMA PRIORIDAD: CURRENT es el turno inmediatamente anterior y pesa más que RECENT_HOMOGENEOUS e HISTORY. Si CURRENT contiene un conjunto homogéneo explícito (scope.events o arrays people/responsibles/donors/products/stores) y el usuario dice «ellos», «los dos», «ambos», «esas» o «cuál de ellos» sin introducir otro tipo, se refiere a ESE conjunto de CURRENT.
 MULTIENTIDAD NATIVA: una dimensión puede llevar uno o varios valores. Usa products, people, responsibles, donors, stores, tickets o purchase_statuses. NO emitas varios zuzu_turn_record para varias entidades homogéneas: emite UNO con la lista. CE devolverá un DATASET conjunto. Si luego se comparan esas mismas entidades y CURRENT ya las contiene, usa inspect CURRENT con response_kind=compare|summary o LOCAL si solo cambia la vista; evita otra consulta.
 METEOROLOGÍA: ControlEvent dispone de Open-Meteo. Para tiempo/clima/previsión usa domain=weather, nunca una métrica weather dentro de comparison. Si el mismo turno pide un trabajo principal y además meteorología, añade query.supplements=[{domain:'weather',scope:...}].
-CONTEXTO = CANDIDATOS, NO FILTROS: CURRENT, RECENT_TURNS y RECENT_HOMOGENEOUS te dicen qué puede estar siendo referido, pero NUNCA activan por sí solos person/responsible/donor/product/event. Solo emite reuse cuando la gramática del CURRENT_USER necesita realmente esa referencia. Si el usuario formula una consulta colectiva/general («nos», «hemos», «compramos», «gastamos», «tenemos») sin volver a nombrar ni pronominalizar una persona anterior, NO heredes esa persona. Una frase paralela corta «¿Y X?» sin nuevo predicado conserva el predicado, domain, scope y response_kind inmediatamente anteriores y sustituye solo la entidad comparable por X. Si el usuario marca cambio de asunto/abandono del foco anterior, el resto de su frase manda como consulta nueva y el producto/persona/dominio anterior deja de ser candidato preferente.
+CONTEXTO = CANDIDATOS, NO FILTROS: CURRENT, RECENT_TURNS y RECENT_HOMOGENEOUS te dicen qué puede estar siendo referido, pero NUNCA activan por sí solos person/responsible/donor/product/event. ENTITY_CANDIDATES_TYPED_TOPK contiene solo un Top-K mecánico ya separado por tipo; tampoco activa nada por sí mismo. Primero decide el rol semántico y luego elige dentro de ese tipo. Solo emite reuse cuando la gramática del CURRENT_USER necesita realmente esa referencia. Si el usuario formula una consulta colectiva/general («nos», «hemos», «compramos», «gastamos», «tenemos») sin volver a nombrar ni pronominalizar una persona anterior, NO heredes esa persona. Una frase paralela corta «¿Y X?» sin nuevo predicado conserva el predicado, domain, scope y response_kind inmediatamente anteriores y sustituye solo la entidad comparable por X. Si el usuario marca cambio de asunto/abandono del foco anterior, el resto de su frase manda como consulta nueva y el producto/persona/dominio anterior deja de ser candidato preferente.
 TIPO DE RESPUESTA: la forma interrogativa manda. Preguntas sí/no («¿X fue?», «¿hay...?», «¿queda...?») usan whether. «¿quién/quiénes?» usa who; «¿qué?» usa what; «¿cuánto?» usa amount; «¿en qué evento?» usa which_event. No conviertas una pregunta whether en table por el mero hecho de que vaya a existir una tabla de apoyo.
 
 CONSULTAS
@@ -14124,13 +14156,15 @@ Cuando ya has elegido compare y el usuario dice «los dos»/«ambos», usa RECEN
 MEMORIA PASADA
 Si HISTORY_CANDIDATES contiene una conversación pasada y la referencia es inequívoca, selecciónala sin preguntar. Si es ambigua, pregunta al usuario mostrando las alternativas. Cuando recuperes una conversación pasada, ControlEvent añadirá de forma determinista el recordatorio humano de fecha/tema. No menciones JSON, herramientas, SQL ni nombres internos.`;
 }
-function v73KernelInput(userPrompt='',session={},entityCandidates={},historyCandidates=[]){
-  const current=v73CurrentSummary(session),recent=v73RecentTurnIndex(session),homogeneous=v73RecentHomogeneous(session),pending=v73PendingHistoryChoices(session),cand={events:arr(entityCandidates?.events).slice(0,8),people:arr(entityCandidates?.people).slice(0,8),stores:arr(entityCandidates?.stores).slice(0,8),products:arr(entityCandidates?.products).slice(0,12)};
+function v73KernelInput(userPrompt='',session={},entityCandidates={},historyCandidates=[],display='usuario',screenEvent=''){
+  const current=v73CurrentSummary(session),recent=v73RecentTurnIndex(session),homogeneous=v73RecentHomogeneous(session),pending=v73PendingHistoryChoices(session),cand=entityCandidates&&typeof entityCandidates==='object'?entityCandidates:{typed:{},evidence:{}};
   const hist=arr(historyCandidates).map(x=>({ref:x.ref,conversation_id:x.conversation_id,turn_id:x.turn_id,seq:x.seq,created_at:x.created_at,prompt:trim(x.prompt).slice(0,220),title:trim(x.title).slice(0,140),domain:x.domain,scope:x.scope,focus:x.focus,semantic:x.semantic_tags||{},row_count:x.row_count,summary:trim(x.summary).slice(0,180),score:x.score,same_conversation:x.same_conversation}));
-  return`CURRENT_USER:\n${trim(userPrompt)}\n\nCURRENT:\n${JSON.stringify(current)}\n\nRECENT_TURNS:\n${JSON.stringify(recent)}\n\nRECENT_HOMOGENEOUS:\n${JSON.stringify(homogeneous)}\n\nPENDING_HISTORY_CHOICES:\n${JSON.stringify(pending)}\n\nHISTORY_CANDIDATES:\n${JSON.stringify(hist)}\n\nENTITY_CANDIDATES:\n${JSON.stringify(cand)}`;
+  const known={logged_user:{type:'PERSON',canonical:trim(display)||'usuario'},screen_event:trim(screenEvent)?{type:'EVENT',canonical:trim(screenEvent),ambient_only:true}:null};
+  return`CURRENT_USER:\n${trim(userPrompt)}\n\nKNOWN_IDENTITIES:\n${JSON.stringify(known)}\n\nCURRENT:\n${JSON.stringify(current)}\n\nRECENT_TURNS:\n${JSON.stringify(recent)}\n\nRECENT_HOMOGENEOUS:\n${JSON.stringify(homogeneous)}\n\nPENDING_HISTORY_CHOICES:\n${JSON.stringify(pending)}\n\nHISTORY_CANDIDATES:\n${JSON.stringify(hist)}\n\nENTITY_CANDIDATES_TYPED_TOPK:\n${JSON.stringify(cand)}`;
 }
+
 async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal}){
-  const instruction=v73KernelInstruction(state,selectedEventId,display),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates),tool=v73TurnTool();let model=policy.model,payload;
+  const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'',instruction=v73KernelInstruction(state,selectedEventId,display),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates,display,screen),tool=v73TurnTool();let model=policy.model,payload;
   const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools:[tool],flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_turn_record']}},externalSignal,maxCalls:1,maxOutputTokens:1650});
   try{payload=await call('v3_0_exp · Ledger · IA interpreta',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Lite no emitió JSON utilizable (${cleanGeminiError(error)}). Flash recibe exactamente la misma petición; no hay reparación semántica.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash interpreta',model);}else{error._ceOrigin='gemini';throw error;}}
   const calls=v261FunctionCalls(payload).filter(c=>trim(c?.name)==='zuzu_turn_record');if(!calls.length){const e=new Error('Gemini no emitió zuzu_turn_record.');e._ceOrigin='gemini';throw e;}if(calls.length>1)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · protocolo','WARN',`Gemini emitió ${calls.length} registros en un turno; se conserva literalmente el último y no se hace reparación.`);
@@ -14559,10 +14593,11 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const display=zuzuLoggedUserDisplayName({usuarioLogado:actor});
   const conversation=await ensureZuzuConversation({conversationId,actor,selectedEventId});
   const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:false,recentLimit:80});
-  const entityCandidates=v70EntityCandidates(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session),usePending=v73IsPendingHistoryChoiceReply(userPrompt,pendingHistory);
+  const entityCandidates=v74EntityCandidatePacket(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session),usePending=v73IsPendingHistoryChoiceReply(userPrompt,pendingHistory);
   const historyCandidates=usePending?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v3_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
+  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW7','INFO',JSON.stringify(entityCandidates).slice(0,2800));
 
   let compiled;
   try{compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal});}
@@ -14674,7 +14709,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],baseCharts=weatherSupplement?[]:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromResult({title:savedView?.title||title,tables:v73TableFromBundle(pseudo)}):(ws?v72ChartFromWorking(ws,flowTrace):[]));visibleCharts=v73ApplyRequestedChartType(weatherCharts.length?weatherCharts:baseCharts,artifactIntent);for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0];if(a&&!visibleCharts.some(x=>trim(x?.title)===trim(a?.title)))visibleCharts.push(a);}}
   zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Gemini decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW6 · ENTIDADES ROBUSTAS + MULTIENTIDAD + METEO',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW7 · COMPILADOR SEMÁNTICO TIPADO',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
