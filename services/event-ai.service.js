@@ -14224,6 +14224,9 @@ CONTRATO DE PRESENTACIÓN
 - Devuelve SIEMPRE dos redacciones distintas del mismo resultado factual: written_answer para pantalla y spoken_answer para voz.
 - written_answer debe ser una respuesta bien escrita, natural y agradable de leer. Contesta primero a lo preguntado. Usa párrafos claros; si el usuario pide prosa, NO uses listas ni viñetas. Si pide brevedad, sé breve. No vuelques filas masivas dentro del texto.
 - spoken_answer está pensado para ser ESCUCHADO: normalmente 1 a 4 frases, sin Markdown, sin tablas, sin enumeraciones largas y sin leer cifras o filas una a una. Debe sonar como conversación real y conservar la conclusión útil de written_answer.
+- MAGNITUDES Y UNIDADES: conserva el significado físico/económico de cada cifra. Los importes monetarios (importe, precio, gasto, compra valorada, ingreso monetario, ingreso pendiente en dinero, donación valorada, saldo, valoración, coste, total monetario y métricas con role=amount) se expresan SIEMPRE en euros en written_answer y spoken_answer. En pantalla usa formato español legible, por ejemplo 1.924 € o 80,37 €; al hablar di «mil novecientos veinticuatro euros» u «ochenta euros con treinta y siete céntimos», de forma natural.
+- Las cantidades físicas NO son euros. Los campos Unidades/cantidad/units se expresan como «unidades» (por ejemplo, «72 unidades»). Los recuentos se nombran según lo que cuentan: eventos, personas, registros, tickets, cuotas, asistentes, etc. No añadas € a un conteo. Porcentajes usan %, temperaturas °C, viento km/h y demás magnitudes conservan su unidad propia cuando RESULTADO_CE la aporta.
+- Si una cifra es ambigua, usa el nombre del campo/metric_role para decidir su magnitud; NO inventes una unidad. La palabra «unidades» del almacenamiento interno nunca sustituye «euros» cuando el dato semánticamente es dinero.
 - presentation decide los artefactos visuales adicionales. table=true cuando una tabla aporta valor real o el usuario la ha pedido. chart=true cuando una gráfica aporta valor real o el usuario la ha pedido. Elige chart_type adecuado; usa none si chart=false.
 - Si table o chart son true, NO dupliques en written_answer las filas o puntos completos: explica la conclusión y deja el detalle al artefacto de ControlEvent.
 - NO vuelvas a decidir otra consulta, NO corrijas el plan anterior y NO pidas herramientas.
@@ -14251,7 +14254,8 @@ async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,d
     gemini_plan_raw:v73CompactFinalValue(rawPlan||{}),
     plan_executed:v73CompactFinalValue(plan||{}),
     resultado_ce:{status,execution:v73RawFinalExecution(execution),dataset:v73RawFinalDataset(activeDataset,activeView,plan),reference_snapshot:reference},
-    recent_conversation:v73RawFinalRecentTurns(session)
+    recent_conversation:v73RawFinalRecentTurns(session),
+    measurement_semantics:{currency:'EUR para amount/importe/precio/gasto/ingreso monetario/donación valorada/saldo/valoración/coste',quantity:'Unidades para units/unidades/cantidad física',counts:'Nombrar la entidad contada: eventos/personas/registros/tickets/cuotas/asistentes',weather:'°C / km/h / % / mm según el campo'}
   };
   const finalTool=v73FinalPresentationTool();
   const payload=await v261CallInteraction({input:`PREGUNTA Y RESULTADO REAL DEL TURNO:\n${JSON.stringify(packet)}`,previousInteractionId:'',model,systemInstruction:v73RawFinalInstruction(),tools:[finalTool],flowTrace,stage:'v3_0_exp · PRESENTACIÓN · Gemini redacta pantalla + voz',toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_final_presentation']}},externalSignal,maxCalls:2,maxOutputTokens:1800});
