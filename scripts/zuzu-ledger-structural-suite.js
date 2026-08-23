@@ -16,6 +16,7 @@ eq(plan,{action:'query',query:{domain:'purchases',scope:{kind:'all_events'},prod
 plan=v73NormalizePlan({action:'query',query:{domain:'purchases',scope:{kind:'named_event',event:'SySA 2026'},person:'Vicente'}});
 ok(!('store' in plan.query)&&!('donor' in plan.query)&&!('ticket' in plan.query),'QUERY no arrastra campos vacíos');
 eq(v73NormalizeScope({kind:'named_events',events:['A','B']}),{kind:'named_events',events:['A','B']},'Scope named_events disperso');
+eq(v73NormalizeScope({kind:'named_events',event:'SySA 2026'}),{kind:'named_events',events:['SySA 2026']},'Scope named_events acepta singleton event del contrato Gemini');
 
 // 2) Producto: si existe producto, el modo nunca cae a none por omisión.
 plan=v73NormalizePlan({action:'query',query:{domain:'purchases',scope:{kind:'all_events'},product:{text:'PAN'}}});

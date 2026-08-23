@@ -13909,7 +13909,7 @@ function v73TurnTool(){
 function v73NormalizeScope(raw={}){
   const kind=['screen_event','named_event','named_events','event_series','all_events','year','latest_events'].includes(trim(raw?.kind))?trim(raw.kind):'';
   const out={kind};if(kind==='named_event'&&trim(raw?.event))out.event=trim(raw.event);
-  else if(kind==='named_events'){const events=arr(raw?.events).map(trim).filter(Boolean).slice(0,40);if(events.length)out.events=events;}
+  else if(kind==='named_events'){const events=arr(raw?.events).map(trim).filter(Boolean).slice(0,40);const single=trim(raw?.event);if(events.length)out.events=events;else if(single)out.events=[single];}
   else if(kind==='event_series'&&trim(raw?.series))out.series=trim(raw.series);
   else if(kind==='year'&&Number.isFinite(Number(raw?.year)))out.year=Math.trunc(Number(raw.year));
   else if(kind==='latest_events'){if(raw?.count!=null)out.count=Math.max(1,Math.min(100,Number(raw.count)||1));if(['newest','oldest'].includes(trim(raw?.order)))out.order=trim(raw.order);}

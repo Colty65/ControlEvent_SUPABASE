@@ -8,10 +8,15 @@ const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8')
 const tests=[];function c(n,v){tests.push([n,!!v]);console.log(`${v?'OK':'KO'} ${n}`);}
 c('Excel conserva oracle estructural en cases',/mode:'FULL-CERT',oracle:x\.oracle/.test(ui));
 c('Replay contract Excel v4',/replayContractVersion:ITV_CONTRACT_VERSION/.test(ui)&&/const ITV_CONTRACT_VERSION=4;/.test(ui));
-c('Nombre ITV usa prefijo runtime normalizado',/a\.download=`\$\{itvFilePrefix\(\)\}_ITV_Zuzu_/.test(ui));
+c('Nombre ITV usa prefijo runtime normalizado',/downloadName=`\$\{itvFilePrefix\(\)\}_ITV_Zuzu_/.test(ui)&&/a\.download=downloadName/.test(ui));
 c('Normalizador colapsa _exp repetidos',/replace\(\/\(\?:_exp\)\{2,\}\/ig,'_exp'\)/.test(ui));
 c('JSON exportado firma contrato y build ITV',/itvContractVersion:ITV_CONTRACT_VERSION,itvBuild:ITV_BUILD/.test(ui));
-c('Index fuerza carga de la build ITV4 actual',/zuzu-test-console-gd\.js\?v=20260823-ITV4-CERT1/.test(index)&&/controlevent-itv-build\" content=\"20260823-ITV4-CERT1/.test(index));
+c('Replay exacto rechaza contrato histórico distinto',/savedContract!==ITV_CONTRACT_VERSION/.test(ui));
+c('Index captura click nativo antes de hardlocks legacy',/__CE_NATIVE_ANCHOR_CLICK__=HTMLAnchorElement\.prototype\.click/.test(index));
+c('Descarga ITV usa click nativo y evita wrappers legacy',/nativeClick=window\.__CE_NATIVE_ANCHOR_CLICK__/.test(ui)&&/nativeClick\.call\(a\)/.test(ui));
+c('JSON declara contrato real de la batería',/batteryReplayContractVersion:num\(preview\?\.replayContractVersion\)\|\|0/.test(ui));
+c('Index fuerza carga de la build ITV4 actual',/zuzu-test-console-gd\.js\?v=20260823-ITV4-CERT2/.test(index)&&/controlevent-itv-build\" content=\"20260823-ITV4-CERT2/.test(index));
+c('named_events conserva event singleton como events[]',/kind==='named_events'[\s\S]{0,220}const single=trim\(raw\?\.event\)[\s\S]{0,120}out\.events=\[single\]/.test(svc));
 c('Gemini recibe regla contexto candidatos no filtros',/CONTEXTO = CANDIDATOS, NO FILTROS/.test(svc));
 c('Gemini recibe regla respuesta por forma interrogativa',/TIPO DE RESPUESTA: la forma interrogativa manda/.test(svc));
 c('Compare person tiene ejecutor tipado',/function v73ExecuteResolvedQuery[\s\S]*comparison[\s\S]*Comparativa de personas/.test(svc));
