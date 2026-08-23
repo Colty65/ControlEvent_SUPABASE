@@ -8348,7 +8348,7 @@ async function v261ExecuteAgentTool(call,state,selectedEventId,flowTrace=[]){
   return v26ExecuteTool(tool,state,selectedEventId);
 }
 
-async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto',externalSignal=null,maxOutputTokens=0,maxCalls=2}){
+async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto',externalSignal=null,maxOutputTokens=0,maxCalls=2,responseSchema=null}){
   const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para Zuzu.');e.status=503;throw e;}
   // v3_0_exp · calidad conversacional antes que microahorro: un turno con herramientas necesita
   // poder completar su segunda Interaction. Mantenemos normalmente máximo 2 llamadas exitosas por turno; una gráfica bancaria puede necesitar una tercera Interaction para materializarse, pero
@@ -8368,7 +8368,7 @@ async function v261CallInteraction({input,previousInteractionId='',model,systemI
   // respaldo Flash. Para Lite solo fijamos el límite de salida; Flash conserva el nivel configurado.
   const generationConfig={max_output_tokens:maxOutput};
   if(!/^gemini-2\.5-flash-lite(?:$|-)/i.test(trim(model))){generationConfig.thinking_level=thinkingLevel;generationConfig.thinking_summaries='none';}
-  const body={model,input,system_instruction:systemInstruction,response_format:{type:'text',mime_type:'application/json',schema:v261FinalSchema()},generation_config:generationConfig,store:true};
+  const body={model,input,system_instruction:systemInstruction,response_format:{type:'text',mime_type:'application/json',schema:responseSchema||v261FinalSchema()},generation_config:generationConfig,store:true};
   if(arr(tools).length){body.tools=tools;generationConfig.tool_choice=toolChoice;}
   if(trim(previousInteractionId))body.previous_interaction_id=trim(previousInteractionId);
   const url='https://generativelanguage.googleapis.com/v1/interactions';
@@ -13141,7 +13141,7 @@ function v70KernelInput(userPrompt='',history=[],memory={},candidates={}){
 function v70NormalizeFrame(raw={}){
   const allowedModes=new Set(['query','transform','inspect','reset','clarify','answer']),allowedDomains=new Set(['inherit','products','purchases','donations','events','event_summary','people','person','stores','catalog_products','catalog_stores','catalog_people','bank','bank_timeline','documentation','management','weather','comparison','conversation']);
   const mode=allowedModes.has(trim(raw?.mode))?trim(raw.mode):'answer',domain=allowedDomains.has(trim(raw?.domain))?trim(raw.domain):'conversation',scope=raw?.scope&&typeof raw.scope==='object'?raw.scope:{},filters=raw?.filters&&typeof raw.filters==='object'?raw.filters:{},transform=raw?.transform&&typeof raw.transform==='object'?raw.transform:{},presentation=raw?.presentation&&typeof raw.presentation==='object'?raw.presentation:{};
-  return{mode,domain,source:['auto','fresh','last_view'].includes(trim(raw?.source))?trim(raw.source):'auto',granularity:trim(raw?.granularity)||'inherit',scope:{kind:trim(scope.kind)||'inherit',event:trim(scope.event),events:arr(scope.events).map(trim).filter(Boolean).slice(0,30),year:scope.year==null?null:Number(scope.year),count:scope.count==null?null:Math.max(1,Math.min(100,Number(scope.count)||1)),order:trim(scope.order)||'newest',base:trim(scope.base)||'all'},filters:{product_text:trim(filters.product_text),product_mode:trim(filters.product_mode)||'none',resolved_products:arr(filters.resolved_products).map(trim).filter(Boolean).slice(0,60),store:trim(filters.store),donor:trim(filters.donor),donor_type:trim(filters.donor_type)||'auto',person:trim(filters.person),responsible:trim(filters.responsible),ticket:trim(filters.ticket),purchase_status:trim(filters.purchase_status),event_status:trim(filters.event_status),inherit_filters:filters.inherit_filters===true,reset_filters:filters.reset_filters===true},transform:{navigation:trim(transform.navigation)||'none',view_filters:arr(transform.view_filters).map(x=>({field:trim(x?.field),value:trim(x?.value),match_mode:['exact','word','contains','semantic'].includes(trim(x?.match_mode))?trim(x.match_mode):'exact'})).filter(x=>x.field&&x.value).slice(0,12),project:arr(transform.project).map(trim).filter(Boolean).slice(0,20),sort:arr(transform.sort).map(x=>({field:trim(x?.field),direction:trim(x?.direction)==='desc'?'desc':'asc'})).filter(x=>x.field).slice(0,6),group_by:arr(transform.group_by).map(trim).filter(Boolean).slice(0,6),metrics:arr(transform.metrics).map(trim).filter(Boolean).slice(0,12),row_limit:transform.row_limit==null?null:Math.max(1,Math.min(10000,Number(transform.row_limit)||1))},presentation:{table:presentation.table!==false,summary:presentation.summary!==false,reasoned:presentation.reasoned===true,chart:presentation.chart===true,exhaustive:presentation.exhaustive===true},freshness:['auto','fresh','cache'].includes(trim(raw?.freshness))?trim(raw.freshness):'auto',pending:raw?.pending&&typeof raw.pending==='object'?{topic:trim(raw.pending.topic),question:trim(raw.pending.question),choices:arr(raw.pending.choices).map(trim).filter(Boolean).slice(0,8)}:null,reply:trim(raw?.reply).slice(0,1200)};
+  return{mode,domain,source:['auto','fresh','last_view'].includes(trim(raw?.source))?trim(raw.source):'auto',granularity:trim(raw?.granularity)||'inherit',scope:{kind:trim(scope.kind)||'inherit',event:trim(scope.event),events:arr(scope.events).map(trim).filter(Boolean).slice(0,30),year:scope.year==null?null:Number(scope.year),count:scope.count==null?null:Math.max(1,Math.min(100,Number(scope.count)||1)),order:trim(scope.order)||'newest',base:trim(scope.base)||'all'},filters:{product_text:trim(filters.product_text),product_mode:trim(filters.product_mode)||'none',resolved_products:arr(filters.resolved_products).map(trim).filter(Boolean).slice(0,60),store:trim(filters.store),donor:trim(filters.donor),donor_type:trim(filters.donor_type)||'auto',person:trim(filters.person),responsible:trim(filters.responsible),ticket:trim(filters.ticket),purchase_status:trim(filters.purchase_status),event_status:trim(filters.event_status),inherit_filters:filters.inherit_filters===true,reset_filters:filters.reset_filters===true},transform:{navigation:trim(transform.navigation)||'none',view_filters:arr(transform.view_filters).map(x=>({field:trim(x?.field),value:trim(x?.value),match_mode:['exact','word','contains','semantic'].includes(trim(x?.match_mode))?trim(x.match_mode):'exact'})).filter(x=>x.field&&x.value).slice(0,12),project:arr(transform.project).map(trim).filter(Boolean).slice(0,20),sort:arr(transform.sort).map(x=>({field:trim(x?.field),direction:trim(x?.direction)==='desc'?'desc':'asc'})).filter(x=>x.field).slice(0,6),group_by:arr(transform.group_by).map(trim).filter(Boolean).slice(0,6),metrics:arr(transform.metrics).map(trim).filter(Boolean).slice(0,12),row_limit:transform.row_limit==null?null:Math.max(1,Math.min(10000,Number(transform.row_limit)||1))},presentation:{table:presentation.table!==false,summary:presentation.summary!==false,reasoned:presentation.reasoned===true,chart:presentation.chart===true,chart_type:['bar','line','pie','donut','horizontalBar'].includes(trim(presentation.chart_type))?trim(presentation.chart_type):'',exhaustive:presentation.exhaustive===true},freshness:['auto','fresh','cache'].includes(trim(raw?.freshness))?trim(raw.freshness):'auto',pending:raw?.pending&&typeof raw.pending==='object'?{topic:trim(raw.pending.topic),question:trim(raw.pending.question),choices:arr(raw.pending.choices).map(trim).filter(Boolean).slice(0,8)}:null,reply:trim(raw?.reply).slice(0,1200)};
 }
 function v70MeaningfulFilter(f={}){return !!(trim(f.product_text)||arr(f.resolved_products).length||trim(f.store)||trim(f.donor)||trim(f.person)||trim(f.responsible)||trim(f.ticket)||trim(f.purchase_status)||trim(f.event_status));}
 function v70MergeCurrentFrame(frame={},memory={}){
@@ -13894,9 +13894,9 @@ function v73TurnTool(){
   const scope={type:'object',properties:{kind:{type:'string',enum:['screen_event','named_event','named_events','event_series','all_events','year','latest_events']},event:{type:'string'},events:{type:'array',items:{type:'string'}},series:{type:'string'},year:{type:'integer'},count:{type:'integer'},order:{type:'string',enum:['newest','oldest']}},required:['kind']};
   const product={type:'object',properties:{text:{type:'string'},match:{type:'string',enum:['exact','family','semantic']}},required:['text','match']};
   const fields={type:'object',properties:{mode:{type:'string',enum:['all','only']},values:{type:'array',items:{type:'string'}}},required:['mode']};
-  const presentation={type:'object',properties:{table:{type:'boolean'},summary:{type:'boolean'},chart:{type:'boolean'}}};
+  const presentation={type:'object',properties:{table:{type:'boolean'},summary:{type:'boolean'},chart:{type:'boolean'},chart_type:{type:'string',enum:['bar','line','pie','donut','horizontalBar']}}};
   const reuse={type:'array',items:{type:'object',properties:{entity:{type:'string',enum:['person','responsible','donor','product','store','event','ticket']},from_ref:{type:'string'},source_field:{type:'string'}},required:['entity','from_ref']}};
-  const operation={type:'object',properties:{type:{type:'string',enum:['set_fields','add_field','add_fields','remove_field','remove_fields','show_all_fields','sort','filter','group','rank','compare','limit','chart']},field:{type:'string'},group_field:{type:'string'},group_role:{type:'string',enum:['person','responsible','donor','product','event','store','ticket']},metric:{type:'string'},metric_role:{type:'string',enum:['amount','units','count']},reference:{type:'string'},values:{type:'array',items:{type:'string'}},fields:{type:'array',items:{type:'string'}},value:{type:'string'},operator:{type:'string',enum:['eq','neq','gt','gte','lt','lte']},match_mode:{type:'string',enum:['exact','word','contains','semantic']},direction:{type:'string',enum:['asc','desc']},placement:{type:'string',enum:['first','last']},metrics:{type:'array',items:{type:'string'}},limit:{type:'integer'}},required:['type']};
+  const operation={type:'object',properties:{type:{type:'string',enum:['set_fields','add_field','add_fields','remove_field','remove_fields','show_all_fields','sort','filter','group','rank','compare','limit','chart']},field:{type:'string'},group_field:{type:'string'},group_role:{type:'string',enum:['person','responsible','donor','product','event','store','ticket']},metric:{type:'string'},metric_role:{type:'string',enum:['amount','units','count']},reference:{type:'string'},values:{type:'array',items:{type:'string'}},fields:{type:'array',items:{type:'string'}},value:{type:'string'},operator:{type:'string',enum:['eq','neq','gt','gte','lt','lte']},match_mode:{type:'string',enum:['exact','word','contains','semantic']},direction:{type:'string',enum:['asc','desc']},placement:{type:'string',enum:['first','last']},metrics:{type:'array',items:{type:'string'}},limit:{type:'integer'},chart_type:{type:'string',enum:['bar','line','pie','donut','horizontalBar']}},required:['type']};
   const query={type:'object',properties:{domain:{type:'string',enum:['products','purchases','donations','events','event_summary','people','person','stores','catalog_products','catalog_stores','catalog_people','bank','bank_timeline','documentation','management','weather','comparison']},scope,product,person:{type:'string'},responsible:{type:'string'},donor:{type:'string'},store:{type:'string'},ticket:{type:'string'},purchase_status:{type:'string'},fields,presentation,reuse,operations:{type:'array',items:operation}},required:['domain','scope']};
   const local={type:'object',properties:{from_ref:{type:'string'},operations:{type:'array',items:operation}},required:['from_ref','operations']};
   const change={type:'object',properties:{type:{type:'string',enum:['replace_scope','set_fields','add_field','remove_field']},scope,fields:{type:'array',items:{type:'string'}},field:{type:'string'}},required:['type']};
@@ -13936,6 +13936,7 @@ function v73NormalizeOperations(raw=[]){
     if(type==='rank'){if(trim(x?.group_field))op.group_field=trim(x.group_field);if(['person','responsible','donor','product','event','store','ticket'].includes(trim(x?.group_role)))op.group_role=trim(x.group_role);if(trim(x?.metric))op.metric=trim(x.metric);if(['amount','units','count'].includes(trim(x?.metric_role)))op.metric_role=trim(x.metric_role);if(trim(x?.reference))op.reference=trim(x.reference);if(['gt','gte','lt','lte','eq','neq'].includes(trim(x?.operator)))op.operator=trim(x.operator);if(['asc','desc'].includes(trim(x?.direction)))op.direction=trim(x.direction);if(x?.limit!=null)op.limit=Math.max(1,Math.min(10000,Number(x.limit)||1));}
     if(type==='compare'){if(trim(x?.group_field))op.group_field=trim(x.group_field);if(['person','responsible','donor','product','event','store','ticket'].includes(trim(x?.group_role)))op.group_role=trim(x.group_role);if(trim(x?.metric))op.metric=trim(x.metric);if(['amount','units','count'].includes(trim(x?.metric_role)))op.metric_role=trim(x.metric_role);const values=arr(x?.values).map(trim).filter(Boolean).slice(0,12);if(values.length)op.values=values;}
     if(type==='limit'&&x?.limit!=null)op.limit=Math.max(1,Math.min(10000,Number(x.limit)||1));
+    if(type==='chart'&&['bar','line','pie','donut','horizontalBar'].includes(trim(x?.chart_type)))op.chart_type=trim(x.chart_type);
     ops.push(op);
   }
   return ops;
@@ -13982,7 +13983,7 @@ function v73NormalizePlan(raw={}){
     if(p&&trim(p.text))out.query.product={text:trim(p.text),match:['exact','family','semantic'].includes(trim(p.match))?trim(p.match):'semantic'};
     for(const k of ['person','responsible','donor','store','ticket','purchase_status'])if(trim(q?.[k]))out.query[k]=trim(q[k]);
     if(f){const mode=trim(f.mode)==='only'?'only':'all';out.query.fields={mode};if(mode==='only'){const values=arr(f.values).map(trim).filter(Boolean).slice(0,24);if(values.length)out.query.fields.values=values;}}
-    if(pres){const compact={};if(pres.table===false)compact.table=false;if(pres.summary===false)compact.summary=false;if(pres.chart===true)compact.chart=true;if(Object.keys(compact).length)out.query.presentation=compact;}
+    if(pres){const compact={};if(typeof pres.table==='boolean')compact.table=pres.table;if(typeof pres.summary==='boolean')compact.summary=pres.summary;if(typeof pres.chart==='boolean')compact.chart=pres.chart;if(['bar','line','pie','donut','horizontalBar'].includes(trim(pres.chart_type)))compact.chart_type=trim(pres.chart_type);if(Object.keys(compact).length)out.query.presentation=compact;}
     const reuse=arr(q.reuse).map(x=>{const y={entity:trim(x?.entity),from_ref:trim(x?.from_ref)};if(trim(x?.source_field))y.source_field=trim(x.source_field);return y;}).filter(x=>x.entity&&x.from_ref).slice(0,8);if(reuse.length)out.query.reuse=reuse;
     const queryOps=v73NormalizeOperations(q.operations);if(queryOps.length)out.query.operations=queryOps;
   }else if(action==='local'){
@@ -13991,10 +13992,21 @@ function v73NormalizePlan(raw={}){
   }else if(action==='reference'){
     const r=raw?.reference&&typeof raw.reference==='object'?raw.reference:{},changes=[];
     for(const x of arr(r.changes).slice(0,10)){const type=trim(x?.type);if(!type)continue;const ch={type};if(type==='replace_scope'&&x?.scope)ch.scope=v73NormalizeScope(x.scope);else if(type==='set_fields'){const fields=arr(x?.fields).map(trim).filter(Boolean).slice(0,24);if(fields.length)ch.fields=fields;}else if(['add_field','remove_field'].includes(type)&&trim(x?.field))ch.field=trim(x.field);changes.push(ch);}
-    out.reference={target_ref:trim(r.target_ref),action:trim(r.action)==='reexecute_plan'?'reexecute_plan':'restore_snapshot'};if(changes.length)out.reference.changes=changes;
+    out.reference={target_ref:trim(r.target_ref),action:['restore_snapshot','reexecute_plan'].includes(trim(r.action))?trim(r.action):''};if(changes.length)out.reference.changes=changes;
   }else if(action==='inspect')out.inspect={target_ref:trim(raw?.inspect?.target_ref)||'CURRENT',kind:trim(raw?.inspect?.kind)==='conversation_summary'?'conversation_summary':'current'};
   else if(action==='clarify'){out.clarify={question:trim(raw?.clarify?.question)};const refs=arr(raw?.clarify?.candidate_refs).map(trim).filter(Boolean).slice(0,8);if(refs.length)out.clarify.candidate_refs=refs;}
   if(trim(raw?.reply))out.reply=trim(raw.reply).slice(0,1800);return out;
+}
+function v73ProtocolViolation(raw={},plan={}){
+  const action=trim(raw?.action),bodies=['query','local','reference','inspect','clarify'].filter(k=>raw?.[k]!=null),wrong=bodies.filter(k=>k!==action);
+  if(!['query','local','reference','inspect','conversation','clarify','reset'].includes(action))return`action inválida o ausente: «${action||'—'}».`;
+  if(wrong.length)return`action=${action} contiene bloques de otra acción (${wrong.join(', ')}). CE no los trasladará ni reparará.`;
+  if(action==='query'){if(!raw?.query||typeof raw.query!=='object')return'QUERY sin bloque query.';if(!trim(raw.query.domain))return'QUERY sin domain.';if(!raw.query.scope||typeof raw.query.scope!=='object'||!trim(raw.query.scope.kind))return'QUERY sin scope explícito.';}
+  if(action==='local'){if(!raw?.local||typeof raw.local!=='object')return'LOCAL sin bloque local.';if(!trim(raw.local.from_ref))return'LOCAL sin from_ref.';if(!arr(raw.local.operations).length)return'LOCAL sin operations. CE no convertirá otro bloque en operación local.';}
+  if(action==='reference'){if(!raw?.reference||typeof raw.reference!=='object')return'REFERENCE sin bloque reference.';if(!trim(raw.reference.target_ref))return'REFERENCE sin target_ref.';if(!['restore_snapshot','reexecute_plan'].includes(trim(raw.reference.action)))return'REFERENCE sin action válida.';}
+  if(action==='inspect'&&(!raw?.inspect||typeof raw.inspect!=='object'))return'INSPECT sin bloque inspect.';
+  if(action==='clarify'&&(!raw?.clarify||typeof raw.clarify!=='object'||!trim(raw.clarify.question)))return'CLARIFY sin question.';
+  return'';
 }
 function v73RecentDistinctEntities(session={},role='person',limit=2){
   const out=[],seen=new Set(),want=trim(role);for(const t of arr(session?.recentTurns).slice().reverse()){
@@ -14055,6 +14067,9 @@ function v73KernelInstruction(state={},selectedEventId='',display='usuario'){
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'ninguno';
   return`Eres el intérprete semántico de Zuzu para ControlEvent. Emite EXACTAMENTE una llamada a zuzu_turn_record y nada más. El usuario es ${display}.
 
+CONTRATO ESTRUCTURAL ESTRICTO
+Cada action usa EXCLUSIVAMENTE su bloque homónimo. action=query => query; action=local => local; action=reference => reference; action=inspect => inspect; action=clarify => clarify. NUNCA pongas query dentro de action=local o action=reference, ni local/reference dentro de action=query. LOCAL exige from_ref y al menos una operation. REFERENCE exige target_ref y action=restore_snapshot|reexecute_plan. Si necesitas cambiar el scope de un resultado anterior, usa REFERENCE reexecute_plan + changes.replace_scope. Si solo agrupas/ordenas/filtras/retocas columnas del resultado visible, usa LOCAL + operations. ControlEvent NO corregirá una estructura cruzada: el error quedará visible.
+
 MODELO DE CONVERSACIÓN
 No existe un estado semántico gigante que debas reconstruir. Cada turno anterior es un registro INMUTABLE referenciable por Tn, CURRENT, Hn o Pn. El mensaje actual manda.
 - query: necesita datos nuevos. Incluye SOLO los datos necesarios para esa consulta. No rellenes campos vacíos ni arrastres entidades antiguas.
@@ -14073,7 +14088,7 @@ CONTEXTO = CANDIDATOS, NO FILTROS: CURRENT, RECENT_TURNS y RECENT_HOMOGENEOUS te
 TIPO DE RESPUESTA: la forma interrogativa manda. Preguntas sí/no («¿X fue?», «¿hay...?», «¿queda...?») usan whether. «¿quién/quiénes?» usa who; «¿qué?» usa what; «¿cuánto?» usa amount; «¿en qué evento?» usa which_event. No conviertas una pregunta whether en table por el mero hecho de que vaya a existir una tabla de apoyo.
 
 CONSULTAS
-products=productos agregados; purchases=líneas físicas de compra; donations=donaciones; person=dossier transversal de UNA persona; event_summary=dossier de UN evento; people=asistencia/listado de personas DENTRO DE UN ÚNICO evento; catalog_people=catálogo global de personas; comparison=comparación tipada. CAPACIDADES: person admite all_events o named_event; people necesita un único evento (screen_event o named_event) y NO debe usarse con all_events; catalog_people sirve para listados/catálogos globales, no para explicar la actividad de una persona concreta. Para comparar EVENTOS usa comparison + group_role=event; para comparar PERSONAS usa comparison + group_role=person + values explícitos y CE obedecerá esa dimensión, sin convertir personas en eventos. Para preguntas amplias sobre una persona concreta («qué fue de X», «háblame de X», «qué sabes de X», si puso dinero, compró o donó), usa person porque su dossier reúne dimensiones personales y puede buscar en todos los eventos; no uses people solo porque la palabra sea una persona ni heredes purchases porque el turno anterior tratase de compras. El dossier de evento/event_summary expone ingresos recibidos/pendientes y personas con ingreso pendiente: preguntas del tipo «¿queda gente por pagar?», «¿quién está pendiente de ingreso?» pertenecen al estado económico del evento, NO a purchases ni a una persona literal llamada «gente». TODA query debe incluir scope explícito. El evento visible «${screen}» es solo ambiente: usa screen_event únicamente si el usuario dice «este evento», «el actual» o equivalente. Si pregunta por una persona/producto sin mencionar evento ni referirse al visible, usa all_events. Si nombra un evento, usa named_event; si enumera varios, named_events.
+products=productos agregados; purchases=líneas físicas de compra; donations=donaciones; person=dossier transversal de UNA persona; event_summary=dossier de UN evento; people=asistencia/listado de personas DENTRO DE UN ÚNICO evento; catalog_people=catálogo global de personas; comparison=comparación tipada. Una expresión colectiva de categoría (por ejemplo socios, asistentes o socios canónicos) NO es el nombre literal de una persona: para catálogo global usa catalog_people y para asistencia de un evento usa people. Una pregunta amplia por el estado de un evento nombrado (cómo va, situación general, resumen del evento, datos importantes) usa event_summary y NO hereda la persona/dominio del turno anterior. Si el usuario enumera varias personas para un resumen o comparación conjunta, conserva TODAS en comparison + group_role=person + values; nunca elijas solo la última. CAPACIDADES: person admite all_events o named_event; people necesita un único evento (screen_event o named_event) y NO debe usarse con all_events; catalog_people sirve para listados/catálogos globales, no para explicar la actividad de una persona concreta. Para comparar EVENTOS usa comparison + group_role=event; para comparar PERSONAS usa comparison + group_role=person + values explícitos y CE obedecerá esa dimensión, sin convertir personas en eventos. Para preguntas amplias sobre una persona concreta («qué fue de X», «háblame de X», «qué sabes de X», si puso dinero, compró o donó), usa person porque su dossier reúne dimensiones personales y puede buscar en todos los eventos; no uses people solo porque la palabra sea una persona ni heredes purchases porque el turno anterior tratase de compras. El dossier de evento/event_summary expone ingresos recibidos/pendientes y personas con ingreso pendiente: preguntas del tipo «¿queda gente por pagar?», «¿quién está pendiente de ingreso?» pertenecen al estado económico del evento, NO a purchases ni a una persona literal llamada «gente». TODA query debe incluir scope explícito. El evento visible «${screen}» es solo ambiente: usa screen_event únicamente si el usuario dice «este evento», «el actual» o equivalente. Si pregunta por una persona/producto sin mencionar evento ni referirse al visible, usa all_events. Si nombra un evento, usa named_event; si enumera varios, named_events.
 Un término de producto genérico se expresa con query.product {text,match}. family para familia léxica; exact para producto exacto; semantic cuando el término no sea literal.
 En una consulta sin columnas explícitas, fields.mode=all. Si el usuario enumera columnas, fields.mode=only con exactamente esas columnas. Para «eventos de la serie X» usa scope.kind=event_series y scope.series=X; ControlEvent/SCC certificará la serie contra el catálogo y guardará después la lista canónica concreta. Para comparar eventos explícitos usa comparison con named_events.
 Si la MISMA pregunta pide además ordenar, agrupar, limitar, filtrar, graficar o retocar columnas sobre el resultado recién extraído, añade query.operations. Esas operaciones se ejecutan localmente DESPUÉS de crear el DATASET; no cambian la extracción ni provocan una segunda consulta. Para rankings usa rank. PREFIERE group_role y metric_role frente a inventar nombres de columnas: group_role puede ser person/responsible/donor/product/event/store/ticket y metric_role amount/units/count. CE traducirá esos roles a los campos físicos del DATASET. Usa group_field/metric solo cuando RECENT_TURNS/VIEW muestre explícitamente el nombre real del campo. reference permite comparar contra una entidad concreta, operator puede ser gt/gte/lt/lte y limit devuelve el top solicitado. Si la frase contiene una comparación relativa como «más que X», «menos que X», «igual o mayor que X», reference y operator son OBLIGATORIOS: no dejes a CE deducir la relación desde el lenguaje humano. Para comparar dos o más valores usa compare con el mismo criterio de roles; CE agrupa una sola vez y conserva únicamente esos valores.
@@ -14084,7 +14099,7 @@ set_fields deja solo esas columnas. add_field/add_fields añade. remove_field/re
 RESPUESTA AL USUARIO
 Indica response_kind según lo que realmente pregunta: amount=cuánto; who=quién; what=qué; whether=sí/no; which_event=en qué evento; compare=comparación; table=petición explícita de tabla; summary=resumen breve; context=qué estás viendo; conversation_summary=resumen de toda la conversación. No conviertas automáticamente cualquier pregunta en «he preparado N registros».
 En ESTA llamada solo interpretas y defines el trabajo. Después de que CE ejecute exactamente ese trabajo, GEMINI recibirá el resultado real y redactará la ÚNICA respuesta visible. answer_blueprint es opcional y solo puede ser una pista breve de tono; no contiene la respuesta factual y CE no añadirá una segunda voz ni una plantilla debajo.
-Respeta también las instrucciones de forma del usuario como parte de la intención: prosa, brevedad, número de frases, tabla, comparación, etc. No conviertas «en prosa» en una lista ni una petición breve en un volcado exhaustivo.
+Respeta también las instrucciones de forma del usuario como parte de la intención: prosa, brevedad, número de frases, tabla, comparación, etc. La forma pedida es una RESTRICCIÓN, no una sugerencia: «en prosa» implica párrafos corridos, sin viñetas, numeración ni tabla; una petición explícita de tabla usa response_kind=table; una gráfica usa presentation.chart=true y, si especifica tipo, chart_type. No conviertas una petición breve en un volcado exhaustivo.
 
 REUTILIZACIÓN
 «Dame otra vez aquello» suele ser reference restore_snapshot. «Vuelve a mirar/consulta otra vez» suele ser reexecute_plan. «Ahora el mismo X pero de todos los eventos» debe ser reexecute_plan de CURRENT con SOLO replace_scope=all_events: no copies ni borres producto, persona, tienda, columnas u otros datos del plan base. En una REFERENCE con changes, cada change modifica exclusivamente esa propiedad y todo lo demás permanece inmutable.
@@ -14103,77 +14118,111 @@ async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCa
   const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools:[tool],flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_turn_record']}},externalSignal,maxCalls:1,maxOutputTokens:1650});
   try{payload=await call('v3_0_exp · Ledger · IA interpreta',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Lite no emitió JSON utilizable (${cleanGeminiError(error)}). Flash recibe exactamente la misma petición; no hay reparación semántica.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash interpreta',model);}else{error._ceOrigin='gemini';throw error;}}
   const calls=v261FunctionCalls(payload).filter(c=>trim(c?.name)==='zuzu_turn_record');if(!calls.length){const e=new Error('Gemini no emitió zuzu_turn_record.');e._ceOrigin='gemini';throw e;}if(calls.length>1)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · protocolo','WARN',`Gemini emitió ${calls.length} registros en un turno; se conserva literalmente el último y no se hace reparación.`);
-  const raw=calls[calls.length-1]?.arguments||{},plan=v73NormalizePlan(raw);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · JSON GEMINI BRUTO','INFO',JSON.stringify(raw).slice(0,5000));zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO','OK',JSON.stringify(plan).slice(0,5000));if(plan.answer_blueprint)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ANSWER_BLUEPRINT','OK',`Gemini aporta solo una pista de tono (${Object.keys(plan.answer_blueprint).join(', ')}). La respuesta factual final la redactará Gemini después de recibir el resultado real de CE; CE no añadirá texto propio.`);return{raw,plan,model};
+  const raw=calls[calls.length-1]?.arguments||{},plan=v73NormalizePlan(raw),protocolError=v73ProtocolViolation(raw,plan);if(protocolError)plan._protocol_error=protocolError;zuzuTracePush(flowTrace,'v3_0_exp · Ledger · JSON GEMINI BRUTO','INFO',JSON.stringify(raw).slice(0,5000));zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO',protocolError?'WARN':'OK',JSON.stringify(plan).slice(0,5000));if(protocolError)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CONTRATO GEMINI','KO',`${protocolError} Se conserva la salida tal cual para diagnóstico y NO se ejecuta una interpretación alternativa.`);if(plan.answer_blueprint)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ANSWER_BLUEPRINT','OK',`Gemini aporta solo una pista de tono (${Object.keys(plan.answer_blueprint).join(', ')}). La respuesta factual final la redactará Gemini después de recibir el resultado real de CE; CE no añadirá texto propio.`);return{raw,plan,model};
 }
 
 // v3_0_exp · ESCAPE LIBRE: después de ejecutar literalmente el plan de Gemini, CE devuelve
 // los datos resultantes a Gemini para que redacte la respuesta final. Esa respuesta se guarda y
 // se entrega SIN pulido, reparación, prefacios, plantillas ni reescrituras de ControlEvent.
 function v73RawFinalRecentTurns(session={}){
-  return arr(session?.recentTurns).slice(-12).map(t=>({
+  return arr(session?.recentTurns).slice(-6).map(t=>({
     seq:Number(t?.seq)||0,
-    user:trim(t?.userPrompt||t?.prompt||t?.user).slice(0,700),
-    answer:text(t?.answer||t?.assistant).slice(0,1400),
-    title:trim(t?.title).slice(0,180),
+    user:trim(t?.userPrompt||t?.prompt||t?.user).slice(0,420),
+    answer:text(t?.answer||t?.assistant).slice(0,650),
+    title:trim(t?.title).slice(0,120),
     action:trim(t?.actionType||t?.action),
     domain:trim(t?.execution?.domain||t?.domain),
     scope:t?.execution?.scope||t?.scope||{},
     focus:t?.execution?.focus||t?.focus||{}
   }));
 }
-function v73RawFinalDataset(dataset=null,view=null){
+function v73CompactFinalValue(value,depth=0){
+  if(value==null||typeof value==='number'||typeof value==='boolean')return value;
+  if(typeof value==='string')return value.slice(0,420);
+  if(depth>=3)return Array.isArray(value)?`[${value.length} elementos]`:'[detalle disponible]';
+  if(Array.isArray(value))return value.slice(0,18).map(v=>v73CompactFinalValue(v,depth+1));
+  if(typeof value==='object'){
+    const out={};for(const [k,v] of Object.entries(value).slice(0,55))out[k]=v73CompactFinalValue(v,depth+1);return out;
+  }
+  return String(value).slice(0,420);
+}
+function v73RawFinalDataset(dataset=null,view=null,plan={}){
   if(!dataset)return null;
-  const rows=v73RowsForStored(dataset,view||{}),limit=220;
+  const rows=v73RowsForStored(dataset,view||{}),baseCols=arr(view?.visibleFields).length?arr(view.visibleFields):v70BusinessVisibleColumns(arr(dataset?.columns)),rowCols=[...new Set(rows.slice(0,4).flatMap(r=>Object.keys(r||{})))],cols=[...new Set([...baseCols,...rowCols])].filter(Boolean).slice(0,14),limit=18;
+  const compactRows=rows.slice(0,limit).map(r=>{const o={};for(const c of cols)if(r&&Object.prototype.hasOwnProperty.call(r,c))o[c]=v73CompactFinalValue(r[c],1);return o;});
   return{
-    domain:trim(dataset?.domain),scope:dataset?.scope||{},facts:dataset?.facts||{},
-    row_count:rows.length,columns:arr(dataset?.columns),visible_fields:arr(view?.visibleFields),
-    rows:rows.slice(0,limit),truncated:rows.length>limit
+    domain:trim(dataset?.domain),scope:v73CompactFinalValue(dataset?.scope||{}),facts:v73CompactFinalValue(dataset?.facts||{}),
+    row_count:rows.length,columns:cols,visible_fields:arr(view?.visibleFields).slice(0,18),rows:compactRows,truncated:rows.length>limit,
+    presentation_available:{table:rows.length>0,chart:rows.length>0}
   };
 }
-function v73RawFinalInstruction({voice=false}={}){
-  return `Eres Zuzu. Estás en la fase FINAL de un turno de ControlEvent. Gemini ya interpretó la pregunta y ControlEvent ejecutó EXACTAMENTE ese plan. Ahora solo debes redactar la contestación final al usuario con los datos que recibes.
+function v73PlanArtifactIntent(plan={},view=null,{voice=false}={}){
+  const p=plan&&typeof plan==='object'?plan:{},q=p.query||{},ops=p.action==='query'?arr(q.operations):p.action==='local'?arr(p.local?.operations):[],chartOp=ops.find(o=>trim(o?.type)==='chart'),chartType=trim(q?.presentation?.chart_type||chartOp?.chart_type||view?.presentation?.chart_type);
+  const chart=q?.presentation?.chart===true||!!chartOp||view?.presentation?.chart===true&&p.response_kind==='table';
+  const table=p.response_kind==='table'||q?.presentation?.table===true;
+  return{table:!!table,chart:!!chart,chart_type:['bar','line','pie','donut','horizontalBar'].includes(chartType)?chartType:''};
+}
+function v73ApplyRequestedChartType(charts=[],intent={}){
+  const type=trim(intent?.chart_type);if(!type)return arr(charts);return arr(charts).map(ch=>({...ch,type}));
+}
+function v73FinalPresentationSchema(){
+  return {type:'object',properties:{
+    title:{type:'string'},
+    written_answer:{type:'string'},
+    spoken_answer:{type:'string'},
+    presentation:{type:'object',properties:{table:{type:'boolean'},chart:{type:'boolean'},chart_type:{type:'string',enum:['bar','line','pie','donut','horizontalBar','none']}},required:['table','chart','chart_type']}
+  },required:['title','written_answer','spoken_answer','presentation']};
+}
+function v73RawFinalInstruction(){
+  return `Eres Zuzu. Estás en la fase FINAL de un turno de ControlEvent. Gemini ya interpretó la petición y ControlEvent ejecutó exactamente ese plan. Tu trabajo ahora es PRESENTAR el resultado con calidad humana.
 
-REGLAS DE ESCAPE LIBRE
+CONTRATO DE PRESENTACIÓN
+- Devuelve SIEMPRE dos redacciones distintas del mismo resultado factual: written_answer para pantalla y spoken_answer para voz.
+- written_answer debe ser una respuesta bien escrita, natural y agradable de leer. Contesta primero a lo preguntado. Usa párrafos claros; si el usuario pide prosa, NO uses listas ni viñetas. Si pide brevedad, sé breve. No vuelques filas masivas dentro del texto.
+- spoken_answer está pensado para ser ESCUCHADO: normalmente 1 a 4 frases, sin Markdown, sin tablas, sin enumeraciones largas y sin leer cifras o filas una a una. Debe sonar como conversación real y conservar la conclusión útil de written_answer.
+- presentation decide los artefactos visuales adicionales. table=true cuando una tabla aporta valor real o el usuario la ha pedido. chart=true cuando una gráfica aporta valor real o el usuario la ha pedido. Elige chart_type adecuado; usa none si chart=false.
+- Si table o chart son true, NO dupliques en written_answer las filas o puntos completos: explica la conclusión y deja el detalle al artefacto de ControlEvent.
 - NO vuelvas a decidir otra consulta, NO corrijas el plan anterior y NO pidas herramientas.
-- NO inventes datos que no estén en RESULTADO_CE. Si el plan fue erróneo, incompleto o los datos no responden bien a la pregunta, dilo de forma natural con lo que realmente permiten concluir; el error debe quedar visible para diagnóstico.
-- Tu answer será la ÚNICA respuesta visible. ControlEvent NO añadirá debajo ninguna tabla, resumen, plantilla ni segunda contestación. Si el usuario necesita que algo aparezca en la respuesta, debes escribirlo tú.
-- Habla en español natural, directo y humano. Contesta primero a lo preguntado y usa solo el detalle necesario. No recites el dataset entero salvo petición explícita de listado/tabla exhaustiva.
-- RESPETA LITERALMENTE las instrucciones de forma del CURRENT_USER: si pide prosa, escribe prosa sin viñetas ni tabla; si pide dos frases, usa dos frases; si pide una tabla, puedes usar tabla; si pide brevedad, resume.
-- NO menciones JSON, PLAN, DATASET, VIEW, herramientas, oráculo, pruebas ni capas internas salvo que el usuario lo pregunte expresamente.
-- No uses frases de proceso como «he preparado N registros» salvo que eso sea realmente lo que el usuario pidió.
-- No añadas saludos, «Te comento» ni ofertas mecánicas al final.
-${voice?'- Es conversación oral: normalmente 1 a 4 frases, sin tablas Markdown ni listas largas.':''}
+- NO inventes datos que no estén en RESULTADO_CE. Si el plan fue erróneo, incompleto o RESULTADO_CE contiene un error, dilo con naturalidad: el fallo debe quedar visible.
+- No menciones PLAN, DATASET, VIEW, JSON, herramientas, oráculo, pruebas o capas internas salvo pregunta expresa.
+- No uses frases de proceso tipo «he preparado N registros», «estoy consultando» ni ofertas mecánicas al final.
+- No añadas saludos innecesarios ni «Te comento».
+- RESPETA la forma pedida por CURRENT_USER: prosa, resumen, opinión, tabla, gráfica, dos frases, etc.
 
-El campo answer del JSON debe contener EXACTAMENTE el texto que debe ver/oir el usuario. ControlEvent no lo modificará después.`;
+Devuelve el objeto estructurado solicitado. written_answer y spoken_answer son texto final; ControlEvent NO los reescribirá.`;
 }
 function v73RawFinalExecution(execution={}){
   const e=execution&&typeof execution==='object'?execution:{},out={};
-  for(const key of ['domain','scope','focus','row_count','aggregate','metrics','filter_summary','error']){const v=e?.[key];if(v!==undefined&&v!==null&&v!=='')out[key]=v;}
+  for(const key of ['domain','scope','focus','row_count','aggregate','metrics','filter_summary','error']){const v=e?.[key];if(v!==undefined&&v!==null&&v!=='')out[key]=v73CompactFinalValue(v);}
   if(arr(e?.pending_candidates).length)out.pending_candidates=arr(e.pending_candidates).slice(0,8);
   return out;
 }
 function v73RawFinalParse(payload){
-  const envelope=v261OutputText(payload);if(!envelope)return{title:'Zuzu',answer:'',envelope:''};
-  try{
-    const parsed=parsePlanJsonLenientHf37(envelope).parsed||{};
-    const answer=typeof parsed?.answer==='string'?parsed.answer:envelope;
-    const title=typeof parsed?.title==='string'&&parsed.title?parsed.title:'Zuzu';
-    return{title,answer,envelope};
-  }catch(_){return{title:'Zuzu',answer:envelope,envelope};}
+  const envelope=v261OutputText(payload);if(!envelope)return{title:'Zuzu',written:'',spoken:'',presentation:{table:false,chart:false,chart_type:'none'},envelope:''};
+  let body=text(envelope).trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim(),parsed={};
+  try{parsed=parsePlanJsonLenientHf37(body).parsed||{};}catch(_){}
+  const written=typeof parsed?.written_answer==='string'?parsed.written_answer:(typeof parsed?.answer==='string'?parsed.answer:'');
+  const spoken=typeof parsed?.spoken_answer==='string'?parsed.spoken_answer:written;
+  const pp=parsed?.presentation&&typeof parsed.presentation==='object'?parsed.presentation:{};
+  const chartType=['bar','line','pie','donut','horizontalBar'].includes(trim(pp.chart_type))?trim(pp.chart_type):'';
+  if(trim(written))return{title:trim(parsed?.title)||'Zuzu',written,spoken:trim(spoken)||written,presentation:{table:pp.table===true,chart:pp.chart===true,chart_type:pp.chart===true?(chartType||'bar'):''},envelope};
+  // Compatibilidad de transporte: si el endpoint devolviera texto fuera del esquema, se usa literal
+  // como ambas versiones. No se resume ni se corrige semánticamente.
+  return{title:'Zuzu',written:body,spoken:body,presentation:{table:false,chart:false,chart_type:''},envelope};
 }
 async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation=false}){
   const activeDataset=dataset||finalBundle?.dataset||null,activeView=view||finalBundle?.view||null;
-  const reference=finalBundle?.turn?{turn_id:trim(finalBundle.turn.turnId),user:trim(finalBundle.turn.userPrompt),answer:text(finalBundle.turn.answer),title:trim(finalBundle.turn.title)}:null;
+  const reference=finalBundle?.turn?{turn_id:trim(finalBundle.turn.turnId),user:trim(finalBundle.turn.userPrompt).slice(0,420),answer:text(finalBundle.turn.answer).slice(0,700),title:trim(finalBundle.turn.title).slice(0,120)}:null;
   const packet={
     current_user:userPrompt,
-    gemini_plan_raw:rawPlan||{},
-    plan_executed:plan||{},
-    resultado_ce:{status,execution:v73RawFinalExecution(execution),dataset:v73RawFinalDataset(activeDataset,activeView),reference_snapshot:reference},
+    input_mode:voiceConversation?'voice':'written',
+    gemini_plan_raw:v73CompactFinalValue(rawPlan||{}),
+    plan_executed:v73CompactFinalValue(plan||{}),
+    resultado_ce:{status,execution:v73RawFinalExecution(execution),dataset:v73RawFinalDataset(activeDataset,activeView,plan),reference_snapshot:reference},
     recent_conversation:v73RawFinalRecentTurns(session)
   };
-  const payload=await v261CallInteraction({input:`PREGUNTA Y RESULTADO REAL DEL TURNO:
-${JSON.stringify(packet)}`,previousInteractionId:'',model,systemInstruction:v73RawFinalInstruction({voice:voiceConversation}),tools:[],flowTrace,stage:'v3_0_exp · ESCAPE LIBRE · Gemini redacta respuesta FINAL',toolChoice:'none',externalSignal,maxCalls:2,maxOutputTokens:voiceConversation?1200:2200});
-  const final=v73RawFinalParse(payload);if(!trim(final.answer)){const e=new Error('Gemini no devolvió texto en la redacción final de escape libre.');e._ceOrigin='gemini';throw e;}
+  const payload=await v261CallInteraction({input:`PREGUNTA Y RESULTADO REAL DEL TURNO:\n${JSON.stringify(packet)}`,previousInteractionId:'',model,systemInstruction:v73RawFinalInstruction(),tools:[],flowTrace,stage:'v3_0_exp · PRESENTACIÓN · Gemini redacta pantalla + voz',toolChoice:'none',externalSignal,maxCalls:2,maxOutputTokens:1800,responseSchema:v73FinalPresentationSchema()});
+  const final=v73RawFinalParse(payload);if(!trim(final.written)){const e=new Error('Gemini no devolvió redacción escrita en la fase final.');e._ceOrigin='gemini';throw e;}
   return final;
 }
 function v73RowsForStored(dataset=null,view=null){
@@ -14284,7 +14333,7 @@ function v73FrameFromQuery(query={}){
     else if(role==='ticket'&&matches(filters.ticket))filters.ticket='';
   }
   const project=q.fields?.mode==='only'?arr(q.fields.values).map(trim).filter(Boolean):[],pres=q.presentation||{};
-  return v70NormalizeFrame({mode:'query',domain:d,source:'fresh',granularity:v71DefaultGranularity(d),scope,filters,transform:{navigation:'none',view_filters:[],project,sort:[],group_by:[],metrics:[],row_limit:null},presentation:{table:pres.table!==false,summary:pres.summary!==false,reasoned:false,chart:pres.chart===true,exhaustive:false},freshness:'fresh'});
+  return v70NormalizeFrame({mode:'query',domain:d,source:'fresh',granularity:v71DefaultGranularity(d),scope,filters,transform:{navigation:'none',view_filters:[],project,sort:[],group_by:[],metrics:[],row_limit:null},presentation:{table:pres.table!==false,summary:pres.summary!==false,reasoned:false,chart:pres.chart===true,chart_type:trim(pres.chart_type),exhaustive:false},freshness:'fresh'});
 }
 function v73ViewObjectFromFrame(datasetId='',frame={},viewData={},title=''){return{datasetId,visibleFields:arr(viewData.visible),sort:arr(frame?.transform?.sort),rowFilters:arr(frame?.transform?.view_filters),groupBy:arr(frame?.transform?.group_by),metrics:arr(frame?.transform?.metrics),rowLimit:frame?.transform?.row_limit??null,presentation:frame?.presentation||{},title:trim(title)||trim(viewData.title)};}
 function v73DatasetObject(frame={},viewData={},result={},scopeInfo={}){
@@ -14371,7 +14420,7 @@ function v73ApplyLocalOperations(bundle={},operations=[],flowTrace=[]){
       const [metricOpRaw,metricFieldRaw]=metricSpec.split(':',2),metricOp=norm(metricOpRaw),metricField=metricFieldRaw?resolve(metricFieldRaw,op.metric_role,'metric'):'',canonicalMetric=metricOp==='sum'&&metricField?`sum:${metricField}`:metricOp==='distinct'&&metricField?`distinct:${metricField}`:'count',metricColumn=metricOp==='sum'&&metricField?`Suma ${metricField}`:metricOp==='distinct'&&metricField?`Distintos ${metricField}`:'Nº registros';
       v.groupBy=[groupKey];v.metrics=[canonicalMetric];v.visibleFields=[groupKey,metricColumn];v.sort=[{field:metricColumn,direction:'desc'}];v.rowLimit=null;v.rowFilters=[...arr(v.rowFilters).filter(f=>trim(f?.stage)!=='post_group'),{field:groupKey,operator:'one_of',values,stage:'post_group'}];
     }else if(type==='limit')v.rowLimit=op.limit==null?null:Number(op.limit);
-    else if(type==='chart')v.presentation={...(v.presentation||{}),chart:true,table:v.presentation?.table!==false};
+    else if(type==='chart')v.presentation={...(v.presentation||{}),chart:true,table:v.presentation?.table!==false,...(trim(op.chart_type)?{chart_type:trim(op.chart_type)}:{})};
     else warn(`Operación LOCAL desconocida «${type}» ignorada; DATASET intacto.`);
   }
   const rows=v73RowsForStored(ds,v);return{view:v,rows,warnings};
@@ -14532,7 +14581,10 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(JSON.stringify(plan)!==JSON.stringify(normalizedPlan))zuzuTracePush(flowTrace,'v3_0_exp · Ledger · interpretación física CE','INFO',`CE completa solo detalles físicos de operación; el registro semántico de Gemini se conserva intacto. EXEC=${JSON.stringify(plan).slice(0,3200)}`);
   let title='Zuzu',answer='',tables=[],charts=[],files=[],status='OK',dataset=null,view=null,datasetId='',viewId='',referencedTurnId='',execution={},finalBundle=null,turnWarnings=[],answerPayload={},answerBlueprintUsed=false;
   try{
-    if(plan.action==='reset'){
+    if(plan._protocol_error){
+      status='KO';title='Salida Gemini no ejecutable';answer='';execution={summary:plan._protocol_error,error:plan._protocol_error,protocol_error:plan._protocol_error};
+      zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ejecución omitida por contrato','KO',`${plan._protocol_error} CE no reubica bloques, no inventa referencias y no ejecuta un plan alternativo.`);
+    }else if(plan.action==='reset'){
       answer=plan.reply||'Empezamos un foco nuevo. La conversación anterior sigue guardada y puedes volver a ella cuando quieras.';execution={summary:'Reinicio de foco sin borrar ledger.'};
     }else if(plan.action==='conversation'){
       answer=plan.reply||'De acuerdo.';execution={summary:'Conversación general sin consulta de datos.'};
@@ -14594,18 +14646,20 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     }
   }catch(error){status='KO';zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ejecución CE','KO',cleanGeminiError(error));answer='ControlEvent no pudo ejecutar este registro. El historial anterior permanece intacto y este fallo queda guardado para auditoría.';execution={summary:cleanGeminiError(error),error:cleanGeminiError(error)};}
 
+  let spokenAnswer='',finalPresentation={};
+
   // ESCAPE LIBRE: la contestación que ve el usuario sale de Gemini DESPUÉS de recibir el resultado CE.
   // La redacción determinista calculada arriba sirve solo como dato interno de ejecución y jamás se
   // usa para sustituir, corregir o pulir el texto final de Gemini.
   try{
     const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation});
-    title=rawFinal.title||title;answer=rawFinal.answer;
-    execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:rawFinal.answer,response_mode:'gemini_raw_escape_free'};
-    zuzuTracePush(flowTrace,'v3_0_exp · ESCAPE LIBRE · RESPUESTA GEMINI SIN RETOQUE','OK',`La respuesta final (${text(rawFinal.answer).length} caracteres) se entrega literalmente. CE no aplica plantillas, repairs ni pulido posterior.`);
+    title=rawFinal.title||title;answer=rawFinal.written;spokenAnswer=rawFinal.spoken;finalPresentation=rawFinal.presentation||{};
+    execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:rawFinal.written,gemini_spoken_answer:rawFinal.spoken,gemini_presentation:finalPresentation,response_mode:'gemini_dual_presentation'};
+    zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · RESPUESTA GEMINI','OK',`Pantalla=${text(rawFinal.written).length} caracteres · voz=${text(rawFinal.spoken).length} caracteres · tabla=${finalPresentation.table?'sí':'no'} · gráfica=${finalPresentation.chart?'sí':'no'}. CE no reescribe ninguna de las dos redacciones.`);
   }catch(finalError){
     status=status==='KO'?'KO':'WARN';
-    answer=`Gemini no pudo emitir la respuesta final de este turno: ${cleanGeminiError(finalError)}`;
-    execution={...(execution||{}),gemini_final_error:cleanGeminiError(finalError),response_mode:'gemini_raw_escape_free_failed'};
+    answer=`Gemini no pudo emitir la respuesta final de este turno: ${cleanGeminiError(finalError)}`;spokenAnswer=answer;finalPresentation={};
+    execution={...(execution||{}),gemini_final_error:cleanGeminiError(finalError),response_mode:'gemini_dual_presentation_failed'};
     zuzuTracePush(flowTrace,'v3_0_exp · ESCAPE LIBRE · fallo redacción final','WARN',cleanGeminiError(finalError));
   }
 
@@ -14616,10 +14670,13 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   let savedDataset=dataset?{...dataset,datasetId:saved.datasetId}:finalBundle?.dataset||session?.dataset||null,savedView=view?{...view,viewId:saved.viewId,datasetId:saved.datasetId||view.datasetId}:finalBundle?.view||session?.view||null;
   if(saved.datasetId&&!savedDataset){const b=await getZuzuTurnBundle({turnId:saved.turn.turnId,actor});savedDataset=b?.dataset||null;savedView=b?.view||savedView;}
   const resultContext=v73LightContext(saved.conversation,saved.turn,savedDataset,savedView),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMMIT INMUTABLE','OK',`turn=${saved.turn.turnId} · action=${plan.action} · dataset=${saved.datasetId||'—'} · view=${saved.viewId||'—'} · status=${status}. El turno anterior no se modifica.`);
-  const physicalRows=savedDataset?v73RowsForStored(savedDataset,savedView||{}):[],physical={domain:trim(savedDataset?.domain||execution?.domain),scope:savedDataset?.scope||execution?.scope||{},focus:execution?.focus||{},row_count:savedDataset?physicalRows.length:(Number(execution?.row_count)||0),dataset_row_count:Number(savedDataset?.rowCount)||0,visible_fields:arr(savedView?.visibleFields),available_fields:arr(savedDataset?.columns),table_row_counts:arr(tables).map(t=>arr(t?.rows).length),chart_count:arr(charts).length,dataset_id:trim(savedDataset?.datasetId),view_id:trim(savedView?.viewId),status,response_kind:trim(normalizedPlan?.response_kind),answer_payload:execution?.answer_payload||{},answer_blueprint:normalizedPlan?.answer_blueprint||{},answer_blueprint_used:!!execution?.answer_blueprint_used,interpreted_plan:plan,response_mode:trim(execution?.response_mode),gemini_final_raw:text(execution?.gemini_final_raw),gemini_final_answer:text(execution?.gemini_final_answer)};
+  const physicalRows=savedDataset?v73RowsForStored(savedDataset,savedView||{}):[],physical={domain:trim(savedDataset?.domain||execution?.domain),scope:savedDataset?.scope||execution?.scope||{},focus:execution?.focus||{},row_count:savedDataset?physicalRows.length:(Number(execution?.row_count)||0),dataset_row_count:Number(savedDataset?.rowCount)||0,visible_fields:arr(savedView?.visibleFields),available_fields:arr(savedDataset?.columns),table_row_counts:arr(tables).map(t=>arr(t?.rows).length),chart_count:arr(charts).length,dataset_id:trim(savedDataset?.datasetId),view_id:trim(savedView?.viewId),status,response_kind:trim(normalizedPlan?.response_kind),answer_payload:execution?.answer_payload||{},answer_blueprint:normalizedPlan?.answer_blueprint||{},answer_blueprint_used:!!execution?.answer_blueprint_used,interpreted_plan:plan,response_mode:trim(execution?.response_mode),gemini_final_raw:text(execution?.gemini_final_raw),gemini_final_answer:text(execution?.gemini_final_answer),gemini_spoken_answer:text(execution?.gemini_spoken_answer),gemini_presentation:execution?.gemini_presentation||{}};
   const responseWarnings=status==='KO'?[execution.summary||'Fallo de ejecución.']:status==='WARN'?(turnWarnings.length?turnWarnings:[execution.summary||'Aviso de interpretación.']):[];physical.warnings=responseWarnings.slice();
-  zuzuTracePush(flowTrace,'v3_0_exp · ESCAPE LIBRE · PRESENTACIÓN CE OCULTA','OK',`CE conserva internamente DATASET/VIEW (${arr(tables).length} tabla(s), ${arr(charts).length} gráfica(s)) y avisos técnicos para continuidad/auditoría, pero no los añade a la respuesta visible. La pantalla muestra solo el answer de Gemini.`);
-  return{ok:true,rejected:false,title,answer,warnings:[],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-escape-free',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · ESCAPE LIBRE · Gemini redacta tras datos CE y CE no retoca answer',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,ledgerAudit:{action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  const baseArtifactIntent=v73PlanArtifactIntent(normalizedPlan,savedView),artifactIntent={table:finalPresentation&&typeof finalPresentation.table==='boolean'?finalPresentation.table:baseArtifactIntent.table,chart:finalPresentation&&typeof finalPresentation.chart==='boolean'?finalPresentation.chart:baseArtifactIntent.chart,chart_type:trim(finalPresentation?.chart_type)||baseArtifactIntent.chart_type};let visibleTables=[],visibleCharts=[];
+  if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);}
+  if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo);visibleCharts=v73ApplyRequestedChartType(ws?v72ChartFromWorking(ws,flowTrace):[],artifactIntent);}
+  zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Gemini decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW4 PRESENTACIÓN · Gemini pantalla+voz + artefactos',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:['zuzu_turn_record',trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
@@ -14627,7 +14684,7 @@ export async function runZuzuUserTurn(input={}){return analyzeEventPrompt(input)
 
 export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){
   const bundle=await getZuzuTurnBundle({turnId,actor});if(!bundle)return null;const ws=v73WorkingFromBundle(bundle),frame=v73FrameForStoredTurn(bundle),scopeInfo=bundle.dataset?v73ScopeInfoFromDataset(bundle.dataset):{kind:'none',eventNames:[],label:''},tables=bundle.view?.presentation?.table===false?[]:v73TableFromBundle(bundle),trace=arr(bundle.turn?.execution?.debug_trace);
-  const charts=bundle.view?.presentation?.chart&&ws?v72ChartFromWorking(ws,[]):[];return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),warnings:[],charts:[],tables:[],files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
+  const intent=v73PlanArtifactIntent(bundle.turn?.normalizedPlan||{},bundle.view||{}),visibleTables=intent.table?tables:[],charts=intent.chart&&ws?v73ApplyRequestedChartType(v72ChartFromWorking(ws,[]),intent):[];return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW3',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
 }
 function v66SoftFailureResult({flowTrace=[],model='',voiceConversation=false,memory={},reason='No he podido completar este turno con seguridad',answer=''}={}){
   const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),txt=trim(answer)||'No he podido completar esta petición, pero he conservado intacto el contexto anterior. Reformúlala o repítela con un poco más de detalle.';

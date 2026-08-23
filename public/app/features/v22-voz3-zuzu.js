@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v3_0_exp-FIX34-VOICE-HYBRID-RESTORED-LISTS';
+  var BUILD='v3_0_exp-RAW4-DUAL-VOICE-PC-MIC';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -34,28 +34,15 @@
   };
 
   var ENTERTAINMENT_PHRASES=[
-    'Estoy rebuscando en los cajones de ControlEvent.',
-    'Dame un segundo, que esto tiene miga.',
-    'Estoy atando cabos, no te me escapes.',
-    'Un momento, que Zuzu está haciendo cuentas.',
-    'Estoy cruzando datos; ya casi lo tengo.',
-    'Esto está cocinándose, y huele bastante bien.',
-    'Déjame mirar debajo de la alfombra digital.',
-    'Estoy buscando la aguja en el pajar.',
-    'Voy tirando del hilo; aparece algo interesante.',
-    'Un segundo, que los números vienen corriendo.',
-    'Estoy poniendo orden en este pequeño sarao.',
-    'No me he ido, sigo husmeando datos.',
-    'Aquí hay tomate; déjame comprobarlo bien.',
-    'Estoy haciendo arqueología fina por ControlEvent.',
-    'Aguanta un instante, que esto promete.',
-    'Estoy separando el grano de la paja.',
-    'Los datos están hablando; estoy escuchándolos.',
-    'Un momento, que no quiero venderte humo.',
-    'Estoy comprobando que las cuentas no hagan trampas.',
-    'Ya veo movimiento; dame un pelín más.'
+    'Estoy con ello.',
+    'Sigo revisando los datos.',
+    'Un momento, que lo estoy ordenando.',
+    'Ya casi lo tengo.',
+    'Estoy cerrando la respuesta.',
+    'Sigo aquí, dame un instante.',
+    'Estoy contrastando lo importante.',
+    'Un segundo más y te lo cuento.'
   ];
-
   function $(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
   function clean(v){return String(v==null?'':v).replace(/\s+/g,' ').trim();}
@@ -110,7 +97,7 @@
   function supportsCeVoice(){return !!(navigator.mediaDevices&&navigator.mediaDevices.getUserMedia&&typeof MediaRecorder!=='undefined'&&typeof fetch==='function');}
   function cloudMime(){var opts=['audio/webm;codecs=opus','audio/webm','audio/mp4'];for(var i=0;i<opts.length;i++){try{if(!MediaRecorder.isTypeSupported||MediaRecorder.isTypeSupported(opts[i]))return opts[i];}catch(_){}}return '';}
   function clamp(n,min,max){n=Number(n)||0;return Math.max(min,Math.min(max,n));}
-  function cloudStatus(kind){if(state.cloudCalibratingUntil>Date.now())setStatus('Calibrando micrófono…','ok');else setStatus(kind==='user'?'Te escucho con Voz CE…':'Voz CE activa. Di «Hola Zuzu».','ok');updateBadge();}
+  function cloudStatus(kind){if(state.cloudCalibratingUntil>Date.now())setStatus('Calibrando micrófono…','ok');else{var mic=clean(state.cloudDeviceLabel||'');setStatus((kind==='user'?'Te escucho':'Voz CE activa. Di «Hola Zuzu»')+(mic?' · '+mic:''),'ok');}updateBadge();}
   function cloudAudioConstraints(){var id=clean(safeGet(STORAGE.mic,'')),audio={echoCancellation:false,noiseSuppression:false,autoGainControl:false};if(id)audio.deviceId={exact:id};return{audio:audio,video:false};}
   function ensureCloudAudioContext(fromGesture){var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return null;var ac=state.cloudAudioContext;try{if(!ac||ac.state==='closed'){ac=new AC();state.cloudAudioContext=ac;}if(fromGesture&&ac.state==='suspended'){var pr=ac.resume();if(pr&&typeof pr.catch==='function')pr.catch(function(){});}}catch(_){return ac||null;}return ac;}
   function cloudTrackInfo(stream){try{var t=stream&&stream.getAudioTracks&&stream.getAudioTracks()[0];state.cloudDeviceLabel=clean(t&&t.label||'Micrófono predeterminado');state.cloudDeviceSettings=t&&t.getSettings?t.getSettings():{};state.cloudDeviceId=clean(state.cloudDeviceSettings.deviceId||safeGet(STORAGE.mic,''));}catch(_){state.cloudDeviceLabel='Micrófono';state.cloudDeviceSettings={};}}
@@ -244,7 +231,7 @@
   function chunkSpeech(v){var text=prepareSpeechText(v);if(!text)return[];var sentences=text.split(/(?<=[.!?;:])\s+/),out=[],cur='';sentences.forEach(function(s){if((cur+' '+s).trim().length<=170)cur=clean(cur+' '+s);else{if(cur)out.push(cur);cur=s;}});if(cur)out.push(cur);return out.length?out:[text];}
   function stopSpeaking(interrupted){state.speechGeneration++;state.speaking=false;state.currentUtterance=null;state.speechChunks=[];state.speechIndex=0;stopBarge();try{window.speechSynthesis.pause();window.speechSynthesis.cancel();}catch(_){}updateBadge();if(!interrupted&&state.conversationMode&&!state.requestInFlight&&!state.awaitingResponse)setTimeout(startUser,180);}
   function speakChunks(answer){if(!supportsSpeech()||!state.conversationMode){startUser();return;}pauseCloudListening();stopRecognition();stopBarge();try{window.speechSynthesis.cancel();}catch(_){}state.speechGeneration++;var gen=state.speechGeneration;state.speechChunks=chunkSpeech(answer);state.speechIndex=0;state.speaking=true;state.mode='speaking';updateBadge();setStatus('Zuzu está hablando. «Perdona» o «Espera» para cortar.','ok');function next(){if(gen!==state.speechGeneration||!state.speaking)return;if(state.speechIndex>=state.speechChunks.length){state.speaking=false;stopBarge();updateBadge();setStatus('Te escucho…','ok');setTimeout(startUser,180);return;}var u=new SpeechSynthesisUtterance(state.speechChunks[state.speechIndex++]);u.lang='es-ES';u.rate=speechRate();u.volume=0.9;var voice=chooseVoice();if(voice)u.voice=voice;state.currentUtterance=u;u.onstart=function(){if(gen===state.speechGeneration)startBarge();};u.onend=function(){if(gen===state.speechGeneration)next();};u.onerror=function(){if(gen===state.speechGeneration)next();};try{window.speechSynthesis.speak(u);}catch(_){next();}}next();}
-  function speakResponse(){var a=q('#ceAiResult .ce-ai-answer');if(a)speakChunks(clean(a.textContent));}
+  function speakResponse(){var dedicated=clean(window.__ceZuzuLastSpokenAnswer||'');var a=q('#ceAiResult .ce-ai-answer');var txt=dedicated||clean(a&&a.textContent);if(txt){if(!state.conversationMode)state.conversationMode=true;speakChunks(txt);}}
   function previewVoice(){if(!supportsSpeech())return;try{window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance('Esta es la voz de Zuzu. Estoy lista para conversar contigo.');u.lang='es-ES';u.rate=speechRate();u.volume=0.9;var v=chooseVoice();if(v)u.voice=v;window.speechSynthesis.speak(u);}catch(_){} }
 
   function loadEntertainmentState(){
@@ -268,8 +255,8 @@
   }
   function stopEntertainment(cancelSpeech){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;var was=state.entertainmentSpeaking;state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(cancelSpeech&&was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){} }}
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Number(delay)||2000);}
-  function speakEntertainmentPhrase(){if(!state.conversationMode||!state.requestInFlight||!supportsSpeech())return;stopEntertainment(false);var now=new Date(),secondOfHour=now.getMinutes()*60+now.getSeconds(),idx=entertainmentIndex(secondOfHour,state.entertainmentCount++),phrase=ENTERTAINMENT_PHRASES[idx];try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=Math.min(1,speechRate()+0.03);u.volume=0.94;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;u.onend=function(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);};u.onerror=function(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);};window.speechSynthesis.speak(u);}catch(_){state.entertainmentSpeaking=false;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);}}
-  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;state.lastEntertainmentIndex=-1;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2000);}
+  function speakEntertainmentPhrase(){if(!state.conversationMode||!state.requestInFlight||!supportsSpeech())return;stopEntertainment(false);var now=new Date(),secondOfHour=now.getMinutes()*60+now.getSeconds(),idx=entertainmentIndex(secondOfHour,state.entertainmentCount++),phrase=ENTERTAINMENT_PHRASES[idx];setStatus(phrase,'ok');try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=Math.min(1,speechRate()+0.03);u.volume=0.94;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;u.onend=function(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(5600);};u.onerror=function(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(5600);};window.speechSynthesis.speak(u);}catch(_){state.entertainmentSpeaking=false;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(4200);}}
+  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;state.lastEntertainmentIndex=-1;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2400);}
 
   function resumeConversationListening(delay){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;setTimeout(function(){if(state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();},Number(delay)||180);}
   function startManualRecording(){if(state.recordingActive||!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||typeof MediaRecorder==='undefined')return Promise.resolve(false);return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:true}}).then(function(stream){state.recorderStream=stream;state.recorderChunks=[];var mr=new MediaRecorder(stream);state.recorder=mr;mr.ondataavailable=function(e){if(e.data&&e.data.size)state.recorderChunks.push(e.data);};mr.onstop=function(){try{state.lastRecordingMime=mr.mimeType||'audio/webm';state.lastRecordingBlob=new Blob(state.recorderChunks,{type:state.lastRecordingMime});}catch(_){}state.recordingActive=false;try{stream.getTracks().forEach(function(t){t.stop();});}catch(_){}state.recorderStream=null;state.recorder=null;updateRecordButton();resumeConversationListening(220);};mr.start(1000);state.recordingActive=true;updateRecordButton();return true;}).catch(function(){setStatus('Grabación no disponible; la conversación por voz sigue activa.','');resumeConversationListening(180);return false;});}
@@ -281,7 +268,11 @@
   function activateDirectConversation(){
     clearWakeTimer();clearTurnTimer();stopEntertainment(true);stopBarge();state.conversationMode=true;state.parked=false;state.mode='user';state.requestInFlight=false;state.awaitingResponse=false;state.turnPrefix='';state.turnSession='';
     stopRecognition();state.needsGesture=false;
-    if(state.cloudFallback||!supportsRecognition()){state.cloudFallback=true;startCloudRecognition('user',true);}else startRecognition('user',true);
+    // RAW4: el botón Hablar usa directamente getUserMedia + Voz CE. En PC evita depender
+    // del servicio Web Speech del navegador, que puede fallar aunque el micrófono físico funcione.
+    if(supportsCeVoice()){state.cloudFallback=true;startCloudRecognition('user',true);}
+    else if(supportsRecognition()){state.cloudFallback=false;startRecognition('user',true);}
+    else setStatus('Este navegador no ofrece una entrada de micrófono compatible.','err');
     updateBadge();return true;
   }
   function toggleDirectConversationMic(){
@@ -308,7 +299,7 @@
 
   document.addEventListener('ce:zuzu-request-started',function(ev){if(!state.conversationMode)return;pauseCloudListening();state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=clean(ev&&ev.detail&&ev.detail.prompt||state.requestPrompt);stopRecognition();clearTurnTimer();setStatus('Consultando ControlEvent…','ok');startEntertainment();});
   document.addEventListener('ce:zuzu-request-error',function(){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(true);setStatus('No se pudo completar. Te escucho.','err');setTimeout(startUser,180);});
-  document.addEventListener('ce:zuzu-response-rendered',function(ev){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(true);var answer=stripVoiceAnswerLead(clean(ev&&ev.detail&&ev.detail.answer));if(!answer){setTimeout(startUser,120);return;}var auto=$('ceVoz3AutoRead');if(!auto||auto.checked!==false)speakChunks(answer);else startUser();});
+  document.addEventListener('ce:zuzu-response-rendered',function(ev){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(true);var raw=clean(ev&&ev.detail&&(ev.detail.spokenAnswer||ev.detail.answer));var answer=stripVoiceAnswerLead(raw);window.__ceZuzuLastSpokenAnswer=answer||raw;if(!answer){setTimeout(startUser,120);return;}var auto=$('ceVoz3AutoRead');if(!auto||auto.checked!==false)speakChunks(answer);else startUser();});
   window.addEventListener('controlevent:zuzu-opened',function(){setTimeout(injectPanel,30);});
   window.addEventListener('controlevent:zuzu-closed',function(){parkConversation();});
   document.addEventListener('click',function(ev){var t=ev.target;if(t&&t.closest&&t.closest('#ceAiDownloadResult')&&state.conversationMode)stopEntertainment(true);},true);
