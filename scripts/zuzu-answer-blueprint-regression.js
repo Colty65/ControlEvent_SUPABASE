@@ -1,58 +1,46 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
 import assert from 'node:assert/strict';
-import { __zuzuStructuralTesting as Z } from '../services/event-ai.service.js';
+import { fileURLToPath } from 'node:url';
 
-const {
-  v73NormalizePlan,
-  v73NormalizeAnswerBlueprint,
-  v73BuildAnswerPayload,
-  v73RenderAnswerBlueprint,
-  v73ComposeAnswer,
-  v73StripRecallPreamble
-}=Z;
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+const src=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
 
-const rows=[{Evento:'SySA 2026',Producto:'PAN (Barra)',Responsable:'Vicente',Importe:100}];
-const dataset={
-  domain:'purchases',scope:{kind:'named_event',event:'SySA 2026'},columns:Object.keys(rows[0]),rows,
-  provenance:{source_args:{frame:{domain:'purchases',scope:{kind:'named_event',event:'SySA 2026'},filters:{responsible:'Vicente',product_text:'PAN'}}}}
-};
-const ws={row_count:1,aggregate:{total_amount:100},row_cache:{rows,columns:Object.keys(rows[0])}};
-const view={visibleFields:['Evento','Producto','Responsable','Importe']};
+function extractFunction(name){
+  const re=new RegExp(`function\\s+${name}\\([^\\n]*\\)\\s*\\{`);
+  const match=src.match(re);if(!match)throw new Error(`No encuentro ${name}`);
+  const start=match.index;const brace=start+match[0].lastIndexOf('{');let depth=0,quote='',esc=false;
+  for(let i=brace;i<src.length;i++){
+    const c=src[i];
+    if(quote){if(esc){esc=false;continue;}if(c==='\\'){esc=true;continue;}if(c===quote)quote='';continue;}
+    if(c==='"'||c==="'"||c==='`'){quote=c;continue;}
+    if(c==='{')depth++; else if(c==='}'&&--depth===0)return src.slice(start,i+1);
+  }
+  throw new Error(`Función incompleta ${name}`);
+}
+const context={console,JSON,Object,Array,Set,Number,String,Math,RegExp,Date,Intl,
+  V73_ANSWER_PLACEHOLDERS:Object.freeze(['amount','count','person','product','event','scope_text','people','items','events','subject','winner','winner_value','runner_up','runner_up_value','difference','metric','summary','detail']),
+  trim:v=>String(v??'').trim(),arr:v=>Array.isArray(v)?v:(v==null?[]:[v])};
+vm.createContext(context);
+for(const fn of ['v73NormalizeAnswerBlueprint','v73AssignReuseValue','v73PrepareAnalyticPlan','v73DatasetSchemaColumns','v73RenderAnswerBlueprint']){
+  vm.runInContext(`${extractFunction(fn)}; this.${fn}=${fn};`,context);
+}
+const {v73NormalizeAnswerBlueprint,v73AssignReuseValue,v73PrepareAnalyticPlan,v73DatasetSchemaColumns,v73RenderAnswerBlueprint}=context;
 
-const plan=v73NormalizePlan({
-  action:'query',response_kind:'amount',
-  answer_blueprint:{template:'En total, nos hemos gastado {amount} en {product} para {event}.'},
-  query:{domain:'purchases',scope:{kind:'named_event',event:'SySA 2026'},product:{text:'PAN',match:'family'}}
-});
-assert.equal(plan.answer_blueprint.template,'En total, nos hemos gastado {amount} en {product} para {event}.');
+assert.equal(v73NormalizeAnswerBlueprint({lead:'Ya son 100 €.'},'amount'),undefined,'lead con cifras rechazado');
+assert.equal(v73NormalizeAnswerBlueprint({lead:'Comprobando el dato...'},'amount'),undefined,'lead de proceso rechazado');
+assert.equal(v73NormalizeAnswerBlueprint({lead:'Sobre este punto, esto es lo que consta.'},'amount').lead,'Sobre este punto, esto es lo que consta.');
+assert.equal(v73RenderAnswerBlueprint({lead:'Te lo resumo de forma sencilla.'},{},'fallback'),'Te lo resumo de forma sencilla.');
+assert.equal(v73RenderAnswerBlueprint({template:'{amount} se ha gastado.'},{amount:'100,00 €'},'fallback'),'','template antiguo no sustituye la verdad factual');
 
-assert.equal(v73NormalizeAnswerBlueprint({template:'Ya son 100 €.'},'amount'),undefined,'un molde con cifras/hechos debe rechazarse');
-assert.equal(v73NormalizeAnswerBlueprint({template:'Sobre {person}, te cuento algo.'},'amount'),undefined,'amount debe contener {amount}');
-assert.equal(v73NormalizeAnswerBlueprint({template:'Resultado {unknown}.'},'summary'),undefined,'placeholder desconocido debe rechazarse');
+const q={person:'Vicente'};assert.equal(v73AssignReuseValue(q,'person','Pocholo').applied,false);assert.equal(q.person,'Vicente');
+const q2={};assert.equal(v73AssignReuseValue(q2,'person','Vicente').applied,true);assert.equal(q2.person,'Vicente');
+const semantic={action:'query',query:{domain:'purchases',scope:{kind:'all_events'},operations:[{type:'rank',reference:'Vicente'}]}};
+const exec=v73PrepareAnalyticPlan(semantic,{});assert.equal(semantic.query.operations[0].group_role,undefined);assert.equal(exec.query.operations[0].group_role,'responsible');
+assert.ok(v73DatasetSchemaColumns('purchases').includes('Importe'));assert.ok(v73DatasetSchemaColumns('purchases').includes('Responsable'));
 
-const payload=v73BuildAnswerPayload('amount','He preparado 1 registro.',ws,dataset,view,plan);
-assert.equal(payload.kind,'amount');
-assert.equal(payload.amount,'100,00 €');
-assert.equal(payload.product,'PAN');
-assert.equal(payload.event,'SySA 2026');
-const rendered=v73RenderAnswerBlueprint(plan.answer_blueprint,payload,'FALLBACK');
-assert.equal(rendered,'En total, nos hemos gastado 100,00 € en PAN para SySA 2026.');
-
-const whetherPlan=v73NormalizePlan({action:'query',response_kind:'whether',answer_blueprint:{yes_template:'Sí, {person} aparece en los datos.',no_template:'No, {person} no aparece en los datos.'},query:{domain:'purchases',scope:{kind:'all_events'},responsible:'Vicente'}});
-const yesPayload=v73BuildAnswerPayload('whether','canon',ws,dataset,view,whetherPlan);
-assert.equal(yesPayload.value,true);
-assert.equal(v73RenderAnswerBlueprint(whetherPlan.answer_blueprint,yesPayload,'fallback'),'Sí, Vicente aparece en los datos.');
-const noPlan={...whetherPlan,query:{...whetherPlan.query,responsible:'Pocholo'}};
-const noPayload=v73BuildAnswerPayload('whether','canon',ws,dataset,view,noPlan);
-assert.equal(noPayload.value,false,'whether debe comprobar el sujeto real, no solo row_count>0');
-assert.equal(v73RenderAnswerBlueprint(whetherPlan.answer_blueprint,noPayload,'fallback'),'No, Pocholo no aparece en los datos.');
-
-const composed=v73ComposeAnswer(plan,'He preparado 1 registro.',ws,dataset,view,{preamble:'Ahora recuerdo **Colty**, el pasado domingo, conversamos sobre compras.'});
-assert.equal(composed.used_blueprint,true);
-assert.match(composed.text,/100,00 €/);
-assert.match(composed.text,/Ahora recuerdo/);
-
-const duplicated='Ahora recuerdo **Colty**, el pasado domingo veintitrés de agosto de dos mil veintiséis, conversamos sobre Dossier personal · Pocholo. Ahora recuerdo **Colty**, el pasado domingo veintitrés de agosto de dos mil veintiséis, conversamos sobre Dossier personal · Pocholo. He preparado el dossier.';
-const stripped=v73StripRecallPreamble(duplicated);
-assert.equal(stripped,'He preparado el dossier.');
-
-console.log('ZUZU ANSWER BLUEPRINT / PAYLOAD: OK');
+assert.match(src,/const factual=v73AnswerForKind[\s\S]*\[trim\(preamble\),trim\(lead\),trim\(factual\)\]/,'la respuesta factual siempre se añade después del lead');
+assert.match(src,/normalizedPlan=compiled\.plan,plan=v73PrepareAnalyticPlan\(normalizedPlan,session\)/,'plan semántico preservado separado de interpretación física');
+assert.match(src,/REUSE no sobrescribe literales actuales/,'autoridad del turno actual trazada');
+console.log('ZUZU ANSWER BLUEPRINT / PAYLOAD / AUTHORITY: OK');

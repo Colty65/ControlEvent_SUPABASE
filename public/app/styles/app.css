@@ -1708,3 +1708,39 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .row-purchase-form input,
   .rowline.compra input{width:100%;min-width:0}
 }
+
+
+/* v3_0_exp · Mantenimiento COMPRAS/DONACIONES · Responsable legible.
+   En edición, Responsable baja a una segunda fila, arranca a la izquierda
+   y ocupa ancho suficiente para socios individuales y parejas. */
+@media (min-width: 901px){
+  .ce-fix23-edit-row .rowline.compra{
+    grid-template-columns:minmax(230px,1.65fr) minmax(80px,.42fr) minmax(100px,.54fr) minmax(105px,.58fr) minmax(160px,.88fr) minmax(175px,1fr) minmax(190px,1.08fr) !important;
+    gap:10px !important;
+    align-items:end;
+  }
+  .ce-fix23-edit-row .rowline.compra .ce-maint-responsable{
+    grid-column:1 / span 3 !important;
+    grid-row:2 !important;
+    min-width:360px !important;
+  }
+  .ce-fix23-edit-row .rowline.compra .ce-maint-responsable select{
+    width:100% !important;
+    min-width:360px !important;
+  }
+  .ce-fix23-edit-row .rowline.compra .ce-maint-actions{
+    grid-column:4 / -1 !important;
+    grid-row:2 !important;
+    justify-self:start;
+    align-self:end;
+    min-width:0;
+  }
+}
+@media (min-width: 901px) and (max-width: 1180px){
+  .ce-fix23-edit-row .rowline.compra .ce-maint-responsable{
+    grid-column:1 / span 4 !important;
+    min-width:320px !important;
+  }
+  .ce-fix23-edit-row .rowline.compra .ce-maint-responsable select{min-width:320px !important;}
+  .ce-fix23-edit-row .rowline.compra .ce-maint-actions{grid-column:5 / -1 !important;}
+}

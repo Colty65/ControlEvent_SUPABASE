@@ -24,6 +24,7 @@ check('RPC espera exactamente edit-donacion-responsable', /edit-donacion-respons
 check('RPC procesa save-donacion', /save-donacion/.test(rpc));
 check('Renderer activo carga después del RPC', html.indexOf('v8-5-compras-rpc-head-fix40.js')>=0 && html.indexOf('v17-fix23-performance-dom-event-scope.js')>html.indexOf('v8-5-compras-rpc-head-fix40.js'));
 check('Compras/Donaciones usan columnas proporcionales en escritorio', /row-purchase-form,[\s\S]*rowline\.compra[\s\S]*grid-template-columns:minmax\(220px,1\.75fr\)[\s\S]*minmax\(210px,1\.32fr\)/.test(css));
+check('Responsable edición baja a fila inferior y queda ancho', /ce-maint-responsable/.test(active) && /grid-column:1 \/ span 3/.test(css) && /min-width:360px/.test(css) && /ce-maint-actions/.test(active));
 
 const ko=tests.filter(([,ok])=>!ok);
 if(ko.length){console.error(`COMPRAS/DONACIONES MAINTENANCE: ${ko.length} KO`);process.exit(1);}
