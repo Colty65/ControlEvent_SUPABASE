@@ -13898,8 +13898,8 @@ async function runZuzuV72QueryKernelThin({userPrompt,state,selectedEventId,flowT
     }else return v72LabNoDataResult({turn,draft,flowTrace,model,policy,voiceConversation,reason:`Gemini emitió una clase no ejecutable (${turn.turn_class}); se conserva literalmente para diagnóstico.`});
 
     frame=v72PermissiveFrame(frame,base,state,selectedEventId,flowTrace);
-    if(!frame)return v72LabNoDataResult({turn,draft,flowTrace,model,policy,voiceConversation,reason:'Gemini no proporcionó domain; CE no inventa el objeto de datos.'});
-    if(turn.turn_class!=='transform_view'&&!v70SourceTool(frame))return v72LabNoDataResult({turn,draft,flowTrace,model,policy,voiceConversation,reason:`Gemini dejó domain=${trim(frame.domain)||'—'} sin una fuente canónica ejecutable. CE no lo transforma en otro dominio.`});
+    if(!frame)return v72LabNoDataResult({turn,draft,flowTrace,model,policy,voiceConversation,reason:'Zuzu no proporcionó domain; CE no inventa el objeto de datos.'});
+    if(turn.turn_class!=='transform_view'&&!v70SourceTool(frame))return v72LabNoDataResult({turn,draft,flowTrace,model,policy,voiceConversation,reason:`Zuzu dejó domain=${trim(frame.domain)||'—'} sin una fuente canónica ejecutable. CE no lo transforma en otro dominio.`});
     zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel Thin LAB · Frame ejecutable','OK',`domain=${frame.domain} · scope=${frame.scope.kind} · granularity=${frame.granularity} · source=${frame.source} · entidades=${[frame.filters.product_text,frame.filters.store,frame.filters.donor,frame.filters.person,frame.filters.responsible].filter(Boolean).join(' / ')||'—'} · campos=${arr(frame?.transform?.project).join(', ')||'TODOS LOS DE NEGOCIO'}.`);
 
     if(turn.turn_class==='transform_view'){
@@ -13907,7 +13907,7 @@ async function runZuzuV72QueryKernelThin({userPrompt,state,selectedEventId,flowT
       scopeInfo=v70ResolveScope(frame,base,state,selectedEventId);const view=v70ApplyView(frame,fake,scopeInfo,state,[]);ws=v70WorkingSetFromView(frame,view,fake,scopeInfo,last);result=fake;
     }else{
       const singleEventTools=new Set(['event_dossier','event_people','event_bank','event_bank_timeline','event_documentation','event_management','event_weather']),toolName=v70SourceTool(frame),probe=v70ResolveScope(frame,base,state,selectedEventId);
-      if(singleEventTools.has(toolName)&&probe.eventNames.length!==1)return v72LabNoDataResult({turn,draft,flowTrace,model,policy,voiceConversation,reason:`Gemini dejó ${toolName} con ${probe.eventNames.length} eventos. Esa fuente exige uno solo y CE no elige cuál ni reinterpreta el ámbito.`});
+      if(singleEventTools.has(toolName)&&probe.eventNames.length!==1)return v72LabNoDataResult({turn,draft,flowTrace,model,policy,voiceConversation,reason:`Zuzu dejó ${toolName} con ${probe.eventNames.length} eventos. Esa fuente exige uno solo y CE no elige cuál ni reinterpreta el ámbito.`});
       const executed=await v70ExecuteCanonicalSource(frame,base,state,selectedEventId,flowTrace);result=executed.result;scopeInfo=executed.scopeInfo;const view=v70ApplyView(frame,result,scopeInfo,state,executed.productNames);ws=v70WorkingSetFromView(frame,view,result,scopeInfo,last);
     }
     if(!ws)return v72LabNoDataResult({turn,draft,flowTrace,model,policy,voiceConversation,reason:'La fuente no llegó a materializar un DATASET reutilizable; se conserva la traza y no se destruye el contexto anterior.'});
@@ -13920,7 +13920,7 @@ async function runZuzuV72QueryKernelThin({userPrompt,state,selectedEventId,flowT
     draft.active_dataset=ws;draft.last_view=ws;draft.current_frame=v70PublicFrame({...frame,scope:{...(frame.scope||{}),kind:scopeInfo.kind,event:scopeInfo.eventNames.length===1?scopeInfo.eventNames[0]:trim(frame?.scope?.event),events:scopeInfo.kind==='named_events'?scopeInfo.eventNames:arr(frame?.scope?.events),year:scopeInfo.year,count:scopeInfo.count,order:scopeInfo.order,base:scopeInfo.base}});{const entityMode=trim(turn?.delta?.entities?.mode),seed=turn.turn_class==='new_query'||(turn.turn_class==='modify_query'&&['replace','clear'].includes(entityMode))?{}:(draft.focus_entities||base.focus_entities||{});draft.focus_entities=turn.turn_class==='transform_view'?{...(seed||{})}:v72FocusFromFrame(draft.current_frame,seed);}draft.pending=null;draft.failure_count=0;v70ScopeFocus(draft,scopeInfo);draft.updated_at=new Date().toISOString();
 
     const tables=frame.presentation.table?v70PresentationFromWorking(ws):[],charts=frame.presentation.chart?v72ChartFromWorking(ws,flowTrace):[];
-    if(frame.presentation.reasoned)v72LabWarn(flowTrace,'Gemini pidió reasoned=true, pero en LAB no se realiza una segunda llamada de redacción: CE responde con el resumen canónico del DATASET para mantener una sola interpretación IA.');
+    if(frame.presentation.reasoned)v72LabWarn(flowTrace,'Zuzu pidió reasoned=true, pero en LAB no se realiza una segunda llamada de redacción: CE responde con el resumen canónico del DATASET para mantener una sola interpretación IA.');
     const answer=v70CanonicalAnswer(frame,result,ws,scopeInfo),files=[];
     for(const t of tables.slice(0,6)){const objs=t.rows.map(r=>Object.fromEntries(t.columns.map((c,i)=>[c,r[i]])));files.push({filename:fileSafe(`${t.title}_v3_0_exp.csv`),mime:'text/csv;charset=utf-8',content:csvFromRows(t.columns,objs)});}
     const resultContext=v72KernelResultContext(draft),usage=summarizeGeminiUsageFromTrace(flowTrace);
@@ -13929,11 +13929,11 @@ async function runZuzuV72QueryKernelThin({userPrompt,state,selectedEventId,flowT
   }catch(error){
     const preserved=JSON.parse(JSON.stringify(base));preserved.failure_count=Math.min(9,(Number(base?.failure_count)||0)+1);const resultContext=v72KernelResultContext(preserved),usage=summarizeGeminiUsageFromTrace(flowTrace),origin=trim(error?._ceOrigin)||'controlevent';
     if(origin==='gemini'){
-      zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel Thin LAB · fallo técnico Gemini','WARN',`${cleanGeminiError(error)}. No existe reparación IA ni interpretación alternativa.`);
-      return{ok:true,rejected:false,title:'Gemini no pudo emitir el turno',answer:'Gemini no llegó a emitir una salida utilizable en este turno. ControlEvent no ha intentado corregirla ni sustituirla; el contexto anterior queda intacto.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-query-kernel-thin-lab-gemini-error',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel Thin · LAB permisivo · fallo técnico Gemini',modelTier:policy.tier,resetInteractionId:true,pendingAction:preserved.pending||null,resultContext,tools:['zuzu_turn_thin'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+      zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel Thin LAB · fallo técnico Zuzu','WARN',`${cleanGeminiError(error)}. No existe reparación IA ni interpretación alternativa.`);
+      return{ok:true,rejected:false,title:'Zuzu no pudo emitir el turno',answer:'Zuzu no llegó a emitir una salida utilizable en este turno. ControlEvent no ha intentado corregirla ni sustituirla; el contexto anterior queda intacto.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-query-kernel-thin-lab-gemini-error',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel Thin · LAB permisivo · fallo técnico Zuzu',modelTier:policy.tier,resetInteractionId:true,pendingAction:preserved.pending||null,resultContext,tools:['zuzu_turn_thin'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
     }
     zuzuTracePush(flowTrace,'v3_0_exp · Query Kernel Thin LAB · fallo técnico CE','KO',`${cleanGeminiError(error)}. Este sí es un fallo de ejecución, no una incoherencia semántica filtrada.`);
-    return{ok:true,rejected:false,title:'ControlEvent no pudo ejecutar el turno',answer:'Se ha producido un fallo técnico real de ControlEvent al ejecutar este turno. Las incoherencias semánticas ya no bloquean; por tanto este fallo debe estudiarse como ejecución/fuente y no como decisión de Gemini.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-query-kernel-thin-lab-ce-error',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel Thin · LAB permisivo · fallo técnico CE',modelTier:policy.tier,resetInteractionId:true,pendingAction:preserved.pending||null,resultContext,tools:['zuzu_turn_thin'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'ControlEvent no pudo ejecutar el turno',answer:'Se ha producido un fallo técnico real de ControlEvent al ejecutar este turno. Las incoherencias semánticas ya no bloquean; por tanto este fallo debe estudiarse como ejecución/fuente y no como decisión de Zuzu.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-query-kernel-thin-lab-ce-error',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Query Kernel Thin · LAB permisivo · fallo técnico CE',modelTier:policy.tier,resetInteractionId:true,pendingAction:preserved.pending||null,resultContext,tools:['zuzu_turn_thin'],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
   }
 }
 
@@ -13984,10 +13984,9 @@ function v73CommandTools(){
       scope_kind:str,event:str,events:list,series:str,year:integer,count:integer,order:str,start_date:str,end_date:str,
       product_text:str,product_match:str,people:list,responsibles:list,donors:list,stores:list,tickets:list,purchase_statuses:list,
       fields:list,table:bool,summary:bool,chart:bool,chart_type:str,chart_x:str,chart_series:list,
-      group_field:str,group_role:str,metric:str,metric_role:str,aggregation:str,
       operations_json:str,reuse_json:str,supplements_json:str,lead:str,voice_lead:str
     },['targets','scope_kind']),
-    make('ce_local','Opera SOLO sobre el dataset CURRENT de la sesión. Gemini no maneja IDs físicos ni referencias Tn para transformaciones locales; operations_json debe ser un array JSON de operaciones CE.',{
+    make('ce_local','Opera SOLO sobre el dataset CURRENT de la sesión. Zuzu no maneja IDs físicos ni referencias Tn para transformaciones locales; operations_json debe ser un array JSON de operaciones CE.',{
       response_kind:str,operations_json:str,lead:str,voice_lead:str
     },['operations_json']),
     make('ce_set_context','Cambia solo el foco conversacional; no consulta datos.',{
@@ -14017,9 +14016,7 @@ function v73CommandCallToRaw(call={}){
     for(const k of ['people','responsibles','donors','stores','tickets','purchase_statuses']){const vals=arr(a[k]).map(trim).filter(Boolean);if(vals.length)q[k]=vals;}
     const fields=arr(a.fields).map(trim).filter(Boolean);if(fields.length)q.fields={mode:'only',values:fields};
     const pres={};if(typeof a.table==='boolean')pres.table=a.table;if(typeof a.summary==='boolean')pres.summary=a.summary;if(typeof a.chart==='boolean')pres.chart=a.chart;if(trim(a.chart_type))pres.chart_type=trim(a.chart_type);if(trim(a.chart_x)||arr(a.chart_series).length){pres.chart_config={chart_type:trim(a.chart_type)||'line',...(trim(a.chart_x)?{x_field:trim(a.chart_x)}:{}),...(arr(a.chart_series).length?{series:arr(a.chart_series).map(trim).filter(Boolean)}:{})};pres.chart=true;}if(Object.keys(pres).length)q.presentation=pres;
-    const ops=v73CompactJsonArg(a.operations_json,[]),compactOps=Array.isArray(ops)?ops.slice():[];
-    if(trim(a.group_field)||trim(a.group_role)||trim(a.metric)||trim(a.metric_role))compactOps.unshift({type:'group',...(trim(a.group_field)?{group_field:trim(a.group_field)}:{}),...(trim(a.group_role)?{group_role:trim(a.group_role)}:{}),...(trim(a.metric)?{metric:trim(a.metric)}:{}),...(trim(a.metric_role)?{metric_role:trim(a.metric_role)}:{}),...(trim(a.aggregation)?{aggregation:trim(a.aggregation)}:{})});
-    if(compactOps.length)q.operations=compactOps;
+    const ops=v73CompactJsonArg(a.operations_json,[]);if(Array.isArray(ops)&&ops.length)q.operations=ops;
     const reuse=v73CompactJsonArg(a.reuse_json,[]);if(Array.isArray(reuse)&&reuse.length)q.reuse=reuse;
     const supplements=v73CompactJsonArg(a.supplements_json,[]);if(Array.isArray(supplements)&&supplements.length)q.supplements=supplements;
     const bp=blueprint();return{action:'query',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(bp?{answer_blueprint:bp}:{}),query:q};
@@ -14046,7 +14043,7 @@ function v73NormalizeScope(raw={}){
   const out={kind},event=trim(raw?.event),events=arr(raw?.events).map(trim).filter(Boolean).slice(0,40);
   // Adaptación física del contrato, no interpretación lingüística: named_event acepta
   // event o una lista events de un solo elemento; named_events acepta events o event.
-  // El nombre emitido por Gemini se conserva literalmente, sin resolverlo ni sustituirlo aquí.
+  // El nombre emitido por Zuzu se conserva literalmente, sin resolverlo ni sustituirlo aquí.
   if(kind==='named_event'){const one=event||events[0]||'';if(one)out.event=one;}
   else if(kind==='named_events'){if(events.length)out.events=events;else if(event)out.events=[event];}
   else if(kind==='event_series'&&trim(raw?.series))out.series=trim(raw.series);
@@ -14182,7 +14179,7 @@ function v73RecentDistinctEntities(session={},role='person',limit=2){
 }
 function v73PrepareAnalyticPlan(plan={},session={}){
   // INTERPRETACIÓN MECÁNICA PARA EJECUCIÓN. No cambia entidades, scope,
-  // referencias ni valores semánticos emitidos por Gemini. Solo completa
+  // referencias ni valores semánticos emitidos por Zuzu. Solo completa
   // detalles físicos implícitos del operador usando capabilities del dominio.
   const p=JSON.parse(JSON.stringify(plan||{})),composite=p.action==='query'&&arr(p?.query?.targets).length>1,domain=composite?'':trim(v73PrimaryDomain(p?.query||{})||session?.currentTurn?.execution?.domain||session?.dataset?.domain),ops=p.action==='query'?arr(p?.query?.operations):p.action==='local'?arr(p?.local?.operations):[];
   const defaults=composite?{}:({purchases:{group_role:'responsible',metric_role:'amount'},donations:{group_role:'donor',metric_role:'amount'},people:{group_role:'person',metric_role:'count'},products:{group_role:'product',metric_role:'amount'},comparison:{group_role:'event',metric_role:'amount'}}[domain]||{});
@@ -14192,7 +14189,7 @@ function v73PrepareAnalyticPlan(plan={},session={}){
     if(!trim(op.metric_role)&&!trim(op.metric)&&defaults.metric_role)op.metric_role=defaults.metric_role;
     if(type==='rank'&&!op.limit&&!trim(op.reference))op.limit=3;
     // No se inventan op.values para compare: «los dos» debe venir interpretado
-    // por Gemini desde RECENT_HOMOGENEOUS/RECENT_TURNS.
+    // por Zuzu desde RECENT_HOMOGENEOUS/RECENT_TURNS.
   }
   return p;
 }
@@ -14341,7 +14338,7 @@ TABLAS, FILTROS Y GRÁFICAS
 - En filtros de texto, exact solo para igualdad completa; para familia/categoría usa contains o semantic.
 - Si se especifican x_field, series, group_field o metric, consérvalos literalmente.
 - Varias gráficas distintas en un turno => varias operaciones chart dentro de operations_json.
-- CÁLCULOS: Gemini decide QUÉ calcular y CE calcula. Si CURRENT_USER pide «cuánto por cada X», total por grupo, promedio, mínimo, máximo o conteo agrupado, emite una operación group explícita con group_field/group_role, metric/metric_role y aggregation. Para el caso simple puedes usar los argumentos compactos group_field, group_role, metric, metric_role y aggregation de ce_query. NO delegues sumas/promedios/conteos a Gemini 2 ni confíes en que los deduzca de filas crudas.
+- CÁLCULOS: Zuzu decide QUÉ calcular y CE calcula. Si CURRENT_USER pide «cuánto por cada X», total por grupo, promedio, mínimo, máximo o conteo agrupado, incluye en operations_json una operación group explícita con group_field/group_role, metric/metric_role y aggregation. NO existen campos compactos de agrupación en ce_query: toda agregación viaja por operations_json. NO delegues sumas/promedios/conteos a la redacción final ni confíes en que los deduzca de filas crudas.
 
 CAMPOS PRINCIPALES
 purchases: Evento, Producto, Segmento, Destino, Unidades, Precio, Importe, Ticket u otros gastos, Tienda, Responsable.
@@ -14359,24 +14356,24 @@ function v73KernelInput(userPrompt='',session={},entityCandidates={},historyCand
 async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext={}}){
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'',instruction=v73KernelInstruction(state,selectedEventId,display,timeContext),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates,display,screen,timeContext),tools=v73CommandTools(),allowed=tools.map(t=>t.name);let model=policy.model,payload;
   const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1500});
-  try{payload=await call('v3_0_exp · Ledger · Gemini elige comando CE',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Lite no emitió un comando CE utilizable (${cleanGeminiError(error)}). Flash recibe exactamente la misma petición y catálogo de comandos.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash elige comando CE',model);}else{error._ceOrigin='gemini';throw error;}}
-  const parseCommand=(pl)=>{const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Gemini debe emitir exactamente UN comando CE; emitió ${calls.length}.`);e._ceOrigin='gemini';throw e;}const command=trim(calls[0].name),raw=v73CommandCallToRaw(calls[0]),plan=v73NormalizePlan(raw),protocolError=v73ProtocolViolation(raw,plan);if(protocolError)plan._protocol_error=protocolError;return{command,raw,plan,protocolError};};
+  try{payload=await call('v3_0_exp · Ledger · Zuzu elige comando CE',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Zuzu Lite no emitió un comando CE utilizable (${cleanGeminiError(error)}). Zuzu Flash recibe exactamente la misma petición y catálogo de comandos.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash elige comando CE',model);}else{error._ceOrigin='gemini';throw error;}}
+  const parseCommand=(pl)=>{const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Zuzu debe emitir exactamente UN comando CE; emitió ${calls.length}.`);e._ceOrigin='gemini';throw e;}const command=trim(calls[0].name),raw=v73CommandCallToRaw(calls[0]),plan=v73NormalizePlan(raw),protocolError=v73ProtocolViolation(raw,plan);if(protocolError)plan._protocol_error=protocolError;return{command,raw,plan,protocolError};};
   let parsed=parseCommand(payload);
   if(parsed.protocolError){
-    zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN GEMINI','WARN',`${parsed.protocolError} CE no repara el significado; solicita a Gemini un único comando válido.`);
+    zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU','WARN',`${parsed.protocolError} CE no repara el significado; solicita a Zuzu un único comando válido.`);
     const repairInput=`${input}\n\nRECHAZO_ESTRUCTURAL_CE:\n${parsed.protocolError}\nReemite EXACTAMENTE una tool CE válida. Conserva la intención de CURRENT_USER; corrige solo la estructura que viola el contrato.`;
-    try{const repairedPayload=await v261CallInteraction({input:repairInput,previousInteractionId:'',model,systemInstruction:instruction,tools,flowTrace,stage:'v3_0_exp · Ledger · Gemini recompila comando CE',toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1500});const candidate=parseCommand(repairedPayload);if(!candidate.protocolError)parsed=candidate;else zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN GEMINI','KO',candidate.protocolError);}catch(repairError){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN GEMINI','KO',cleanGeminiError(repairError));}
+    try{const repairedPayload=await v261CallInteraction({input:repairInput,previousInteractionId:'',model,systemInstruction:instruction,tools,flowTrace,stage:'v3_0_exp · Ledger · Zuzu recompila comando CE',toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1500});const candidate=parseCommand(repairedPayload);if(!candidate.protocolError)parsed=candidate;else zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU','KO',candidate.protocolError);}catch(repairError){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU','KO',cleanGeminiError(repairError));}
   }
   const {command,raw,plan,protocolError}=parsed;
-  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMANDO GEMINI','INFO',`${command} · ${JSON.stringify(raw).slice(0,5000)}`);
+  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMANDO ZUZU','INFO',`${command} · ${JSON.stringify(raw).slice(0,5000)}`);
   zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO',protocolError?'WARN':'OK',JSON.stringify(plan).slice(0,5000));
-  if(protocolError)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CONTRATO GEMINI','KO',`${protocolError} El catálogo de comandos evita mezclar acciones; CE no ejecutará un plan alternativo.`);
-  if(plan.answer_blueprint)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ANSWER_BLUEPRINT','OK',`Gemini aporta solo una pista de tono (${Object.keys(plan.answer_blueprint).join(', ')}). La respuesta factual final la redactará Gemini después de recibir el resultado real de CE; CE no añadirá texto propio.`);
+  if(protocolError)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CONTRATO ZUZU','KO',`${protocolError} El catálogo de comandos evita mezclar acciones; CE no ejecutará un plan alternativo.`);
+  if(plan.answer_blueprint)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ANSWER_BLUEPRINT','OK',`Zuzu aporta solo una pista de tono (${Object.keys(plan.answer_blueprint).join(', ')}). La respuesta factual final la redactará Zuzu después de recibir el resultado real de CE; CE no añadirá texto propio.`);
   return{raw,plan,model,command};
 }
 
-// v3_0_exp · ESCAPE LIBRE: después de ejecutar literalmente el plan de Gemini, CE devuelve
-// los datos resultantes a Gemini para que redacte la respuesta final. Esa respuesta se guarda y
+// v3_0_exp · ESCAPE LIBRE: después de ejecutar literalmente el plan de Zuzu, CE devuelve
+// los datos resultantes a Zuzu para que redacte la respuesta final. Esa respuesta se guarda y
 // se entrega SIN pulido, reparación, prefacios, plantillas ni reescrituras de ControlEvent.
 function v73RawFinalRecentTurns(session={}){
   return arr(session?.recentTurns).slice(-6).map(t=>({
@@ -14427,7 +14424,7 @@ function v73ApplyRequestedChartType(charts=[],intent={}){
 function v73FinalPresentationSchema(){return{type:'object',properties:{title:{type:'string'},written_answer:{type:'string'},spoken_answer:{type:'string'},presentation:{type:'object',properties:{table:{type:'boolean'},chart:{type:'boolean'},chart_type:{type:'string',enum:['bar','line','pie','donut','horizontalBar','none']}},required:['table','chart','chart_type']}},required:['title','written_answer','spoken_answer','presentation']};}
 function v73FinalPresentationTool(){return{type:'function',name:'zuzu_final_presentation',description:'Entrega las dos redacciones finales y la decisión de artefactos.',parameters:v73FinalPresentationSchema()};}
 function v73RawFinalInstruction(){
-  return `Eres Zuzu. Estás en la fase FINAL de un turno de ControlEvent. Gemini ya interpretó la petición y ControlEvent ejecutó exactamente ese plan. Tu trabajo ahora es PRESENTAR el resultado con calidad humana.
+  return `Eres Zuzu. Estás en la fase FINAL de un turno de ControlEvent. Zuzu ya interpretó la petición y ControlEvent ejecutó exactamente ese plan. Tu trabajo ahora es PRESENTAR el resultado con calidad humana. Zuzu es MASCULINO: habla siempre de ti en masculino. Tu carácter es directo, rudo en el buen sentido, seguro y con presencia; cercano cuando toca, pero sin sonar blando, cursi ni servicial en exceso. La voz debe imaginarse grave y potente, con frases naturales y firmes.
 
 CONTRATO DE PRESENTACIÓN
 - compiled_action/plan_executed del TURNO ACTUAL tiene autoridad absoluta. No existe memoria factual implícita de turnos anteriores.
@@ -14445,7 +14442,7 @@ CONTRATO DE PRESENTACIÓN
 - AUTORIDAD DE MÉTRICA: si plan_executed declara metric_role=units, la respuesta principal es cantidad física aunque el mismo DATASET contenga importes; si declara amount, la principal es económica; si declara count, es cardinalidad. No cambies una métrica por otra solo porque exista otra columna numérica.
 - presentation decide artefactos adicionales, PERO NO puede suprimir un artefacto ya pedido en plan_executed: si plan_executed contiene show_table o presentation.table=true, devuelve table=true; si contiene chart o presentation.chart=true, devuelve chart=true. Puedes añadir artefactos útiles, nunca vetar los explícitos. Elige chart_type adecuado; usa none solo si chart=false.
 - Si table o chart son true, NO dupliques en written_answer las filas o puntos completos: explica la conclusión y deja el detalle al artefacto de ControlEvent.
-- ARITMÉTICA: NO calcules sumas, promedios, mínimos, máximos, porcentajes derivados ni conteos recorriendo filas del dataset. Gemini 1 decide la operación y CE debe devolver el resultado ya calculado. Puedes citar únicamente agregados/facts o filas agrupadas que RESULTADO_CE ya haya calculado. Si falta el agregado necesario, dilo; no hagas tú la cuenta.
+- ARITMÉTICA: NO calcules sumas, promedios, mínimos, máximos, porcentajes derivados ni conteos recorriendo filas del dataset. Zuzu, en la fase de interpretación, decide la operación y CE debe devolver el resultado ya calculado. Puedes citar únicamente agregados/facts o filas agrupadas que RESULTADO_CE ya haya calculado. Si falta el agregado necesario, dilo; no hagas tú la cuenta.
 - NO vuelvas a decidir otra consulta, NO corrijas el plan anterior y NO pidas herramientas.
 - NO inventes datos que no estén en RESULTADO_CE. Si el plan fue erróneo, incompleto o RESULTADO_CE contiene un error, dilo con naturalidad: el fallo debe quedar visible.
 - No menciones PLAN, DATASET, VIEW, JSON, herramientas, oráculo, pruebas o capas internas salvo pregunta expresa.
@@ -14478,12 +14475,12 @@ async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,d
   const finalTool=v73FinalPresentationTool(),baseInput=`PREGUNTA Y RESULTADO REAL DEL TURNO:\n${JSON.stringify(packet)}`;
   const callFinal=async(stage,input)=>v261CallInteraction({input,previousInteractionId:'',model,systemInstruction:v73RawFinalInstruction(),tools:[finalTool],flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:['zuzu_final_presentation']}},externalSignal,maxCalls:2,maxOutputTokens:1800});
   let payload;
-  try{payload=await callFinal('v3_0_exp · PRESENTACIÓN · Gemini redacta pantalla + voz',baseInput);}catch(error){
+  try{payload=await callFinal('v3_0_exp · PRESENTACIÓN · Zuzu redacta pantalla + voz',baseInput);}catch(error){
     const msg=cleanGeminiError(error);if(!/invalid json|json syntax|could not be parsed|no devolvi[oó].*presentaci[oó]n/i.test(msg))throw error;
     zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · REINTENTO JSON','WARN',`${msg}. Se reintenta una sola vez con el MISMO resultado CE y sin cambiar la semántica.`);
-    payload=await callFinal('v3_0_exp · PRESENTACIÓN · Gemini reintenta JSON',`${baseInput}\n\nREINTENTO_TECNICO: La salida anterior no fue JSON/tool válida. Emite EXACTAMENTE una llamada zuzu_final_presentation válida. No cambies hechos, cifras, ámbito ni conclusión.`);
+    payload=await callFinal('v3_0_exp · PRESENTACIÓN · Zuzu reintenta JSON',`${baseInput}\n\nREINTENTO_TECNICO: La salida anterior no fue JSON/tool válida. Emite EXACTAMENTE una llamada zuzu_final_presentation válida. No cambies hechos, cifras, ámbito ni conclusión.`);
   }
-  const final=v73RawFinalParse(payload);if(!trim(final.written)){const e=new Error('Gemini no devolvió redacción escrita en la fase final.');e._ceOrigin='gemini';throw e;}
+  const final=v73RawFinalParse(payload);if(!trim(final.written)){const e=new Error('Zuzu no devolvió redacción escrita en la fase final.');e._ceOrigin='gemini';throw e;}
   return final;
 }
 function v73RowsForStored(dataset=null,view=null){
@@ -14673,7 +14670,7 @@ function v73ApplyTypedEntityFilters(frame={},rows=[]){
 }
 function v73ApplyLocalOperations(bundle={},operations=[],flowTrace=[]){
   const ds=bundle.dataset;if(!ds)return{error:'El turno referenciado no conserva un DATASET.',warnings:[]};
-  const ops=arr(operations).filter(x=>trim(x?.type));if(!ops.length){const msg='Gemini clasificó el turno como LOCAL pero no emitió ninguna operación. DATASET y VIEW permanecen intactos y no se consulta BBDD.';v72LabWarn(flowTrace,msg);return{error:msg,warnings:[msg],unchanged:true,view:bundle.view||null,rows:v73RowsForStored(ds,bundle.view||{})};}
+  const ops=arr(operations).filter(x=>trim(x?.type));if(!ops.length){const msg='Zuzu clasificó el turno como LOCAL pero no emitió ninguna operación. DATASET y VIEW permanecen intactos y no se consulta BBDD.';v72LabWarn(flowTrace,msg);return{error:msg,warnings:[msg],unchanged:true,view:bundle.view||null,rows:v73RowsForStored(ds,bundle.view||{})};}
   const base=bundle.view||{visibleFields:v73BusinessFields(ds.columns),sort:[],rowFilters:[],groupBy:[],metrics:[],rowLimit:null,presentation:{table:true,summary:true,chart:false},title:bundle.turn?.title||'Datos'},v=JSON.parse(JSON.stringify(base));if(!arr(v.visibleFields).length)v.visibleFields=v73BusinessFields(ds.columns);const columns=arr(ds.columns),warnings=[],explicitChartRequested=ops.some(o=>trim(o?.type)==='chart');let chartOpsSeen=0;
   const warn=msg=>{warnings.push(msg);v72LabWarn(flowTrace,msg);};
   const resolve=(f,roleHint='',kind='role')=>{let available=columns.slice();if(arr(v.groupBy).length){const grouped=v70ApplyGroup(arr(ds.rows),arr(v.groupBy),arr(v.metrics));if(grouped?.length)available=[...new Set([...available,...Object.keys(grouped[0]||{})])];}const k=v70FieldKey([Object.fromEntries(available.map(c=>[c,'']))],f)||available.find(c=>norm(c)===norm(f));if(k)return k;const inferred=trim(roleHint)||v73RoleFromLabel(f,ds?.domain),resolvedKind=(kind==='role'&&['amount','units'].includes(inferred))?'metric':kind;return v73FieldFromCapability({...ds,columns:available},f,resolvedKind,inferred)||'';};
@@ -14926,25 +14923,25 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const historyCandidates=usePending?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v3_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
-  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW14','INFO',JSON.stringify(entityCandidates).slice(0,2800));
+  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW14A','INFO',JSON.stringify(entityCandidates).slice(0,2800));
 
   let compiled;
   try{compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone}});}
   catch(error){
-    zuzuTracePush(flowTrace,'v3_0_exp · Ledger · fallo de compilación Gemini','WARN',`${cleanGeminiError(error)}. El fallo se registra como turno inmutable y no altera el turno anterior.`);
-    const answer='Gemini no llegó a emitir un registro ejecutable en este turno. He conservado intacta la conversación anterior y he guardado el fallo para auditoría.';
+    zuzuTracePush(flowTrace,'v3_0_exp · Ledger · fallo de compilación Zuzu','WARN',`${cleanGeminiError(error)}. El fallo se registra como turno inmutable y no altera el turno anterior.`);
+    const answer='Zuzu no llegó a emitir un registro ejecutable en este turno. He conservado intacta la conversación anterior y he guardado el fallo para auditoría.';
     const execution={summary:cleanGeminiError(error),error:cleanGeminiError(error),debug_trace:arr(flowTrace).slice(0,160)};
-    const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'},execution,datasetId:session?.currentTurn?.datasetId||'',viewId:session?.currentTurn?.viewId||'',parentTurnId:session?.currentTurn?.turnId||'',status:'WARN',title:'Gemini no pudo interpretar el turno',answer,selectedEventId});
+    const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'},execution,datasetId:session?.currentTurn?.datasetId||'',viewId:session?.currentTurn?.viewId||'',parentTurnId:session?.currentTurn?.turnId||'',status:'WARN',title:'Zuzu no pudo interpretar el turno',answer,selectedEventId});
     const resultContext=v73LightContext(saved.conversation,saved.turn,session?.dataset||null,session?.view||null),usage=summarizeGeminiUsageFromTrace(flowTrace);
-    return{ok:true,rejected:false,title:'Gemini no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Ledger Inmutable v1 · fallo compilación registrado',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',architecture:'Zuzu Ledger Inmutable v1 · fallo compilación registrado',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
   }
 
   const raw=compiled.raw,normalizedPlan=compiled.plan,plan=v73PrepareAnalyticPlan(normalizedPlan,session),model=compiled.model,command=compiled.command,parentTurnId=session?.currentTurn?.turnId||'';
-  if(JSON.stringify(plan)!==JSON.stringify(normalizedPlan))zuzuTracePush(flowTrace,'v3_0_exp · Ledger · interpretación física CE','INFO',`CE completa solo detalles físicos de operación; el registro semántico de Gemini se conserva intacto. EXEC=${JSON.stringify(plan).slice(0,3200)}`);
+  if(JSON.stringify(plan)!==JSON.stringify(normalizedPlan))zuzuTracePush(flowTrace,'v3_0_exp · Ledger · interpretación física CE','INFO',`CE completa solo detalles físicos de operación; el registro semántico de Zuzu se conserva intacto. EXEC=${JSON.stringify(plan).slice(0,3200)}`);
   let title='Zuzu',answer='',tables=[],charts=[],files=[],status='OK',dataset=null,view=null,datasetId='',viewId='',referencedTurnId='',execution={},finalBundle=null,turnWarnings=[],answerPayload={},answerBlueprintUsed=false;
   try{
     if(plan._protocol_error){
-      status='KO';title='Salida Gemini no ejecutable';answer='';execution={summary:plan._protocol_error,error:plan._protocol_error,protocol_error:plan._protocol_error};
+      status='KO';title='Salida Zuzu no ejecutable';answer='';execution={summary:plan._protocol_error,error:plan._protocol_error,protocol_error:plan._protocol_error};
       zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ejecución omitida por contrato','KO',`${plan._protocol_error} CE no reubica bloques, no inventa referencias y no ejecuta un plan alternativo.`);
     }else if(plan.action==='conversation'){
       const kind=trim(plan?.conversation?.kind)||'general';
@@ -15006,7 +15003,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
       const preamble=await v73RecallPreambleForReuse(plan.query,session,historyCandidates,actor,display,userPrompt),reused=await v73ApplyReuse(plan.query,session,historyCandidates,actor,flowTrace);
       if(arr(reused?.targets).length>1){const built=await v73ExecuteCompositePlan(reused,state,selectedEventId,flowTrace);dataset=built.dataset;view=built.view;tables=built.tables;charts=built.charts;title=built.title;if(built.warnings.length){status='WARN';turnWarnings.push(...built.warnings);}const composed=v73ComposeAnswer(plan,built.canonical,built.ws,built.dataset,built.view,{preamble,voice:voiceConversation});answer=composed.text;answerPayload=composed.payload;answerBlueprintUsed=composed.used_blueprint;execution=v73ExecutionMeta(built.frame,built.scopeInfo,built.ws,`${title}${built.warnings.length?` · ${built.warnings.join(' ')}`:''}`);execution.resolved_query=built.resolved_query;}
       else{const cert=v73CertifyQuery(reused,state,flowTrace);if(cert.error){status='WARN';answer=`No puedo ejecutar todavía esta consulta: ${cert.error} He conservado el historial y no he ampliado la petición.`;execution={summary:cert.error};}
-      else{const resolved=cert.query,frame=v73FrameFromQuery(resolved);if(!trim(frame.domain)){status='WARN';answer='Gemini no indicó qué objeto de información consultar. No he inventado uno.';execution={summary:'QUERY sin domain.'};}
+      else{const resolved=cert.query,frame=v73FrameFromQuery(resolved);if(!trim(frame.domain)){status='WARN';answer='Zuzu no indicó qué objeto de información consultar. No he inventado uno.';execution={summary:'QUERY sin domain.'};}
         else if(v72ScopeIsStructurallyInvalid(frame.scope)||!v73ScopeValid(frame.scope)){status='WARN';answer='La consulta quedó sin un ámbito ejecutable completo. He conservado el historial y no he ampliado la consulta a otros eventos.';execution={domain:frame.domain,scope:frame.scope,focus:v72FocusFromFrame(frame,{}),summary:'QUERY con scope incompleto.'};}
         else{const ex=await v73ExecuteResolvedQuery(frame,resolved,state,selectedEventId,flowTrace),built=v73MaterializeQueryResult(frame,resolved,{...ex,state},flowTrace);dataset=built.dataset;view=built.view;tables=built.tables;charts=built.charts;title=built.title||'Respuesta de Zuzu';if(built.warnings.length){status='WARN';turnWarnings.push(...built.warnings);}const composed=v73ComposeAnswer(plan,built.canonical,built.ws,built.dataset,built.view,{preamble,voice:voiceConversation});answer=composed.text;answerPayload=composed.payload;answerBlueprintUsed=composed.used_blueprint;execution=v73ExecutionMeta(frame,ex.scopeInfo,built.ws,`${title}${built.warnings.length?` · ${built.warnings.join(' ')}`:''}`);}}}
     }
@@ -15014,17 +15011,17 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
 
   let spokenAnswer='',finalPresentation={};
 
-  // ESCAPE LIBRE: la contestación que ve el usuario sale de Gemini DESPUÉS de recibir el resultado CE.
+  // ESCAPE LIBRE: la contestación que ve el usuario sale de Zuzu DESPUÉS de recibir el resultado CE.
   // La redacción determinista calculada arriba sirve solo como dato interno de ejecución y jamás se
-  // usa para sustituir, corregir o pulir el texto final de Gemini.
+  // usa para sustituir, corregir o pulir el texto final de Zuzu.
   try{
     const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation,audience:{usuario:profile.identificacion||display,nombre:profile.nombre||display,nivel:profile.nivel}});
     title=rawFinal.title||title;answer=rawFinal.written;spokenAnswer=rawFinal.spoken;finalPresentation=rawFinal.presentation||{};
     execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:rawFinal.written,gemini_spoken_answer:rawFinal.spoken,gemini_presentation:finalPresentation,response_mode:'gemini_dual_presentation'};
-    zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · RESPUESTA GEMINI','OK',`Pantalla=${text(rawFinal.written).length} caracteres · voz=${text(rawFinal.spoken).length} caracteres · tabla=${finalPresentation.table?'sí':'no'} · gráfica=${finalPresentation.chart?'sí':'no'}. CE no reescribe ninguna de las dos redacciones.`);
+    zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(rawFinal.written).length} caracteres · voz=${text(rawFinal.spoken).length} caracteres · tabla=${finalPresentation.table?'sí':'no'} · gráfica=${finalPresentation.chart?'sí':'no'}. CE no reescribe ninguna de las dos redacciones.`);
   }catch(finalError){
     status=status==='KO'?'KO':'WARN';
-    answer=`Gemini no pudo emitir la respuesta final de este turno: ${cleanGeminiError(finalError)}`;spokenAnswer=answer;finalPresentation={};
+    answer=`Zuzu no pudo emitir la respuesta final de este turno: ${cleanGeminiError(finalError)}`;spokenAnswer=answer;finalPresentation={};
     execution={...(execution||{}),gemini_final_error:cleanGeminiError(finalError),response_mode:'gemini_dual_presentation_failed'};
     zuzuTracePush(flowTrace,'v3_0_exp · ESCAPE LIBRE · fallo redacción final','WARN',cleanGeminiError(finalError));
   }
@@ -15042,8 +15039,8 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const artifactIntent=v73MergeArtifactIntent(normalizedPlan,savedView,finalPresentation);let visibleTables=[],visibleCharts=[];
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
-  zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Gemini decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14 · CONTINUIDAD + CÁLCULO CE + VOZ HUMANA',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14A · SCHEMA LIGERO + CONTINUIDAD + CÁLCULO CE + VOZ MASCULINA',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.

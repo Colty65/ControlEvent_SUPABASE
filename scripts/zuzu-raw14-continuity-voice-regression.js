@@ -17,20 +17,20 @@ function test(name,cond){
 }
 
 // Contrato / continuidad / ejecución CE.
-test('RAW14 identificado',svc.includes('RAW14 · CONTINUIDAD + CÁLCULO CE + VOZ HUMANA'));
+test('RAW14A identificado',svc.includes('RAW14A · SCHEMA LIGERO + CONTINUIDAD + CÁLCULO CE + VOZ MASCULINA'));
 test('person con people[1] se convierte mecánicamente a person',/filters\.people\.length===1\)\{filters\.person=filters\.people\[0\];filters\.people=\[\];\}/.test(svc));
 test('event_series exige series y rechaza event/events',svc.includes('scope event_series debe usar series y no event/events'));
 test('scope reciente de evento tiene autoridad cronológica',svc.includes('autoridad temporal del ámbito de evento')&&svc.includes("eventScopeSource='explicit_set_context'"));
 test('varios eventos + referencia singular obliga a aclarar',svc.includes('Si CURRENT_CONTEXT.scope contiene VARIOS eventos')&&svc.includes('usa ce_clarify'));
 test('people incluye situación de pago por evento',svc.includes('people = asistencia/censo/presencia E INGRESO/SITUACIÓN DE PAGO dentro de un evento'));
 test('parejas/grupos exactos se conservan indivisibles',svc.includes('ENTIDADES CANÓNICAS INDIVISIBLES')&&svc.includes('No la partas por conjunciones'));
-test('Gemini1 puede ordenar agregación explícita',svc.includes('group_field')&&svc.includes('metric_role')&&svc.includes('aggregation')&&svc.includes('Gemini decide QUÉ calcular y CE calcula'));
-test('Gemini2 no puede hacer aritmética sobre filas',svc.includes('ARITMÉTICA: NO calcules sumas, promedios, mínimos, máximos'));
-test('Gemini2 recibe audiencia informal y formal',svc.includes('audience:{usuario:')&&svc.includes('nombre:profile.nombre||display'));
-test('Gemini2 permite vocativo ocasional según tono',svc.includes('En tono informal/colegueo usa audience.usuario')&&svc.includes('seria, formal, ejecutiva o delicada usa audience.nombre'));
+test('Zuzu puede ordenar agregación explícita por operations_json',svc.includes('group_field')&&svc.includes('metric_role')&&svc.includes('aggregation')&&svc.includes('Zuzu decide QUÉ calcular y CE calcula')&&svc.includes('toda agregación viaja por operations_json'));
+test('Redacción final no puede hacer aritmética sobre filas',svc.includes('ARITMÉTICA: NO calcules sumas, promedios, mínimos, máximos'));
+test('Zuzu final recibe audiencia informal y formal',svc.includes('audience:{usuario:')&&svc.includes('nombre:profile.nombre||display'));
+test('Zuzu permite vocativo ocasional según tono',svc.includes('En tono informal/colegueo usa audience.usuario')&&svc.includes('seria, formal, ejecutiva o delicada usa audience.nombre'));
 test('voz final puede resumir la escrita',svc.includes('Es correcto RESUMIR para voz aunque written_answer sea más completo'));
 test('voz de dinero trunca; escrito conserva decimales',svc.includes('SOLO la parte entera truncada hacia cero')&&svc.includes('written_answer conserva siempre el importe exacto con sus decimales'));
-test('Gemini2 reintenta una sola vez JSON inválido',svc.includes('PRESENTACIÓN · REINTENTO JSON')&&svc.includes('MISMO resultado CE')&&svc.includes('Gemini reintenta JSON'));
+test('Zuzu reintenta una sola vez JSON inválido',svc.includes('PRESENTACIÓN · REINTENTO JSON')&&svc.includes('MISMO resultado CE')&&svc.includes('Zuzu reintenta JSON'));
 
 // Voz del navegador: entretenimiento y lectura monetaria.
 const phraseMatch=voice.match(/var ENTERTAINMENT_PHRASES=\[([\s\S]*?)\n  \];/);
@@ -67,7 +67,7 @@ sandbox.window.Event=sandbox.Event;
 vm.createContext(sandbox);
 try{vm.runInContext(voice,sandbox,{filename:'v22-voz3-zuzu.js'});}catch(e){console.error('KO · carga VM voz:',e);process.exitCode=1;}
 const api=sandbox.window.ControlEventVoiceTurns;
-test('API de voz RAW14 cargable sin iniciar micrófono',!!api&&String(api.version).includes('RAW14'));
+test('API de voz RAW14 cargable sin iniciar micrófono',!!api&&String(api.version).includes('RAW14A'));
 if(api){
   const spoken=api.spokenPreview('Mira, Colty, el total es 1.924,99 €; otro son 80,99 euros y el saldo es -1,92 €.');
   test('la voz elimina céntimos sin redondear y conserva vocativo',spoken.includes('Mira, Colty')&&spoken.includes('mil novecientos veinticuatro euros')&&spoken.includes('ochenta euros')&&spoken.includes('menos un euro')&&!spoken.includes('99'));
