@@ -22,7 +22,7 @@ t('frase completa se confirma al terminar',/u\.onend=function\(\)\{entertainment
 t('respuesta sigue esperando 500 ms tras entretenimiento',/Math\.max\(0,500-/.test(voice));
 
 t('prompt de voz conserva todos los puntos importantes',/NO un resumen telegráfico/.test(svc)&&/NO resumas la sustancia/.test(svc)&&/2 a 6 frases naturales/.test(svc));
-t('hay control automático de cobertura hablada',/function v73SpokenCoverageNeedsRepair/.test(svc)&&/Zuzu completa la voz/.test(svc)&&/WRITTEN_ANSWER_VALIDO_Y_AUTORITATIVO/.test(svc));
+t('hay control automático de cobertura hablada',/function v73SpokenCoverageNeedsRepair/.test(svc)&&/fallback oral, sin nueva llamada IA/.test(svc)&&/spoken:final.written/.test(svc));
 
 const pf=svc.match(/function v73ProtocolViolation\(raw=\{\},plan=\{\}\)\{[\s\S]*?\n\}\nfunction v73RecentDistinctEntities/);
 let protocol=null;if(pf){const code=pf[0].replace(/\nfunction v73RecentDistinctEntities[\s\S]*$/,'')+'\nthis.fn=v73ProtocolViolation;';const box={trim:v=>String(v==null?'':v).trim(),arr:v=>Array.isArray(v)?v:(v==null?[]:[v])};vm.createContext(box);vm.runInContext(code,box);protocol=box.fn;}

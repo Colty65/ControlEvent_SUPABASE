@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v3_0_exp-RAW14B-VOZ-COMPLETA-DECK-SIN-REPETIR-FIX37';
+  var BUILD='v3_0_exp-RAW14C-EN-CURSO-COMPRAS-EVENTO-ACTIVO-VOZ-FIX38';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -261,7 +261,8 @@
   function humanizeSpokenLabels(v){
     var out=String(v==null?'':v);
     out=out.replace(/\s*[-–—/]?\s*\b(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SEPT|OCT|NOV|DIC)[._\/-]?(?:20)?\d{2}\b/gi,' ');
-    out=out.replace(/\b(\d+(?:[.,]\d+)?)\s*(ml|cl|lt|l|kg|gr|g|cm|mm)\b/gi,function(_,n,u){return spokenQuantity(n,u);});
+    // RAW14C: no uses \b tras unidades de una letra: en JavaScript la í de «líneas» no cuenta como ASCII word-char y «40 líneas» se interpretaba como «40 l» + «íneas» (litrosíneas).
+    out=out.replace(/\b(\d+(?:[.,]\d+)?)\s*(ml|cl|lt|l|kg|gr|g|cm|mm)(?![A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/gi,function(_,n,u){return spokenQuantity(n,u);});
     out=out.replace(/\bzero\b/gi,'cero').replace(/\b\d{1,2}en\d{1,2}\b/gi,' ');
     var ordSing={1:'primero',2:'segundo',3:'tercero',4:'cuarto',5:'quinto',6:'sexto',7:'séptimo',8:'octavo',9:'noveno',10:'décimo'},ordPlur={1:'primeros',2:'segundos',3:'terceros',4:'cuartos',5:'quintos',6:'sextos',7:'séptimos',8:'octavos',9:'novenos',10:'décimos'};
     out=out.replace(/\b(10|[1-9])\s*[º°]([sS])?\b/g,function(_,n,p){return p?ordPlur[Number(n)]:ordSing[Number(n)];}).replace(/\bcuartos\s+final\b/gi,'cuartos de final');
