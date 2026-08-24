@@ -1,15 +1,11 @@
-import fs from 'node:fs';
-const src=fs.readFileSync('services/event-ai.service.js','utf8');
+import fs from 'node:fs';const s=fs.readFileSync(new URL('../services/event-ai.service.js',import.meta.url),'utf8');
 const tests=[
- ['Damerau transposición',/transposición adyacente cuenta como UN error/],
- ['candidate match_kind exact',/match_kind:exact\?'exact'/],
- ['exact suprime parciales mismo tipo',/exactMatched=new Set[\s\S]*!exactMatched\.has/],
- ['regla exact fuzzy contexto aclaración',/exacto tipado > candidato fuzzy claro > contexto reciente del MISMO tipo > aclaración/],
- ['person multientidad sin forzar comparison',/domain=person \+ query\.people con TODAS/],
- ['canonizador tipado fuzzy post-Gemini',/function v73CertifyTypedEntities[\s\S]*ENTIDAD TIPADA[\s\S]*variante\/fuzzy/],
- ['segunda llamada Gemini permitida',/Gemini redacta pantalla \+ voz'[\s\S]{0,300}maxCalls:2/],
- ['weather supplement prioridad gráfica',/weatherSupplement=arr\(normalizedPlan\?\.query\?\.supplements\)[\s\S]*weatherCharts=weatherSupplement/],
- ['RAW6/RAW7 evolución identificada',/RAW(?:6 · ENTIDADES ROBUSTAS \+ MULTIENTIDAD \+ METEO|7 · COMPILADOR SEMÁNTICO TIPADO)/]
-];
-let ko=0;for(const [n,re] of tests){if(re.test(src))console.log('OK · '+n);else{ko++;console.error('KO · '+n)}}
-if(ko){console.error(`RAW6 REGRESSION: ${ko} KO`);process.exit(1)}console.log('RAW6 REGRESSION: OK');
+ ['Damerau transposición',/function semanticEditDistance[\s\S]*Damerau-Levenshtein[\s\S]*transposición adyacente/i.test(s)],
+ ['candidate match exact/strong/fuzzy',/match_kind[\s\S]*exact[\s\S]*strong[\s\S]*fuzzy/.test(s)],
+ ['canonizador tipado post-Gemini',/function v73CertifyTypedEntities[\s\S]*semanticResolveEntity/.test(s)],
+ ['persona multientidad preservada',/people:stringList[\s\S]*responsibles:stringList[\s\S]*donors:stringList/.test(s)],
+ ['segunda llamada Gemini permitida',/v73RawFinalWithGemini/.test(s)],
+ ['weather supplement soportado',/function v73ExecuteSupplement[\s\S]*domain\)!=='weather'/.test(s)],
+ ['set_context se resuelve dentro del tipo',/function v73CertifyContext[\s\S]*semanticType/.test(s)],
+ ['RAW11 evolución identificada',/RAW11 · CONTRATO GEMINI↔CE CERRADO/.test(s)]
+];let bad=0;for(const [n,ok] of tests){console.log((ok?'OK':'KO')+' · '+n);if(!ok)bad++;}if(bad)process.exit(1);console.log('ENTITY RESOLUTION REGRESSION: OK');

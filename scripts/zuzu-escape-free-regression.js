@@ -18,7 +18,7 @@ const checks=[
  ['modo voz no borra artefactos visuales',!/voiceConversation\)\{data\.charts=\[\]/.test(ui)],
  ['scope named_event acepta events[0] sin perder evento',/if\(kind==='named_event'\)\{const one=event\|\|events\[0\]\|\|'';if\(one\)out\.event=one;\}/.test(ai)],
  ['scope named_events acepta event singular',/else if\(kind==='named_events'\)\{if\(events\.length\)out\.events=events;else if\(event\)out\.events=\[event\];\}/.test(ai)],
- ['contrato de acciones es estricto',/CONTRATO ESTRUCTURAL ESTRICTO/.test(ai)&&/v73ProtocolViolation/.test(ai)],
+ ['contrato de acciones es estricto',/SEIS COMANDOS/.test(ai)&&/v73ProtocolViolation/.test(ai)&&/Gemini debe emitir exactamente UN comando CE/.test(ai)],
  ['presentación la decide Gemini',/gemini_presentation/.test(ai)&&/PRESENTACIÓN · ARTEFACTOS/.test(ai)],
  ['redacción oral diferenciada',/spoken_answer está pensado para ser ESCUCHADO/.test(ai)],
  ['prosa respetada',/si el usuario pide prosa, NO uses listas ni viñetas/.test(ai)],
