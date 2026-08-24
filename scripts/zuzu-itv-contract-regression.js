@@ -17,8 +17,8 @@ c('Descarga ITV usa click nativo y evita wrappers legacy',/nativeClick=window\._
 c('JSON declara contrato real de la batería',/batteryReplayContractVersion:num\(preview\?\.replayContractVersion\)\|\|0/.test(ui));
 c('Index fuerza carga de la build PRESENTACION RAW4 actual',/zuzu-test-console-gd\.js\?v=20260823-PRESENTACION-RAW4/.test(index)&&/controlevent-itv-build\" content=\"20260823-PRESENTACION-RAW4/.test(index));
 c('named_events conserva event singleton como events[]',/kind==='named_events'[\s\S]{0,220}else if\(event\)out\.events=\[event\]/.test(svc));
-c('Gemini recibe regla contexto candidatos no filtros',/CONTEXTO = CANDIDATOS, NO FILTROS/.test(svc));
-c('Gemini recibe regla respuesta por forma interrogativa',/TIPO DE RESPUESTA: la forma interrogativa manda/.test(svc));
+c('Gemini recibe candidatos como ayuda no activadores',/Los candidatos son ayuda, no activadores/.test(svc));
+c('Gemini recibe regla de response_kind por intención actual',/TIPO DE RESPUESTA: decide response_kind por lo que CURRENT_USER pide obtener ahora/.test(svc));
 c('Compare person tiene ejecutor tipado',/function v73ExecuteResolvedQuery[\s\S]*comparison[\s\S]*Comparativa de personas/.test(svc));
 c('Comparison capability contiene Persona y Aportación vinculada',/comparison:\{roles:\{person:\['Persona'\]/.test(svc)&&/Aportación vinculada/.test(svc));
 const ko=tests.filter(([,v])=>!v);if(ko.length){console.error(`ZUZU ITV CONTRACT: ${ko.length} KO`);process.exit(1);}console.log('ZUZU ITV CONTRACT: OK');

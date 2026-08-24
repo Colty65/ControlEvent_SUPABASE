@@ -116,7 +116,7 @@ function semanticTagsFromTurn(turn={}){
   ].filter(Boolean);
   for(const e of arr(scope.events))if(trim(e?.name||e))entities.push({role:'event',value:trim(e?.name||e)});
   return{
-    action:trim(plan.action||turn.actionType),domain:trim(q.domain||exec.domain),responseKind:trim(plan.response_kind),
+    action:trim(plan.action||turn.actionType),domain:trim(q.domain||arr(q.targets)[0]?.domain||exec.domain),responseKind:trim(plan.response_kind),
     entities,scopeKind:trim(scope.kind||exec.scope?.kind),scopeEvent:trim(scope.event||exec.scope?.event),
     operations:arr(plan.local?.operations).map(o=>({type:trim(o?.type),field:trim(o?.field||o?.group_field),value:trim(o?.value||o?.reference)})).filter(o=>o.type)
   };

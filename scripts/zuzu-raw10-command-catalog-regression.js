@@ -14,6 +14,6 @@ const tests=[
  ['dinero usa amount',/magnitud económica\/monetaria/.test(s)],
  ['group_field se conserva y ejecuta',/requestedGroup=trim\(op\.group_field\)/.test(s)],
  ['chart admite series y x_field',/series:\{type:'array'[\s\S]*x_field:\{type:'string'\}/.test(s)],
- ['arquitectura RAW11 identificada',/RAW11 · CONTRATO GEMINI↔CE CERRADO/.test(s)]
+ ['arquitectura RAW12 identificada',/RAW12 · CONTRATO ÚNICO \+ OBEDECER ARTEFACTOS/.test(s)]
 ];
 let bad=0;for(const [n,ok] of tests){console.log((ok?'OK':'KO')+' - '+n);if(!ok)bad++;}if(bad)process.exit(1);console.log('ZUZU COMMAND CATALOG COMPAT: OK');

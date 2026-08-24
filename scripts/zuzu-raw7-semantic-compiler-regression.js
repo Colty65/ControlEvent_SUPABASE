@@ -12,7 +12,7 @@ const tests=[
  ['aclaración solo mismo tipo',/dos o más alternativas DEL MISMO TIPO/],
  ['input incluye CURRENT_CONTEXT y candidatos',/CURRENT_CONTEXT:\\n[\s\S]*CANDIDATES:\\n/],
  ['ledger usa packet tipado',/const entityCandidates=v74EntityCandidatePacket\(state,userPrompt\)/],
- ['traza candidatos tipados RAW11',/CANDIDATOS TIPADOS RAW11/],
- ['arquitectura RAW11',/RAW11 · CONTRATO GEMINI↔CE CERRADO/]
+ ['traza candidatos tipados RAW12',/CANDIDATOS TIPADOS RAW12/],
+ ['arquitectura RAW12',/RAW12 · CONTRATO ÚNICO \+ OBEDECER ARTEFACTOS/]
 ];
 let ko=0;for(const [n,re] of tests){if(re.test(src))console.log('OK · '+n);else{ko++;console.error('KO · '+n)}}if(ko){console.error(`SEMANTIC COMPILER REGRESSION: ${ko} KO`);process.exit(1)}console.log('SEMANTIC COMPILER REGRESSION: OK');

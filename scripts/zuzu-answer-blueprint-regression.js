@@ -21,9 +21,9 @@ function extractFunction(name){
 }
 const context={console,JSON,Object,Array,Set,Number,String,Math,RegExp,Date,Intl,
   V73_ANSWER_PLACEHOLDERS:Object.freeze(['amount','count','person','product','event','scope_text','people','items','events','subject','winner','winner_value','runner_up','runner_up_value','difference','metric','summary','detail']),
-  trim:v=>String(v??'').trim(),arr:v=>Array.isArray(v)?v:(v==null?[]:[v])};
+  trim:v=>String(v??'').trim(),arr:v=>Array.isArray(v)?v:(v==null?[]:[v]),norm:v=>String(v??'').trim().toLowerCase()};
 vm.createContext(context);
-for(const fn of ['v73NormalizeAnswerBlueprint','v73AssignReuseValue','v73PrepareAnalyticPlan','v73DatasetSchemaColumns','v73RenderAnswerBlueprint']){
+for(const fn of ['v73NormalizeAnswerBlueprint','v73AssignReuseValue','v73NormalizeTargets','v73PrimaryTarget','v73PrimaryDomain','v73PrepareAnalyticPlan','v73DatasetSchemaColumns','v73RenderAnswerBlueprint']){
   vm.runInContext(`${extractFunction(fn)}; this.${fn}=${fn};`,context);
 }
 const {v73NormalizeAnswerBlueprint,v73AssignReuseValue,v73PrepareAnalyticPlan,v73DatasetSchemaColumns,v73RenderAnswerBlueprint}=context;
@@ -36,7 +36,7 @@ assert.equal(v73RenderAnswerBlueprint({template:'{amount} se ha gastado.'},{amou
 
 const q={person:'Vicente'};assert.equal(v73AssignReuseValue(q,'person','Pocholo').applied,false);assert.equal(q.person,'Vicente');
 const q2={};assert.equal(v73AssignReuseValue(q2,'person','Vicente').applied,true);assert.equal(q2.person,'Vicente');
-const semantic={action:'query',query:{domain:'purchases',scope:{kind:'all_events'},operations:[{type:'rank',reference:'Vicente'}]}};
+const semantic={action:'query',query:{targets:[{domain:'purchases'}],scope:{kind:'all_events'},operations:[{type:'rank',reference:'Vicente'}]}};
 const exec=v73PrepareAnalyticPlan(semantic,{});assert.equal(semantic.query.operations[0].group_role,undefined);assert.equal(exec.query.operations[0].group_role,'responsible');
 assert.ok(v73DatasetSchemaColumns('purchases').includes('Importe'));assert.ok(v73DatasetSchemaColumns('purchases').includes('Responsable'));
 

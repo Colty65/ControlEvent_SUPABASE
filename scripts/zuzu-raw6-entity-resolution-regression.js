@@ -7,5 +7,5 @@ const tests=[
  ['segunda llamada Gemini permitida',/v73RawFinalWithGemini/.test(s)],
  ['weather supplement soportado',/function v73ExecuteSupplement[\s\S]*domain\)!=='weather'/.test(s)],
  ['set_context se resuelve dentro del tipo',/function v73CertifyContext[\s\S]*semanticType/.test(s)],
- ['RAW11 evolución identificada',/RAW11 · CONTRATO GEMINI↔CE CERRADO/.test(s)]
+ ['RAW12 evolución identificada',/RAW12 · CONTRATO ÚNICO \+ OBEDECER ARTEFACTOS/.test(s)]
 ];let bad=0;for(const [n,ok] of tests){console.log((ok?'OK':'KO')+' · '+n);if(!ok)bad++;}if(bad)process.exit(1);console.log('ENTITY RESOLUTION REGRESSION: OK');
