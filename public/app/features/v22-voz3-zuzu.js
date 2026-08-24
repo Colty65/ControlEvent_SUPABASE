@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v3_0_exp-RAW14A-VOICE-MASCULINA-POTENTE-FIX36';
+  var BUILD='v3_0_exp-RAW14B-VOZ-COMPLETA-DECK-SIN-REPETIR-FIX37';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v35', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v35'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v37', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v37', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v37'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -30,7 +30,7 @@
     bargeRecognition:null, bargeGeneration:0,
     voices:[],
     recorderStream:null, recorder:null, recorderChunks:[], recordingActive:false, lastRecordingBlob:null, lastRecordingMime:'',
-    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentFinishedAt:0, pendingAnswerTimer:null, lastEntertainmentIndex:-1, entertainmentUsed:[], entertainmentCycle:0, entertainmentLoaded:false
+    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentFinishedAt:0, pendingAnswerTimer:null, lastEntertainmentIndex:-1, entertainmentDeck:[], pendingEntertainmentIndex:-1, entertainmentCycle:0, entertainmentLoaded:false
   };
 
   var ENTERTAINMENT_PHRASES=[
@@ -73,7 +73,27 @@
     'Estoy ordenando el tinglado y ahora te cuento.',
     'Un momento, que las tablas están declarando.',
     'Estoy dejando la respuesta lista para servir.',
-    'Sigo aquí; los datos no se me escapan.'
+    'Sigo aquí; los datos no se me escapan.',
+    'Estoy metiendo las cifras en cintura.',
+    'Un momento, que aquí nadie se va sin declarar.',
+    'Estoy pasando la escoba por los datos sospechosos.',
+    'Casi está; solo me falta apretar un par de tornillos.',
+    'Estoy mirando esto con cara de pocos amigos, funciona de maravilla.',
+    'Dame un instante, que estoy interrogando a la tabla buena.',
+    'Estoy haciendo limpieza; el ruido ya va camino de la calle.',
+    'Un segundo, que quiero darte carne y no huesos.',
+    'Estoy cuadrando esto como si me fuera el sueldo en ello.',
+    'Voy rematando; aquí no sale nada hasta que esté decente.',
+    'Estoy buscando la trampa, por si los datos vienen con ganas de cachondeo.',
+    'Un momento, que estoy poniendo firmes a las columnas.',
+    'Sigo al aparato; esto ya empieza a cantar.',
+    'Estoy rascando un poco más, que todavía queda sustancia.',
+    'Casi lo tengo; la última cifra está intentando escaquearse.',
+    'Estoy comprobando el resultado dos veces, que luego vienen los sustos.',
+    'Un instante; esto sale ahora mismo y sale con fundamento.',
+    'Estoy separando lo útil de la morralla.',
+    'Voy cerrando; los números ya han dejado de hacerse los interesantes.',
+    'Dame medio minuto de dignidad informática y te lo suelto.'
   ];
   function $(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
@@ -265,30 +285,39 @@
   function speakResponse(){var dedicated=clean(window.__ceZuzuLastSpokenAnswer||'');var a=q('#ceAiResult .ce-ai-answer');var txt=dedicated||clean(a&&a.textContent);if(txt){if(!state.conversationMode)state.conversationMode=true;speakChunks(txt);}}
   function previewVoice(){if(!supportsSpeech())return;try{window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance('Esta es la voz de Zuzu. Estoy listo. Vamos al lío.');u.lang='es-ES';u.rate=speechRate();u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;window.speechSynthesis.speak(u);}catch(_){} }
 
+  function entertainmentRandomInt(max){
+    max=Math.max(1,Number(max)||1);try{if(window.crypto&&window.crypto.getRandomValues){var a=new Uint32Array(1);window.crypto.getRandomValues(a);return a[0]%max;}}catch(_){}return Math.floor(Math.random()*max);
+  }
+  function shuffleEntertainmentDeck(items){
+    var deck=items.slice();for(var i=deck.length-1;i>0;i--){var j=entertainmentRandomInt(i+1),tmp=deck[i];deck[i]=deck[j];deck[j]=tmp;}return deck;
+  }
+  function persistEntertainmentState(){
+    try{safeSet(STORAGE.entertainmentDeck,JSON.stringify(state.entertainmentDeck||[]));safeSet(STORAGE.entertainmentLast,String(Number(state.lastEntertainmentIndex)));safeSet(STORAGE.entertainmentCycle,String(state.entertainmentCycle||0));}catch(_){}
+  }
+  function refillEntertainmentDeck(){
+    var all=[];for(var i=0;i<ENTERTAINMENT_PHRASES.length;i++)all.push(i);state.entertainmentDeck=shuffleEntertainmentDeck(all);if(state.entertainmentDeck.length>1&&state.entertainmentDeck[0]===state.lastEntertainmentIndex){var t=state.entertainmentDeck[0];state.entertainmentDeck[0]=state.entertainmentDeck[1];state.entertainmentDeck[1]=t;}state.entertainmentCycle++;persistEntertainmentState();
+  }
   function loadEntertainmentState(){
-    if(state.entertainmentLoaded)return;state.entertainmentLoaded=true;
-    try{var raw=JSON.parse(safeGet(STORAGE.entertainmentUsed,'[]')),cleaned=Array.isArray(raw)?raw.map(Number).filter(function(x){return Number.isInteger(x)&&x>=0&&x<ENTERTAINMENT_PHRASES.length;}):[];state.entertainmentUsed=Array.from(new Set(cleaned));}catch(_){state.entertainmentUsed=[];}
-    state.entertainmentCycle=Math.max(0,Number(safeGet(STORAGE.entertainmentCycle,'0'))||0);
-    if(state.entertainmentUsed.length>ENTERTAINMENT_PHRASES.length)state.entertainmentUsed=[];
-    state.lastEntertainmentIndex=state.entertainmentUsed.length?state.entertainmentUsed[state.entertainmentUsed.length-1]:-1;
+    if(state.entertainmentLoaded)return;state.entertainmentLoaded=true;state.entertainmentCycle=Math.max(0,Number(safeGet(STORAGE.entertainmentCycle,'0'))||0);state.lastEntertainmentIndex=Number(safeGet(STORAGE.entertainmentLast,'-1'));if(!Number.isInteger(state.lastEntertainmentIndex)||state.lastEntertainmentIndex<0||state.lastEntertainmentIndex>=ENTERTAINMENT_PHRASES.length)state.lastEntertainmentIndex=-1;
+    try{var raw=JSON.parse(safeGet(STORAGE.entertainmentDeck,'[]'));state.entertainmentDeck=Array.isArray(raw)?raw.map(Number).filter(function(x,i,a){return Number.isInteger(x)&&x>=0&&x<ENTERTAINMENT_PHRASES.length&&a.indexOf(x)===i;}):[];}catch(_){state.entertainmentDeck=[];}
+    if(!state.entertainmentDeck.length)refillEntertainmentDeck();
   }
-  function persistEntertainmentState(){try{safeSet(STORAGE.entertainmentUsed,JSON.stringify(state.entertainmentUsed||[]));safeSet(STORAGE.entertainmentCycle,String(state.entertainmentCycle||0));}catch(_){} }
-  function entertainmentIndex(second,count){
-    loadEntertainmentState();var previous=state.lastEntertainmentIndex;
-    if(state.entertainmentUsed.length>=ENTERTAINMENT_PHRASES.length){state.entertainmentUsed=[];state.entertainmentCycle++;}
-    var used=new Set(state.entertainmentUsed),available=[];
-    for(var i=0;i<ENTERTAINMENT_PHRASES.length;i++)if(!used.has(i))available.push(i);
-    var sec=Math.max(0,Math.min(3599,Number(second)||0)),seed=((sec+1)*1103515245)>>>0;
-    seed=(seed+Math.imul((state.entertainmentCycle+1),2654435761)+Math.imul((Number(count)||0)+1,2246822519))>>>0;
-    seed=(Math.imul((seed^(seed>>>16))>>>0,3266489917)>>>0);
-    var pos=seed%available.length,idx=available[pos];if(available.length>1&&idx===previous)idx=available[(pos+1)%available.length];
-    state.entertainmentUsed.push(idx);state.lastEntertainmentIndex=idx;persistEntertainmentState();return idx;
+  function nextEntertainmentIndex(){
+    loadEntertainmentState();if(!state.entertainmentDeck.length)refillEntertainmentDeck();var idx=state.entertainmentDeck.shift();state.pendingEntertainmentIndex=idx;persistEntertainmentState();return idx;
   }
-  function stopEntertainment(cancelSpeech){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;if(cancelSpeech){var was=state.entertainmentSpeaking;state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(was)state.entertainmentFinishedAt=Date.now();if(was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){} }} }
+  function commitEntertainmentIndex(idx){
+    idx=Number(idx);if(Number.isInteger(idx)&&idx>=0&&idx<ENTERTAINMENT_PHRASES.length)state.lastEntertainmentIndex=idx;state.pendingEntertainmentIndex=-1;persistEntertainmentState();
+  }
+  function requeueEntertainmentIndex(idx){
+    loadEntertainmentState();idx=Number(idx);if(Number.isInteger(idx)&&idx>=0&&idx<ENTERTAINMENT_PHRASES.length&&state.entertainmentDeck.indexOf(idx)<0){var pos=state.entertainmentDeck.length?entertainmentRandomInt(state.entertainmentDeck.length+1):0;state.entertainmentDeck.splice(pos,0,idx);}state.pendingEntertainmentIndex=-1;persistEntertainmentState();
+  }
+  function stopEntertainment(cancelSpeech){
+    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;if(cancelSpeech){var was=state.entertainmentSpeaking,idx=state.pendingEntertainmentIndex,u=state.entertainmentUtterance;if(u){try{u.onend=null;u.onerror=null;}catch(_){}}state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(was)state.entertainmentFinishedAt=Date.now();if(Number.isInteger(idx)&&idx>=0)requeueEntertainmentIndex(idx);if(was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){}}}
+  }
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Number(delay)||2000);}
-  function entertainmentEnded(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(5600);}
-  function speakEntertainmentPhrase(){if(!state.conversationMode||!state.requestInFlight||!supportsSpeech())return;stopEntertainment(false);var now=new Date(),secondOfHour=now.getMinutes()*60+now.getSeconds(),idx=entertainmentIndex(secondOfHour,state.entertainmentCount++),phrase=ENTERTAINMENT_PHRASES[idx];setStatus(phrase,'ok');try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=Math.min(1,speechRate()+0.03);u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;u.onend=entertainmentEnded;u.onerror=entertainmentEnded;window.speechSynthesis.speak(u);}catch(_){entertainmentEnded();}}
-  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;state.lastEntertainmentIndex=-1;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2400);}
+  function entertainmentEnded(ok,idx){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();if(ok)commitEntertainmentIndex(idx);else requeueEntertainmentIndex(idx);if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(5600);}
+  function speakEntertainmentPhrase(){if(!state.conversationMode||!state.requestInFlight||!supportsSpeech())return;stopEntertainment(false);var idx=nextEntertainmentIndex(),phrase=ENTERTAINMENT_PHRASES[idx];setStatus(phrase,'ok');try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=Math.min(1,speechRate()+0.03);u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;u.onend=function(){entertainmentEnded(true,idx);};u.onerror=function(){entertainmentEnded(false,idx);};window.speechSynthesis.speak(u);}catch(_){entertainmentEnded(false,idx);}}
+  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2400);}
   function queueAnswerAfterEntertainment(answer,autoRead){clearTimeout(state.pendingAnswerTimer);state.pendingAnswerTimer=null;var hadEntertainment=state.entertainmentSpeaking||!!state.entertainmentUtterance||(state.entertainmentFinishedAt>0&&Date.now()-state.entertainmentFinishedAt<600);function deliver(){if(!state.conversationMode)return;if(state.entertainmentSpeaking){state.pendingAnswerTimer=setTimeout(deliver,60);return;}var wait=hadEntertainment?Math.max(0,500-(Date.now()-(state.entertainmentFinishedAt||0))):0;state.pendingAnswerTimer=setTimeout(function(){state.pendingAnswerTimer=null;if(!state.conversationMode)return;if(autoRead)speakChunks(answer);else startUser();},wait);}deliver();}
 
   function resumeConversationListening(delay){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;setTimeout(function(){if(state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();},Number(delay)||180);}

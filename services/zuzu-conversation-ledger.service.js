@@ -46,7 +46,7 @@ function publicView(r={}){return{viewId:trim(r.view_id),conversationId:trim(r.co
 async function tableGetConversation(id){const {data,error}=await db().from(T_CONV).select('*').eq('conversation_id',id).maybeSingle();if(error)throw error;return data?publicConversation(data):null;}
 async function tableEnsureConversation(row){const {data,error}=await db().from(T_CONV).upsert(row,{onConflict:'conversation_id'}).select('*').single();if(error)throw error;return publicConversation(data);}
 async function tableGetTurn(id){const {data,error}=await db().from(T_TURN).select('*').eq('turn_id',id).maybeSingle();if(error)throw error;return data?publicTurn(data):null;}
-async function tableListTurns(convId,limit=50){const {data,error}=await db().from(T_TURN).select('*').eq('conversation_id',convId).order('seq',{ascending:false}).limit(Math.max(1,Math.min(200,Number(limit)||50)));if(error)throw error;return arr(data).map(publicTurn).sort((a,b)=>a.seq-b.seq);}
+async function tableListTurns(convId,limit=500){const {data,error}=await db().from(T_TURN).select('*').eq('conversation_id',convId).order('seq',{ascending:false}).limit(Math.max(1,Math.min(1000,Number(limit)||500)));if(error)throw error;return arr(data).map(publicTurn).sort((a,b)=>a.seq-b.seq);}
 async function tableGetDataset(id,{includeRows=true}={}){
   if(!id)return null;
   const projection=includeRows?'*':'dataset_id,conversation_id,source_turn_id,domain,scope,row_count,columns,facts,provenance,fingerprint,created_at';
@@ -56,7 +56,7 @@ async function tableGetView(id){if(!id)return null;const {data,error}=await db()
 
 async function fallbackGetConversation(id){const v=await metaGet(mkey('conversation',id));return v?publicConversation(v):null;}
 async function fallbackGetTurn(id){const v=await metaGet(mkey('turn',id));return v?publicTurn(v):null;}
-async function fallbackListTurns(convId,limit=50){const items=await metaList(`${META_PREFIX}turn:${safeId(convId)}-`,limit);return items.map(x=>publicTurn(x.value)).sort((a,b)=>a.seq-b.seq);}
+async function fallbackListTurns(convId,limit=500){const items=await metaList(`${META_PREFIX}turn:${safeId(convId)}-`,limit);return items.map(x=>publicTurn(x.value)).sort((a,b)=>a.seq-b.seq);}
 async function fallbackGetDataset(id){const v=id?await metaGet(mkey('dataset',id)):null;return v?publicDataset(v):null;}
 async function fallbackGetView(id){const v=id?await metaGet(mkey('view',id)):null;return v?publicView(v):null;}
 
@@ -164,7 +164,7 @@ export async function listZuzuConversations({actor={},limit=40}={}){
   try{const {data,error}=await db().from(T_CONV).select('*').eq('user_id',uid).order('updated_at',{ascending:false}).limit(Math.max(1,Math.min(100,Number(limit)||40)));if(error)throw error;return arr(data).map(publicConversation);}catch(error){if(!isMissingTable(error))throw error;const items=await metaList(`${META_PREFIX}conversation:`,300);return items.map(x=>publicConversation(x.value)).filter(x=>norm(x.userId)===norm(uid)).sort((a,b)=>text(b.updatedAt).localeCompare(text(a.updatedAt))).slice(0,limit);}
 }
 
-export async function readZuzuConversation({conversationId='',actor={},limit=100}={}){
+export async function readZuzuConversation({conversationId='',actor={},limit=500}={}){
   const session=await getZuzuConversationSession({conversationId,actor,includeRows:false,recentLimit:limit});if(!session)return null;return{conversation:session.conversation,turns:session.recentTurns.map(t=>({turnId:t.turnId,seq:t.seq,userPrompt:t.userPrompt,actionType:t.actionType,status:t.status,title:t.title,answer:t.answer,createdAt:t.createdAt,datasetId:t.datasetId,viewId:t.viewId,execution:t.execution}))};
 }
 

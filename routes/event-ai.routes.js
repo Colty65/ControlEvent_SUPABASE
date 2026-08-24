@@ -12,7 +12,7 @@ router.post('/event-ai/analyze', asyncHandler(async (req, res) => {
 
 
 router.post('/event-ai/conversations/read', asyncHandler(async (req,res)=>{
-  const body=req.body||{};res.json({ok:true,data:await readZuzuConversation({conversationId:body.conversationId,actor:body.usuarioLogado||body.user||body.authUser||body.ce_acceso||{},limit:body.limit||100})});
+  const body=req.body||{};res.json({ok:true,data:await readZuzuConversation({conversationId:body.conversationId,actor:body.usuarioLogado||body.user||body.authUser||body.ce_acceso||{},limit:body.limit||500})});
 }));
 router.post('/event-ai/conversations/list', asyncHandler(async (req,res)=>{
   const body=req.body||{};res.json({ok:true,conversations:await listZuzuConversations({actor:body.usuarioLogado||body.user||body.authUser||body.ce_acceso||{},limit:body.limit||40})});

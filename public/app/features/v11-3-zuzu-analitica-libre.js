@@ -269,13 +269,13 @@
     return hist.map(function(turn,idx){
       var q=conversationTrailExcerpt(turn&&turn.user||'');
       var a=withoutGeminiLabel(conversationTrailExcerpt(turn&&turn.assistant||''));
-      return '<div class="ce-ai-conversation-rail-turn"><div class="ce-ai-conversation-rail-turnno">Turno '+(base+idx+1)+'</div><div class="ce-ai-conversation-rail-line"><b>P:</b> '+esc(q||'—')+'</div><div class="ce-ai-conversation-rail-line"><b>R:</b> '+esc(a||'—')+'</div></div>';
+      return '<div class="ce-ai-conversation-rail-turn"><div class="ce-ai-conversation-rail-turnno">Turno '+zuzuTurnNumber(turn,base+idx+1)+'</div><div class="ce-ai-conversation-rail-line"><b>P:</b> '+esc(q||'—')+'</div><div class="ce-ai-conversation-rail-line"><b>R:</b> '+esc(a||'—')+'</div></div>';
     }).join('');
   }
   function updateConversationTrail(){
     var body=$('ceAiConversationRailBody'),count=$('ceAiConversationRailCount');
     var all=loadZuzuConversation();
-    if(count) count.textContent=String(all.length);
+    if(count) count.textContent=String(zuzuConversationTurnCount());
     if(body){ body.innerHTML=conversationTrailBodyHtml(); body.scrollTop=body.scrollHeight; }
   }
   function activeConversationModel(currentPrompt){
@@ -311,11 +311,11 @@
   function conversationResumeHtml(){
     var hist=loadZuzuConversation().slice(-8);
     if(!hist.length) return '<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>';
-    return '<div class="ce-ai-card ce-ai-conversation-card ce-ai-conversation-screen-only"><h3>💬 Conversación abierta · '+hist.length+' turnos guardados</h3><div class="ce-ai-answer">El rastro resumido del hilo está visible a la derecha del prompt. Puedes continuar preguntando o pulsar 🧹 para empezar de cero.</div></div>';
+    return '<div class="ce-ai-card ce-ai-conversation-card ce-ai-conversation-screen-only"><h3>💬 Conversación abierta · '+zuzuConversationTurnCount()+' turnos</h3><div class="ce-ai-answer">El rastro resumido del hilo está visible a la derecha del prompt. Puedes continuar preguntando o pulsar 🧹 para empezar de cero.</div></div>';
   }
   function updateConversationMode(){
     var node=$('ceAiConversationMode'); if(!node) return;
-    var turns=loadZuzuConversation().length;
+    var turns=zuzuConversationTurnCount();
     if(!turns){
       node.className='ce-ai-mode-strip is-new';
       node.innerHTML='<span class="ce-ai-mode-pill">🔵 CONSULTA NUEVA</span>';
@@ -329,6 +329,7 @@
     updateConversationTrail();
     var r=$('ceAiResult'); if(r){ r.innerHTML=conversationResumeHtml(); r.setAttribute('data-ce-resume-only','1'); }
     window.__ceLastZuzuResult=null;
+    syncZuzuConversationFromServer(ZUZU_LOCAL_HISTORY_LIMIT).then(function(){updateConversationMode();updateConversationTrail();var rr=$('ceAiResult');if(rr&&rr.getAttribute('data-ce-resume-only')==='1')rr.innerHTML=conversationResumeHtml();}).catch(function(){});
   }
 
 
@@ -376,7 +377,7 @@
     var title=selected.length===1?responsePdfTitle({__prompt:selected[0].turn.user},selected[0].turn.user):('ControlEvent_v3_0_exp-conversacion_Zuzu-'+dateStamp(now)+'.pdf');
     var userName=loggedUserDisplayName(),chunks=[];
     for(var k=0;k<selected.length;k++){
-      var item=selected[k],turn=item.turn||{},n=item.idx+1,serverData=await fetchArchivedTurnPresentation(turn),answerHtml='',trace='';
+      var item=selected[k],turn=item.turn||{},n=zuzuTurnNumber(turn,item.idx+1),serverData=await fetchArchivedTurnPresentation(turn),answerHtml='',trace='';
       if(serverData){answerHtml=resultCoreHtml(serverData,{includeFiles:false,includeTrace:false});trace=includeTrace?traceHtml(serverData):'';if(trace){try{var h=document.createElement('div');h.innerHTML=trace;[].slice.call(h.querySelectorAll('details')).forEach(function(d){d.setAttribute('open','open');});trace=h.innerHTML;}catch(_){trace=String(trace).replace(/<details(?![^>]*\bopen\b)/ig,'<details open');}}}
       else{answerHtml=archivedTurnHtml(turn);trace=includeTrace?printableArchivedTraceHtml(turn):'';}
       chunks.push('<section class="ce-print-turn"><div class="ce-print-turn-head"><strong>Turno '+n+' · Pregunta</strong><div class="ce-print-turn-q">'+esc(turn.user||'')+'</div></div>'+answerHtml+trace+'</section>');
@@ -386,13 +387,14 @@
     win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body><main class="ce-print-wrap"><header class="ce-print-head"><div class="ce-print-top"><div><h1>✨ Conversación Zuzu · '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'</h1><div class="ce-print-meta">Usuario: '+esc(userName)+'</div></div><div class="ce-print-datetime">'+esc(prettyDateTime(now))+'</div></div></header>'+body+'</main><script>window.onload=function(){setTimeout(function(){try{document.querySelectorAll(".ce-ai-trace details").forEach(function(d){d.open=true;d.setAttribute("open","open");});document.title='+JSON.stringify(title)+';window.focus();window.print();}catch(e){}},250)};window.onafterprint=function(){try{window.opener&&window.opener.document&&window.opener.document.dispatchEvent(new CustomEvent("ce:zuzu-pdf-print-finished"));}catch(e){}}<\/script></body></html>');
     win.document.close();closeZuzuPdfPicker();setStatus('Abierta impresión con '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'.','ok');
   }
-  function openZuzuPdfPicker(){
+  async function openZuzuPdfPicker(){
     closeZuzuPdfPicker();
+    await syncZuzuConversationFromServer(ZUZU_LOCAL_HISTORY_LIMIT);
     var hist=loadZuzuConversation();
     if(!hist.length){setStatus('Haz una consulta para generar un PDF de respuesta.','err');return;}
     var rows=hist.map(function(turn,idx){
       var q=conversationTrailExcerpt(turn&&turn.user||''),a=conversationTrailExcerpt(turn&&turn.assistant||'');
-      return '<label class="ce-ai-pdf-turn"><input type="checkbox" class="ce-ai-pdf-turn-check" value="'+idx+'" checked><span><div class="ce-ai-pdf-turn-title">Turno '+(idx+1)+'</div><div class="ce-ai-pdf-turn-line"><b>P:</b> '+esc(q||'—')+'</div><div class="ce-ai-pdf-turn-line"><b>R:</b> '+esc(a||'—')+'</div><div class="ce-ai-pdf-turn-badges">'+pdfPickerTurnBadges(turn)+'</div></span></label>';
+      return '<label class="ce-ai-pdf-turn"><input type="checkbox" class="ce-ai-pdf-turn-check" value="'+idx+'" checked><span><div class="ce-ai-pdf-turn-title">Turno '+zuzuTurnNumber(turn,idx+1)+'</div><div class="ce-ai-pdf-turn-line"><b>P:</b> '+esc(q||'—')+'</div><div class="ce-ai-pdf-turn-line"><b>R:</b> '+esc(a||'—')+'</div><div class="ce-ai-pdf-turn-badges">'+pdfPickerTurnBadges(turn)+'</div></span></label>';
     }).join('');
     document.body.insertAdjacentHTML('beforeend','<div id="ceAiPdfPicker"><div class="ce-ai-pdf-picker-card"><div class="ce-ai-pdf-picker-head"><h3>🖨️ Preparar PDF de la conversación</h3><div>Están marcadas todas las preguntas/respuestas. Desmarca únicamente lo que no quieras conservar.</div></div><div class="ce-ai-pdf-picker-tools"><button type="button" id="ceAiPdfAll">Marcar todo</button><button type="button" id="ceAiPdfNone">Desmarcar todo</button><label class="ce-ai-pdf-trace-label"><input type="checkbox" id="ceAiPdfTrace" checked> Incluir traza técnica</label><span style="margin-left:auto;font-size:11px;color:#64748b">Se conservan texto, tablas y gráficas de cada turno.</span></div><div class="ce-ai-pdf-picker-list">'+rows+'</div><div class="ce-ai-pdf-picker-foot"><button type="button" id="ceAiPdfCancel">Cancelar</button><button type="button" class="ce-ai-pdf-primary" id="ceAiPdfPrint">Imprimir / Guardar PDF</button></div></div></div>');
     $('ceAiPdfAll').onclick=function(){document.querySelectorAll('#ceAiPdfPicker .ce-ai-pdf-turn-check').forEach(function(x){x.checked=true;});};
@@ -484,10 +486,9 @@
   }
   function clearZuzuThinkingTimer(){ if(window.__ceZuzuThinkingTimer){clearInterval(window.__ceZuzuThinkingTimer);window.__ceZuzuThinkingTimer=null;} }
   function setZuzuButtonHeartbeat(on){ var el=$('ceAiRun'); if(!el)return; var active=!!on; el.classList.toggle('is-thinking',active); el.setAttribute('aria-busy',active?'true':'false'); }
-  var ZUZU_WAIT_PHRASES=['Estoy con ello…','Sigo trabajando con los datos…','Un momento, que lo estoy cerrando…','Ya casi está…'];
+  var ZUZU_WAIT_STATUS='Zuzu está trabajando…';
   function startZuzuThinking(){
-    clearZuzuThinkingTimer();setZuzuButtonHeartbeat(true);var i=0;window.__ceZuzuThinkingState={index:0};setStatus(ZUZU_WAIT_PHRASES[0],'');
-    window.__ceZuzuThinkingTimer=setInterval(function(){if(!window.__ceZuzuRunBusy)return;i=(i+1)%ZUZU_WAIT_PHRASES.length;setStatus(ZUZU_WAIT_PHRASES[i],'');},2800);
+    clearZuzuThinkingTimer();setZuzuButtonHeartbeat(true);window.__ceZuzuThinkingState={active:true};setStatus(ZUZU_WAIT_STATUS,'');
   }
   function finishZuzuThinkingFast(){ setZuzuButtonHeartbeat(false); if(window.__ceZuzuRunBusy)setStatus('Redactando la respuesta…',''); return Promise.resolve(); }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); setZuzuButtonHeartbeat(false); window.__ceZuzuThinkingState=null; }
@@ -513,12 +514,31 @@
     return '';
   }
   function zuzuConversationKey(){ return zuzuStorageKey('conversation'); }
+  var ZUZU_LOCAL_HISTORY_LIMIT=500;
+  function zuzuTurnNumber(turn,fallback){
+    var n=Number(turn&&((turn.turnSeq!=null?turn.turnSeq:turn.seq)));return Number.isFinite(n)&&n>0?Math.trunc(n):Math.max(1,Number(fallback)||1);
+  }
+  function zuzuConversationTurnCount(){
+    var all=loadZuzuConversation(); if(!all.length)return 0;
+    var maxSeq=0; for(var i=0;i<all.length;i++){var n=Number(all[i]&&((all[i].turnSeq!=null?all[i].turnSeq:all[i].seq)));if(Number.isFinite(n)&&n>maxSeq)maxSeq=n;}
+    return Math.max(all.length,Math.trunc(maxSeq||0));
+  }
+  async function syncZuzuConversationFromServer(limit){
+    var cid=loadZuzuServerConversationId(); if(!cid)return loadZuzuConversation();
+    try{
+      var res=await fetch('/api/event-ai/conversations/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversationId:cid,usuarioLogado:loggedUserPayload(),limit:Math.max(1,Math.min(1000,Number(limit)||ZUZU_LOCAL_HISTORY_LIMIT))})});
+      var obj=await res.json(); var turns=obj&&obj.data&&Array.isArray(obj.data.turns)?obj.data.turns:[]; if(!res.ok||!turns.length)return loadZuzuConversation();
+      var old=loadZuzuConversation(),by={}; old.forEach(function(t){if(t&&t.turnId)by[String(t.turnId)]=t;});
+      var merged=turns.map(function(t){var prior=by[String(t.turnId||'')]||{};var answer=String(t.answer||prior.assistant||'');return Object.assign({},prior,{turnId:String(t.turnId||prior.turnId||''),turnSeq:Number(t.seq)||Number(prior.turnSeq)||0,user:String(t.userPrompt||prior.user||'').slice(0,700),assistant:answer.slice(0,420),assistantTail:answer.slice(-300),title:String(t.title||prior.title||'').slice(0,160),archiveHtml:prior.archiveHtml||'',archiveTraceHtml:prior.archiveTraceHtml||'',archiveMeta:prior.archiveMeta||{}});});
+      window.__ceZuzuConversationV26=merged.slice(-ZUZU_LOCAL_HISTORY_LIMIT); saveZuzuConversation(); return window.__ceZuzuConversationV26;
+    }catch(_){return loadZuzuConversation();}
+  }
   function loadZuzuConversation(){
     if(Array.isArray(window.__ceZuzuConversationV26)) return window.__ceZuzuConversationV26;
-    try{ var raw=zuzuMigratedStorageValue('conversation'); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-50):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
+    try{ var raw=zuzuMigratedStorageValue('conversation'); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-ZUZU_LOCAL_HISTORY_LIMIT):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
     return window.__ceZuzuConversationV26;
   }
-  function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-50))); }catch(_){ } }
+  function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-ZUZU_LOCAL_HISTORY_LIMIT))); }catch(_){ } }
   function zuzuContextKey(){ return zuzuStorageKey('context'); }
   function loadZuzuConversationContext(){
     if(window.__ceZuzuConversationContextV26 && typeof window.__ceZuzuConversationContextV26==='object') return window.__ceZuzuConversationContextV26;
@@ -659,7 +679,7 @@
     setStatus('', '');
     var resEl=$('ceAiResult');
     var voiceConversation=!!(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.isConversationalMode==='function'&&window.ControlEventV22Voz4.isConversationalMode());
-    var conversationTurnNumber=loadZuzuConversation().length+1;
+    var conversationTurnNumber=zuzuConversationTurnCount()+1;
     try{document.dispatchEvent(new CustomEvent('ce:zuzu-request-started',{detail:{prompt:prompt,voiceConversation:voiceConversation,turnNumber:conversationTurnNumber}}));}catch(_){ }
     startZuzuThinking(prompt);
     try{
@@ -715,8 +735,8 @@
       var fullAnswer=String(data.answer||'');
       if(!(data.meta&&data.meta.doNotArchiveTurn===true)){
         // Ledger v1: el navegador guarda solo el índice ligero. Tablas, trazas, DATASET y VIEW se recuperan del servidor bajo demanda (PDF/recuerdo).
-        window.__ceZuzuConversationV26.push({turnId:turnId,user:prompt.slice(0,700),assistant:fullAnswer.slice(0,420),assistantTail:fullAnswer.slice(-300),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:[],selectedEventId:selectedEventId(),conversationContext:null,pendingAction:pendingAction,resultContext:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:'',archiveMeta:archiveMetaForData(data)});
-        if(window.__ceZuzuConversationV26.length>50)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-50);
+        window.__ceZuzuConversationV26.push({turnId:turnId,turnSeq:Number(data.turnSeq||(data.meta&&data.meta.turnSeq)||conversationTurnNumber)||conversationTurnNumber,user:prompt.slice(0,700),assistant:fullAnswer.slice(0,420),assistantTail:fullAnswer.slice(-300),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:[],selectedEventId:selectedEventId(),conversationContext:null,pendingAction:pendingAction,resultContext:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:'',archiveMeta:archiveMetaForData(data)});
+        if(window.__ceZuzuConversationV26.length>ZUZU_LOCAL_HISTORY_LIMIT)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-ZUZU_LOCAL_HISTORY_LIMIT);
         saveZuzuConversation();
       }
       updateConversationMode();
