@@ -18,7 +18,8 @@
     "test:compras-donaciones-maintenance": "node scripts/compras-donaciones-maintenance-regression.js",
     "test:zuzu-ledger-fixes": "node scripts/zuzu-ledger-fixes-regression.js",
     "test:zuzu-answer-blueprint": "node scripts/zuzu-answer-blueprint-regression.js",
-    "test:zuzu-itv-contract": "node scripts/zuzu-itv-contract-regression.js"
+    "test:zuzu-itv-contract": "node scripts/zuzu-itv-contract-regression.js",
+    "test:zuzu-raw14": "node scripts/zuzu-raw14-continuity-voice-regression.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
