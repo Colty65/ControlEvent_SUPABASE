@@ -11,12 +11,14 @@ function extractFunction(name){
 }
 const arr=x=>Array.isArray(x)?x:[],trim=x=>String(x??'').trim(),norm=x=>trim(x).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
-// 1. Contrato único: query.targets 1..N. No doble sintaxis domain/targets.
-const c1={arr,trim,norm};vm.createContext(c1);vm.runInContext(`${extractFunction('v73TurnTool')}\n${extractFunction('v73CommandTools')}\n${extractFunction('v73NormalizeTargets')}\n${extractFunction('v73PrimaryTarget')}\n${extractFunction('v73PrimaryDomain')}\nthis.tools=v73CommandTools();this.nt=v73NormalizeTargets;this.pd=v73PrimaryDomain;`,c1);
-const qs=c1.tools.find(t=>t.name==='ce_query').parameters.properties.query;
-test('schema query obliga targets',qs.required.includes('targets')&&qs.properties.targets.minItems===1);
-test('schema query ya no expone domain alternativo',!Object.prototype.hasOwnProperty.call(qs.properties,'domain'));
-test('un target simple produce dominio primario',c1.pd({targets:[{domain:'weather'}]})==='weather');
+// 1. Contrato único con schema ligero: targets 1..N sin árbol JSON anidado gigante.
+const c1={arr,trim,norm,parsePlanJsonLenientHf37:x=>({parsed:JSON.parse(x)})};vm.createContext(c1);vm.runInContext(`${extractFunction('v73CompactJsonArg')}\n${extractFunction('v73CommandTools')}\n${extractFunction('v73CommandCallToRaw')}\n${extractFunction('v73NormalizeTargets')}\n${extractFunction('v73PrimaryTarget')}\n${extractFunction('v73PrimaryDomain')}\nthis.tools=v73CommandTools();this.map=v73CommandCallToRaw;this.nt=v73NormalizeTargets;this.pd=v73PrimaryDomain;`,c1);
+const qtool=c1.tools.find(t=>t.name==='ce_query'),qs=qtool.parameters;
+test('schema ligero obliga targets y scope_kind',qs.required.includes('targets')&&qs.required.includes('scope_kind'));
+test('schema query es plano y no reintroduce query anidado',!Object.prototype.hasOwnProperty.call(qs.properties,'query')&&qs.properties.operations_json.type==='string');
+test('catálogo de 6 tools queda por debajo de 5 KB',JSON.stringify(c1.tools).length<5000);
+const mapped=c1.map({name:'ce_query',arguments:{targets:['weather'],scope_kind:'named_event',event:'FUNCION 2026'}});
+test('un target simple compacto produce dominio primario',c1.pd(mapped.query)==='weather');
 const dedup=c1.nt({targets:[{domain:'person'},{domain:'person',metric_role:'count'}]});
 test('targets repetidos del mismo dominio se deduplican mecánicamente',dedup.length===1&&dedup[0].domain==='person');
 
@@ -87,9 +89,9 @@ test('dataset weather expone humedad relativa',/weather:\['Evento','Localidad','
 
 // 9. Prompt: fecha actual, persona múltiple en un target, filtros elípticos y no redundar fuentes.
 test('Gemini recibe CURRENT_TIME',/CURRENT_TIME:/.test(src)&&/clientLocalDateTime/.test(src));
-test('prompt enseña person múltiple en UN target',/Varias personas: UN solo target \{domain:"person"\} \+ people/.test(src));
+test('prompt enseña person múltiple en UN target',/Varias personas: UN solo target \"person\" \+ people/.test(src));
 test('prompt prohíbe purchases+products como rutas alternativas',/purchases = líneas[\s\S]*products = producto lógico agregado[\s\S]*Elige UNO/.test(src));
-test('prompt conserva semantic_filters en elipsis',/elipsis\/pronombre conserva los semantic_filters compatibles/.test(src));
+test('prompt conserva semantic_filters en elipsis',/elipsis\/pronombre conserva semantic_filters compatibles/.test(src));
 
 // 10. Replay server-side respeta requested chart.
 test('replay prioriza v73RequestedChartFromBundle',/readZuzuLedgerTurnPresentation[\s\S]*v73RequestedChartFromBundle\(bundle/.test(src));

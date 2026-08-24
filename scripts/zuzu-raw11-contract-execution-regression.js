@@ -20,18 +20,18 @@ function extractFunction(name){
   throw new Error(`Función ${name} incompleta`);
 }
 
-// Contrato estructural: seis tools exclusivas, sin inspect/reset como comando de primera llamada.
+// Contrato estructural: seis tools exclusivas con schema ligero RAW12A.
 const contractContext={};vm.createContext(contractContext);
-vm.runInContext(`${extractFunction('v73TurnTool')}\n${extractFunction('v73CommandTools')}\nthis.tools=v73CommandTools();`,contractContext);
+vm.runInContext(`${extractFunction('v73CommandTools')}\nthis.tools=v73CommandTools();`,contractContext);
 const toolNames=contractContext.tools.map(x=>x.name);
 test('catálogo cerrado de 6 comandos',JSON.stringify(toolNames)===JSON.stringify(['ce_query','ce_local','ce_set_context','ce_reference','ce_conversation','ce_clarify']));
-test('response_kind distingue amount/units/count',contractContext.tools[0].parameters.properties.response_kind.enum.includes('units')&&contractContext.tools[0].parameters.properties.response_kind.enum.includes('count'));
-const qSchema=contractContext.tools[0].parameters.properties.query;
-test('query usa contrato único targets 1..N',!!qSchema.properties.targets&&!qSchema.properties.domain&&qSchema.required.includes('targets'));
-test('target no fuerza métrica',qSchema.properties.targets.items.required.length===1&&qSchema.properties.targets.items.required[0]==='domain');
-const localOps=contractContext.tools[1].parameters.properties.local.properties.operations.items.properties.type.enum;
-test('local tiene show_table explícito',localOps.includes('show_table'));
-test('chart contract tiene x_field y series',!!qSchema.properties.presentation.properties.chart_config.properties.x_field&&!!qSchema.properties.presentation.properties.chart_config.properties.series);
+const qSchema=contractContext.tools[0].parameters;
+test('response_kind sigue disponible en schema compacto',qSchema.properties.response_kind.type==='string');
+test('query usa contrato único targets 1..N',!!qSchema.properties.targets&&qSchema.required.includes('targets')&&qSchema.required.includes('scope_kind'));
+test('target no fuerza métrica',!!qSchema.properties.target_metric_roles&&!qSchema.required.includes('target_metric_roles'));
+const localSchema=contractContext.tools[1].parameters;
+test('local expresa operaciones en JSON compacto',localSchema.properties.operations_json.type==='string'&&localSchema.required.includes('operations_json'));
+test('chart contract conserva x_field y series por campos compactos',!!qSchema.properties.chart_x&&!!qSchema.properties.chart_series);
 
 // Stubs físicos mínimos para ejecutar DE VERDAD la operación local actual.
 const arr=x=>Array.isArray(x)?x:[];
@@ -84,7 +84,7 @@ test('total units no se convierte en euros',metricContext.total('units',ws,datas
 
 // Prompt/context guardrails.
 test('frase actual tiene autoridad absoluta',/CURRENT_USER tiene autoridad absoluta/.test(src));
-test('corrección explícita cancela interpretación incompatible',/corrección explícita: cancela cualquier interpretación previa incompatible/i.test(src));
+test('corrección explícita cancela interpretación incompatible',/corrección explícita: cancela (?:cualquier interpretación previa|lo anterior) incompatible/i.test(src));
 test('consulta compuesta se ejecuta por targets',/function v73ExecuteCompositePlan[\s\S]*targets\.length<2[\s\S]*QUERY COMPUESTA RAW12/.test(src));
 test('current_context incluye fields disponibles/visibles',/active_dataset:activeDataset[\s\S]*recent_referents/.test(src)&&/available_fields[\s\S]*visible_fields/.test(src));
 test('final respeta autoridad metric_role',/AUTORIDAD DE MÉTRICA:[\s\S]*metric_role=units/.test(src));

@@ -13962,29 +13962,78 @@ function v73TurnTool(){
   const answer_blueprint={type:'object',description:'Pista opcional de tono, nunca hechos.',properties:{lead:{type:'string'},voice_lead:{type:'string'}}};
   return{scope,product,stringList,productList,fields,chartConfig,presentation,reuse,operation,target,query,local,change,reference,clarify,answer_blueprint};
 }
+function v73CompactJsonArg(value,fallback=[]){
+  if(Array.isArray(value))return value;
+  if(value&&typeof value==='object')return value;
+  const raw=trim(value);if(!raw)return fallback;
+  try{return JSON.parse(raw);}catch(_){
+    try{const parsed=parsePlanJsonLenientHf37(raw)?.parsed;return parsed==null?fallback:parsed;}catch(__){return fallback;}
+  }
+}
 function v73CommandTools(){
-  const base=v73TurnTool();
+  // RAW12A · ESQUEMA LIGERO. Gemini estaba rechazando el catálogo RAW12 antes de
+  // ejecutar ninguna llamada ("too many states for serving"). La semántica sigue
+  // estando en el prompt y en la validación CE; la capa de function-calling solo
+  // expresa un contrato compacto por comando para no agotar el autómata del proveedor.
+  const str={type:'string'},list={type:'array',items:{type:'string'}},bool={type:'boolean'},integer={type:'integer'};
   const make=(name,description,properties,required=[])=>({type:'function',name,description,parameters:{type:'object',properties,required}});
-  const response_kind={type:'string',enum:['auto','amount','units','count','who','what','whether','which_event','compare','summary','table','context','conversation_summary']};
-  const context={type:'object',description:'Actualiza solo el foco conversacional; NO consulta datos.',properties:{clear_all:{type:'boolean'},type:{type:'string',enum:['event','person','product','store','donor','responsible','ticket']},values:{type:'array',items:{type:'string'},description:'Uno o varios nombres del mismo tipo.'}}};
-  const conversation={type:'object',properties:{kind:{type:'string',enum:['general','system_complaint','current_context','conversation_summary']},note:{type:'string',description:'Resumen semántico breve del mensaje, sin inventar hechos.'}},required:['kind']};
   return[
-    make('ce_query','CONSULTAR. Obtiene datos nuevos. Usa SIEMPRE query.targets: uno para una consulta simple y varios solo si el usuario pide objetos de negocio distintos. Puede incluir operaciones y presentación en el mismo comando.',{response_kind,answer_blueprint:base.answer_blueprint,query:base.query},['query']),
-    make('ce_local','OPERAR_LOCAL. Trabaja exclusivamente sobre un DATASET ya materializado: mostrar tabla, columnas, ordenar, filtrar, agrupar, ranking, límite o gráfica. No consulta BBDD.',{response_kind,answer_blueprint:base.answer_blueprint,local:base.local},['local']),
-    make('ce_set_context','CAMBIAR_CONTEXTO. Cambia el foco sin devolver filas. clear_all=true reinicia el foco; si no, indica type+values.',{response_kind,context},['context']),
-    make('ce_reference','REFERENCIA. Restaura exactamente un resultado anterior o reejecuta su consulta con cambios explícitos.',{response_kind,answer_blueprint:base.answer_blueprint,reference:base.reference},['reference']),
-    make('ce_conversation','CONVERSACIÓN/META. Saludo, queja, comentario, pregunta sobre el contexto actual o resumen de conversación. No consulta BBDD ni manipula el dataset.',{conversation},['conversation']),
-    make('ce_clarify','ACLARAR. Solo cuando queda una ambigüedad material real no resoluble por tipo+candidatos+contexto.',{clarify:base.clarify},['clarify'])
+    make('ce_query','Consulta datos nuevos. targets contiene uno o varios dominios distintos; operations_json es un array JSON opcional de operaciones CE.',{
+      targets:list,target_metric_roles:list,response_kind:str,
+      scope_kind:str,event:str,events:list,series:str,year:integer,count:integer,order:str,start_date:str,end_date:str,
+      product_text:str,product_match:str,people:list,responsibles:list,donors:list,stores:list,tickets:list,purchase_statuses:list,
+      fields:list,table:bool,summary:bool,chart:bool,chart_type:str,chart_x:str,chart_series:list,
+      operations_json:str,reuse_json:str,supplements_json:str,lead:str,voice_lead:str
+    },['targets','scope_kind']),
+    make('ce_local','Opera solo sobre un dataset ya existente. operations_json debe ser un array JSON de operaciones CE.',{
+      from_ref:str,response_kind:str,operations_json:str,lead:str,voice_lead:str
+    },['from_ref','operations_json']),
+    make('ce_set_context','Cambia solo el foco conversacional; no consulta datos.',{
+      clear_all:bool,context_type:str,values:list,response_kind:str
+    },[]),
+    make('ce_reference','Restaura o reejecuta un turno anterior.',{
+      target_ref:str,reference_action:str,changes_json:str,response_kind:str,lead:str,voice_lead:str
+    },['target_ref','reference_action']),
+    make('ce_conversation','Conversación o meta-comentario sin consultar datos.',{
+      kind:str,note:str
+    },['kind']),
+    make('ce_clarify','Pide una aclaración solo si existe ambigüedad material real.',{
+      question:str,options:list,candidate_refs:list
+    },['question'])
   ];
 }
 function v73CommandCallToRaw(call={}){
   const name=trim(call?.name),a=call?.arguments&&typeof call.arguments==='object'?call.arguments:{};
-  if(name==='ce_query')return{action:'query',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(a.answer_blueprint?{answer_blueprint:a.answer_blueprint}:{}),query:a.query||{}};
-  if(name==='ce_local')return{action:'local',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(a.answer_blueprint?{answer_blueprint:a.answer_blueprint}:{}),local:a.local||{}};
-  if(name==='ce_set_context')return{action:'set_context',response_kind:trim(a.response_kind)||'context',context:a.context||{}};
-  if(name==='ce_reference')return{action:'reference',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(a.answer_blueprint?{answer_blueprint:a.answer_blueprint}:{}),reference:a.reference||{}};
-  if(name==='ce_conversation')return{action:'conversation',conversation:a.conversation||{kind:'general'}};
-  if(name==='ce_clarify')return{action:'clarify',clarify:a.clarify||{}};
+  const blueprint=()=>{const b={};if(trim(a.lead))b.lead=trim(a.lead);if(trim(a.voice_lead))b.voice_lead=trim(a.voice_lead);return Object.keys(b).length?b:null;};
+  if(name==='ce_query'){
+    // Compatibilidad con registros/harness antiguos que aún entreguen query anidado.
+    if(a.query&&typeof a.query==='object')return{action:'query',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(a.answer_blueprint?{answer_blueprint:a.answer_blueprint}:{}),query:a.query};
+    const domains=arr(a.targets).map(trim).filter(Boolean),roles=arr(a.target_metric_roles).map(trim),targets=domains.map((domain,i)=>({domain,...(['amount','units','count'].includes(roles[i])?{metric_role:roles[i]}:{})}));
+    const scope={kind:trim(a.scope_kind)};if(trim(a.event))scope.event=trim(a.event);const events=arr(a.events).map(trim).filter(Boolean);if(events.length)scope.events=events;if(trim(a.series))scope.series=trim(a.series);if(a.year!=null)scope.year=a.year;if(a.count!=null)scope.count=a.count;if(trim(a.order))scope.order=trim(a.order);if(trim(a.start_date))scope.start_date=trim(a.start_date);if(trim(a.end_date))scope.end_date=trim(a.end_date);
+    const q={targets,scope};
+    if(trim(a.product_text))q.product={text:trim(a.product_text),match:trim(a.product_match)||'semantic'};
+    for(const k of ['people','responsibles','donors','stores','tickets','purchase_statuses']){const vals=arr(a[k]).map(trim).filter(Boolean);if(vals.length)q[k]=vals;}
+    const fields=arr(a.fields).map(trim).filter(Boolean);if(fields.length)q.fields={mode:'only',values:fields};
+    const pres={};if(typeof a.table==='boolean')pres.table=a.table;if(typeof a.summary==='boolean')pres.summary=a.summary;if(typeof a.chart==='boolean')pres.chart=a.chart;if(trim(a.chart_type))pres.chart_type=trim(a.chart_type);if(trim(a.chart_x)||arr(a.chart_series).length){pres.chart_config={chart_type:trim(a.chart_type)||'line',...(trim(a.chart_x)?{x_field:trim(a.chart_x)}:{}),...(arr(a.chart_series).length?{series:arr(a.chart_series).map(trim).filter(Boolean)}:{})};pres.chart=true;}if(Object.keys(pres).length)q.presentation=pres;
+    const ops=v73CompactJsonArg(a.operations_json,[]);if(Array.isArray(ops)&&ops.length)q.operations=ops;
+    const reuse=v73CompactJsonArg(a.reuse_json,[]);if(Array.isArray(reuse)&&reuse.length)q.reuse=reuse;
+    const supplements=v73CompactJsonArg(a.supplements_json,[]);if(Array.isArray(supplements)&&supplements.length)q.supplements=supplements;
+    const bp=blueprint();return{action:'query',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(bp?{answer_blueprint:bp}:{}),query:q};
+  }
+  if(name==='ce_local'){
+    if(a.local&&typeof a.local==='object')return{action:'local',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(a.answer_blueprint?{answer_blueprint:a.answer_blueprint}:{}),local:a.local};
+    const ops=v73CompactJsonArg(a.operations_json,[]),bp=blueprint();return{action:'local',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(bp?{answer_blueprint:bp}:{}),local:{from_ref:trim(a.from_ref)||'CURRENT',operations:Array.isArray(ops)?ops:[]}};
+  }
+  if(name==='ce_set_context'){
+    if(a.context&&typeof a.context==='object')return{action:'set_context',response_kind:trim(a.response_kind)||'context',context:a.context};
+    return{action:'set_context',response_kind:trim(a.response_kind)||'context',context:{clear_all:a.clear_all===true,...(trim(a.context_type)?{type:trim(a.context_type)}:{}),...(arr(a.values).length?{values:arr(a.values).map(trim).filter(Boolean)}:{})}};
+  }
+  if(name==='ce_reference'){
+    if(a.reference&&typeof a.reference==='object')return{action:'reference',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(a.answer_blueprint?{answer_blueprint:a.answer_blueprint}:{}),reference:a.reference};
+    const changes=v73CompactJsonArg(a.changes_json,[]),bp=blueprint();return{action:'reference',...(trim(a.response_kind)?{response_kind:trim(a.response_kind)}:{}),...(bp?{answer_blueprint:bp}:{}),reference:{target_ref:trim(a.target_ref),action:trim(a.reference_action),...(Array.isArray(changes)&&changes.length?{changes}:{})}};
+  }
+  if(name==='ce_conversation')return{action:'conversation',conversation:{kind:trim(a.kind)||trim(a.conversation?.kind)||'general',...(trim(a.note||a.conversation?.note)?{note:trim(a.note||a.conversation?.note)}:{})}};
+  if(name==='ce_clarify')return{action:'clarify',clarify:a.clarify&&typeof a.clarify==='object'?a.clarify:{question:trim(a.question),...(arr(a.options).length?{options:arr(a.options).map(trim).filter(Boolean)}:{}),...(arr(a.candidate_refs).length?{candidate_refs:arr(a.candidate_refs).map(trim).filter(Boolean)}:{})}};
   return{action:'conversation',conversation:{kind:'general'}};
 }
 function v73NormalizeScope(raw={}){
@@ -14202,80 +14251,77 @@ function v73IsPendingHistoryChoiceReply(prompt='',choices=[]){
 }
 function v73KernelInstruction(state={},selectedEventId='',display='usuario',timeContext={}){
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'ninguno',localNow=trim(timeContext?.local)||trim(timeContext?.iso)||new Date().toISOString(),tz=trim(timeContext?.timezone)||'Europe/Madrid';
-  return`Eres el COMPILADOR SEMÁNTICO determinista de Zuzu para ControlEvent. Tu única tarea es traducir CURRENT_USER a EXACTAMENTE UNA tool del catálogo. CE ejecutará literalmente el comando. No escribas explicación ni una segunda tool.
+  return`Eres el COMPILADOR SEMÁNTICO de Zuzu para ControlEvent. Traduce CURRENT_USER a EXACTAMENTE UNA tool CE. No expliques nada y no emitas una segunda tool. CE ejecutará literalmente tu orden.
 
-PRIORIDAD SEMÁNTICA
-1. CURRENT_USER tiene autoridad absoluta.
-2. CURRENT_CONTEXT solo completa elipsis, pronombres, referencias visuales y parámetros omitidos.
-3. CANDIDATES ayudan a resolver nombres DESPUÉS de decidir el TIPO semántico.
-4. El evento visible «${screen}» es solo ambiente; úsalo únicamente si el usuario remite inequívocamente al evento actual.
-5. El usuario logado «${display}» es PERSONA, nunca EVENTO/TIENDA/PRODUCTO.
-6. FECHA/HORA ACTUAL: ${localNow} (${tz}). Resuelve expresiones relativas como «hoy», «ayer», «el año pasado» o «el mes que viene» respecto a esta referencia, nunca respecto a ejemplos o turnos antiguos.
+PRIORIDAD
+1. CURRENT_USER tiene autoridad absoluta y manda siempre.
+2. CURRENT_CONTEXT solo completa elipsis, pronombres y parámetros omitidos compatibles.
+3. CANDIDATES ayudan DESPUÉS de decidir el tipo semántico; nunca activan por sí solos un tipo. Los candidatos son ayuda, no activadores.
+4. Evento visible «${screen}» = ambiente, no contexto obligatorio.
+5. Usuario logado «${display}» = PERSONA.
+6. Fecha/hora actual: ${localNow} (${tz}). Resuelve expresiones relativas respecto a esta fecha.
 
-SEIS COMANDOS
-- ce_query: necesita datos nuevos. Usa SIEMPRE query.targets. Una consulta simple lleva exactamente 1 target; varios targets solo cuando el usuario pide OBJETOS DE NEGOCIO DISTINTOS en la misma frase. Nunca uses un target por persona/evento/producto ni varias fuentes alternativas para responder lo mismo.
-- ce_local: transforma el CURRENT DATASET sin BBDD: show_table, columnas, sort, filter, group, rank, compare, limit, chart. Puede usar cualquier available_field aunque no sea visible.
-- ce_set_context: cambia solo el foco conversacional. Si además pide datos, NO uses set_context: usa ce_query con el nuevo scope. Para empezar de cero usa clear_all=true.
-- ce_reference: restaura o reejecuta un turno anterior cuando el usuario realmente vuelve a un resultado previo.
-- ce_conversation: saludo, comentario, queja, meta-conversación, «qué tenemos ahora» o resumen de la conversación. No repitas una consulta anterior por inercia.
-- ce_clarify: solo cuando quedan dos o más alternativas DEL MISMO TIPO materialmente plausibles y ninguna domina por contexto/evidencia.
+COMANDOS Y ARGUMENTOS COMPACTOS
+- ce_query: datos nuevos. arguments.targets = array de dominios distintos, mínimo uno. scope_kind es obligatorio. Los demás filtros van en campos planos.
+  Ejemplo conceptual: targets:["weather"], scope_kind:"named_event", event:"FUNCION 2026", start_date:"2026-09-03", end_date:"2026-09-07", chart:true, chart_type:"line", chart_x:"Fecha", chart_series:["Temp. máx","Temp. mín"].
+  Para métricas por target usa target_metric_roles alineado por posición con targets. Ej.: targets:["purchases","donations"], target_metric_roles:["amount","units"].
+  fields es una lista de COLUMNAS visibles. people/responsibles/donors/stores/tickets son listas de ENTIDADES, aunque haya solo una.
+  operations_json, si hace falta, es un STRING que contiene un array JSON válido de operaciones CE, por ejemplo [{"type":"group","group_field":"Producto","metric":"Unidades","metric_role":"units","aggregation":"sum"}].
+- ce_local: solo DATASET existente. from_ref normalmente CURRENT. operations_json es un STRING con un array JSON de operaciones, por ejemplo [{"type":"show_table"}] o [{"type":"chart","chart_type":"line","x_field":"Fecha","series":["Temp. máx","Temp. mín"]}]. No consulta BBDD.
+- ce_set_context: solo cambia foco. Usa context_type + values. Para borrar foco, clear_all=true. Si además se piden datos, usa ce_query, no set_context.
+- ce_reference: vuelve realmente a un turno previo. target_ref + reference_action (restore_snapshot o reexecute_plan). changes_json opcional.
+- ce_conversation: saludo, comentario, queja, meta, contexto actual o resumen. No repitas una consulta anterior por inercia.
+- ce_clarify: solo ambigüedad material real entre alternativas plausibles del mismo tipo.
+
+VALORES CE PERMITIDOS
+Dominios: products, purchases, donations, events, event_summary, people, person, stores, catalog_products, catalog_stores, catalog_people, bank, bank_timeline, documentation, management, weather, comparison.
+Scope: screen_event, named_event, named_events, event_series, all_events, year, latest_events.
+response_kind: amount, units, count, who, what, whether, which_event, compare, summary, table, context, conversation_summary.
+Operaciones JSON: show_table, set_fields, add_field, add_fields, remove_field, remove_fields, show_all_fields, sort, filter, group, rank, compare, limit, chart.
+filter.match_mode: exact, word, contains, semantic. chart_type: bar, line, pie, donut, horizontalBar. metric_role: amount, units, count.
 
 CONTINUIDAD HUMANA
-Clasifica primero el mensaje actual por significado, no por palabras sueltas:
-A) continuación elíptica: conserva intención anterior y sustituye/añade solo lo expresado;
-B) modificación: conserva el objeto/dataset pertinente y cambia la dimensión pedida;
-C) petición autocontenida nueva: construye intención desde cero y no arrastres el dominio anterior;
-D) corrección explícita: cancela cualquier interpretación previa incompatible;
-E) comentario/meta: ce_conversation, sin operaciones de negocio.
-Una entidad explícita NO implica por sí sola cambio de tema: decide si la frase es autocontenida o una elipsis/modificación. Una queja no es una orden de repetir el turno anterior.
-Si CURRENT_CONTEXT.scope_authority=explicit_set_context, ese scope es el ámbito activo por defecto de las consultas posteriores hasta que CURRENT_USER lo sustituya explícitamente. Un DATASET anterior incompatible con ese scope no debe pisarlo.
-En una corrección que cambia solo UNA dimensión (por ejemplo el ámbito), conserva dominio y filtros semánticos compatibles de last_intent; elimina únicamente lo que la corrección contradiga.
+Clasifica primero el mensaje actual:
+A) continuación elíptica: conserva intención compatible y sustituye/añade solo lo dicho;
+B) modificación: conserva objeto/dataset pertinente y cambia la dimensión pedida;
+C) petición autocontenida nueva: construye desde cero, sin arrastrar el dominio anterior;
+D) corrección explícita: cancela lo anterior incompatible;
+E) comentario/meta: ce_conversation.
+Si CURRENT_CONTEXT.scope_authority=explicit_set_context, ese scope es el ámbito activo por defecto hasta que CURRENT_USER lo cambie. Un dataset antiguo incompatible no puede pisarlo. Una elipsis/pronombre conserva semantic_filters compatibles de last_intent salvo corrección explícita.
 
 ENTIDADES
-Decide primero PERSON/EVENT/STORE/PRODUCT/TICKET según significado. Después consulta solo candidatos de ese tipo. exact > strong > fuzzy claro > recent_referents del mismo tipo. Los candidatos son ayuda, no activadores. Si el tipo está claro pero no hay candidato, conserva el texto literal en el campo tipado; CE lo resolverá mecánicamente dentro de ese tipo. No inventes IDs. Varias entidades homogéneas van en arrays plurales dentro del MISMO comando.
+Decide primero PERSON/EVENT/STORE/PRODUCT/TICKET por significado. Luego mira candidatos del mismo tipo. exact > strong > fuzzy claro > recent_referents del mismo tipo. Si el tipo está claro pero falta candidato, conserva el texto literal en el campo tipado; CE resolverá mecánicamente dentro de ese tipo. No inventes IDs. Varias entidades homogéneas van juntas en la misma lista.
 
-DOMINIOS / GRANULARIDAD
-- person = dossier/visión transversal de una o varias PERSONAS nombradas. Varias personas: UN solo target {domain:"person"} + people:[...].
-- people = asistencia/participación/censo del evento, no dossier general de personas concretas.
-- purchases = líneas/registros físicos de compra. products = producto lógico agregado. Elige UNO según la granularidad pedida; no uses purchases+products para la misma magnitud.
-- donations = donaciones. events = catálogo/atributos de eventos. event_summary = dossier de un evento. comparison = comparación métrica entre eventos/personas cuando realmente se pide comparar.
-- Múltiples targets representan peticiones distintas (por ejemplo compras Y donaciones), no rutas físicas alternativas ni entidades repetidas.
+DOMINIO Y GRANULARIDAD
+- person = dossier transversal de una o varias personas concretas. Varias personas: UN solo target "person" + people:[...].
+- people = asistencia/censo/participación dentro de evento.
+- purchases = líneas físicas de compra. products = producto lógico agregado. Elige UNO para una misma magnitud; no uses purchases+products como dos rutas para lo mismo.
+- donations = donaciones. events = catálogo de eventos. event_summary = dossier de un evento. comparison = comparación real.
+Múltiples targets solo cuando el usuario pide OBJETOS DE NEGOCIO DISTINTOS, por ejemplo compras Y donaciones. No repitas dominios por persona, evento o producto.
 
 SCOPE
-Toda query lleva scope explícito. named_event para uno, named_events para varios, all_events para todos. Para persona/producto sin evento ni referencia al actual, normalmente all_events. Fecha/rango explícito => start_date/end_date ISO YYYY-MM-DD y manda sobre fechas generales del evento. Si un modificador temporal sirve para identificar una entidad recurrente concreta (serie/nombre + año absoluto o relativo), úsalo para resolver el EVENT correspondiente cuando los candidatos/contexto lo sostengan; no lo conviertas mecánicamente en scope=year si el usuario está señalando un evento concreto.
+Toda ce_query lleva scope_kind explícito. named_event para uno, named_events para varios, all_events para todos. Para persona/producto sin evento, normalmente all_events. Fecha/rango explícito => start_date/end_date ISO YYYY-MM-DD y manda sobre las fechas generales del evento.
 
-MAGNITUDES (decisión dimensional, no keywords)
-- amount: la respuesta pedida es una magnitud económica/monetaria.
-- units: la respuesta pedida es cantidad física/acumulación de una entidad inventariable o medible.
-- count: la respuesta pedida es cardinalidad/frecuencia de registros, personas, tickets, eventos, etc.
-«cantidad de producto» sin dimensión monetaria => units. Si no se pide una magnitud (p.ej. «lista de compras»), NO fuerces metric_role.
-TIPO DE RESPUESTA: decide response_kind por lo que CURRENT_USER pide obtener ahora (quién, qué, existencia, cantidad física, dinero, conteo, comparación, tabla), no por la forma del DATASET ni por la respuesta anterior.
-Cuando la respuesta principal sea una magnitud, alinea response_kind con ella: units para cantidad física, amount para dinero y count para cardinalidad.
+MAGNITUD
+amount = magnitud económica/monetaria. units = cantidad física. count = cardinalidad. Decide por la dimensión semántica, no por palabras fijas. «Cantidad de producto» sin dimensión monetaria => units. Una lista/detalle puede no necesitar metric_role. TIPO DE RESPUESTA: decide response_kind por lo que CURRENT_USER pide obtener ahora. Cuando la respuesta principal es una magnitud, alinea response_kind.
 
-TABLAS Y GRÁFICAS
-- Resultado ya materializado + «tabla/lista» => ce_local + show_table.
-- Si CURRENT DATASET ya contiene el sujeto, filtros y scope pertinentes y la nueva pregunta puede responderse con available_fields, PREFIERE ce_local: no reconsultes. Esto incluye pedir quién, desglose, orden, grupo, columnas o gráfica sobre ese mismo conjunto.
-- Una elipsis/pronombre conserva los semantic_filters compatibles de last_intent (producto, persona, responsable, donante, tienda, ticket) salvo sustitución/corrección explícita.
-- Primera extracción en tabla => ce_query + presentation.table=true.
-- Ordenar/filtrar/agrupar/añadir/quitar columnas del resultado actual => ce_local.
-- Gráfica del resultado actual => ce_local + chart. Usa x_field/series exactamente de active_dataset.available_fields cuando existan.
-- Datos nuevos + agrupación/orden/gráfica en la MISMA frase => un ce_query con operations.
-- Si el usuario especifica group_field, x_field, series o metric, rellénalos; CE debe obedecerlos literalmente.
-- En filter sobre texto: match_mode=exact solo si se pide el valor completo exacto de la celda; para familia/categoría/fragmento conceptual usa semantic o contains según corresponda. No uses eq+exact para una familia como si fuera un nombre completo.
-- Si pide varias gráficas distintas en el mismo turno, emite varias operaciones chart; CE las conservará todas.
+TABLAS, FILTROS Y GRÁFICAS
+- Resultado ya materializado + «tabla/lista» => ce_local + show_table. En el schema compacto: operations_json=[{"type":"show_table"}].
+- Ordenar/filtrar/agrupar/añadir/quitar columnas del resultado actual => ce_local. Gráfica del resultado actual => ce_local + chart.
+- Primera extracción en tabla => ce_query con table=true.
+- Datos nuevos + operación/gráfica en la misma frase => ce_query, usando campos chart_* para una gráfica simple o operations_json para operaciones complejas/múltiples.
+- En filtros de texto, exact solo para igualdad completa; para familia/categoría usa contains o semantic.
+- Si se especifican x_field, series, group_field o metric, consérvalos literalmente.
+- Varias gráficas distintas en un turno => varias operaciones chart dentro de operations_json.
 
-CAMPOS CANÓNICOS PRINCIPALES
+CAMPOS PRINCIPALES
 purchases: Evento, Producto, Segmento, Destino, Unidades, Precio, Importe, Ticket u otros gastos, Tienda, Responsable.
 donations: Evento, Producto, Segmento, Destino, Unidades, Precio, Valor, Tipo de donación, Donante, Responsable.
 weather: Evento, Localidad, Día, Fecha, Cielo, Temp. máx, Temp. mín, Humedad relativa %, Humedad máx %, Humedad mín %, Prob. lluvia %, Viento km/h.
 comparison: Evento, Ingresos, Compras realizadas, Donaciones valoradas, Saldo operativo, Valoración del evento, Asistentes canónicos.
-fields controla visibilidad solicitada; el DATASET interno conserva sus columnas disponibles.
 
-CONSULTAS COMPUESTAS
-Toda query usa targets. Si una sola frase pide un objeto, usa UN target. Si pide objetos distintos (ej. purchases + donations), usa varios targets y filtros/scope comunes. Nunca repitas el mismo domain en targets: las entidades homogéneas van en people/events/products/... y la granularidad elige una sola fuente semántica. Cada target puede llevar metric_role distinto o ninguno. No emitas dos tools.
-
-SALIDA
-Comprueba antes de emitir: una sola tool; comando correcto; no arrastre incompatible; scope completo; entidades tipadas; magnitud correcta si existe; tabla/gráfica inequívoca; query.targets tiene 1..N dominios DISTINTOS; una persona múltiple no crea targets repetidos; local solo usa DATASET existente.`;
+ANTES DE EMITIR
+Una sola tool; comando correcto; scope completo si query; targets 1..N y sin duplicados; varias personas en people, no en targets; no arrastre incompatible; magnitud correcta; tabla/gráfica inequívoca; operations_json debe ser JSON válido; local solo sobre dataset existente.`;
 }
 function v73KernelInput(userPrompt='',session={},entityCandidates={},historyCandidates=[],display='usuario',screenEvent='',timeContext={}){
   const currentContext=v73CurrentSummary(session),recentRefs=arr(session?.recentTurns).slice(-6).map(t=>({ref:`T${t.seq}`,prompt:trim(t.userPrompt).slice(0,180),command:trim(t.actionType),domain:trim(t.execution?.domain),scope:t.execution?.scope||{},focus:t.execution?.focus||{},title:trim(t.title).slice(0,110),dataset_id:trim(t.datasetId)})),recentDialogue=arr(session?.recentTurns).slice(-4).map(t=>({ref:`T${t.seq}`,user:trim(t.userPrompt).slice(0,220),assistant:trim(t.answer).slice(0,320)})),hist=arr(historyCandidates).map(x=>({ref:x.ref,turn_id:x.turn_id,created_at:x.created_at,prompt:trim(x.prompt).slice(0,180),title:trim(x.title).slice(0,120),domain:x.domain,scope:x.scope,row_count:x.row_count,score:x.score})),candidates=arr(entityCandidates?.flat).slice(0,12),known={current_user:{type:'PERSON',name:trim(display)||'usuario'},screen_event:trim(screenEvent)?{type:'EVENT',name:trim(screenEvent),ambient_only:true}:null},clock={iso:trim(timeContext?.iso)||new Date().toISOString(),local:trim(timeContext?.local)||'',timezone:trim(timeContext?.timezone)||'Europe/Madrid'};
@@ -14688,7 +14734,7 @@ async function v73ExecuteCompositePlan(query={},state={},selectedEventId='',flow
   const parts=summaries.map(x=>{const bits=[`${x.domain}: ${x.row_count} registros`];if(x.metric_role==='amount'&&x.total_amount!=null)bits.push(`${v26FormatEuro(x.total_amount)}`);if(x.metric_role==='units'&&x.total_units!=null)bits.push(`${v26FormatPlainNumber(x.total_units,3)} unidades`);return bits.join(', ');});
   const canonical=`Consulta compuesta ejecutada en un único turno: ${parts.join(' · ')}.`;
   const scopeInfo=v73ScopeInfoFromDataset(dataset),frame={domain:'composite',scope:dataset.scope,filters:{},presentation:view.presentation,transform:{}};
-  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · QUERY COMPUESTA RAW12','OK',`${targets.length} targets ejecutados: ${targets.map(t=>t.domain).join(' + ')} · ${combinedRows.length} filas combinadas.`);
+  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · QUERY COMPUESTA RAW12A','OK',`${targets.length} targets ejecutados: ${targets.map(t=>t.domain).join(' + ')} · ${combinedRows.length} filas combinadas.`);
   return{dataset,view,ws,tables,charts,title:view.title,canonical,warnings,frame,scopeInfo,resolved_query:{...query,scope:dataset.scope}};
 }
 
@@ -14831,7 +14877,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const historyCandidates=usePending?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v3_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
-  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW12','INFO',JSON.stringify(entityCandidates).slice(0,2800));
+  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW12A','INFO',JSON.stringify(entityCandidates).slice(0,2800));
 
   let compiled;
   try{compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone}});}
@@ -14948,7 +14994,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Gemini decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW12 · CONTRATO ÚNICO + OBEDECER ARTEFACTOS',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'gemini-zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW12 · CONTRATO ÚNICO + OBEDECER ARTEFACTOS · HOTFIX A SCHEMA LIGERO',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
@@ -14959,7 +15005,7 @@ export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){
   const ws=v73WorkingFromBundle(bundle),frame=v73FrameForStoredTurn(bundle),scopeInfo=bundle.dataset?v73ScopeInfoFromDataset(bundle.dataset):{kind:'none',eventNames:[],label:''},tables=bundle.view?.presentation?.table===false?[]:v73TableFromBundle(bundle),trace=arr(bundle.turn?.execution?.debug_trace);
   const intent=v73PlanArtifactIntent(bundle.turn?.normalizedPlan||{},bundle.view||{}),visibleTables=intent.table?tables:[];let charts=[];
   if(intent.chart&&ws){const requested=v73RequestedChartFromBundle(bundle,[]),base=requested.length?requested:(trim(bundle.dataset?.domain)==='weather'?v73WeatherChartFromDataset(bundle.dataset,bundle.view||{}):v72ChartFromWorking(ws,[]));charts=v73ApplyRequestedChartType(base,intent);}
-  return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW12',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
+  return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW12A',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
 }
 function v66SoftFailureResult({flowTrace=[],model='',voiceConversation=false,memory={},reason='No he podido completar este turno con seguridad',answer=''}={}){
   const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),txt=trim(answer)||'No he podido completar esta petición, pero he conservado intacto el contexto anterior. Reformúlala o repítela con un poco más de detalle.';
