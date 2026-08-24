@@ -3,7 +3,7 @@ const s=fs.readFileSync(new URL('../services/event-ai.service.js',import.meta.ur
 const tests=[
  ['EUR para importes',/importes monetarios[\s\S]*SIEMPRE en euros/.test(s)],
  ['Unidades no son euros',/Las cantidades físicas NO son euros[\s\S]*«unidades»/.test(s)],
- ['Voz dice euros',/al hablar di «mil novecientos veinticuatro euros»/.test(s)],
+ ['Voz dice euros sin decimales',/spoken_answer[\s\S]*SOLO la parte entera truncada hacia cero[\s\S]*PROHIBIDO redondear/.test(s)],
  ['No inventar unidad',/NO inventes una unidad/.test(s)],
  ['Contrato semántico al redactor',/measurement_semantics:\{currency:'EUR/.test(s)]
 ];
