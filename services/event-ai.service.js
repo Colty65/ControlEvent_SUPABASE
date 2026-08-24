@@ -13288,6 +13288,11 @@ function v70ApplyViewFilters(rows=[],filters=[]){
     const key=v70FieldKey(out,spec?.field);if(!key)continue;const wanted=trim(spec?.value),mode=trim(spec?.match_mode)||'exact',operator=trim(spec?.operator)||'eq',wn=norm(wanted),wt=new Set((semanticCleanToken(wanted)||'').split(' ').filter(Boolean));
     out=out.filter(r=>{
       const raw=trim(r?.[key]),rn=norm(raw);
+      if(operator==='purchase_status'){
+        const allowed=new Set(arr(spec?.values).map(trim).filter(v=>['realized','pending'].includes(v)));
+        const state=isRealizedPurchaseTicket(raw)?'realized':(isPendingTicket(raw)?'pending':'');
+        return !!state&&allowed.has(state);
+      }
       if(operator==='one_of'){const allowed=arr(spec?.values).map(norm).filter(Boolean);return allowed.some(v=>rn===v);}
       if(['gt','gte','lt','lte'].includes(operator)){
         const left=v40MaybeNumber(r?.[key]),right=v40MaybeNumber(spec?.value);if(left==null||right==null)return false;
@@ -14070,6 +14075,8 @@ function v73NormalizeOperations(raw=[]){
       if(x?.value!=null&&trim(x.value)!=='')op.value=trim(x.value);
       if(['eq','neq','gt','gte','lt','lte'].includes(trim(x?.operator)))op.operator=trim(x.operator);
       if(['exact','word','contains','semantic'].includes(trim(x?.match_mode)))op.match_mode=trim(x.match_mode);
+      const ps=[...new Set([...arr(x?.purchase_statuses),trim(x?.purchase_status)].map(trim).filter(v=>['realized','pending','all'].includes(v)))];
+      if(ps.length)op.purchase_statuses=ps;
     }
     if(type==='sort'){if(['asc','desc'].includes(trim(x?.direction)))op.direction=trim(x.direction);if(['amount','units','count'].includes(trim(x?.metric_role)))op.metric_role=trim(x.metric_role);}
     if(['add_field','add_fields'].includes(type)&&['first','last'].includes(trim(x?.placement)))op.placement=trim(x.placement);
@@ -14354,6 +14361,10 @@ TABLAS, FILTROS Y GRÁFICAS
 - Si se especifican x_field, series, group_field o metric, consérvalos literalmente.
 - Varias gráficas distintas en un turno => varias operaciones chart dentro de operations_json.
 - CÁLCULOS: Zuzu decide QUÉ calcular y CE calcula. Si CURRENT_USER pide «cuánto por cada X», total por grupo, promedio, mínimo, máximo o conteo agrupado, incluye en operations_json una operación group explícita con group_field/group_role, metric/metric_role y aggregation. Si pides una magnitud amount/units/count para VARIAS personas/donantes/responsables/tiendas/productos y el resultado debe distinguirlas o compararlas, la agregación por entidad es OBLIGATORIA: nunca entregues filas crudas para que la redacción final haga la suma. NO existen campos compactos de agrupación en ce_query: toda agregación viaja por operations_json. NO delegues sumas/promedios/conteos a la redacción final ni confíes en que los deduzca de filas crudas.
+- PROYECCIÓN DE CAMPOS: fields significa EXCLUSIVAMENTE «el usuario ha pedido ver solo estas columnas». No uses fields para expresar «por Responsable», «por tienda», «quiénes», «una por una», ordenación, agrupación o sujeto. Si el usuario no enumera columnas explícitamente, NO proyectes: conserva todos los campos de negocio. «Una por una por X» significa detalle completo ordenado/agrupado por X, no quedarse solo con la columna X.
+- ORDENACIÓN Y AGRUPACIÓN: sort/group/rank/compare van SIEMPRE en operations_json. NUNCA metas order/sort/group dentro de scope: scope solo define ámbito de eventos/fechas.
+- LISTAS DE QUIÉNES: si CURRENT_USER pregunta qué personas/responsables/donantes/tiendas/etc. aparecen, usa response_kind="who" (o "what" para productos/conceptos) y materializa una operación group/count o equivalente sobre la dimensión pertinente. El objetivo es que CE entregue el conjunto COMPLETO de valores distintos; no confíes en una muestra de filas para decidir quiénes son todos.
+- DOSSIER DE PERSONAS: una petición abierta como «háblame de X», «qué sabes de X» o «qué hicieron X e Y» es domain="person" aunque haya un evento activo. Usa domain="people" SOLO cuando la pregunta trate específicamente de asistencia, presencia, condición de socio o situación/importe de ingreso en el evento.
 
 CAMPOS PRINCIPALES
 purchases: Evento, Producto, Segmento, Destino, Unidades, Precio, Importe, Ticket u otros gastos, Tienda, Responsable.
@@ -14412,15 +14423,48 @@ function v73CompactFinalValue(value,depth=0){
   }
   return String(value).slice(0,420);
 }
+function v73FinalColumnStats(rows=[],columns=[]){
+  const out={};
+  for(const c of arr(columns).map(trim).filter(Boolean).slice(0,18)){
+    const values=arr(rows).map(r=>r?.[c]).filter(v=>v!==undefined&&v!==null&&trim(v)!=='');
+    if(!values.length)continue;
+    const nums=values.map(v40MaybeNumber).filter(v=>v!=null),numeric=nums.length>=Math.max(2,Math.ceil(values.length*0.9));
+    if(numeric){
+      out[c]={kind:'number',count:nums.length,sum:round(nums.reduce((a,v)=>a+v,0),4),min:round(Math.min(...nums),4),max:round(Math.max(...nums),4)};
+      continue;
+    }
+    const uniq=[],seen=new Set();for(const v of values){const raw=trim(v),k=norm(raw);if(!k||seen.has(k))continue;seen.add(k);uniq.push(raw);}
+    out[c]={kind:'text',count:values.length,distinct_count:uniq.length,values_complete:uniq.length<=40,...(uniq.length<=40?{distinct_values:uniq}:{sample_values:uniq.slice(0,12)})};
+  }
+  return out;
+}
+function v73FinalViewFacts(dataset=null,view=null,rows=[]){
+  if(!dataset)return{};
+  const source=dataset?.facts||{},frame=dataset?.provenance?.source_args?.frame||{},mutated=!!(v70MeaningfulFilter(frame?.filters||{})||arr(view?.rowFilters).length||arr(view?.groupBy).length||Number(view?.rowLimit)>0),contextKeys=['event','event_status','event_in_progress','status','purchase_status_explicit','purchase_status_rule','detail_semantics','valuation_formula','income_semantics','identity_semantics','operational_responsibility_semantics'];
+  const facts=mutated?Object.fromEntries(contextKeys.filter(k=>source?.[k]!==undefined).map(k=>[k,source[k]])):{...source};
+  facts.view_row_count=arr(rows).length;
+  const cols=[...new Set(arr(rows).flatMap(r=>Object.keys(r||{})))];
+  const amountField=v70FieldKey(rows,'Importe')||v70FieldKey(rows,'Valor'),unitField=v70FieldKey(rows,'Unidades');
+  if(amountField){const vals=rows.map(r=>v40MaybeNumber(r?.[amountField])).filter(v=>v!=null);if(vals.length)facts.view_total_amount=v26Money(vals.reduce((a,v)=>a+v,0));}
+  if(unitField){const vals=rows.map(r=>v40MaybeNumber(r?.[unitField])).filter(v=>v!=null);if(vals.length)facts.view_total_units=round(vals.reduce((a,v)=>a+v,0),4);}
+  if(trim(dataset?.domain)==='purchases'){
+    const productField=v70FieldKey(rows,'Producto'),ticketField=v70FieldKey(rows,'Ticket u otros gastos'),typeField=v70FieldKey(rows,'Tipo');let realized=0,pending=0,realizedAmount=0,pendingAmount=0;
+    for(const r of rows){const type=norm(typeField?r?.[typeField]:''),ticket=trim(ticketField?r?.[ticketField]:'');let st='';if(type==='realizada'||type==='realizado')st='realized';else if(type==='pendiente')st='pending';else if(isRealizedPurchaseTicket(ticket))st='realized';else if(isPendingTicket(ticket))st='pending';if(!st)continue;const amt=amountField?(v40MaybeNumber(r?.[amountField])??0):0;if(st==='realized'){realized++;realizedAmount+=amt;}else{pending++;pendingAmount+=amt;}}
+    facts.purchase_line_count=rows.length;facts.product_count=productField?new Set(rows.map(r=>norm(r?.[productField])).filter(Boolean)).size:undefined;facts.total_amount=amountField?v26Money(realizedAmount+pendingAmount):facts.view_total_amount;facts.realized_purchase_count=realized;facts.pending_purchase_count=pending;facts.realized_purchase_amount=v26Money(realizedAmount);facts.pending_purchase_amount=v26Money(pendingAmount);facts.view_purchase_status_semantics='Estos recuentos/importes describen SOLO la VIEW actual ya filtrada, no el evento completo salvo que la VIEW sea completa.';
+  }
+  Object.keys(facts).forEach(k=>facts[k]===undefined&&delete facts[k]);return facts;
+}
 function v73RawFinalDataset(dataset=null,view=null,plan={}){
   if(!dataset)return null;
-  const rows=v73RowsForStored(dataset,view||{}),baseCols=arr(view?.visibleFields).length?arr(view.visibleFields):v70BusinessVisibleColumns(arr(dataset?.columns)),rowCols=[...new Set(rows.slice(0,4).flatMap(r=>Object.keys(r||{})))],cols=[...new Set([...baseCols,...rowCols])].filter(Boolean).slice(0,14),limit=18;
+  const rows=v73RowsForStored(dataset,view||{}),baseCols=arr(view?.visibleFields).length?arr(view.visibleFields):v70BusinessVisibleColumns(arr(dataset?.columns)),rowCols=[...new Set(rows.slice(0,4).flatMap(r=>Object.keys(r||{})))],cols=[...new Set((baseCols.length?baseCols:rowCols).map(trim).filter(Boolean))].slice(0,14),limit=18;
   const compactRows=rows.slice(0,limit).map(r=>{const o={};for(const c of cols)if(r&&Object.prototype.hasOwnProperty.call(r,c))o[c]=v73CompactFinalValue(r[c],1);return o;});
-  const sourceFacts=dataset?.facts||{},localAction=trim(plan?.action)==='local',localFacts=localAction?Object.fromEntries(Object.entries(sourceFacts).filter(([k])=>['event','event_status','event_in_progress','status','purchase_status_explicit','realized_purchase_count','pending_purchase_count','realized_purchase_amount','pending_purchase_amount','purchase_notice'].includes(k))):sourceFacts;
+  const statCols=v70BusinessVisibleColumns(arr(view?.visibleFields).length?arr(view.visibleFields):cols).slice(0,18),columnStats=v73FinalColumnStats(rows,statCols),facts=v73FinalViewFacts(dataset,view||{},rows),localAction=trim(plan?.action)==='local';
   return{
-    domain:trim(dataset?.domain),scope:v73CompactFinalValue(dataset?.scope||{}),facts:v73CompactFinalValue(localFacts),
-    row_count:rows.length,columns:cols,visible_fields:arr(view?.visibleFields).slice(0,18),rows:compactRows,truncated:rows.length>limit,
-    view_is_authoritative:localAction,source_facts_trimmed_for_local:localAction,
+    domain:trim(dataset?.domain),scope:v73CompactFinalValue(dataset?.scope||{}),facts:v73CompactFinalValue(facts),
+    row_count:rows.length,columns:cols,visible_fields:arr(view?.visibleFields).slice(0,18),column_stats:v73CompactFinalValue(columnStats),
+    rows_sample:compactRows,sample_size:compactRows.length,rows_sample_is_complete:rows.length<=limit,truncated:rows.length>limit,
+    row_semantics:rows.length>limit?'rows_sample es SOLO una muestra inicial; NUNCA sirve para decidir quiénes son todos ni para calcular totales. column_stats/facts describen la VIEW completa.':'rows_sample contiene toda la VIEW actual.',
+    view_is_authoritative:true,source_facts_reconciled_to_view:true,local_action:localAction,
     presentation_available:{table:rows.length>0,chart:rows.length>0}
   };
 }
@@ -14444,7 +14488,9 @@ function v73RawFinalInstruction(){
   return `Eres Zuzu. Estás en la fase FINAL de un turno de ControlEvent. Zuzu ya interpretó la petición y ControlEvent ejecutó exactamente ese plan. Tu trabajo ahora es PRESENTAR el resultado con calidad humana. Zuzu es MASCULINO: habla siempre de ti en masculino. Tu carácter es directo, rudo en el buen sentido, seguro y con presencia; cercano cuando toca, pero sin sonar blando, cursi ni servicial en exceso. La voz debe imaginarse grave y potente, con frases naturales y firmes.
 
 CONTRATO DE PRESENTACIÓN
-- compiled_action/plan_executed del TURNO ACTUAL tiene autoridad absoluta. No existe memoria factual implícita de turnos anteriores. Si resultado_ce.dataset.view_is_authoritative=true, las filas de la VIEW actual mandan y no debes extrapolar facts globales de la fuente que ya no correspondan a esa vista.
+- compiled_action/plan_executed del TURNO ACTUAL tiene autoridad absoluta. No existe memoria factual implícita de turnos anteriores. resultado_ce.dataset describe exclusivamente la VIEW actual y es la única base factual permitida para este turno.
+- RESULTADO COMPLETO VS MUESTRA: resultado_ce.authoritative_payload fue calculado por CE sobre la VIEW completa y tiene prioridad para sujeto, recuento, people_values/item_values/event_values y métricas ya materializadas. resultado_ce.dataset.rows_sample puede ser SOLO una muestra cuando truncated=true. NUNCA deduzcas de rows_sample que solo existen los nombres, productos o valores que aparecen en esas primeras filas. Para saber TODOS los valores de una columna usa column_stats[campo].distinct_values únicamente cuando values_complete=true. Para totales usa facts o column_stats numéricos calculados por CE. Si el dato completo no está disponible, dilo: jamás completes por intuición.
+- COHERENCIA TEXTO/TABLA: cualquier afirmación del texto debe ser compatible con column_stats/facts y con la tabla que CE mostrará. Si column_stats.Responsable contiene 7 responsables, está prohibido afirmar que «los responsables son» solo dos. Si el plan proyectó columnas insuficientes para responder un detalle, reconoce que el resultado materializado no contiene ese detalle en vez de inventarlo.
 - Si mandatory_event_notice existe, debes comunicar ese aviso de evento En curso tanto en written_answer como en spoken_answer.
 - Si action=conversation: responde SOLO al comentario/meta actual; no menciones cifras, personas, productos, tablas o resultados anteriores. presentation.table=false y chart=false.
 - Si action=set_context: limita la respuesta a confirmar el nuevo foco; no recites datos del dataset anterior. presentation.table=false y chart=false.
@@ -14462,7 +14508,7 @@ CONTRATO DE PRESENTACIÓN
 - Si table o chart son true, NO dupliques en written_answer las filas o puntos completos: explica la conclusión y deja el detalle al artefacto de ControlEvent.
 - ARITMÉTICA: NO calcules sumas, promedios, mínimos, máximos, porcentajes derivados ni conteos recorriendo filas del dataset. Zuzu, en la fase de interpretación, decide la operación y CE debe devolver el resultado ya calculado. Puedes citar únicamente agregados/facts o filas agrupadas que RESULTADO_CE ya haya calculado. Si falta el agregado necesario, dilo; no hagas tú la cuenta.
 - NO vuelvas a decidir otra consulta, NO corrijas el plan anterior y NO pidas herramientas.
-- NO inventes datos que no estén en RESULTADO_CE. Si el plan fue erróneo, incompleto o RESULTADO_CE contiene un error, dilo con naturalidad: el fallo debe quedar visible.
+- NO inventes datos que no estén en RESULTADO_CE. Está prohibido mencionar productos, importes, personas, tiendas, tickets, cantidades o conclusiones que no aparezcan en facts, column_stats completos o rows_sample. Una memoria estadística del modelo NO es evidencia. Si el plan fue erróneo, incompleto o RESULTADO_CE contiene un error, dilo con naturalidad: el fallo debe quedar visible.
 - No menciones PLAN, DATASET, VIEW, JSON, herramientas, oráculo, pruebas o capas internas salvo pregunta expresa.
 - No uses frases de proceso tipo «he preparado N registros», «estoy consultando» ni ofertas mecánicas al final.
 - No añadas saludos rituales ni «Te comento». La dirección ocasional al usuario indicada arriba sí está permitida cuando haga la conversación más humana.
@@ -14480,26 +14526,35 @@ function v73RawFinalParse(payload){const calls=v261FunctionCalls(payload).filter
 function v73SpokenCoverageNeedsRepair(final={},plan={}){
   const action=trim(plan?.action);if(!['query','local','reference'].includes(action))return false;const w=trim(final?.written),sp=trim(final?.spoken);if(w.length<240)return false;if(!sp)return true;const ratio=sp.length/Math.max(1,w.length),sentenceCount=(w.match(/[.!?](?:\s|$)/g)||[]).length;return (sp.length<170&&sentenceCount>=2)||(ratio<0.42&&sp.length<480);
 }
-function v73InProgressEventNotice(state={},dataset=null,selectedEventId=''){
+function v73InProgressEventNotice(state={},dataset=null,selectedEventId='',view=null){
   if(!dataset)return null;const sc=dataset?.scope||{},names=[];if(trim(sc?.event))names.push(trim(sc.event));for(const x of arr(sc?.events))if(trim(x)&&!names.some(n=>norm(n)===norm(x)))names.push(trim(x));if(trim(sc?.kind)==='screen_event'&&!names.length){const ev=v26EventById(state,selectedEventId);if(ev)names.push(trim(ev?.titulo));}
   const eventMap=v70EventLookup(state),active=[];for(const name of names){const ev=eventMap.get(norm(name));if(ev&&isEventInProgressValue(ev?.situacion))active.push(trim(ev?.titulo)||name);}if(!active.length)return null;
-  const facts=dataset?.facts||{},base=active.length===1?`${active[0]} está En curso; los datos son provisionales y pueden cambiar hasta el cierre.`:`Hay ${active.length} eventos En curso en este resultado (${active.join(', ')}); sus datos son provisionales y pueden cambiar hasta el cierre.`;let purchase='';
+  const facts=v73FinalViewFacts(dataset,view||{},v73RowsForStored(dataset,view||{})),base=active.length===1?`${active[0]} está En curso; los datos son provisionales y pueden cambiar hasta el cierre.`:`Hay ${active.length} eventos En curso en este resultado (${active.join(', ')}); sus datos son provisionales y pueden cambiar hasta el cierre.`;let purchase='';
   if(trim(dataset?.domain)==='purchases'&&active.length===1){const r=Number(facts?.realized_purchase_count),p=Number(facts?.pending_purchase_count),st=trim(facts?.status);if(Number.isFinite(r)&&Number.isFinite(p)){if(st==='realized')purchase=` Este detalle contiene solo las ${r} compras realizadas; quedan ${p} compras previstas pendientes no incluidas.`;else if(st==='pending')purchase=` Este detalle corresponde a ${p} compras previstas pendientes.`;else purchase=` En compras se están considerando todas: ${r} realizadas y ${p} pendientes previstas.`;}}
   return{events:active,written:`Aviso: ${base}${purchase}`,spoken:`Ojo: ${base}${purchase}`};
 }
 function v73EnsureInProgressNotice(final={},notice=null,flowTrace=[]){if(!notice)return final;let written=trim(final?.written),spoken=trim(final?.spoken),changed=false;const has=t=>/\ben\s+curso\b|\bprovisional(?:es)?\b/i.test(t);if(!has(written)){written=`${written}${written?'\n\n':''}${notice.written}`;changed=true;}if(!has(spoken)){spoken=`${spoken}${spoken?' ':''}${notice.spoken}`;changed=true;}if(changed)zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · EVENTO EN CURSO','OK','CE añade el aviso factual obligatorio de provisionalidad del evento En curso.');return{...final,written,spoken};}
-async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation=false,audience={},state={},selectedEventId=''}){
+function v73AuthoritativePayloadForFinal(raw={},dataset=null,view=null){
+  const src=raw&&typeof raw==='object'?raw:{},out={};
+  for(const k of ['kind','count','person','product','event','scope_text','subject','empty','requested_metric_role','requested_metric_value','amount_value','amount','units_value','units','count_value','value','matched_count','metric','winner','winner_value','runner_up','runner_up_value','difference'])if(src?.[k]!==undefined&&src?.[k]!==null&&src?.[k]!=='')out[k]=src[k];
+  const visible=new Set(arr(view?.visibleFields).map(norm)),hasAny=names=>arr(names).some(x=>visible.has(norm(x)));
+  if(arr(src.people_values).length&&hasAny(['Responsable','Donante','Persona','Asistente','Nombre','Socio'])){out.people_values=arr(src.people_values).slice(0,40);out.people=trim(src.people);}
+  if(arr(src.item_values).length&&hasAny(['Producto','Concepto','Descripción'])){out.item_values=arr(src.item_values).slice(0,40);out.items=trim(src.items);}
+  if(arr(src.event_values).length&&hasAny(['Evento'])){out.event_values=arr(src.event_values).slice(0,40);out.events=trim(src.events);}
+  return out;
+}
+async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation=false,audience={},state={},selectedEventId='',authoritativePayload={}}){
   const action=trim(plan?.action),dataAction=['query','local','reference','inspect'].includes(action),activeDataset=dataAction?(dataset||finalBundle?.dataset||null):null,activeView=dataAction?(view||finalBundle?.view||null):null;
   const reference=action==='reference'&&finalBundle?.turn?{turn_id:trim(finalBundle.turn.turnId),title:trim(finalBundle.turn.title).slice(0,120)}:null;
   const rawExec=v73RawFinalExecution(execution),safeExec=dataAction?rawExec:(action==='set_context'?{summary:rawExec.summary,focus:rawExec.focus,context:rawExec.context,error:rawExec.error}:action==='clarify'?{summary:rawExec.summary,pending_candidates:rawExec.pending_candidates,error:rawExec.error}:{summary:rawExec.summary,error:rawExec.error});
-  const eventNotice=v73InProgressEventNotice(state,activeDataset,selectedEventId);
+  const eventNotice=v73InProgressEventNotice(state,activeDataset,selectedEventId,activeView);
   const packet={
     current_user:userPrompt,
     input_mode:voiceConversation?'voice':'written',
     audience:{usuario:trim(audience?.usuario),nombre:trim(audience?.nombre),nivel:trim(audience?.nivel)},
     compiled_action:action,
     plan_executed:v73CompactFinalValue(plan||{}),
-    resultado_ce:{status,execution:safeExec,dataset:v73RawFinalDataset(activeDataset,activeView,plan),...(reference?{reference_snapshot:reference}:{})},
+    resultado_ce:{status,execution:safeExec,dataset:v73RawFinalDataset(activeDataset,activeView,plan),authoritative_payload:v73CompactFinalValue(v73AuthoritativePayloadForFinal(authoritativePayload,activeDataset,activeView)),...(reference?{reference_snapshot:reference}:{})},
     mandatory_event_notice:eventNotice?v73CompactFinalValue(eventNotice):null,
     measurement_semantics:{currency:'EUR para amount/importe/precio/gasto/ingreso monetario/donación valorada/saldo/valoración/coste',quantity:'Unidades para units/unidades/cantidad física',counts:'Nombrar la entidad contada: eventos/personas/registros/tickets/cuotas/asistentes',weather:'°C / km/h / % / mm según el campo; humedad relativa usa %'}
   };
@@ -14723,7 +14778,13 @@ function v73ApplyLocalOperations(bundle={},operations=[],flowTrace=[]){
     else if(type==='sort'){
       const requested=trim(op.field)||trim(op.metric_role),role=trim(op.metric_role)||v73RoleFromLabel(requested,ds?.domain),k=resolve(requested,role,['amount','units'].includes(role)?'metric':'role');if(!k)warn(`Ordenación ignorada: el campo/rol «${requested}» no existe en el DATASET.`);else v.sort=[{field:k,direction:op.direction==='desc'?'desc':'asc'}];
     }else if(type==='filter'){
-      const k=resolve(op.field);if(!k)warn(`Filtro local ignorado: el campo «${trim(op.field)}» no existe en el DATASET.`);else v.rowFilters=[...arr(v.rowFilters),{field:k,value:trim(op.value),operator:trim(op.operator)||'eq',match_mode:trim(op.match_mode)||'exact'}];
+      const purchaseStatuses=arr(op.purchase_statuses).map(trim).filter(v=>['realized','pending','all'].includes(v));
+      if(purchaseStatuses.length&&trim(ds?.domain)==='purchases'){
+        const wanted=purchaseStatuses.includes('all')?['realized','pending']:purchaseStatuses;
+        v.rowFilters=[...arr(v.rowFilters),{field:'Ticket u otros gastos',operator:'purchase_status',values:wanted,stage:'pre_group'}];
+      }else{
+        const k=resolve(op.field);if(!k)warn(`Filtro local ignorado: el campo «${trim(op.field)}» no existe en el DATASET.`);else v.rowFilters=[...arr(v.rowFilters),{field:k,value:trim(op.value),operator:trim(op.operator)||'eq',match_mode:trim(op.match_mode)||'exact'}];
+      }
     }else if(type==='group'){
       const requestedGroup=trim(op.group_field)||trim(op.field)||trim(op.group_role),k=resolve(requestedGroup,op.group_role,'role');if(!k)warn(`Agrupación ignorada: no hay una dimensión ejecutable para «${requestedGroup}».`);else{v.groupBy=[k];v.metrics=arr(op.metrics);if(!v.metrics.length&&trim(op.metric)){const mf=resolve(op.metric,op.metric_role,'metric'),agg=['sum','avg','count','min','max'].includes(trim(op.aggregation))?trim(op.aggregation):'sum';if(agg==='count')v.metrics=['count'];else if(mf)v.metrics=[`${agg}:${mf}`];}if(!v.metrics.length&&['amount','units'].includes(trim(op.metric_role))){const mr=trim(op.metric_role),mf=resolve(mr,mr,'metric');if(mf)v.metrics=[`sum:${mf}`];}if(!v.metrics.length&&trim(op.metric_role)==='count')v.metrics=['count'];const derived=[k];for(const spec of (v.metrics.length?v.metrics:['count'])){const [opRaw,fieldRaw]=trim(spec).split(':',2),mop=norm(opRaw),mf=fieldRaw?resolve(fieldRaw,op.metric_role,'metric'):'';if(mop==='count')derived.push('Nº registros');else if(mop==='sum'&&mf)derived.push(`Suma ${mf}`);else if(mop==='avg'&&mf)derived.push(`Media ${mf}`);else if(mop==='min'&&mf)derived.push(`Mín ${mf}`);else if(mop==='max'&&mf)derived.push(`Máx ${mf}`);else if(mop==='distinct'&&mf)derived.push(`Distintos ${mf}`);}v.visibleFields=[...new Set(derived)];}
     }else if(type==='rank'){
@@ -14880,7 +14941,7 @@ function v73BuildAnswerPayload(kind='',canonical='',ws=null,dataset=null,view=nu
   if(totalAmount!=null){payload.amount_value=v26Money(totalAmount);payload.amount=v26FormatEuro(v26Money(totalAmount));}
   if(totalUnits!=null){payload.units_value=round(totalUnits,4);payload.units=`${v26FormatPlainNumber(totalUnits,4)} unidades`;}
   if(requestedMetric==='count')payload.count_value=v73MetricTotal('count',ws,dataset);
-  if(who.values.length){payload.people_values=who.values.slice(0,12);payload.people=v73JoinHuman(payload.people_values);}
+  if(who.values.length){payload.people_values=who.values.slice(0,40);payload.people=v73JoinHuman(payload.people_values);}
   if(what.values.length){payload.item_values=what.values.slice(0,12);payload.items=v73JoinHuman(payload.item_values);}
   if(events.values.length){payload.event_values=events.values.slice(0,12);payload.events=v73JoinHuman(payload.event_values);if(!payload.event&&payload.event_values.length===1)payload.event=payload.event_values[0];}
   if(k==='whether'){
@@ -14913,7 +14974,7 @@ function v73AnswerForKind(kind='',canonical='',ws=null,dataset=null,view=null,pl
   if(k==='amount'){const role=requestedMetric||'amount',total=v73MetricTotal(role,ws,dataset);if(total==null)return canonical;if(role==='units')return`La cantidad es ${v26FormatPlainNumber(total,4)} unidades.`;if(role==='count')return`Hay ${v26FormatPlainNumber(total,0)} registros.`;return`El importe es ${v26FormatEuro(v26Money(total))}.`;}
   if(k==='units'){const total=v73MetricTotal('units',ws,dataset);return total!=null?`La cantidad es ${v26FormatPlainNumber(total,4)} unidades.`:canonical;}
   if(k==='count'){const total=v73MetricTotal('count',ws,dataset);return total!=null?`Hay ${v26FormatPlainNumber(total,0)} registros.`:canonical;}
-  if(k==='who'){const u=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Nombre','Socio']);if(u.values.length)return u.values.length===1?`Fue ${u.values[0]}.`:`Son ${u.values.slice(0,8).join(', ')}${u.values.length>8?'…':''}.`;return canonical;}
+  if(k==='who'){const u=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Nombre','Socio']);if(u.values.length)return u.values.length===1?`Fue ${u.values[0]}.`:`Son ${u.values.slice(0,40).join(', ')}${u.values.length>40?'…':''}.`;return canonical;}
   if(k==='what'){const u=v73UniqueValues(rows,['Producto','Concepto','Descripción']);if(u.values.length)return u.values.length===1?`Fue ${u.values[0]}.`:`Encontré ${u.values.slice(0,8).join(', ')}${u.values.length>8?'…':''}.`;return canonical;}
   if(k==='whether'){
     const p=v73BuildAnswerPayload('whether',canonical,ws,dataset,view,{}),yes=!!p.value,frame=dataset?.provenance?.source_args?.frame||{},f=frame?.filters||{},domain=trim(dataset?.domain||frame?.domain),scope=dataset?.scope||{},event=trim(scope?.event),person=trim(p.person||f.person||f.responsible||f.donor),product=trim(p.product||f.product_text);
@@ -14959,7 +15020,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const historyCandidates=usePending?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v3_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
-  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW14C','INFO',JSON.stringify(entityCandidates).slice(0,2800));
+  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW14D','INFO',JSON.stringify(entityCandidates).slice(0,2800));
 
   let compiled;
   try{compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone}});}
@@ -15051,7 +15112,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   // La redacción determinista calculada arriba sirve solo como dato interno de ejecución y jamás se
   // usa para sustituir, corregir o pulir el texto final de Zuzu.
   try{
-    const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation,audience:{usuario:profile.identificacion||display,nombre:profile.nombre||display,nivel:profile.nivel},state,selectedEventId});
+    const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation,audience:{usuario:profile.identificacion||display,nombre:profile.nombre||display,nivel:profile.nivel},state,selectedEventId,authoritativePayload:answerPayload});
     title=rawFinal.title||title;answer=rawFinal.written;spokenAnswer=rawFinal.spoken;finalPresentation=rawFinal.presentation||{};
     execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:rawFinal.written,gemini_spoken_answer:rawFinal.spoken,gemini_presentation:finalPresentation,response_mode:'gemini_dual_presentation'};
     zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(rawFinal.written).length} caracteres · voz=${text(rawFinal.spoken).length} caracteres · tabla=${finalPresentation.table?'sí':'no'} · gráfica=${finalPresentation.chart?'sí':'no'}. CE no reescribe ninguna de las dos redacciones.`);
@@ -15076,7 +15137,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14C · EVENTO EN CURSO + COMPRAS COMPLETAS + EVENTO ACTIVO + VOZ CORREGIDA',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14D · ANTIALUCINACIÓN + COHERENCIA TEXTO/TABLA + VIEW COMPLETA',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
@@ -15087,7 +15148,7 @@ export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){
   const ws=v73WorkingFromBundle(bundle),frame=v73FrameForStoredTurn(bundle),scopeInfo=bundle.dataset?v73ScopeInfoFromDataset(bundle.dataset):{kind:'none',eventNames:[],label:''},tables=bundle.view?.presentation?.table===false?[]:v73TableFromBundle(bundle),trace=arr(bundle.turn?.execution?.debug_trace);
   const intent=v73PlanArtifactIntent(bundle.turn?.normalizedPlan||{},bundle.view||{}),visibleTables=intent.table?tables:[];let charts=[];
   if(intent.chart&&ws){const requested=v73RequestedChartFromBundle(bundle,[]),base=requested.length?requested:(trim(bundle.dataset?.domain)==='weather'?v73WeatherChartFromDataset(bundle.dataset,bundle.view||{}):v72ChartFromWorking(ws,[]));charts=v73ApplyRequestedChartType(base,intent);}
-  return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW13',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
+  return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW14D',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
 }
 function v66SoftFailureResult({flowTrace=[],model='',voiceConversation=false,memory={},reason='No he podido completar este turno con seguridad',answer=''}={}){
   const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),txt=trim(answer)||'No he podido completar esta petición, pero he conservado intacto el contexto anterior. Reformúlala o repítela con un poco más de detalle.';

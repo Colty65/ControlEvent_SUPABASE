@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v3_0_exp-RAW14C-EN-CURSO-COMPRAS-EVENTO-ACTIVO-VOZ-FIX38';
+  var BUILD='v3_0_exp-RAW14D-ANTIALUCINACION-COHERENCIA-FIX39';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
