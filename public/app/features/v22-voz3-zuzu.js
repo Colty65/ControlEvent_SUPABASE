@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v3_0_exp-RAW14H-ENTRETENIMIENTO-SIN-REPETICION-FIX40';
+  var BUILD='v3_0_exp-RAW14J-TIEMPO-ENTRETENIMIENTO-CONTINUO-FIX41';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v40', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v40', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v40'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v41', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v41', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v41', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v41'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -30,70 +30,70 @@
     bargeRecognition:null, bargeGeneration:0,
     voices:[],
     recorderStream:null, recorder:null, recorderChunks:[], recordingActive:false, lastRecordingBlob:null, lastRecordingMime:'',
-    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentFinishedAt:0, pendingAnswerTimer:null, lastEntertainmentIndex:-1, entertainmentDeck:[], pendingEntertainmentIndex:-1, entertainmentCycle:0, entertainmentLoaded:false
+    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentFinishedAt:0, pendingAnswerTimer:null, lastEntertainmentIndex:-1, entertainmentDeck:[], entertainmentUsed:[], pendingEntertainmentIndex:-1, entertainmentCycle:0, entertainmentLoaded:false
   };
 
   var ENTERTAINMENT_PHRASES=[
-    'Estoy con ello.',
-    'Sigo revisando los datos.',
-    'Un momento, que lo estoy ordenando.',
-    'Ya casi lo tengo.',
-    'Estoy cerrando la respuesta.',
-    'Sigo aquí, dame un instante.',
-    'Estoy contrastando lo importante.',
-    'Un segundo más y te lo cuento.',
-    'Estoy atando los cabos.',
-    'Déjame cuadrar esto bien.',
-    'Un instante, que estoy poniendo los datos en fila.',
-    'Estoy separando el grano de la paja.',
-    'Voy por la última comprobación.',
-    'Estoy mirando dónde está la miga de esto.',
-    'Dame un segundo, que los números se han puesto interesantes.',
-    'Estoy negociando con los datos; de momento colaboran.',
-    'Un momento, que aquí hay más miga de la que parecía.',
-    'Estoy poniendo orden en este pequeño zoológico de datos.',
-    'Casi está; los duendes de las tablas hoy vienen obedientes.',
-    'Estoy haciendo que las cifras confiesen.',
-    'Voy a darle una vuelta más para no contarte una milonga.',
-    'Estoy comprobando que no se nos cuele ningún polizón.',
-    'Un segundo, que esto tiene su aquel.',
-    'Estoy encajando las piezas sin usar martillo, de momento.',
-    'Sigo husmeando; algo útil va saliendo.',
-    'Estoy afinando la respuesta para no darte la chapa.',
-    'Un instante, que quiero dejar esto bien rematado.',
-    'Estoy revisando la letra pequeña de los datos.',
-    'Voy cerrando flecos; alguno venía con ganas de guerra.',
-    'Estoy poniendo a cada cifra en su sitio.',
-    'Dame un momento, que no quiero que una coma nos monte un drama.',
-    'Estoy sacando lo importante y mandando el ruido al banquillo.',
-    'Casi lo tengo; estoy haciendo una última pasada.',
-    'Un segundo, que esta respuesta merece salir peinada.',
-    'Estoy comprobando que todo encaje antes de soltarlo.',
-    'Voy con calma, que correr aquí sale caro.',
-    'Estoy ordenando el tinglado y ahora te cuento.',
-    'Un momento, que las tablas están declarando.',
-    'Estoy dejando la respuesta lista para servir.',
-    'Sigo aquí; los datos no se me escapan.',
-    'Estoy metiendo las cifras en cintura.',
-    'Un momento, que aquí nadie se va sin declarar.',
-    'Estoy pasando la escoba por los datos sospechosos.',
-    'Casi está; solo me falta apretar un par de tornillos.',
-    'Estoy mirando esto con cara de pocos amigos, funciona de maravilla.',
-    'Dame un instante, que estoy interrogando a la tabla buena.',
-    'Estoy haciendo limpieza; el ruido ya va camino de la calle.',
-    'Un segundo, que quiero darte carne y no huesos.',
-    'Estoy cuadrando esto como si me fuera el sueldo en ello.',
-    'Voy rematando; aquí no sale nada hasta que esté decente.',
-    'Estoy buscando la trampa, por si los datos vienen con ganas de cachondeo.',
-    'Un momento, que estoy poniendo firmes a las columnas.',
-    'Sigo al aparato; esto ya empieza a cantar.',
-    'Estoy rascando un poco más, que todavía queda sustancia.',
-    'Casi lo tengo; la última cifra está intentando escaquearse.',
-    'Estoy comprobando el resultado dos veces, que luego vienen los sustos.',
-    'Un instante; esto sale ahora mismo y sale con fundamento.',
-    'Estoy separando lo útil de la morralla.',
-    'Voy cerrando; los números ya han dejado de hacerse los interesantes.',
-    'Dame medio minuto de dignidad informática y te lo suelto.'
+    'Voy al grano, dame un momento.',
+    'Estoy cruzando las piezas.',
+    'Los números están pasando revista.',
+    'Esto tiene miga; sigo.',
+    'Voy limpiando el ruido.',
+    'Un instante, que aquí hay tema.',
+    'Estoy comprobando por dónde respira esto.',
+    'La tabla está hablando; la estoy escuchando.',
+    'Sigo dentro, no me he ido a por café.',
+    'Estoy cuadrando las cuentas sin hacer trampas.',
+    'Esto va saliendo.',
+    'Dame dos latidos más.',
+    'Voy detrás del dato bueno.',
+    'Estoy separando hechos de sospechas.',
+    'Los cabos empiezan a atarse.',
+    'Aquí hay tomate; sigo mirando.',
+    'Estoy peinando la respuesta.',
+    'Los datos hoy vienen respondones.',
+    'Voy cerrando el círculo.',
+    'Un momento, que una cifra se me está haciendo la interesante.',
+    'Estoy poniendo firmes a las columnas.',
+    'Esto ya huele a respuesta.',
+    'Sigo rascando, que queda sustancia.',
+    'Estoy comprobando que no haya polizones.',
+    'La maquinaria sigue girando.',
+    'Voy con la última vuelta de tuerca.',
+    'Los datos están confesando por orden.',
+    'Estoy buscando la trampa antes de que nos encuentre ella.',
+    'Esto no se me escapa.',
+    'Un instante, que quiero sacarlo limpio.',
+    'La cosa avanza; aguanta ahí.',
+    'Estoy cruzando responsables, importes y demás fauna.',
+    'Voy quitando paja.',
+    'El tinglado empieza a cuadrar.',
+    'Estoy afinando para no contarte una milonga.',
+    'Aquí sigo, con el casco puesto.',
+    'Dame un poco de cancha, que lo remato.',
+    'Estoy revisando la letra pequeña.',
+    'Los datos ya están entrando en vereda.',
+    'Esto tiene más capas que una cebolla, pero voy.',
+    'Voy comprobando una cosa contra otra.',
+    'Estoy cazando incoherencias.',
+    'Un segundo, que no quiero regalarte humo.',
+    'La respuesta está en boxes.',
+    'Estoy apretando los últimos tornillos.',
+    'Las cifras ya han dejado de hacerse las suecas.',
+    'Voy a sacar carne, no huesos.',
+    'Esto está casi para servir.',
+    'Sigo al aparato.',
+    'Estoy dándole una última mirada de mala leche.',
+    'No me pierdo; estoy siguiendo el rastro.',
+    'La tabla buena ya está sobre la mesa.',
+    'Estoy cuadrando el puzle.',
+    'Un poco más y sale con fundamento.',
+    'Estoy revisando que cada cosa sea lo que dice ser.',
+    'Los datos están en fila; falta pasar revista.',
+    'Voy rematando sin prisas tontas.',
+    'Esto ya canta bastante.',
+    'Estoy cerrando flecos.',
+    'Ya lo tengo contra las cuerdas; un momento.'
   ];
   function $(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
@@ -293,45 +293,56 @@
     var deck=items.slice();for(var i=deck.length-1;i>0;i--){var j=entertainmentRandomInt(i+1),tmp=deck[i];deck[i]=deck[j];deck[j]=tmp;}return deck;
   }
   function persistEntertainmentState(){
-    try{safeSet(STORAGE.entertainmentDeck,JSON.stringify(state.entertainmentDeck||[]));safeSet(STORAGE.entertainmentLast,String(Number(state.lastEntertainmentIndex)));safeSet(STORAGE.entertainmentCycle,String(state.entertainmentCycle||0));}catch(_){}
+    try{safeSet(STORAGE.entertainmentDeck,JSON.stringify(state.entertainmentDeck||[]));safeSet(STORAGE.entertainmentUsed,JSON.stringify(state.entertainmentUsed||[]));safeSet(STORAGE.entertainmentLast,String(Number(state.lastEntertainmentIndex)));safeSet(STORAGE.entertainmentCycle,String(state.entertainmentCycle||0));}catch(_){}
   }
   function refillEntertainmentDeck(){
-    var all=[];for(var i=0;i<ENTERTAINMENT_PHRASES.length;i++)all.push(i);state.entertainmentDeck=shuffleEntertainmentDeck(all);if(state.entertainmentDeck.length>1&&state.entertainmentDeck[0]===state.lastEntertainmentIndex){var t=state.entertainmentDeck[0];state.entertainmentDeck[0]=state.entertainmentDeck[1];state.entertainmentDeck[1]=t;}state.entertainmentCycle++;persistEntertainmentState();
+    var all=[];for(var i=0;i<ENTERTAINMENT_PHRASES.length;i++)all.push(i);
+    state.entertainmentUsed=[];state.entertainmentDeck=shuffleEntertainmentDeck(all);
+    if(state.entertainmentDeck.length>1&&state.entertainmentDeck[0]===state.lastEntertainmentIndex){var t=state.entertainmentDeck[0];state.entertainmentDeck[0]=state.entertainmentDeck[1];state.entertainmentDeck[1]=t;}
+    state.entertainmentCycle++;persistEntertainmentState();
   }
   function loadEntertainmentState(){
     if(state.entertainmentLoaded)return;state.entertainmentLoaded=true;state.entertainmentCycle=Math.max(0,Number(safeGet(STORAGE.entertainmentCycle,'0'))||0);state.lastEntertainmentIndex=Number(safeGet(STORAGE.entertainmentLast,'-1'));if(!Number.isInteger(state.lastEntertainmentIndex)||state.lastEntertainmentIndex<0||state.lastEntertainmentIndex>=ENTERTAINMENT_PHRASES.length)state.lastEntertainmentIndex=-1;
-    try{var raw=JSON.parse(safeGet(STORAGE.entertainmentDeck,'[]'));state.entertainmentDeck=Array.isArray(raw)?raw.map(Number).filter(function(x,i,a){return Number.isInteger(x)&&x>=0&&x<ENTERTAINMENT_PHRASES.length&&a.indexOf(x)===i;}):[];}catch(_){state.entertainmentDeck=[];}
-    if(!state.entertainmentDeck.length)refillEntertainmentDeck();
+    try{var used=JSON.parse(safeGet(STORAGE.entertainmentUsed,'[]'));state.entertainmentUsed=Array.isArray(used)?used.map(Number).filter(function(x,i,a){return Number.isInteger(x)&&x>=0&&x<ENTERTAINMENT_PHRASES.length&&a.indexOf(x)===i;}):[];}catch(_){state.entertainmentUsed=[];}
+    try{var raw=JSON.parse(safeGet(STORAGE.entertainmentDeck,'[]'));state.entertainmentDeck=Array.isArray(raw)?raw.map(Number).filter(function(x,i,a){return Number.isInteger(x)&&x>=0&&x<ENTERTAINMENT_PHRASES.length&&state.entertainmentUsed.indexOf(x)<0&&a.indexOf(x)===i;}):[];}catch(_){state.entertainmentDeck=[];}
+    if(state.entertainmentUsed.length>=ENTERTAINMENT_PHRASES.length||!state.entertainmentDeck.length)refillEntertainmentDeck();
   }
   function nextEntertainmentIndex(){
-    loadEntertainmentState();
-    if(!state.entertainmentDeck.length)refillEntertainmentDeck();
-    var idx=state.entertainmentDeck.shift();
-    // RAW14H · En cuanto una frase se SELECCIONA para sonar queda consumida en el ciclo.
-    // SpeechSynthesis puede emitir 'interrupted/canceled' después de haber pronunciado parte o
-    // toda la frase; si la reencolamos en ese caso el usuario puede oírla 2 o 3 veces. Quemarla
-    // al seleccionarla garantiza que no reaparece hasta agotar las 60.
-    state.lastEntertainmentIndex=idx;
-    state.pendingEntertainmentIndex=idx;
-    persistEntertainmentState();
-    return idx;
+    loadEntertainmentState();if(!state.entertainmentDeck.length)refillEntertainmentDeck();
+    var idx=state.entertainmentDeck[0];state.pendingEntertainmentIndex=idx;persistEntertainmentState();return idx;
   }
   function commitEntertainmentIndex(idx){
-    idx=Number(idx);if(Number.isInteger(idx)&&idx>=0&&idx<ENTERTAINMENT_PHRASES.length)state.lastEntertainmentIndex=idx;state.pendingEntertainmentIndex=-1;persistEntertainmentState();
+    idx=Number(idx);if(!Number.isInteger(idx)||idx<0||idx>=ENTERTAINMENT_PHRASES.length)return;
+    state.entertainmentDeck=(state.entertainmentDeck||[]).filter(function(x){return Number(x)!==idx;});
+    if(state.entertainmentUsed.indexOf(idx)<0)state.entertainmentUsed.push(idx);
+    state.lastEntertainmentIndex=idx;state.pendingEntertainmentIndex=-1;persistEntertainmentState();
   }
   function requeueEntertainmentIndex(idx){
-    // RAW14H · NO se reencolan frases ya seleccionadas. Aunque el navegador las interrumpa,
-    // se consideran consumidas para evitar repeticiones perceptibles dentro del ciclo.
-    state.pendingEntertainmentIndex=-1;persistEntertainmentState();
+    idx=Number(idx);state.pendingEntertainmentIndex=-1;
+    if(Number.isInteger(idx)&&idx>=0&&idx<ENTERTAINMENT_PHRASES.length&&state.entertainmentUsed.indexOf(idx)<0){
+      state.entertainmentDeck=(state.entertainmentDeck||[]).filter(function(x){return Number(x)!==idx;});
+      state.entertainmentDeck.push(idx);
+    }
+    persistEntertainmentState();
   }
   function stopEntertainment(cancelSpeech){
-    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;if(cancelSpeech){var was=state.entertainmentSpeaking,u=state.entertainmentUtterance;if(u){try{u.onend=null;u.onerror=null;}catch(_){}}state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.pendingEntertainmentIndex=-1;if(was)state.entertainmentFinishedAt=Date.now();persistEntertainmentState();if(was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){}}}
+    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;
+    if(cancelSpeech){var was=state.entertainmentSpeaking,u=state.entertainmentUtterance,idx=state.pendingEntertainmentIndex;if(u){try{u.onstart=null;u.onend=null;u.onerror=null;}catch(_){}}
+      state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(idx>=0&&state.entertainmentUsed.indexOf(idx)<0)requeueEntertainmentIndex(idx);state.pendingEntertainmentIndex=-1;if(was)state.entertainmentFinishedAt=Date.now();persistEntertainmentState();if(was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){}}}
   }
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Math.max(0,Number(delay)||0));}
-  function entertainmentEnded(ok,idx){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();commitEntertainmentIndex(idx);if(state.conversationMode&&state.requestInFlight&&state.entertainmentCount<2)scheduleEntertainment(6500);}
-  function speakEntertainmentPhrase(){if(!state.conversationMode||!state.requestInFlight||!supportsSpeech()||state.entertainmentCount>=2)return;stopEntertainment(false);var idx=nextEntertainmentIndex(),phrase=ENTERTAINMENT_PHRASES[idx];state.entertainmentCount++;setStatus(phrase,'ok');try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';// Las frases de espera van un poco más rápidas que la respuesta: si Zuzu termina mientras habla, reducimos la espera sin cortar la frase.
-      u.rate=Math.min(1.08,speechRate()+0.12);u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;u.onend=function(){entertainmentEnded(true,idx);};u.onerror=function(){entertainmentEnded(false,idx);};window.speechSynthesis.speak(u);}catch(_){entertainmentEnded(false,idx);}}
-  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(1200);}
+  function entertainmentEnded(ok,idx,started){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();if(!started)requeueEntertainmentIndex(idx);if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2000);}
+  function speakEntertainmentPhrase(){
+    if(!state.conversationMode||!state.requestInFlight||!supportsSpeech()||state.entertainmentSpeaking)return;
+    var idx=nextEntertainmentIndex(),phrase=ENTERTAINMENT_PHRASES[idx],started=false;state.entertainmentCount++;setStatus(phrase,'ok');
+    try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=Math.min(1.08,speechRate()+0.12);u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;
+      u.onstart=function(){started=true;commitEntertainmentIndex(idx);};
+      u.onend=function(){entertainmentEnded(true,idx,started);};
+      u.onerror=function(){entertainmentEnded(false,idx,started);};
+      window.speechSynthesis.speak(u);
+    }catch(_){entertainmentEnded(false,idx,false);}
+  }
+  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2000);}
   function queueAnswerAfterEntertainment(answer,autoRead){clearTimeout(state.pendingAnswerTimer);state.pendingAnswerTimer=null;var hadEntertainment=state.entertainmentSpeaking||!!state.entertainmentUtterance||(state.entertainmentFinishedAt>0&&Date.now()-state.entertainmentFinishedAt<600);function deliver(){if(!state.conversationMode)return;if(state.entertainmentSpeaking){state.pendingAnswerTimer=setTimeout(deliver,60);return;}var wait=hadEntertainment?Math.max(0,500-(Date.now()-(state.entertainmentFinishedAt||0))):0;state.pendingAnswerTimer=setTimeout(function(){state.pendingAnswerTimer=null;if(!state.conversationMode)return;if(autoRead)speakChunks(answer);else startUser();},wait);}deliver();}
 
   function resumeConversationListening(delay){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;setTimeout(function(){if(state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();},Number(delay)||180);}

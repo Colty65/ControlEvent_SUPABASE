@@ -5505,7 +5505,7 @@ function semanticCanonicalSocioRows(rows){
   })).filter(x=>{
     if(norm(x.range)!=='socio'||!x.name)return false;
     const n=norm(x.name);
-    return !/^z[_\s-]*dev\b/.test(n)&&!/^grupo\b/.test(n)&&!/^pe[ñn]a\b/.test(n)&&!/^personas\b/.test(n);
+    return !/^z[_\s-]*dev(?:$|[_\s-])/.test(n)&&!/^grupo\b/.test(n)&&!/^pe[ñn]a\b/.test(n)&&!/^personas\b/.test(n);
   });
   const key=v=>norm(v).replace(/[^a-z0-9ñ]+/g,' ').replace(/\s+/g,' ').trim();
   const isPair=v=>isCanonicalPairName(v);
@@ -6792,18 +6792,14 @@ async function v26ToolStorePurchases(tool,state,selectedEventId=''){
   const rows=[...groups.values()].map(x=>({...x,Importe:v26Money(x.Importe)})).sort((a,b)=>text(b['Fecha inicio']).localeCompare(text(a['Fecha inicio']))); const total=v26Money(rows.reduce((a,x)=>a+num(x.Importe),0));
   return{id:tool.id,name:tool.name,ok:true,title:`Compras · ${r.nombre}`,facts:{store:r.nombre,status:tool.status,scope:tool.scope,event_count:rows.filter(x=>num(x.Importe)!==0).length,total_amount:total,total_records:rows.reduce((a,x)=>a+num(x['Registros de compra']),0)},tables:[v26Table('by_event',`Compras en ${r.nombre} por evento`,rows,{Evento:v26TextSchema('Evento'),'Fecha inicio':v26DateSchema(),'Fecha fin':v26DateSchema(),'Registros de compra':v26CountSchema('registros','Registros de compra'),Importe:v26MoneySchema('Importe de compras según estado solicitado')})]};
 }
-// v3_0_exp FIX6 · Censo físico confirmado por mantenimiento (17/08/2026).
-// ce_personas guarda 20 registros canónicos de SOCIO, varios de ellos como pareja/entidad
-// («A y B»), pero NO guarda una cardinalidad física por registro. Inferir siempre 2 personas
-// por cada « y » produjo 34 y no el censo real confirmado de 33. No se modifica aquí la
-// lógica de asistencia por evento: este dato es únicamente el censo maestro global de socios.
-const V20_CANONICAL_SOCIOS_PHYSICAL_COUNT = 33;
+// RAW14J · El censo canónico excluye realmente z_DEV/Grupo/Peña/Personas y aplica
+// la regla física de parejas del propio ControlEvent. No se usa un número mágico ligado
+// al número de filas: el total de personas nace del dataset canónico materializado.
 async function v26ToolCanonicalSocios(tool,state){
   const rows=semanticCanonicalSocioRows(arr(state?.personas).map(p=>({id:p?.id,nombre:p?.nombre,rango:p?.rango})));
-  const inferredPeople=rows.reduce((a,x)=>a+num(x?.Personas),0);
-  const people=rows.length===20?V20_CANONICAL_SOCIOS_PHYSICAL_COUNT:inferredPeople;
+  const people=rows.reduce((a,x)=>a+num(x?.Personas),0);
   const displayRows=rows.map(x=>({'Socio canónico':trim(x?.['Socio canónico'])}));
-  return{id:tool.id,name:tool.name,ok:true,title:'Socios canónicos · ColtyLAB',facts:{canonical_records:rows.length,people_count:people,people_count_source:rows.length===20?'Censo físico confirmado por mantenimiento: 33 socios':'Inferencia por registros canónicos',criterion:'Rango SOCIO; excluye z_DEV, Grupo, Peña y Personas; el listado canónico se conserva sin deducir cardinalidad física de cada texto «A y B».'},tables:[v26Table('socios','Socios canónicos · criterio ColtyLAB',displayRows,{'Socio canónico':v26TextSchema('Socio o pareja canónica')})]};
+  return{id:tool.id,name:tool.name,ok:true,title:'Socios canónicos · ColtyLAB',facts:{canonical_records:rows.length,people_count:people,people_count_source:'Censo canónico materializado por ControlEvent; las parejas canónicas computan sus personas físicas.',criterion:'Rango SOCIO; excluye z_DEV, Grupo, Peña y Personas. Las parejas canónicas se computan como personas físicas según las reglas de ControlEvent.'},tables:[v26Table('socios','Socios canónicos · criterio ColtyLAB',displayRows,{'Socio canónico':v26TextSchema('Socio o pareja canónica')})]};
 }
 async function v26ToolEventsCatalog(tool,state){
   const rows=arr(state?.eventos).map(e=>({Evento:trim(e?.titulo),Descripción:trim(e?.descripcion),'Fecha inicio':trim(e?.fechaIni),'Fecha fin':trim(e?.fechaFin),Estado:trim(e?.situacion),Precio:v26Money(e?.precio)})).sort((a,b)=>parseEventDateForSort(b['Fecha inicio'])-parseEventDateForSort(a['Fecha inicio'])||text(a.Evento).localeCompare(text(b.Evento),'es'));
@@ -14015,13 +14011,13 @@ function v73CommandTools(){
   // ejecutar ninguna llamada ("too many states for serving"). La semántica sigue
   // estando en el prompt y en la validación CE; la capa de function-calling solo
   // expresa un contrato compacto por comando para no agotar el autómata del proveedor.
-  const str={type:'string'},list={type:'array',items:{type:'string'}},bool={type:'boolean'},integer={type:'integer'},contextType={type:'string',enum:['event','person','product','store','donor','responsible','ticket']};
+  const str={type:'string'},list={type:'array',items:{type:'string'}},bool={type:'boolean'},integer={type:'integer'},peopleMode={type:'string',description:'attendees=SOLO asistentes; attendance_full=asistentes + socios no asistentes en la MISMA petición; non_attending_members=SOLO socios no asistentes; canonical_members=censo canónico; income=ingreso/pago',enum:['attendance_full','attendees','non_attending_members','canonical_members','income']},contextType={type:'string',enum:['event','person','product','store','donor','responsible','ticket']};
   const make=(name,description,properties,required=[])=>({type:'function',name,description,parameters:{type:'object',properties,required}});
   return[
     make('ce_query','Consulta datos nuevos. targets contiene uno o varios dominios distintos; operations_json es un array JSON opcional de operaciones CE.',{
       targets:list,target_metric_roles:list,response_kind:str,
       scope_kind:str,event:str,events:list,series:str,year:integer,count:integer,order:str,start_date:str,end_date:str,
-      product_text:str,product_match:str,people_mode:str,people:list,responsibles:list,donors:list,stores:list,tickets:list,purchase_statuses:list,
+      product_text:str,product_match:str,people_mode:peopleMode,people:list,responsibles:list,donors:list,stores:list,tickets:list,purchase_statuses:list,
       fields:list,table:bool,summary:bool,chart:bool,chart_type:str,chart_x:str,chart_series:list,
       operations_json:str,reuse_json:str,supplements_json:str,lead:str,voice_lead:str
     },['targets','scope_kind']),
@@ -14376,7 +14372,9 @@ DOMINIO Y GRANULARIDAD
 - person = dossier transversal/abierto de una o varias personas concretas: qué hicieron, qué sabes de ellas, participación, compras bajo responsabilidad, donaciones y gestión disponibles. Varias personas: UN solo target "person" + people:[...]. No inventes columnas como "Actividad"; pide el dossier canónico. Si es UNA persona, también usa people:[nombre]; CE lo resuelve mecánicamente.
   En eventos En curso, «compras bajo responsabilidad» dentro del dossier incluye TODAS las compras asignadas, separando realizadas y pendientes. No concluyas que una persona no tiene compras si solo carece de TKxx: puede tener compras previstas asignadas.
 - people = asistencia/censo/presencia E INGRESO/SITUACIÓN DE PAGO dentro de un evento, pero DEBES declarar people_mode. Valores: attendance_full = asistentes físicos + socios no asistentes; attendees = solo asistentes físicos; non_attending_members = solo socios canónicos no asistentes; canonical_members = censo/listado de socios canónicos de ControlEvent; income = filas/situación de ingreso/pago. Una pregunta concreta como si una persona ha pagado, cuánto tiene pendiente o cómo figura su ingreso en ESE evento usa people_mode=income.
-- ASISTENCIA CANÓNICA: para «asistentes», «quién asiste», «quién no asiste», «socios no asistentes» o una combinación de ellos, NO agrupes las filas administrativas por Asistente/Persona y NO uses count de registros. Usa el people_mode adecuado y deja que CE materialice la asistencia canónica por PERSONAS físicas usando Numero/parejas/reglas del censo. Si el usuario pide asistentes Y no asistentes en la misma frase, usa UNA sola ce_query targets:["people"] + people_mode="attendance_full"; jamás emitas dos comandos. Si pide lista/tabla, table=true es suficiente: CE ya devuelve resumen y detalle canónico.
+- ASISTENCIA CANÓNICA: para «asistentes», «quién asiste», «quién no asiste», «socios no asistentes» o una combinación de ellos, NO agrupes las filas administrativas por Asistente/Persona y NO uses count de registros. Usa el people_mode adecuado y deja que CE materialice la asistencia canónica por PERSONAS físicas usando Numero/parejas/reglas del censo. Si el usuario pide asistentes Y no asistentes en la misma frase, usa UNA sola ce_query targets:["people"] + people_mode="attendance_full"; jamás emitas dos comandos. Si pide SOLO asistentes, people_mode="attendees": NO uses attendance_full. Si pide SOLO socios no asistentes, people_mode="non_attending_members". Si pide lista/tabla, table=true es suficiente: CE ya devuelve resumen y detalle canónico.
+- PETICIÓN COMPUESTA DE UN MISMO OBJETO: si CURRENT_USER pide varios aspectos del MISMO conjunto de personas/evento y además una tabla o gráfica, sigue siendo UNA sola ce_query. Para varias personas con ingresos + donaciones + responsabilidades de compras + gestión usa targets:["person"] + people:[...] y añade table/chart en la MISMA tool; no emitas otra tool para la gráfica ni una tool por cada aspecto.
+- ENTRADA POSIBLEMENTE ACCIDENTAL DE VOZ: si CURRENT_USER es un fragmento semánticamente incoherente con el hilo y no contiene una petición de negocio o meta que puedas sostener con confianza, NO fuerces una query porque CANDIDATES haya encontrado una coincidencia léxica. Usa ce_conversation kind="incoherent_input" y pide repetirlo con una respuesta breve y simpática. Esta decisión es semántica de Zuzu; CE no mantiene listas de frases prohibidas.
 - SOCIO CANÓNICO EN CONTROLEVENT: no inventes una definición genérica. Si preguntan qué es, cuántos hay o piden la lista de socios canónicos, usa targets:["people"] + people_mode="canonical_members" y presenta el criterio/facts que CE devuelva.
 - ENTIDADES CANÓNICAS INDIVISIBLES: si CANDIDATES contiene una coincidencia exacta de varias palabras para una entidad del tipo que has decidido (incluidas parejas/grupos), conserva ese canonical_name como UNA entidad. No la partas por conjunciones salvo que CURRENT_USER pida explícitamente a sus miembros por separado.
 - purchases = líneas físicas de compra. products = producto lógico agregado. Elige UNO para una misma magnitud; no uses purchases+products como dos rutas para lo mismo.
@@ -14439,12 +14437,21 @@ async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCa
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'',instruction=v73KernelInstruction(state,selectedEventId,display,timeContext),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates,display,screen,timeContext),tools=v73CommandTools(),allowed=tools.map(t=>t.name);let model=policy.model,payload;
   const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1500});
   try{payload=await call('v3_0_exp · Ledger · Zuzu elige comando CE',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Zuzu Lite no emitió un comando CE utilizable (${cleanGeminiError(error)}). Zuzu Flash recibe exactamente la misma petición y catálogo de comandos.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash elige comando CE',model);}else{error._ceOrigin='gemini';throw error;}}
-  const parseCommand=(pl)=>{const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Zuzu debe emitir exactamente UN comando CE; emitió ${calls.length}.`);e._ceOrigin='gemini';throw e;}const command=trim(calls[0].name),raw=v73CommandCallToRaw(calls[0]),plan=v73NormalizePlan(raw),protocolError=v73ProtocolViolation(raw,plan)||v73UngroundedEventScopeViolation(raw,session,entityCandidates);if(protocolError)plan._protocol_error=protocolError;return{command,raw,plan,protocolError};};
-  let parsed=parseCommand(payload);
+  const parseCommand=(pl)=>{const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Zuzu debe emitir exactamente UN comando CE; emitió ${calls.length}.`);e._ceOrigin='gemini';e._ceCommandCount=calls.length;throw e;}const command=trim(calls[0].name),raw=v73CommandCallToRaw(calls[0]),plan=v73NormalizePlan(raw),protocolError=v73ProtocolViolation(raw,plan)||v73UngroundedEventScopeViolation(raw,session,entityCandidates);if(protocolError)plan._protocol_error=protocolError;return{command,raw,plan,protocolError};};
+  const repairCommand=async(reason,stage='v3_0_exp · Ledger · Zuzu recompila comando CE')=>{
+    const repairInput=`${input}\n\nRECHAZO_ESTRUCTURAL_CE:\n${reason}\nReemite EXACTAMENTE UNA tool CE válida. Conserva TODAS las partes compatibles de CURRENT_USER y corrige solo la estructura. Si el usuario pidió dos poblaciones del mismo dominio, represéntalas con el modo compuesto de ese dominio (por ejemplo attendance_full). Si pidió datos y una tabla/gráfica, la presentación viaja dentro de la MISMA ce_query. Si pidió varios aspectos de las mismas personas, usa UN target person con people:[...] y una sola ce_query.`;
+    return v261CallInteraction({input:repairInput,previousInteractionId:'',model,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:2,maxOutputTokens:1500});
+  };
+  let parsed;
+  try{parsed=parseCommand(payload);}catch(parseError){
+    if(Number(parseError?._ceCommandCount)!==1){
+      zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU · MÚLTIPLES COMANDOS','WARN',`${cleanGeminiError(parseError)} CE no mezcla ni interpreta las tools: pide a Zuzu que consolide la intención en una sola.`);
+      try{parsed=parseCommand(await repairCommand(cleanGeminiError(parseError),'v3_0_exp · Ledger · Zuzu consolida en UN comando CE'));}catch(repairError){repairError._ceOrigin=repairError._ceOrigin||'gemini';throw repairError;}
+    }else throw parseError;
+  }
   if(parsed.protocolError){
     zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU','WARN',`${parsed.protocolError} CE no repara el significado; solicita a Zuzu un único comando válido.`);
-    const repairInput=`${input}\n\nRECHAZO_ESTRUCTURAL_CE:\n${parsed.protocolError}\nReemite EXACTAMENTE una tool CE válida. Conserva la intención de CURRENT_USER; corrige solo la estructura que viola el contrato.`;
-    try{const repairedPayload=await v261CallInteraction({input:repairInput,previousInteractionId:'',model,systemInstruction:instruction,tools,flowTrace,stage:'v3_0_exp · Ledger · Zuzu recompila comando CE',toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1500});const candidate=parseCommand(repairedPayload);if(!candidate.protocolError)parsed=candidate;else zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU','KO',candidate.protocolError);}catch(repairError){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU','KO',cleanGeminiError(repairError));}
+    try{const candidate=parseCommand(await repairCommand(parsed.protocolError));if(!candidate.protocolError)parsed=candidate;else zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU','KO',candidate.protocolError);}catch(repairError){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · RECOMPILACIÓN ZUZU','KO',cleanGeminiError(repairError));}
   }
   const {command,raw,plan,protocolError}=parsed;
   zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMANDO ZUZU','INFO',`${command} · ${JSON.stringify(raw).slice(0,5000)}`);
@@ -14553,8 +14560,10 @@ CONTRATO DE PRESENTACIÓN
 - COHERENCIA TEXTO/TABLA: cualquier afirmación del texto debe ser compatible con column_stats/facts y con la tabla que CE mostrará. Si column_stats.Responsable contiene 7 responsables, está prohibido afirmar que «los responsables son» solo dos. Si el plan proyectó columnas insuficientes para responder un detalle, reconoce que el resultado materializado no contiene ese detalle en vez de inventarlo.
 - GRUPOS NO SON REGISTROS FÍSICOS: si facts.view_group_by/view_group_count existen, las filas visibles representan grupos agregados. No digas «7 compras» porque haya 7 responsables agrupados. Para el número real de compras usa facts.purchase_line_count / realized_purchase_count / pending_purchase_count.
 - ASISTENCIA: si facts.people_mode / total_attendees_people / member_attendees_people / nonmember_attendees_people / nonattending_members_people existen, ESOS son los números canónicos de PERSONAS físicas y mandan sobre row_count, Nº registros o el número de filas de la tabla. Una pareja/registro con Personas=2 representa dos personas. Si people_mode=canonical_members, usa canonical_records y people_count exactamente como los entrega CE y no conviertas registros canónicos en asistentes.
+- TIEMPO VERBAL DEL EVENTO: temporal_context.now y temporal_context.events son autoritativos. Finalizado/past = puedes hablar en pasado. En curso + phase=future = habla de previsiones/intenciones futuras («asistirán», «figuran previstos/no previstos»); está prohibido afirmar «han asistido», «no han asistido», «no pudieron asistir» o «finalmente». En curso + phase=ongoing = habla en presente y como estado provisional («figuran/constan como asistentes», «de momento constan como no asistentes»); NO conviertas un estado de asistencia en un hecho pasado cerrado. En curso + phase=past_window_open = el periodo calendario ya pasó aunque el estado administrativo siga abierto: puedes usar pasado, aclarando la provisionalidad si es relevante. Si no hay fase segura, usa lenguaje neutral de estado registrado.
 - Si mandatory_event_notice existe, debes comunicar ese aviso de evento En curso tanto en written_answer como en spoken_answer.
-- Si action=conversation: responde SOLO al comentario/meta actual; no menciones cifras, personas, productos, tablas o resultados anteriores. presentation.table=false y chart=false.
+- Si action=conversation y plan_executed.conversation.kind="current_context", usa resultado_ce.execution.current_context para explicar el foco/hilo disponible. Si CE entrega current_context, está PROHIBIDO decir que has perdido el hilo o pedir al usuario que lo reconstruya.
+- Si action=conversation fuera del caso current_context: responde SOLO al comentario/meta actual; no menciones cifras, personas, productos, tablas o resultados anteriores. presentation.table=false y chart=false.
 - Si action=set_context: limita la respuesta a confirmar el nuevo foco; no recites datos del dataset anterior. presentation.table=false y chart=false.
 - Si action=clarify: formula únicamente la aclaración necesaria. presentation.table=false y chart=false.
 - Si RESULTADO_CE.status es KO/WARN por falta de dataset o scope, describe ese fallo actual; no lo tapes con una respuesta factual anterior.
@@ -14598,6 +14607,28 @@ function v73InProgressEventNotice(state={},dataset=null,selectedEventId='',view=
   if(trim(dataset?.domain)==='purchases'&&active.length===1){const r=Number(facts?.realized_purchase_count),p=Number(facts?.pending_purchase_count),st=trim(facts?.status);if(Number.isFinite(r)&&Number.isFinite(p)){if(st==='realized')purchase=` Este detalle contiene solo las ${r} compras realizadas; quedan ${p} compras previstas pendientes no incluidas.`;else if(st==='pending')purchase=` Este detalle corresponde a ${p} compras previstas pendientes.`;else purchase=` En compras se están considerando todas: ${r} realizadas y ${p} pendientes previstas.`;}}
   return{events:active,written:`Aviso: ${base}${purchase}`,spoken:`Ojo: ${base}${purchase}`};
 }
+function v73EventTemporalContext(state={},dataset=null,selectedEventId='',timeContext={}){
+  const localDate=parseCeDateToIso(trim(timeContext?.local)||trim(timeContext?.iso))||new Date().toISOString().slice(0,10),sc=dataset?.scope||{},names=[];
+  if(trim(sc?.event))names.push(trim(sc.event));
+  for(const x of arr(sc?.events))if(trim(x)&&!names.some(n=>norm(n)===norm(x)))names.push(trim(x));
+  if(trim(sc?.kind)==='screen_event'&&!names.length){const ev=v26EventById(state,selectedEventId);if(ev)names.push(trim(ev?.titulo));}
+  const byName=v70EventLookup(state),events=[];
+  for(const name of names){
+    const ev=byName.get(norm(name))||arr(state?.eventos).find(e=>trim(e?.id)===name);if(!ev)continue;
+    const status=trim(ev?.situacion||ev?.Estado),start=parseCeDateToIso(ev?.fechaIni||ev?.fechaInicio||ev?.['fecha ini']||''),end=parseCeDateToIso(ev?.fechaFin||ev?.fecha_fin||ev?.['fecha fin']||'')||start;
+    let phase='unknown';
+    if(/^finalizad/i.test(norm(status)))phase='past';
+    else if(isEventInProgressValue(status)){
+      if(start&&localDate<start)phase='future';
+      else if(end&&localDate>end)phase='past_window_open';
+      else if(start&&end&&localDate>=start&&localDate<=end)phase='ongoing';
+      else phase='in_progress_unknown_dates';
+    }else if(end&&localDate>end)phase='past';else if(start&&localDate<start)phase='future';
+    const attendance_language=phase==='future'?'future_status':phase==='ongoing'?'current_provisional_status':(phase==='past'||phase==='past_window_open')?'past_result':'neutral_status';
+    events.push({event:trim(ev?.titulo)||name,status,start_date:start,end_date:end,phase,attendance_language});
+  }
+  return{now:{iso:trim(timeContext?.iso),local:trim(timeContext?.local),timezone:trim(timeContext?.timezone)||'Europe/Madrid',local_date:localDate},events};
+}
 function v73EnsureInProgressNotice(final={},notice=null,flowTrace=[]){if(!notice)return final;let written=trim(final?.written),spoken=trim(final?.spoken),changed=false;const has=t=>/\ben\s+curso\b|\bprovisional(?:es)?\b/i.test(t);if(!has(written)){written=`${written}${written?'\n\n':''}${notice.written}`;changed=true;}if(!has(spoken)){spoken=`${spoken}${spoken?' ':''}${notice.spoken}`;changed=true;}if(changed)zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · EVENTO EN CURSO','OK','CE añade el aviso factual obligatorio de provisionalidad del evento En curso.');return{...final,written,spoken};}
 function v73AuthoritativePayloadForFinal(raw={},dataset=null,view=null){
   const src=raw&&typeof raw==='object'?raw:{},out={};
@@ -14608,7 +14639,7 @@ function v73AuthoritativePayloadForFinal(raw={},dataset=null,view=null){
   if(arr(src.event_values).length&&hasAny(['Evento'])){out.event_values=arr(src.event_values).slice(0,40);out.events=trim(src.events);}
   return out;
 }
-async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation=false,audience={},state={},selectedEventId='',authoritativePayload={}}){
+async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation=false,audience={},state={},selectedEventId='',authoritativePayload={},timeContext={}}){
   const action=trim(plan?.action),dataAction=['query','local','reference','inspect'].includes(action),activeDataset=dataAction?(dataset||finalBundle?.dataset||null):null,activeView=dataAction?(view||finalBundle?.view||null):null;
   const reference=action==='reference'&&finalBundle?.turn?{turn_id:trim(finalBundle.turn.turnId),title:trim(finalBundle.turn.title).slice(0,120)}:null;
   const rawExec=v73RawFinalExecution(execution),safeExec=dataAction?rawExec:(action==='set_context'?{summary:rawExec.summary,focus:rawExec.focus,context:rawExec.context,error:rawExec.error}:action==='clarify'?{summary:rawExec.summary,pending_candidates:rawExec.pending_candidates,error:rawExec.error}:{summary:rawExec.summary,error:rawExec.error});
@@ -14621,6 +14652,7 @@ async function v73RawFinalWithGemini({userPrompt,rawPlan,plan,status,execution,d
     plan_executed:v73CompactFinalValue(plan||{}),
     resultado_ce:{status,execution:safeExec,dataset:v73RawFinalDataset(activeDataset,activeView,plan),authoritative_payload:v73CompactFinalValue(v73AuthoritativePayloadForFinal(authoritativePayload,activeDataset,activeView)),...(reference?{reference_snapshot:reference}:{})},
     mandatory_event_notice:eventNotice?v73CompactFinalValue(eventNotice):null,
+    temporal_context:v73CompactFinalValue(v73EventTemporalContext(state,activeDataset,selectedEventId,timeContext)),
     measurement_semantics:{currency:'EUR para amount/importe/precio/gasto/ingreso monetario/donación valorada/saldo/valoración/coste',quantity:'Unidades para units/unidades/cantidad física',counts:'Nombrar la entidad contada: eventos/personas/registros/tickets/cuotas/asistentes',weather:'°C / km/h / % / mm según el campo; humedad relativa usa %'}
   };
   const finalTool=v73FinalPresentationTool(),baseInput=`PREGUNTA Y RESULTADO REAL DEL TURNO:\n${JSON.stringify(packet)}`;
@@ -15117,7 +15149,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const historyCandidates=usePending?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v3_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
-  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW14I','INFO',JSON.stringify(entityCandidates).slice(0,2800));
+  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW14J','INFO',JSON.stringify(entityCandidates).slice(0,2800));
 
   let compiled;
   try{compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone}});}
@@ -15209,7 +15241,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   // La redacción determinista calculada arriba sirve solo como dato interno de ejecución y jamás se
   // usa para sustituir, corregir o pulir el texto final de Zuzu.
   try{
-    const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation,audience:{usuario:profile.identificacion||display,nombre:profile.nombre||display,nivel:profile.nivel},state,selectedEventId,authoritativePayload:answerPayload});
+    const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation,audience:{usuario:profile.identificacion||display,nombre:profile.nombre||display,nivel:profile.nivel},state,selectedEventId,authoritativePayload:answerPayload,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone}});
     title=rawFinal.title||title;answer=rawFinal.written;spokenAnswer=rawFinal.spoken;finalPresentation=rawFinal.presentation||{};
     execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:rawFinal.written,gemini_spoken_answer:rawFinal.spoken,gemini_presentation:finalPresentation,response_mode:'gemini_dual_presentation'};
     zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(rawFinal.written).length} caracteres · voz=${text(rawFinal.spoken).length} caracteres · tabla=${finalPresentation.table?'sí':'no'} · gráfica=${finalPresentation.chart?'sí':'no'}. CE no reescribe ninguna de las dos redacciones.`);
@@ -15234,7 +15266,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14I · ASISTENCIA CANÓNICA FÍSICA + SOCIOS CANÓNICOS + RAW14H',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14J · TIEMPO CONVERSACIONAL + ASISTENCIA CANÓNICA + ENTRETENIMIENTO CONTINUO',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
@@ -15245,7 +15277,7 @@ export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){
   const ws=v73WorkingFromBundle(bundle),frame=v73FrameForStoredTurn(bundle),scopeInfo=bundle.dataset?v73ScopeInfoFromDataset(bundle.dataset):{kind:'none',eventNames:[],label:''},tables=bundle.view?.presentation?.table===false?[]:v73TableFromBundle(bundle),trace=arr(bundle.turn?.execution?.debug_trace);
   const intent=v73PlanArtifactIntent(bundle.turn?.normalizedPlan||{},bundle.view||{}),visibleTables=intent.table?tables:[];let charts=[];
   if(intent.chart&&ws){const requested=v73RequestedChartFromBundle(bundle,[]),base=requested.length?requested:(trim(bundle.dataset?.domain)==='weather'?v73WeatherChartFromDataset(bundle.dataset,bundle.view||{}):v72ChartFromWorking(ws,[]));charts=v73ApplyRequestedChartType(base,intent);}
-  return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW14I',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
+  return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW14J',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
 }
 function v66SoftFailureResult({flowTrace=[],model='',voiceConversation=false,memory={},reason='No he podido completar este turno con seguridad',answer=''}={}){
   const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),txt=trim(answer)||'No he podido completar esta petición, pero he conservado intacto el contexto anterior. Reformúlala o repítela con un poco más de detalle.';

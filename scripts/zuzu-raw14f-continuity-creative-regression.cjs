@@ -39,5 +39,5 @@ t('poesía/historia de evento nunca se compila como conversation',/REDACCIÓN CR
 t('respuesta general obliga a usar descripción/contexto si existen',/CONTEXTO DE EVENTO OBLIGATORIO/.test(svc)&&/respuesta general con solo cifras es incompleta/.test(svc));
 t('poesía no puede ser texto genérico intercambiable',/texto genérico intercambiable/.test(svc));
 t('tool set_context restringe context_type a tipos válidos',/contextType=\{type:'string',enum:\['event','person','product','store','donor','responsible','ticket'\]\}/.test(svc));
-t('traza activa identifica RAW14F',/CANDIDATOS TIPADOS RAW14F/.test(svc));
+t('traza activa identifica familia RAW14F+',/CANDIDATOS TIPADOS RAW14(?:F|J)/.test(svc));
 console.log(`\nRAW14F · ${pass}/${pass+fail} comprobaciones OK`);process.exit(fail?1:0);
