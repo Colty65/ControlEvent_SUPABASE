@@ -25,7 +25,7 @@ t('la recompilación dispone de una segunda llamada real',/repairCommand[\s\S]{0
 
 // Contexto temporal llega hasta la fase final y gobierna el tiempo verbal.
 t('packet final contiene temporal_context',/temporal_context:v73CompactFinalValue\(v73EventTemporalContext/.test(svc));
-t('fase final prohíbe pasado cerrado durante evento ongoing',/TIEMPO VERBAL DEL EVENTO:[\s\S]{0,900}phase=ongoing[\s\S]{0,500}NO conviertas un estado de asistencia en un hecho pasado cerrado/.test(svc));
+t('fase final prohíbe pasado cerrado mientras el evento siga En curso',/TIEMPO VERBAL DEL EVENTO:[\s\S]{0,1400}En curso[^\n]*phase=ongoing\/open_after_window[^\n]*nunca pasado cerrado[\s\S]{0,500}prohibido afirmar/.test(svc));
 t('current_context no puede fingir que ha perdido el hilo',/current_context[\s\S]{0,400}PROHIBIDO decir que has perdido el hilo/.test(svc));
 t('z_DEV con sufijo underscore queda excluido del censo canónico',/\^z\[_\\s-\]\*dev\(\?:\$\|\[_\\s-\]\)/.test(svc));
 

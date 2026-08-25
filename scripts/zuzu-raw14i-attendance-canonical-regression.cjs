@@ -11,6 +11,7 @@ t('asistentes + no asistentes caben en una sola query',/attendance_full[\s\S]{0,
 t('socio canónico obliga a consultar criterio CE',/SOCIO CANÓNICO EN CONTROLEVENT:[\s\S]{0,500}canonical_members/.test(svc));
 t('presentador prioriza personas físicas sobre row_count',/total_attendees_people[\s\S]{0,500}PERSONAS físicas/.test(svc));
 t('facts de asistencia sobreviven a VIEW agrupada',/contextKeys=\[[^\]]*'total_attendees_people'[^\]]*'nonattending_members_people'/.test(svc));
+t('asistencia En curso queda definida como estado registrado, no hecho pasado',/attendance_semantics:[^\n]*En curso[^\n]*NO prueba que la asistencia ya haya ocurrido/.test(svc));
 
 // Ejecuta físicamente el nuevo materializador de asistencia con un fixture canónico.
 const start=svc.indexOf('function v73ExpandCanonicalAttendanceList');
@@ -18,7 +19,7 @@ const end=svc.indexOf('async function v73ExecuteResolvedQuery',start);
 let full=null,abs=null;
 if(start>=0&&end>start){
   const code=svc.slice(start,end);
-  const box={arr,trim,norm,Number,Date,
+  const box={arr,trim,norm,Number,Date,isEventInProgressValue:v=>norm(v)==='en curso',
     v61Hash:x=>'h',
     v26TextSchema:()=>({}),v26CountSchema:()=>({}),v26Table:(key,title,rows)=>({key,title,rows}),
     zuzuTracePush:()=>{},
@@ -31,7 +32,7 @@ if(start>=0&&end>start){
       noSociosAsistentes:[{nombre:'Invitado',personas:1}],sociosNoAsistentes:[{nombre:'Pocholo y Celes',personas:2}],criterio:'fixture'
     }]})
   };
-  box.state={eventos:[{id:'e1',titulo:'FUNCION 2026'}]};
+  box.state={eventos:[{id:'e1',titulo:'FUNCION 2026',situacion:'En curso'}]};
   vm.createContext(box);vm.runInContext(code+'\nthis.fn=v73CanonicalPeopleResult;',box);
   Promise.resolve().then(async()=>{
     full=await box.fn({people_mode:'attendance_full',scope:{kind:'named_event',event:'FUNCION 2026'}},box.state,'e1',[]);
