@@ -20,7 +20,8 @@
     "test:zuzu-answer-blueprint": "node scripts/zuzu-answer-blueprint-regression.js",
     "test:zuzu-itv-contract": "node scripts/zuzu-itv-contract-regression.js",
     "test:zuzu-raw14": "node scripts/zuzu-raw14-continuity-voice-regression.js",
-    "test:zuzu-raw14l": "node scripts/zuzu-raw14l-pdf2-focus-mic-regression.cjs"
+    "test:zuzu-raw14l": "node scripts/zuzu-raw14l-pdf2-focus-mic-regression.cjs",
+    "test:zuzu-raw14m": "node scripts/zuzu-raw14m-voice-engine-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
