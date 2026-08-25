@@ -14011,8 +14011,13 @@ function v73CommandTools(){
   // ejecutar ninguna llamada ("too many states for serving"). La semántica sigue
   // estando en el prompt y en la validación CE; la capa de function-calling solo
   // expresa un contrato compacto por comando para no agotar el autómata del proveedor.
-  const str={type:'string'},list={type:'array',items:{type:'string'}},bool={type:'boolean'},integer={type:'integer'},peopleMode={type:'string',description:'attendees=TODOS los asistentes; attending_members=SOLO socios asistentes; attending_non_members=SOLO no socios asistentes; attendance_full=asistentes + socios no asistentes en la MISMA petición; non_attending_members=SOLO socios no asistentes; canonical_members=censo canónico; income=ingreso/pago',enum:['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income']},contextType={type:'string',enum:['event','person','product','store','donor','responsible','ticket']},inputQuality={type:'string',description:'Calidad semántica del CURRENT_USER: coherent, intentional_topic_shift o possible_voice_noise.'};
-  const make=(name,description,properties,required=[])=>({type:'function',name,description,parameters:{type:'object',properties:{input_quality:inputQuality,input_note:str,...properties},required:[...new Set(['input_quality',...required])]}});
+  const str={type:'string'},list={type:'array',items:{type:'string'}},bool={type:'boolean'},integer={type:'integer'},peopleMode={type:'string',description:'attendees=TODOS los asistentes; attending_members=SOLO socios asistentes; attending_non_members=SOLO no socios asistentes; attendance_full=asistentes + socios no asistentes en la MISMA petición; non_attending_members=SOLO socios no asistentes; canonical_members=censo canónico; income=ingreso/pago',enum:['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income']},contextType={type:'string',enum:['event','person','product','store','donor','responsible','ticket']};
+  // RAW14O: no añadimos input_quality/input_note a TODAS las tools. Ese pequeño añadido
+  // multiplicaba los estados del schema y Gemini rechazaba el catálogo entero con
+  // "too much branching for serving" antes de realizar una sola llamada. La criba de
+  // audio sigue ocurriendo en ESTA MISMA primera llamada: si Gemini considera que el
+  // audio es basura debe usar ce_conversation/incoherent_input con prefijo VOICE_NOISE.
+  const make=(name,description,properties,required=[])=>({type:'function',name,description,parameters:{type:'object',properties,required:[...new Set(required)]}});
   return[
     make('ce_query','Consulta datos nuevos. targets contiene uno o varios dominios distintos; operations_json es un array JSON opcional de operaciones CE.',{
       targets:list,target_metric_roles:list,response_kind:str,
@@ -14038,11 +14043,16 @@ function v73CommandTools(){
     },['question'])
   ];
 }
-function v73InputAssessmentFromArgs(args={}){
-  const quality=trim(args?.input_quality).toLowerCase().replace(/[\s-]+/g,'_'),allowed=['coherent','intentional_topic_shift','possible_voice_noise'];
-  if(!allowed.includes(quality))return null;
-  const note=trim(args?.input_note).slice(0,280);
-  return{quality,...(note?{note}:{})};
+function v73VoiceGateAssessment(raw={},plan={},voiceConversation=false){
+  if(!voiceConversation)return{quality:'text_or_not_voice'};
+  const action=trim(plan?.action),kind=trim(plan?.conversation?.kind),note=trim(plan?.conversation?.note);
+  if(action==='conversation'&&kind==='incoherent_input'&&/^VOICE_NOISE\s*:/i.test(note)){
+    return{quality:'possible_voice_noise',note:note.replace(/^VOICE_NOISE\s*:\s*/i,'').slice(0,280)};
+  }
+  // Un cambio radical de evento/asunto es válido. No intentamos adivinar aquí si fue
+  // "topic shift": Gemini ya lo ha valorado antes de elegir su tool y, si era válido,
+  // la tool normal es la autoridad. Esta etiqueta solo distingue rechazo por ruido.
+  return{quality:'accepted'};
 }
 function v73CommandCallToRaw(call={}){
   const name=trim(call?.name),a=call?.arguments&&typeof call.arguments==='object'?call.arguments:{};
@@ -14357,13 +14367,12 @@ Operaciones JSON: show_table, compact_table, set_fields, add_field, add_fields, 
 filter.match_mode: exact, word, contains, semantic. chart_type: bar, line, pie, donut, horizontalBar. metric_role: amount, units, count.
 
 CALIDAD DE ENTRADA DE VOZ
-ANTES de decidir el comando clasifica CURRENT_USER y escribe input_quality EN LA MISMA tool. En INPUT_CHANNEL=voice esta clasificación es además una barrera de seguridad contra audio accidental:
-- coherent: petición/comentario comprensible, sea continuación o sea una petición nueva.
-- intentional_topic_shift: cambio intencionado de asunto, persona, producto, evento o serie. ES VÁLIDO aunque rompa por completo con el tema anterior. Un cambio radical de evento o conversación NO es ruido por ser diferente.
-- possible_voice_noise: fragmento, sílaba, coletilla o transcripción accidental que no sostiene con confianza una intención conversacional o de negocio ni como continuación ni como petición nueva.
-No uses possible_voice_noise simplemente porque el mensaje es corto: «Cito», «pan», «2026», «sí», «la tercera» pueden ser continuaciones válidas según contexto. Úsalo para basura real como restos fonéticos aislados o frases que parecen haberse colado por el micrófono.
-Si eliges possible_voice_noise, usa ce_conversation kind="incoherent_input", con una nota breve para pedir repetir; NO consultes BBDD ni transformes CURRENT.
-input_note puede explicar en pocas palabras el motivo. En texto input_quality también es obligatorio, pero CE solo usa la barrera de rechazo automático cuando INPUT_CHANNEL=voice.
+Si INPUT_CHANNEL=voice, ANTES de elegir la tool haz internamente esta criba usando CURRENT_USER + RECENT_DIALOGUE + CURRENT_CONTEXT:
+- petición/comentario comprensible: emite la tool CE normal;
+- cambio intencionado de asunto, persona, producto, evento o serie: también emite la tool CE normal. ES VÁLIDO aunque rompa por completo con el tema anterior. Un cambio radical de evento o conversación NO es ruido por ser diferente;
+- posible basura de micrófono: fragmento, sílaba, coletilla o transcripción accidental que no sostiene con confianza una intención conversacional ni de negocio. En ese caso emite ce_conversation kind="incoherent_input" y note DEBE empezar exactamente por "VOICE_NOISE:" seguido de una explicación corta. NO consultes BBDD ni transformes CURRENT.
+No trates como basura algo solo porque sea corto: «Cito», «pan», «2026», «sí», «la tercera» pueden ser continuaciones válidas según contexto.
+No añadas campos input_quality ni input_note: la criba se expresa únicamente mediante ce_conversation/incoherent_input cuando realmente detectas ruido.
 
 CONTINUIDAD HUMANA
 Clasifica primero el mensaje actual:
@@ -14462,12 +14471,11 @@ function v73UngroundedEventScopeViolation(raw={},session={},entityCandidates={},
 
 function v73VoiceInputAssessmentViolation(raw={},plan={},voiceConversation=false){
   if(!voiceConversation)return'';
-  const quality=trim(raw?.input_assessment?.quality);
-  if(!['coherent','intentional_topic_shift','possible_voice_noise'].includes(quality))return'En un turno de voz falta input_quality válido. Debe ser coherent, intentional_topic_shift o possible_voice_noise en la MISMA tool.';
-  if(quality==='possible_voice_noise'){
-    const ok=trim(plan?.action)==='conversation'&&trim(plan?.conversation?.kind)==='incoherent_input';
-    if(!ok)return'Gemini ha clasificado CURRENT_USER como possible_voice_noise. No ejecutes query/local/context/reference: usa ce_conversation kind="incoherent_input" y pide repetir brevemente.';
-  }
+  // RAW14O: la calidad ya no forma parte del schema. Si Gemini decide que el audio es
+  // basura, lo expresa con ce_conversation/incoherent_input + VOICE_NOISE:. El resto de
+  // comandos (incluidos cambios radicales de tema) son válidos y siguen el contrato normal.
+  const action=trim(plan?.action),kind=trim(plan?.conversation?.kind),note=trim(plan?.conversation?.note);
+  if(action==='conversation'&&/^VOICE_NOISE\s*:/i.test(note)&&kind!=='incoherent_input')return'VOICE_NOISE solo puede emitirse con ce_conversation kind="incoherent_input".';
   return'';
 }
 
@@ -14485,9 +14493,9 @@ async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCa
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'',instruction=v73KernelInstruction(state,selectedEventId,display,timeContext),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates,display,screen,timeContext,voiceConversation),tools=v73CommandTools(),allowed=tools.map(t=>t.name);let model=policy.model,payload;
   const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1500});
   try{payload=await call('v3_0_exp · Ledger · Zuzu elige comando CE',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v3_0_exp · Ledger · Lite → Flash','WARN',`Zuzu Lite no emitió un comando CE utilizable (${cleanGeminiError(error)}). Zuzu Flash recibe exactamente la misma petición y catálogo de comandos.`);model=policy.flashModel;payload=await call('v3_0_exp · Ledger · Flash elige comando CE',model);}else{error._ceOrigin='gemini';throw error;}}
-  const parseCommand=(pl)=>{const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Zuzu debe emitir exactamente UN comando CE; emitió ${calls.length}.`);e._ceOrigin='gemini';e._ceCommandCount=calls.length;throw e;}const command=trim(calls[0].name),assessment=v73InputAssessmentFromArgs(calls[0]?.arguments||{}),raw={...v73CommandCallToRaw(calls[0]),...(assessment?{input_assessment:assessment}:{})},plan=v73NormalizePlan(raw),protocolError=v73VoiceInputAssessmentViolation(raw,plan,voiceConversation)||v73ProtocolViolation(raw,plan)||v73MultiPersonCandidateViolation(raw,entityCandidates)||v73UngroundedEventScopeViolation(raw,session,entityCandidates,state);if(protocolError)plan._protocol_error=protocolError;return{command,raw,plan,protocolError};};
+  const parseCommand=(pl)=>{const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Zuzu debe emitir exactamente UN comando CE; emitió ${calls.length}.`);e._ceOrigin='gemini';e._ceCommandCount=calls.length;throw e;}const command=trim(calls[0].name),raw=v73CommandCallToRaw(calls[0]),plan=v73NormalizePlan(raw),protocolError=v73VoiceInputAssessmentViolation(raw,plan,voiceConversation)||v73ProtocolViolation(raw,plan)||v73MultiPersonCandidateViolation(raw,entityCandidates)||v73UngroundedEventScopeViolation(raw,session,entityCandidates,state);if(protocolError)plan._protocol_error=protocolError;return{command,raw,plan,protocolError};};
   const repairCommand=async(reason,stage='v3_0_exp · Ledger · Zuzu recompila comando CE')=>{
-    const repairInput=`${input}\n\nRECHAZO_ESTRUCTURAL_CE:\n${reason}\nReemite EXACTAMENTE UNA tool CE válida. Si INPUT_CHANNEL=voice conserva o corrige input_quality en esa misma tool; un cambio intencional de tema/evento es intentional_topic_shift, no ruido. Conserva TODAS las partes compatibles de CURRENT_USER y corrige solo la estructura. Si el usuario pidió dos poblaciones del mismo dominio, represéntalas con el modo compuesto de ese dominio (por ejemplo attendance_full). Si pidió datos y una tabla/gráfica, la presentación viaja dentro de la MISMA ce_query. Si pidió varios aspectos de las mismas personas, usa UN target person con people:[...] y una sola ce_query; person NO lleva people_mode. Un dossier multientidad conserva todas sus dimensiones y la gráfica no debe introducir group/rank que oculte compras/donaciones/gestión. Las columnas monetarias canónicas del resumen multientidad incluyen Ingreso imputado persona, Ingresos del registro, Compras bajo responsabilidad y Donaciones vinculadas.`;
+    const repairInput=`${input}\n\nRECHAZO_ESTRUCTURAL_CE:\n${reason}\nReemite EXACTAMENTE UNA tool CE válida. Si INPUT_CHANNEL=voice vuelve a hacer la criba semántica: un cambio intencional de tema/evento es válido; solo el ruido real usa ce_conversation/incoherent_input con note empezando por VOICE_NOISE:. Conserva TODAS las partes compatibles de CURRENT_USER y corrige solo la estructura. Si el usuario pidió dos poblaciones del mismo dominio, represéntalas con el modo compuesto de ese dominio (por ejemplo attendance_full). Si pidió datos y una tabla/gráfica, la presentación viaja dentro de la MISMA ce_query. Si pidió varios aspectos de las mismas personas, usa UN target person con people:[...] y una sola ce_query; person NO lleva people_mode. Un dossier multientidad conserva todas sus dimensiones y la gráfica no debe introducir group/rank que oculte compras/donaciones/gestión. Las columnas monetarias canónicas del resumen multientidad incluyen Ingreso imputado persona, Ingresos del registro, Compras bajo responsabilidad y Donaciones vinculadas.`;
     return v261CallInteraction({input:repairInput,previousInteractionId:'',model,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:2,maxOutputTokens:1500});
   };
   let parsed;
@@ -14503,7 +14511,7 @@ async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCa
   }
   const {command,raw,plan,protocolError}=parsed;
   zuzuTracePush(flowTrace,'v3_0_exp · Ledger · COMANDO ZUZU','INFO',`${command} · ${JSON.stringify(raw).slice(0,5000)}`);
-  if(voiceConversation){const qa=raw?.input_assessment||{};zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CALIDAD ENTRADA VOZ',trim(qa?.quality)==='possible_voice_noise'?'WARN':'OK',`${trim(qa?.quality)||'sin clasificar'}${trim(qa?.note)?` · ${trim(qa.note)}`:''}`);}
+  if(voiceConversation){const qa=v73VoiceGateAssessment(raw,plan,true);zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CALIDAD ENTRADA VOZ',trim(qa?.quality)==='possible_voice_noise'?'WARN':'OK',`${trim(qa?.quality)||'accepted'}${trim(qa?.note)?` · ${trim(qa.note)}`:''}`);}
   zuzuTracePush(flowTrace,'v3_0_exp · Ledger · REGISTRO NORMALIZADO',protocolError?'WARN':'OK',JSON.stringify(plan).slice(0,5000));
   if(protocolError)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CONTRATO ZUZU','KO',`${protocolError} El catálogo de comandos evita mezclar acciones; CE no ejecutará un plan alternativo.`);
   if(plan.answer_blueprint)zuzuTracePush(flowTrace,'v3_0_exp · Ledger · ANSWER_BLUEPRINT','OK',`Zuzu aporta solo una pista de tono (${Object.keys(plan.answer_blueprint).join(', ')}). La respuesta factual final la redactará Zuzu después de recibir el resultado real de CE; CE no añadirá texto propio.`);
@@ -15267,7 +15275,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const historyCandidates=usePending?pendingHistory:(isRecallPrompt(userPrompt)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8}):[]);
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v3_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
-  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW14N','INFO',JSON.stringify(entityCandidates).slice(0,2800));
+  zuzuTracePush(flowTrace,'v3_0_exp · Ledger · CANDIDATOS TIPADOS RAW14O','INFO',JSON.stringify(entityCandidates).slice(0,2800));
 
   let compiled;
   try{compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone},voiceConversation});}
@@ -15384,7 +15392,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v3_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14N · VOICE INPUT GATE + FOCO CANÓNICO',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v3_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14O · VOICE INPUT GATE SIN SCHEMA BRANCHING + FOCO CANÓNICO',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
@@ -15395,7 +15403,7 @@ export async function readZuzuLedgerTurnPresentation({turnId='',actor={}}={}){
   const ws=v73WorkingFromBundle(bundle),frame=v73FrameForStoredTurn(bundle),scopeInfo=bundle.dataset?v73ScopeInfoFromDataset(bundle.dataset):{kind:'none',eventNames:[],label:''},tables=bundle.view?.presentation?.table===false?[]:v73TableFromBundle(bundle),trace=arr(bundle.turn?.execution?.debug_trace);
   const intent=v73PlanArtifactIntent(bundle.turn?.normalizedPlan||{},bundle.view||{}),visibleTables=intent.table?tables:[];let charts=[];
   if(intent.chart&&ws){const requested=v73RequestedChartFromBundle(bundle,[]),base=requested.length?requested:(trim(bundle.dataset?.domain)==='weather'?v73WeatherChartFromDataset(bundle.dataset,bundle.view||{}):v72ChartFromWorking(ws,[]));charts=v73ApplyRequestedChartType(base,intent);}
-  return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW14N',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
+  return{ok:true,rejected:false,__prompt:bundle.turn.userPrompt,title:bundle.turn.title||'Zuzu',answer:bundle.turn.answer||v70CanonicalAnswer(frame,{title:bundle.turn.title,facts:bundle.dataset?.facts||{}},ws,scopeInfo),spokenAnswer:text(bundle.turn?.execution?.gemini_spoken_answer||bundle.turn.answer),warnings:[],charts,tables:visibleTables,files:[],provider:'zuzu-ledger-server-replay',model:'',conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,meta:{conversationId:bundle.conversation.conversationId,turnId:bundle.turn.turnId,architecture:'Zuzu Ledger Inmutable v1 · reproducción server-side RAW14O',debugTrace:trace},debugTrace:trace,showDebugTrace:true};
 }
 function v66SoftFailureResult({flowTrace=[],model='',voiceConversation=false,memory={},reason='No he podido completar este turno con seguridad',answer=''}={}){
   const resultContext=v62ResultContext(memory),usage=summarizeGeminiUsageFromTrace(flowTrace),txt=trim(answer)||'No he podido completar esta petición, pero he conservado intacto el contexto anterior. Reformúlala o repítela con un poco más de detalle.';

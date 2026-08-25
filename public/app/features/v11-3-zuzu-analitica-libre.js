@@ -452,6 +452,7 @@
     installPromptEventShield();
     var old=$('ceGeminiLibreOverlay'); if(old) old.remove();
     document.body.insertAdjacentHTML('beforeend', modalHtml());
+    try{ window.dispatchEvent(new CustomEvent('controlevent:zuzu-opened',{detail:{source:'zuzu-modal'}})); }catch(_){ }
     var closeBtn=$('ceAiClose');
     if(closeBtn){ closeBtn.addEventListener('click',function(ev){ ev.preventDefault(); ev.stopPropagation(); closeModal(); }, true); }
     $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(); });
@@ -470,7 +471,11 @@
     restoreServerConversationIfNeeded();
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
-  function closeModal(){ closeZuzuPdfPicker(); clearZuzuThinkingTimer(); var o=$('ceGeminiLibreOverlay'); if(o) o.remove(); }
+  function closeModal(){
+    closeZuzuPdfPicker(); clearZuzuThinkingTimer();
+    var o=$('ceGeminiLibreOverlay'), had=!!o; if(o) o.remove();
+    if(had){ try{ window.dispatchEvent(new CustomEvent('controlevent:zuzu-closed',{detail:{source:'zuzu-modal',fromGesture:true}})); }catch(_){ } }
+  }
   function setStatus(msg, kind){ var el=$('ceAiStatus'); if(!el) return; el.className='ce-ai-status '+(kind||''); el.textContent=msg||''; }
   function zuzuPromptFlags(prompt){
     var p=String(prompt||'').toLowerCase();
