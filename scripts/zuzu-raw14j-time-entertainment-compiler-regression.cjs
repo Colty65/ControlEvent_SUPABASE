@@ -17,8 +17,8 @@ t('una frase se consume cuando SpeechSynthesis confirma onstart',/u\.onstart=fun
 t('se conserva pausa mínima de 0,5 s antes de respuesta',/Math\.max\(0,500-\(Date\.now\(\)-\(state\.entertainmentFinishedAt\|\|0\)\)\)/.test(voice));
 
 // Contrato Zuzu/CE: compuestos en una sola tool y recompilación automática si Zuzu devuelve varias.
-t('people_mode tiene enum estructural',/peopleMode=\{type:'string'[\s\S]{0,300}enum:\['attendance_full','attendees','non_attending_members','canonical_members','income'\]/.test(svc));
-t('solo asistentes obliga attendees, no attendance_full',/Si pide SOLO asistentes, people_mode="attendees"/.test(svc));
+t('people_mode tiene enum estructural',/peopleMode=\{type:'string'[\s\S]{0,420}enum:\['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income'\]/.test(svc));
+t('solo asistentes sin distinguir socio obliga attendees, no attendance_full',/Si pide SOLO asistentes sin distinguir condición de socio, people_mode="attendees"/.test(svc));
 t('petición personas + varios aspectos + gráfica sigue siendo una sola ce_query',/PETICIÓN COMPUESTA DE UN MISMO OBJETO:[\s\S]{0,700}UNA sola ce_query/.test(svc));
 t('si Zuzu emite varias tools se le pide consolidar sin que CE las mezcle',/RECOMPILACIÓN ZUZU · MÚLTIPLES COMANDOS/.test(svc)&&/CE no mezcla ni interpreta las tools/.test(svc));
 t('la recompilación dispone de una segunda llamada real',/repairCommand[\s\S]{0,1400}maxCalls:2/.test(svc));

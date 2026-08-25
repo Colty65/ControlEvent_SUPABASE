@@ -4,7 +4,7 @@ let pass=0,fail=0;function t(name,ok){if(ok){console.log('OK · '+name);pass++;}
 const trim=v=>String(v==null?'':v).trim(),arr=v=>Array.isArray(v)?v:[],norm=v=>trim(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
 t('ce_query expone people_mode compacto',/product_text:str,product_match:str,people_mode:peopleMode,people:list/.test(svc));
-t('people_mode admite cinco significados estructurales',/attendance_full','attendees','non_attending_members','canonical_members','income/.test(svc));
+t('people_mode admite siete significados estructurales',/attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income/.test(svc));
 t('contrato rechaza QUERY people sin people_mode',/QUERY people sin people_mode válido/.test(svc));
 t('prompt separa asistencia canónica de filas administrativas',/ASISTENCIA CANÓNICA:[\s\S]{0,900}NO agrupes las filas administrativas/.test(svc));
 t('asistentes + no asistentes caben en una sola query',/attendance_full[\s\S]{0,900}jamás emitas dos comandos/.test(svc));

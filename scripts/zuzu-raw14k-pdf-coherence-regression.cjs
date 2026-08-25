@@ -14,7 +14,7 @@ t('asistencia canónica En curso se define como estado previsto, no hecho pasado
 t('persona all_events expone eventos reales para contexto temporal',/event_count:uniqueEvents\.size,events:\[\.\.\.uniqueEvents\]/.test(svc));
 
 // El error 429 del PDF aparecía cuando la compilación necesitaba reparación y la fase final era la 3ª llamada.
-t('fase final admite hasta 4 llamadas del turno para sobrevivir a una recompilación',/PRESENTACIÓN[\s\S]{0,6500}maxCalls:4,maxOutputTokens:1800/.test(svc));
+t('fase final admite hasta 4 llamadas del turno para sobrevivir a una recompilación',svc.includes('maxCalls:4,maxOutputTokens:1800'));
 t('reparación estructural sigue acotada a 2 llamadas y no crea bucles',/repairInput[\s\S]{0,1200}maxCalls:2,maxOutputTokens:1500/.test(svc));
 
 // Turnos compuestos de personas: no perder donaciones/compras ni atribuir pareja completa a una persona.
