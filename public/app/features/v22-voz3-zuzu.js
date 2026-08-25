@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v3_0_exp-RAW14D-ANTIALUCINACION-COHERENCIA-FIX39';
+  var BUILD='v3_0_exp-RAW14H-ENTRETENIMIENTO-SIN-REPETICION-FIX40';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v37', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v37', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v37'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v40', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v40', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v40'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -304,21 +304,34 @@
     if(!state.entertainmentDeck.length)refillEntertainmentDeck();
   }
   function nextEntertainmentIndex(){
-    loadEntertainmentState();if(!state.entertainmentDeck.length)refillEntertainmentDeck();var idx=state.entertainmentDeck.shift();state.pendingEntertainmentIndex=idx;persistEntertainmentState();return idx;
+    loadEntertainmentState();
+    if(!state.entertainmentDeck.length)refillEntertainmentDeck();
+    var idx=state.entertainmentDeck.shift();
+    // RAW14H · En cuanto una frase se SELECCIONA para sonar queda consumida en el ciclo.
+    // SpeechSynthesis puede emitir 'interrupted/canceled' después de haber pronunciado parte o
+    // toda la frase; si la reencolamos en ese caso el usuario puede oírla 2 o 3 veces. Quemarla
+    // al seleccionarla garantiza que no reaparece hasta agotar las 60.
+    state.lastEntertainmentIndex=idx;
+    state.pendingEntertainmentIndex=idx;
+    persistEntertainmentState();
+    return idx;
   }
   function commitEntertainmentIndex(idx){
     idx=Number(idx);if(Number.isInteger(idx)&&idx>=0&&idx<ENTERTAINMENT_PHRASES.length)state.lastEntertainmentIndex=idx;state.pendingEntertainmentIndex=-1;persistEntertainmentState();
   }
   function requeueEntertainmentIndex(idx){
-    loadEntertainmentState();idx=Number(idx);if(Number.isInteger(idx)&&idx>=0&&idx<ENTERTAINMENT_PHRASES.length&&state.entertainmentDeck.indexOf(idx)<0){var pos=state.entertainmentDeck.length?entertainmentRandomInt(state.entertainmentDeck.length+1):0;state.entertainmentDeck.splice(pos,0,idx);}state.pendingEntertainmentIndex=-1;persistEntertainmentState();
+    // RAW14H · NO se reencolan frases ya seleccionadas. Aunque el navegador las interrumpa,
+    // se consideran consumidas para evitar repeticiones perceptibles dentro del ciclo.
+    state.pendingEntertainmentIndex=-1;persistEntertainmentState();
   }
   function stopEntertainment(cancelSpeech){
-    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;if(cancelSpeech){var was=state.entertainmentSpeaking,idx=state.pendingEntertainmentIndex,u=state.entertainmentUtterance;if(u){try{u.onend=null;u.onerror=null;}catch(_){}}state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(was)state.entertainmentFinishedAt=Date.now();if(Number.isInteger(idx)&&idx>=0)requeueEntertainmentIndex(idx);if(was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){}}}
+    clearTimeout(state.entertainmentTimer);state.entertainmentTimer=null;if(cancelSpeech){var was=state.entertainmentSpeaking,u=state.entertainmentUtterance;if(u){try{u.onend=null;u.onerror=null;}catch(_){}}state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.pendingEntertainmentIndex=-1;if(was)state.entertainmentFinishedAt=Date.now();persistEntertainmentState();if(was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){}}}
   }
-  function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Number(delay)||2000);}
-  function entertainmentEnded(ok,idx){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();if(ok)commitEntertainmentIndex(idx);else requeueEntertainmentIndex(idx);if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(5600);}
-  function speakEntertainmentPhrase(){if(!state.conversationMode||!state.requestInFlight||!supportsSpeech())return;stopEntertainment(false);var idx=nextEntertainmentIndex(),phrase=ENTERTAINMENT_PHRASES[idx];setStatus(phrase,'ok');try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=Math.min(1,speechRate()+0.03);u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;u.onend=function(){entertainmentEnded(true,idx);};u.onerror=function(){entertainmentEnded(false,idx);};window.speechSynthesis.speak(u);}catch(_){entertainmentEnded(false,idx);}}
-  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2400);}
+  function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Math.max(0,Number(delay)||0));}
+  function entertainmentEnded(ok,idx){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();commitEntertainmentIndex(idx);if(state.conversationMode&&state.requestInFlight&&state.entertainmentCount<2)scheduleEntertainment(6500);}
+  function speakEntertainmentPhrase(){if(!state.conversationMode||!state.requestInFlight||!supportsSpeech()||state.entertainmentCount>=2)return;stopEntertainment(false);var idx=nextEntertainmentIndex(),phrase=ENTERTAINMENT_PHRASES[idx];state.entertainmentCount++;setStatus(phrase,'ok');try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';// Las frases de espera van un poco más rápidas que la respuesta: si Zuzu termina mientras habla, reducimos la espera sin cortar la frase.
+      u.rate=Math.min(1.08,speechRate()+0.12);u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;u.onend=function(){entertainmentEnded(true,idx);};u.onerror=function(){entertainmentEnded(false,idx);};window.speechSynthesis.speak(u);}catch(_){entertainmentEnded(false,idx);}}
+  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(1200);}
   function queueAnswerAfterEntertainment(answer,autoRead){clearTimeout(state.pendingAnswerTimer);state.pendingAnswerTimer=null;var hadEntertainment=state.entertainmentSpeaking||!!state.entertainmentUtterance||(state.entertainmentFinishedAt>0&&Date.now()-state.entertainmentFinishedAt<600);function deliver(){if(!state.conversationMode)return;if(state.entertainmentSpeaking){state.pendingAnswerTimer=setTimeout(deliver,60);return;}var wait=hadEntertainment?Math.max(0,500-(Date.now()-(state.entertainmentFinishedAt||0))):0;state.pendingAnswerTimer=setTimeout(function(){state.pendingAnswerTimer=null;if(!state.conversationMode)return;if(autoRead)speakChunks(answer);else startUser();},wait);}deliver();}
 
   function resumeConversationListening(delay){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;setTimeout(function(){if(state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();},Number(delay)||180);}

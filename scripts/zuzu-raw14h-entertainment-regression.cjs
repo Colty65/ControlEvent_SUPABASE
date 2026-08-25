@@ -1,0 +1,20 @@
+const fs=require('fs');
+const path=require('path');
+const root=path.resolve(__dirname,'..');
+const voice=fs.readFileSync(path.join(root,'public/app/features/v22-voz3-zuzu.js'),'utf8');
+let ok=0;
+function test(name,cond){if(!cond){console.error('KO',name);process.exitCode=1;}else{ok++;console.log('OK',name);}}
+const phraseBlock=(voice.match(/var ENTERTAINMENT_PHRASES=\[([\s\S]*?)\];/)||[])[1]||'';
+const phrases=[...phraseBlock.matchAll(/'((?:\\'|[^'])*)'/g)].map(m=>m[1].trim().toLowerCase());
+const unique=new Set(phrases);
+test('hay 60 frases de entretenimiento',phrases.length===60);
+test('las 60 frases son textualmente distintas',unique.size===60);
+test('RAW14H usa nueva baraja persistente',/entertainment_deck_v40/.test(voice)&&/entertainment_last_v40/.test(voice));
+test('la frase se consume al seleccionarla',/state\.entertainmentDeck\.shift\(\)[\s\S]{0,450}state\.lastEntertainmentIndex=idx[\s\S]{0,200}persistEntertainmentState\(\)/.test(voice));
+test('una frase interrumpida no vuelve a la baraja',/function requeueEntertainmentIndex\(idx\)[\s\S]{0,260}NO se reencolan/.test(voice)&&!/function requeueEntertainmentIndex\(idx\)[\s\S]{0,500}splice\(/.test(voice));
+test('máximo dos frases por petición',/state\.entertainmentCount>=2/.test(voice)&&/state\.entertainmentCount<2/.test(voice));
+test('primera frase empieza antes: 1,2 segundos',/scheduleEntertainment\(1200\)/.test(voice));
+test('segunda solo si la consulta sigue viva y tras 6,5 s',/state\.requestInFlight&&state\.entertainmentCount<2\)scheduleEntertainment\(6500\)/.test(voice));
+test('frase de entretenimiento va algo más rápida',/u\.rate=Math\.min\(1\.08,speechRate\(\)\+0\.12\)/.test(voice));
+test('se conserva la pausa mínima de 0,5 s antes de responder',/Math\.max\(0,500-\(Date\.now\(\)-\(state\.entertainmentFinishedAt\|\|0\)\)\)/.test(voice));
+console.log(`${ok}/10 comprobaciones OK`);

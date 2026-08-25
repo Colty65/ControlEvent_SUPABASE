@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp FIX9.3.13 · Cuadre Banco: importación En curso con fecha final automática y revisión En saldo. */
+/* ControlEvent v3_0_exp FIX9.3.14 · Cuadre Banco: importación contextual En curso, auto-fecha y revisión. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -1288,18 +1288,18 @@
       invalidateMovementCache();
       const autoPeriod=result?.period||result?.activeEventUpdate?.period||null;
       const reviewCount=Number(result?.reviewRequiredCount||0);
-      const newOff=Number(result?.insertedDefaultedOff||0);
+      const newOn=Number(result?.insertedDefaultedOn||0);
       if(result?.eventInProgress===true){
-        // Tras una carga en un evento En curso dejamos a la vista los movimientos más
-        // recientes para que el usuario solo tenga que decidir cuáles entran «En saldo».
-        // No se conserva un filtro/search anterior que pudiera ocultar los recién cargados.
+        // RAW14H · La carga se hace desde el evento que el usuario está manteniendo.
+        // Los nuevos parten EN SALDO aquí; dejamos los más recientes delante para que pueda
+        // desactivar únicamente los que no correspondan. En otros eventos En curso nacen OFF.
         if(reviewCount>0){store.filter='TODOS';store.search='';store.sort='DESC';}
         if(autoPeriod?.dateFrom) store.dateFrom=text(autoPeriod.dateFrom);
         if(autoPeriod?.dateTo) store.dateTo=text(autoPeriod.dateTo);
       }
       const importedPeriod=result.dateFrom&&result.dateTo?` · periodo del fichero ${formatDate(result.dateFrom,false)}–${formatDate(result.dateTo,false)}`:'';
       const autoDate=autoPeriod?.dateTo?` Fecha final bancaria aplicada automáticamente: ${formatDate(autoPeriod.dateTo,false)}.`:'';
-      const reviewHint=reviewCount>0?` ${reviewCount} movimiento(s) quedan inicialmente FUERA DEL SALDO para revisión${newOff?` (${newOff} realmente nuevo(s))`:''}. Activa «En saldo» solo en los que correspondan a este evento.`:'';
+      const reviewHint=reviewCount>0?` ${reviewCount} movimiento(s) nuevo(s) quedan inicialmente EN SALDO en este evento${newOn?` (${newOn} activado(s))`:''}. Repásalos y desactiva solo los que no le correspondan. En los demás eventos En curso estos movimientos parten FUERA DEL SALDO.`:'';
       notice(`CSV incorporado: ${result.inserted} movimiento(s) nuevo(s), ${result.duplicates} repetido(s) omitido(s)${arr(result.warnings).length?` y ${result.warnings.length} aviso(s)`:''}${importedPeriod}.${autoDate}${reviewHint}`,'ok',true);
       await load({force:true,preserveNotice:true});
     }catch(error){ notice(error.message,'error',true); }

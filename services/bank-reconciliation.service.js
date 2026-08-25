@@ -1008,60 +1008,33 @@ async function applyImportToInProgressEvent({eventId,accountId,parsed,insertedRo
     :null;
 
   const selectedAccount=text(accountId||parsed?.accountId);
-  const movementRows=await selectPaged(MOVEMENTS_TABLE,{
-    columns:'id,account_id,executed_at,value_date,source_hash',
-    order:'executed_at',ascending:true,
-    apply:q=>selectedAccount?q.eq('account_id',selectedAccount):q
-  });
   const insertedIds=new Set(arr(insertedRows).map(row=>text(row?.id)).filter(Boolean));
-  const newlyVisibleIds=new Set();
-  for(const row of movementRows){
-    const day=dateOnly(row.executed_at||row.value_date);
-    if(!day||day<nextPeriod.dateFrom||day>nextPeriod.dateTo) continue;
-    const wasVisible=!!previousPeriod&&day>=previousPeriod.dateFrom&&day<=previousPeriod.dateTo;
-    if(!wasVisible) newlyVisibleIds.add(text(row.id));
-  }
 
-  // Todo movimiento realmente insertado en esta carga queda FUERA DEL SALDO para este evento.
-  // Además, si al ampliar la Fecha final aparecen movimientos que ya estaban en el histórico
-  // global pero todavía no habían entrado en el periodo del evento, también quedan pendientes
-  // de revisión. Nunca se pisa una decisión específica que el usuario ya hubiera tomado.
-  const reviewCandidateIds=new Set([...insertedIds,...newlyVisibleIds].filter(Boolean));
-  const [existingStates,existingTicketLinks,existingIncomeLinks]=await Promise.all([
-    selectPaged(EVENT_MOVEMENT_STATE_TABLE,{
-      columns:'event_id,movement_id,included,updated_by,updated_at',
-      order:'updated_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)
-    }),
-    selectPaged(LINKS_TABLE,{columns:'event_id,movement_id',order:'created_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)}),
-    selectPaged(INCOME_LINKS_TABLE,{columns:'event_id,movement_id',order:'created_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)})
-  ]);
-  const explicitIds=new Set(arr(existingStates).map(row=>text(row.movement_id)).filter(Boolean));
-  const alreadyReconciledIds=new Set([
-    ...arr(existingTicketLinks).map(row=>text(row.movement_id)).filter(Boolean),
-    ...arr(existingIncomeLinks).map(row=>text(row.movement_id)).filter(Boolean)
-  ]);
+  // RAW14H · La carga se realiza DESDE el evento que el usuario está manteniendo.
+  // Los movimientos realmente NUEVOS acaban de crearse en ce_bank_movements, por lo que no
+  // pueden tener todavía una decisión específica de otro usuario para ESTE evento. Se escribe
+  // directamente el estado event-specific EN SALDO y evitamos consultas intermedias innecesarias.
+  //
+  // El registro global nace included=false (véase importBankCsv). Consecuencia buscada:
+  //   - evento seleccionado de la carga -> estado específico TRUE -> EN SALDO;
+  //   - cualquier otro evento En curso -> sin estado específico -> global FALSE -> FUERA DEL SALDO;
+  //   - evento Finalizado -> solo su foto persistida -> absolutamente inalterado.
   const actorName=text(actor.identificacion||actor.nombre)||'SISTEMA';
-  const reviewRows=[...reviewCandidateIds]
-    .filter(id=>id&&!explicitIds.has(id)&&!alreadyReconciledIds.has(id))
-    .map(id=>({event_id:selectedEvent,movement_id:id,included:false,updated_by:`AUTO_IMPORT_REVISION:${actorName}`}));
-  for(let i=0;i<reviewRows.length;i+=200){
-    const {error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).upsert(reviewRows.slice(i,i+200),{onConflict:'event_id,movement_id'});
+  const selectedOnRows=[...insertedIds]
+    .map(id=>({event_id:selectedEvent,movement_id:id,included:true,updated_by:`AUTO_IMPORT_EVENTO_SELECCIONADO:${actorName}`}));
+  for(let i=0;i<selectedOnRows.length;i+=200){
+    const {error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).upsert(selectedOnRows.slice(i,i+200),{onConflict:'event_id,movement_id'});
     if(error) throw error;
   }
-
+  const selectedOnIds=new Set(selectedOnRows.map(row=>text(row.movement_id)).filter(Boolean));
   const periodChanged=!previousPeriod||previousPeriod.dateFrom!==nextPeriod.dateFrom||previousPeriod.dateTo!==nextPeriod.dateTo;
   // Equivale funcionalmente a pulsar «Aplicar fechas»: guarda el periodo, regenera la
   // conciliación automática ya existente y persiste la foto de estados del periodo.
-  // Los movimientos de esta importación ya tienen un estado específico included=false,
-  // por lo que este paso NO puede activarlos automáticamente.
+  // Los movimientos NUEVOS de esta importación ya tienen un estado específico included=true
+  // para el evento seleccionado, por lo que la instantánea no puede invertir esa presunción.
   const autoActor={...actor,identificacion:`AUTO_IMPORT_FECHA_FINAL:${actorName}`};
   const appliedPeriod=await setBankEventPeriod(selectedEvent,nextPeriod.dateFrom,nextPeriod.dateTo,autoActor,selectedAccount);
 
-  const movementDayById=new Map(movementRows.map(row=>[text(row.id),dateOnly(row.executed_at||row.value_date)]));
-  const reviewVisibleCount=reviewRows.filter(row=>{
-    const day=movementDayById.get(text(row.movement_id));
-    return !!day&&day>=nextPeriod.dateFrom&&day<=nextPeriod.dateTo;
-  }).length;
   return {
     applied:true,
     eventInProgress:true,
@@ -1072,9 +1045,12 @@ async function applyImportToInProgressEvent({eventId,accountId,parsed,insertedRo
     previousPeriod:previousPeriod||null,
     dateToExtended:!!previousPeriod&&nextPeriod.dateTo>previousPeriod.dateTo,
     periodChanged,
-    insertedDefaultedOff:[...insertedIds].filter(id=>reviewRows.some(row=>text(row.movement_id)===id)).length,
-    newlyVisibleDefaultedOff:[...newlyVisibleIds].filter(id=>reviewRows.some(row=>text(row.movement_id)===id)).length,
-    reviewRequiredCount:reviewVisibleCount
+    insertedDefaultedOn:[...insertedIds].filter(id=>selectedOnIds.has(id)).length,
+    insertedDefaultedOff:0,
+    newlyVisibleDefaultedOff:0,
+    // Siguen requiriendo revisión humana, pero parten EN SALDO en el evento desde el que se cargó.
+    reviewRequiredCount:[...insertedIds].filter(id=>selectedOnIds.has(id)).length,
+    otherInProgressDefault:'GLOBAL_OFF'
   };
 }
 
@@ -1130,7 +1106,11 @@ export async function importBankCsv(payload = {}, actor = {}){
         description:row.description,
         amount:row.amount,
         bank_balance:row.bankBalance,
-        included:true,
+        // RAW14H · Un movimiento recién importado nace globalmente FUERA DEL SALDO.
+        // El evento desde el que se hace la carga recibe inmediatamente un estado específico
+        // included=true. Así, ese evento lo ve activo y cualquier OTRO evento En curso lo ve
+        // inactivo por defecto sin contaminar eventos finalizados ni necesitar filas por evento.
+        included:false,
         source_hash:row.sourceHash,
         import_batch_id:batchId,
         source_filename:row.sourceFilename,
@@ -1153,7 +1133,9 @@ export async function importBankCsv(payload = {}, actor = {}){
       eventInProgress:activeEventUpdate.eventInProgress===true,
       period:activeEventUpdate.period||null,
       reviewRequiredCount:Number(activeEventUpdate.reviewRequiredCount||0),
-      insertedDefaultedOff:Number(activeEventUpdate.insertedDefaultedOff||0)
+      insertedDefaultedOn:Number(activeEventUpdate.insertedDefaultedOn||0),
+      insertedDefaultedOff:Number(activeEventUpdate.insertedDefaultedOff||0),
+      otherInProgressDefault:text(activeEventUpdate.otherInProgressDefault)
     };
   }catch(error){
     if(batchCreated){
