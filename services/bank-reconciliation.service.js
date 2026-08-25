@@ -706,7 +706,8 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     // iniciado el mantenimiento tiene que existir al menos un movimiento con una fila/evidencia
     // persistida para ESTE evento: estado En saldo/excluido, vínculo TKxx o vínculo manual de ingreso.
     const periodUpdater=text(period?.updatedBy);
-    const periodExplicit=period?.saved===true && periodUpdater.toUpperCase()!=='INICIALIZACION_AUTOMATICA';
+    const periodAutoImport=/^AUTO_IMPORT_FECHA_FINAL(?::|$)/i.test(periodUpdater);
+    const periodExplicit=period?.saved===true && periodUpdater.toUpperCase()!=='INICIALIZACION_AUTOMATICA' && !periodAutoImport;
     const stateMovementIds=new Set(arr(stateRows).map(row=>text(row.movement_id)).filter(Boolean));
     const ticketMovementIds=new Set(arr(activeRawLinkRows).map(row=>text(row.movement_id)).filter(Boolean));
     const incomeMovementIds=new Set(arr(manualIncomeLinkRows).map(row=>text(row.movement_id)).filter(Boolean));
@@ -813,7 +814,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         ticketsComplete:ticketsCompleteForLifecycle,
         incomesComplete:incomesCompleteForLifecycle,
         evidence:reconciliationEvidence,
-        periodSource:periodExplicit?'MANUAL':(period?.saved===true?'INICIALIZACION_AUTOMATICA':'CALCULADO_NO_GUARDADO')
+        periodSource:periodExplicit?'MANUAL':(periodAutoImport?'AUTO_IMPORTACION':(period?.saved===true?'INICIALIZACION_AUTOMATICA':'CALCULADO_NO_GUARDADO'))
       },
       readOnly:event.finalized,
       ticketSummary,
@@ -975,8 +976,117 @@ export async function setBankEventPeriod(eventId,dateFrom,dateTo,actor={},accoun
   }catch(error){ throw friendlyDbError(error); }
 }
 
+function latestImportedBankDate(parsed={}){
+  return maxDate([
+    validIsoDate(parsed?.dateTo),
+    ...arr(parsed?.movements).map(row=>dateOnly(row?.executedAt||row?.valueDate)).filter(Boolean)
+  ]);
+}
+
+async function applyImportToInProgressEvent({eventId,accountId,parsed,insertedRows=[],actor={}}={}){
+  const selectedEvent=text(eventId);
+  if(!selectedEvent) return {applied:false,eventInProgress:false,reason:'SIN_EVENTO'};
+  const event=await loadEvent(selectedEvent);
+  // Defensa adicional: la ruta ya bloquea escrituras en eventos cerrados, pero este helper
+  // tampoco modifica periodo/estados si se invoca desde otro punto en el futuro.
+  if(event.finalized) return {applied:false,eventInProgress:false,eventFinalized:true,reason:'EVENTO_FINALIZADO'};
+
+  const {data:settingRow,error:settingError}=await db().from(EVENT_SETTINGS_TABLE).select('*').eq('event_id',selectedEvent).maybeSingle();
+  if(settingError) throw settingError;
+  const previous=settingRow?eventSettingFromDb(settingRow):null;
+  const importedLatest=latestImportedBankDate(parsed);
+  const importedEarliest=minDate([
+    validIsoDate(parsed?.dateFrom),
+    ...arr(parsed?.movements).map(row=>dateOnly(row?.executedAt||row?.valueDate)).filter(Boolean)
+  ]);
+  const nextDateFrom=validIsoDate(previous?.dateFrom)||minDate([event.startDate,importedEarliest])||importedLatest;
+  const nextDateTo=maxDate([validIsoDate(previous?.dateTo),importedLatest])||nextDateFrom;
+  if(!nextDateFrom||!nextDateTo) return {applied:false,eventInProgress:true,reason:'SIN_PERIODO_IMPORTADO'};
+  const nextPeriod={dateFrom:nextDateFrom,dateTo:nextDateTo};
+  const previousPeriod=validIsoDate(previous?.dateFrom)&&validIsoDate(previous?.dateTo)
+    ?{dateFrom:validIsoDate(previous.dateFrom),dateTo:validIsoDate(previous.dateTo)}
+    :null;
+
+  const selectedAccount=text(accountId||parsed?.accountId);
+  const movementRows=await selectPaged(MOVEMENTS_TABLE,{
+    columns:'id,account_id,executed_at,value_date,source_hash',
+    order:'executed_at',ascending:true,
+    apply:q=>selectedAccount?q.eq('account_id',selectedAccount):q
+  });
+  const insertedIds=new Set(arr(insertedRows).map(row=>text(row?.id)).filter(Boolean));
+  const newlyVisibleIds=new Set();
+  for(const row of movementRows){
+    const day=dateOnly(row.executed_at||row.value_date);
+    if(!day||day<nextPeriod.dateFrom||day>nextPeriod.dateTo) continue;
+    const wasVisible=!!previousPeriod&&day>=previousPeriod.dateFrom&&day<=previousPeriod.dateTo;
+    if(!wasVisible) newlyVisibleIds.add(text(row.id));
+  }
+
+  // Todo movimiento realmente insertado en esta carga queda FUERA DEL SALDO para este evento.
+  // Además, si al ampliar la Fecha final aparecen movimientos que ya estaban en el histórico
+  // global pero todavía no habían entrado en el periodo del evento, también quedan pendientes
+  // de revisión. Nunca se pisa una decisión específica que el usuario ya hubiera tomado.
+  const reviewCandidateIds=new Set([...insertedIds,...newlyVisibleIds].filter(Boolean));
+  const [existingStates,existingTicketLinks,existingIncomeLinks]=await Promise.all([
+    selectPaged(EVENT_MOVEMENT_STATE_TABLE,{
+      columns:'event_id,movement_id,included,updated_by,updated_at',
+      order:'updated_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)
+    }),
+    selectPaged(LINKS_TABLE,{columns:'event_id,movement_id',order:'created_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)}),
+    selectPaged(INCOME_LINKS_TABLE,{columns:'event_id,movement_id',order:'created_at',ascending:true,apply:q=>q.eq('event_id',selectedEvent)})
+  ]);
+  const explicitIds=new Set(arr(existingStates).map(row=>text(row.movement_id)).filter(Boolean));
+  const alreadyReconciledIds=new Set([
+    ...arr(existingTicketLinks).map(row=>text(row.movement_id)).filter(Boolean),
+    ...arr(existingIncomeLinks).map(row=>text(row.movement_id)).filter(Boolean)
+  ]);
+  const actorName=text(actor.identificacion||actor.nombre)||'SISTEMA';
+  const reviewRows=[...reviewCandidateIds]
+    .filter(id=>id&&!explicitIds.has(id)&&!alreadyReconciledIds.has(id))
+    .map(id=>({event_id:selectedEvent,movement_id:id,included:false,updated_by:`AUTO_IMPORT_REVISION:${actorName}`}));
+  for(let i=0;i<reviewRows.length;i+=200){
+    const {error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).upsert(reviewRows.slice(i,i+200),{onConflict:'event_id,movement_id'});
+    if(error) throw error;
+  }
+
+  const periodChanged=!previousPeriod||previousPeriod.dateFrom!==nextPeriod.dateFrom||previousPeriod.dateTo!==nextPeriod.dateTo;
+  // Equivale funcionalmente a pulsar «Aplicar fechas»: guarda el periodo, regenera la
+  // conciliación automática ya existente y persiste la foto de estados del periodo.
+  // Los movimientos de esta importación ya tienen un estado específico included=false,
+  // por lo que este paso NO puede activarlos automáticamente.
+  const autoActor={...actor,identificacion:`AUTO_IMPORT_FECHA_FINAL:${actorName}`};
+  const appliedPeriod=await setBankEventPeriod(selectedEvent,nextPeriod.dateFrom,nextPeriod.dateTo,autoActor,selectedAccount);
+
+  const movementDayById=new Map(movementRows.map(row=>[text(row.id),dateOnly(row.executed_at||row.value_date)]));
+  const reviewVisibleCount=reviewRows.filter(row=>{
+    const day=movementDayById.get(text(row.movement_id));
+    return !!day&&day>=nextPeriod.dateFrom&&day<=nextPeriod.dateTo;
+  }).length;
+  return {
+    applied:true,
+    eventInProgress:true,
+    eventId:selectedEvent,
+    period:appliedPeriod?.period||{dateFrom:nextPeriod.dateFrom,dateTo:nextPeriod.dateTo},
+    automaticIncomePersistence:appliedPeriod?.automaticIncomePersistence||null,
+    periodMovementSnapshot:appliedPeriod?.periodMovementSnapshot||null,
+    previousPeriod:previousPeriod||null,
+    dateToExtended:!!previousPeriod&&nextPeriod.dateTo>previousPeriod.dateTo,
+    periodChanged,
+    insertedDefaultedOff:[...insertedIds].filter(id=>reviewRows.some(row=>text(row.movement_id)===id)).length,
+    newlyVisibleDefaultedOff:[...newlyVisibleIds].filter(id=>reviewRows.some(row=>text(row.movement_id)===id)).length,
+    reviewRequiredCount:reviewVisibleCount
+  };
+}
+
 export async function importBankCsv(payload = {}, actor = {}){
   const parsed = parseBankCsv(payload.csvText, payload.filename);
+  const selectedEvent=text(payload.eventId);
+  // El CSV se importa desde Cuadre Banco de un evento. Un evento Finalizado es una foto
+  // inmutable y no debe poder ampliar su periodo ni recibir estados nuevos.
+  if(selectedEvent){
+    const event=await loadEvent(selectedEvent);
+    if(event.finalized) fail(`El evento «${event.title}» está Finalizado. La importación no puede alterar su Cuadre Banco.`,409,'BANK_EVENT_FINALIZED');
+  }
   const batchId = crypto.randomUUID();
   let batchCreated = false;
   try{
@@ -1010,6 +1120,7 @@ export async function importBankCsv(payload = {}, actor = {}){
     if(batchError) throw batchError;
     batchCreated = true;
 
+    const insertedRows=[];
     if(fresh.length){
       const rows = fresh.map(row => ({
         account_id:row.accountId,
@@ -1026,11 +1137,24 @@ export async function importBankCsv(payload = {}, actor = {}){
         created_by:text(actor.identificacion || actor.nombre)
       }));
       for(let i=0;i<rows.length;i+=300){
-        const {error}=await db().from(MOVEMENTS_TABLE).insert(rows.slice(i,i+300));
+        const {data,error}=await db().from(MOVEMENTS_TABLE).insert(rows.slice(i,i+300)).select('id,account_id,executed_at,value_date,source_hash');
         if(error) throw error;
+        insertedRows.push(...arr(data));
       }
     }
-    return {ok:true,batchId,accountId:parsed.accountId,accountLabel:parsed.accountLabel,dateFrom:parsed.dateFrom,dateTo:parsed.dateTo,parsed:parsed.movements.length,inserted:fresh.length,duplicates:parsed.movements.length-fresh.length,warnings:parsed.warnings};
+
+    const activeEventUpdate=selectedEvent
+      ?await applyImportToInProgressEvent({eventId:selectedEvent,accountId:parsed.accountId,parsed,insertedRows,actor})
+      :{applied:false,eventInProgress:false,reason:'SIN_EVENTO'};
+    return {
+      ok:true,batchId,accountId:parsed.accountId,accountLabel:parsed.accountLabel,dateFrom:parsed.dateFrom,dateTo:parsed.dateTo,
+      parsed:parsed.movements.length,inserted:fresh.length,duplicates:parsed.movements.length-fresh.length,warnings:parsed.warnings,
+      activeEventUpdate,
+      eventInProgress:activeEventUpdate.eventInProgress===true,
+      period:activeEventUpdate.period||null,
+      reviewRequiredCount:Number(activeEventUpdate.reviewRequiredCount||0),
+      insertedDefaultedOff:Number(activeEventUpdate.insertedDefaultedOff||0)
+    };
   }catch(error){
     if(batchCreated){
       try{ await db().from(BATCHES_TABLE).delete().eq('id',batchId); }catch(_){ /* limpieza no bloqueante */ }
