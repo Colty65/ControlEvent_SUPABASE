@@ -33,5 +33,5 @@ t('Gemini2 recibe column_stats completos',/column_stats:v73CompactFinalValue\(co
 t('Gemini2 recibe payload autoritativo calculado por CE',/authoritative_ce_payload|authoritative_payload/.test(svc)&&/authoritativePayload:answerPayload/.test(svc));
 t('contrato prohíbe contradicción texto/tabla',/COHERENCIA TEXTO\/TABLA/.test(svc)&&/está prohibido afirmar/.test(svc));
 t('contrato prohíbe inventar campos ausentes',/Está prohibido mencionar productos, importes, personas, tiendas, tickets/.test(svc));
-t('traza activa identifica RAW14D',/CANDIDATOS TIPADOS RAW14D/.test(svc));
+t('traza activa identifica RAW14D o evolución posterior',/CANDIDATOS TIPADOS RAW14(?:D|E)/.test(svc));
 console.log(`\nRAW14D · ${pass}/${pass+fail} comprobaciones OK`);process.exit(fail?1:0);

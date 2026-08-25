@@ -23,7 +23,7 @@ t('continuación conserva CURRENT sobre pantalla',/CURRENT_CONTEXT\.scope manda 
 t('prompt define realizadas y pendientes',/REALIZADA = compra no donada/.test(svc)&&/PENDIENTE\/PREVISTA/.test(svc)&&/Nunca ocultes pendientes por defecto/.test(svc));
 
 t('aviso En curso es obligatorio y mecánico',/function v73InProgressEventNotice/.test(svc)&&/function v73EnsureInProgressNotice/.test(svc)&&/mandatory_event_notice/.test(svc));
-t('local usa VIEW como autoridad factual',/view_is_authoritative:localAction/.test(svc)&&/source_facts_trimmed_for_local/.test(svc));
+t('local usa VIEW como autoridad factual',/view_is_authoritative:true/.test(svc)&&/source_facts_reconciled_to_view:true/.test(svc));
 t('event_summary multievento ya es ejecutable',/EVENT_SUMMARY MULTIEVENTO/.test(svc)&&/name:'compare_events'/.test(svc));
 
 t('voz corta no gasta tercera llamada IA',/fallback oral, sin nueva llamada IA/.test(svc)&&!/Zuzu completa la voz/.test(svc));
@@ -35,5 +35,5 @@ t('40 líneas no se interpreta como 40 litros',!unitRx.test('40 líneas'));
 unitRx.lastIndex=0;t('40 l sigue detectándose como litros',unitRx.test('40 l'));
 t('código de voz contiene protección letras acentuadas',/\(\?!\[A-Za-zÁÉÍÓÚÜÑáéíóúüñ\]\)/.test(voice));
 
-t('traza activa identifica RAW14C',/CANDIDATOS TIPADOS RAW14C/.test(svc));
+t('traza activa identifica RAW14C o evolución posterior',/CANDIDATOS TIPADOS RAW14(?:C|D|E)/.test(svc));
 console.log(`\nRAW14C · ${pass}/${pass+fail} comprobaciones OK`);process.exit(fail?1:0);
