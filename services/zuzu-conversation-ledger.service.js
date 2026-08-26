@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp · RAW14Q · Zuzu Conversation Ledger + Memoria episódica.
+/* ControlEvent v3_0_exp · RAW14R · Zuzu Conversation Ledger + Memoria episódica/proactiva humana.
    Persistencia server-side, inmutable por turno. El navegador conserva solo conversation_id.
    Prefiere tablas dedicadas; si no existen, usa ce_meta sin bloquear la conversación. */
 import crypto from 'node:crypto';
@@ -331,10 +331,43 @@ function planSimilarityScore(plan={},item={}){
   return score;
 }
 function daysAgo(createdAt='',nowIso=''){const a=new Date(createdAt).getTime(),b=new Date(trim(nowIso)||Date.now()).getTime();return Number.isFinite(a)&&Number.isFinite(b)?Math.max(0,(b-a)/86400000):99999;}
-export async function searchZuzuProactiveMemory({actor={},prompt='',plan={},conversationId='',nowIso='',days=4,limit=2}={}){
-  const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),maxDays=Math.max(1,Number(days)||4);
-  const scored=items.filter(x=>trim(x.conversationId)!==trim(conversationId)&&daysAgo(x.createdAt,nowIso)<=maxDays).map(x=>({...x,score:planSimilarityScore(plan,x)+historyScore(prompt,x)*0.45})).filter(x=>x.score>=3.15).sort((a,b)=>b.score-a.score||text(b.createdAt).localeCompare(text(a.createdAt)));
-  const out=[],seenConversation=new Set();for(const x of scored){if(seenConversation.has(x.conversationId))continue;seenConversation.add(x.conversationId);const episode=await readZuzuMemoryEpisode({conversationId:x.conversationId,actor,matchedTurnId:x.turnId,includeAnswers:false});if(episode)out.push({...episode,match:{turn_id:x.turnId,score:Number(x.score.toFixed(3)),summary:x.summary}});if(out.length>=Math.max(1,Math.min(3,Number(limit)||2)))break;}return out;
+function proactiveEntityValues(plan={},prompt=''){
+  const q=plan?.query||{},vals=[];
+  for(const k of ['people','responsibles','donors','stores','tickets'])for(const v of arr(q?.[k])){const t=trim(v?.text||v);if(t)vals.push(t);}
+  for(const k of ['person','responsible','donor','store','ticket']){const t=trim(q?.[k]);if(t)vals.push(t);}
+  if(trim(q?.product?.text))vals.push(trim(q.product.text));
+  // Conversación ociosa: una mención suficientemente concreta puede actuar como ancla social aunque no haya QUERY.
+  if(!vals.length){for(const t of tokens(prompt))if(t.length>=5)vals.push(t);}
+  return uniqueNorm(vals);
+}
+function proactiveItemEntityValues(item={}){
+  const vals=[];
+  for(const e of arr(item?.memoryEntities||item?.semanticTags?.entities)){const t=trim(e?.value||e);if(t)vals.push(t);}
+  const sig=item?.planSignature||{};for(const k of ['people','responsibles','donors','stores','tickets'])for(const v of arr(sig?.[k])){const t=trim(v?.text||v);if(t)vals.push(t);}
+  for(const k of ['person','responsible','donor','store','ticket']){const t=trim(sig?.[k]);if(t)vals.push(t);}
+  if(trim(sig?.product?.text))vals.push(trim(sig.product.text));
+  return uniqueNorm(vals);
+}
+function proactiveEntityOverlap(plan={},prompt='',item={}){
+  const cur=proactiveEntityValues(plan,prompt),old=proactiveItemEntityValues(item);let n=0;
+  for(const a of cur)if(old.some(b=>norm(a)===norm(b)))n++;return n;
+}
+function proactiveAgeMeta(createdAt='',nowIso='',user=''){
+  const days=daysAgo(createdAt,nowIso),hours=days*24,u=trim(user)||'amigo';
+  if(hours<=8)return{age_band:'few_hours',age_days:Number(days.toFixed(3)),age_label:hours<1?'hace menos de una hora':`hace ${Math.max(1,Math.round(hours))} hora${Math.round(hours)===1?'':'s'}`,human_intro:`Vaya cabecita que tienes ${u}, el tío Zuzu te lo recuerda.`};
+  if(days<=4){const d=Math.max(1,Math.round(days));return{age_band:'few_days',age_days:Number(days.toFixed(3)),age_label:`hace ${d} día${d===1?'':'s'}`,human_intro:`${u}, se te ha ido un poco la olla desde hace ${d} día${d===1?'':'s'}; el tío Zuzu te refresca la memoria.`};}
+  if(days<=180){const d=Math.max(5,Math.round(days));return{age_band:'days_to_months',age_days:Number(days.toFixed(3)),age_label:`hace ${d} días`,human_intro:`Madre mía, ${u}, esto ya estaba cogiendo polvo en el cajón de Zuzu; espera, que te refresco la memoria.`};}
+  return{age_band:'long_ago',age_days:Number(days.toFixed(3)),age_label:`hace ${Math.max(1,Math.round(days/30))} meses`,human_intro:`Yo lo tengo fresco ${u}, ahora te cuento y te pondrás tan contento.`};
+}
+export async function searchZuzuProactiveMemory({actor={},prompt='',plan={},conversationId='',nowIso='',days=3650,limit=3}={}){
+  const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),maxDays=Math.max(4,Number(days)||3650),user=actorName(actor);
+  const scored=items.filter(x=>trim(x.conversationId)!==trim(conversationId)&&daysAgo(x.createdAt,nowIso)<=maxDays).map(x=>{
+    const age=daysAgo(x.createdAt,nowIso),overlap=proactiveEntityOverlap(plan,prompt,x),lex=historyScore(prompt,x),base=planSimilarityScore(plan,x),score=base+lex*0.55+Math.min(2,overlap)*1.25;
+    const threshold=age<=0.34?2.55:age<=4?2.85:age<=180?3.75:4.65;
+    const eligible=score>=threshold && (age<=4 || overlap>0 || lex>=2.2);
+    return{...x,score,overlap,lex,age,eligible,ageMeta:proactiveAgeMeta(x.createdAt,nowIso,user)};
+  }).filter(x=>x.eligible).sort((a,b)=>b.score-a.score||a.age-b.age||text(b.createdAt).localeCompare(text(a.createdAt)));
+  const out=[],seenConversation=new Set();for(const x of scored){if(seenConversation.has(x.conversationId))continue;seenConversation.add(x.conversationId);const episode=await readZuzuMemoryEpisode({conversationId:x.conversationId,actor,matchedTurnId:x.turnId,includeAnswers:false});if(episode)out.push({...episode,match:{turn_id:x.turnId,score:Number(x.score.toFixed(3)),summary:x.summary,entity_overlap:x.overlap,lexical_score:Number(x.lex.toFixed(3))},...x.ageMeta});if(out.length>=Math.max(1,Math.min(4,Number(limit)||3)))break;}return out;
 }
 export async function searchZuzuSocialMemoryHints({actor={},prompt='',plan={},conversationId='',nowIso='',limit=2}={}){
   const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid);

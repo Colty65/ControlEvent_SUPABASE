@@ -22,7 +22,8 @@
     "test:zuzu-raw14": "node scripts/zuzu-raw14-continuity-voice-regression.js",
     "test:zuzu-raw14l": "node scripts/zuzu-raw14l-pdf2-focus-mic-regression.cjs",
     "test:zuzu-raw14m": "node scripts/zuzu-raw14m-voice-engine-regression.cjs",
-    "test:zuzu-raw14q": "node scripts/zuzu-raw14q-memory-episodic-regression.cjs"
+    "test:zuzu-raw14q": "node scripts/zuzu-raw14q-memory-episodic-regression.cjs",
+    "test:zuzu-raw14r": "node scripts/zuzu-raw14r-memory-proactive-human-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
