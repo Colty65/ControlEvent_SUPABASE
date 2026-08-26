@@ -26,7 +26,8 @@
     "test:zuzu-raw14r": "node scripts/zuzu-raw14r-memory-proactive-human-regression.cjs",
     "test:zuzu-raw14s": "node scripts/zuzu-raw14s-memory-reliability-regression.cjs",
     "test:zuzu-raw14t": "node scripts/zuzu-raw14t-memory-core-experience-seed-regression.cjs",
-    "test:zuzu-raw14u": "node scripts/zuzu-raw14u-voice-token-context-regression.cjs"
+    "test:zuzu-raw14u": "node scripts/zuzu-raw14u-voice-token-context-regression.cjs",
+    "test:zuzu-raw14v": "node scripts/zuzu-raw14v-focus-coverage-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

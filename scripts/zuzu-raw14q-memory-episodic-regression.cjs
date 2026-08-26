@@ -23,7 +23,7 @@ t('referencia año pasado por estas fechas',/ano\\s\+pasado[\s\S]*por\\s\+estas\
 t('búsqueda proactiva conserva memoria histórica amplia con umbral por antigüedad',/searchZuzuProactiveMemory[\s\S]*days=3650[\s\S]*threshold=age<=0\.34/.test(ledger));
 t('memoria social limitada a dos pistas',/searchZuzuSocialMemoryHints[\s\S]*Math\.min\(2/.test(ledger));
 t('compiler conoce recall_episode/resume_episode',/recall_episode/.test(ai)&&/resume_episode/.test(ai));
-t('CURRENT_CONTEXT conserva esquema cronológico del episodio retomado',/turn_outline:arr\(me\.turns\)\.slice\(0,12\)/.test(ai));
+t('CURRENT_CONTEXT conserva esquema cronológico del episodio retomado',/turn_outline:arr\(me\.turns\)\.slice\(0,(?:12|16)\)/.test(ai));
 t('recuerdo explícito recupera conversación completa',/MEMORIA EPISÓDICA · RECALL/.test(ai)&&/readZuzuMemoryEpisode/.test(ai));
 t('retomar no reejecuta automáticamente datos antiguos',/Conversación histórica retomada desde el principio[\s\S]*las cifras antiguas NO se convierten en datos actuales/.test(ai));
 t('reexecute_plan se conserva para actualización actual',/reexecute_plan/.test(ai));
@@ -31,10 +31,10 @@ t('memoria proactiva se busca tras compilar consulta',/searchZuzuProactiveMemory
 t('final writer usa la introducción humana calculada por CE',/proactive_memory\.human_intro[\s\S]*EXACTAMENTE/.test(ai));
 t('memoria social es opcional y máximo una alusión',/MEMORIA SOCIAL[\s\S]*como máximo UNA alusión breve/i.test(ai));
 t('recuerdo histórico nunca se presenta como dato actual',/No mezcles esas cifras antiguas con datos actuales/i.test(ai));
-t('recall/resume no inventan tabla ni gráfica',/action==='reference'&&\['recall_episode','resume_episode'\][\s\S]*table:false,chart:false/.test(ai));
+t('recall/resume no inventan tabla ni gráfica',/action==='reference'&&\['recall_episode','resume_episode'(?:,'recall_turn','reexecute_episode')?\][\s\S]*table:false,chart:false/.test(ai));
 t('CURRENT conserva dataset al recordar',/recall_episode','resume_episode'[\s\S]*carriesActiveDataset/.test(ai)||/carriesActiveDataset=[^;]*recall_episode[^;]*resume_episode/.test(ai));
 t('traza registra si el turno entra o no en memoria',/MEMORIA EPISÓDICA · ALMACENAMIENTO/.test(ai));
-t('arquitectura memoria episódica/proactiva vigente',/RAW14(?:R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|S · MEMORIA FIABLE \+ PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA|U · TOKEN BUDGET \+ CONTEXTO ESTRICTO)/.test(ai));
+t('arquitectura memoria episódica/proactiva vigente',/RAW14(?:R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|S · MEMORIA FIABLE \+ PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA|U · TOKEN BUDGET \+ CONTEXTO ESTRICTO|V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE)/.test(ai));
 
 // Prueba funcional del parser temporal, extrayendo la función pura sin importar Supabase.
 function extractFunction(src,name){const start=src.indexOf(`function ${name}(`)>=0?src.indexOf(`function ${name}(`):src.indexOf(`export function ${name}(`);if(start<0)throw new Error(name);const brace=src.indexOf('{',start);let d=0,q='',esc=false;for(let i=brace;i<src.length;i++){const c=src[i];if(q){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===q)q='';continue;}if(c==='"'||c==="'"||c==='`'){q=c;continue;}if(c==='{')d++;else if(c==='}'&&--d===0)return src.slice(start,i+1).replace(/^export\s+/,'');}throw new Error(name);}

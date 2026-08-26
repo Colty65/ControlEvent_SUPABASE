@@ -16,5 +16,5 @@ t('payload final transporta banda, edad e intro',/age_band:trim\(me\.age_band\)[
 t('final writer antepone memoria antes de respuesta actual',/antes de entrar de lleno en la respuesta nueva[\s\S]*Después contesta la petición ACTUAL/.test(ai));
 t('recuerdo viejo nunca sustituye dato vigente',/recuerdo antiguo nunca es fuente factual vigente/.test(ai));
 t('se evita repetir misma conversación histórica inmediatamente',/v75ProactiveMemoryUsedRecently/.test(ai));
-t('arquitectura memoria proactiva vigente',/RAW14(?:R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|S · MEMORIA FIABLE \+ PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA|U · TOKEN BUDGET \+ CONTEXTO ESTRICTO)/.test(ai));
+t('arquitectura memoria proactiva vigente',/RAW14(?:R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|S · MEMORIA FIABLE \+ PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA|U · TOKEN BUDGET \+ CONTEXTO ESTRICTO|V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE)/.test(ai));
 console.log(`\nRAW14R MEMORIA PROACTIVA HUMANA · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);
