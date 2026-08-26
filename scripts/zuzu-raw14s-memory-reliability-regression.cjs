@@ -31,7 +31,7 @@ t('prompt prohíbe usar entidad como target_ref',/target_ref NUNCA puede ser el 
 t('prompt distingue revisar CURRENT de recordar pasado',/Vuelve a revisarla[\s\S]*NO abrir memoria histórica/.test(ai));
 t('detalle de esa conversación vuelve al episodio recordado',/dame detalle de esa conversación[\s\S]*reference_action=\"recall_episode\"/.test(ai));
 t('meta-memoria comprensible no es VOICE_NOISE',/META-CONVERSACIÓN[\s\S]*has recuperado de la memoria[\s\S]*NUNCA VOICE_NOISE/.test(ai));
-t('arquitectura RAW14S preservada dentro de RAW14T',/RAW14T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA/.test(ai)&&/CANDIDATOS TIPADOS RAW14T/.test(ai));
+t('arquitectura RAW14S preservada dentro de RAW14U',/RAW14U · TOKEN BUDGET \+ CONTEXTO ESTRICTO/.test(ai)&&/CANDIDATOS TIPADOS RAW14U/.test(ai));
 
 function extractFunction(src,name){const start=src.indexOf(`function ${name}(`)>=0?src.indexOf(`function ${name}(`):src.indexOf(`export function ${name}(`);if(start<0)throw new Error(name);const brace=src.indexOf('{',start);let d=0,q='',esc=false;for(let i=brace;i<src.length;i++){const c=src[i];if(q){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===q)q='';continue;}if(c==='"'||c==="'"||c==='`'){q=c;continue;}if(c==='{')d++;else if(c==='}'&&--d===0)return src.slice(start,i+1).replace(/^export\s+/,'');}throw new Error(name);}
 try{

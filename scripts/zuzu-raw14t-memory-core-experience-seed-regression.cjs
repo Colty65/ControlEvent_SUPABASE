@@ -28,6 +28,6 @@ t('huella tiene shape_id estable',/shape_id:fingerprint\(shape\)/.test(ledger));
 t('huella no toma userPrompt ni answer dentro de memoryExperienceSignature',(()=>{const a=ledger.indexOf('function memoryExperienceSignature('),b=ledger.indexOf('export function deriveZuzuExperienceSignature',a),x=ledger.slice(a,b);return !/userPrompt|\.answer\b/.test(x);})());
 t('huella no toma valores literales de entidades',(()=>{const a=ledger.indexOf('function memoryExperienceSignature('),b=ledger.indexOf('export function deriveZuzuExperienceSignature',a),x=ledger.slice(a,b);return !/\.value\b|scope\.event|people\]|stores\]|product\.text/.test(x);})());
 
-t('arquitectura final RAW14T',/RAW14T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA/.test(ai)&&/CANDIDATOS TIPADOS RAW14T/.test(ai));
+t('arquitectura final conserva Memory Core en RAW14U',/RAW14U · TOKEN BUDGET \+ CONTEXTO ESTRICTO/.test(ai)&&/CANDIDATOS TIPADOS RAW14U/.test(ai));
 
 console.log(`\nRAW14T MEMORY CORE / EXPERIENCIA SEMILLA · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

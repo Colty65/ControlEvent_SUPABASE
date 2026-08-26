@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp · Zuzu Voice · RAW14P VOICE COPY · wake persistente + cierre/rearme + guard post-Borra texto
+/* ControlEvent v3_0_exp · Zuzu Voice · RAW14U · guard local de residuos + barge-in robusto + carrusel 100×2,5 s
    Objetivo: recuperar la escucha ambiental que sí funcionó y mantener conversación oral humana.
    Flujo deliberadamente simple:
    AMBIENTE -> "Hola Zuzu" -> USUARIO -> ESPERA IA -> ZUZU HABLA -> USUARIO.
@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v3_0_exp-RAW14P-VOICE-COPY-FIX46';
+  var BUILD='v3_0_exp-RAW14U-VOICE-GUARD-CAROUSEL-FIX47';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v43', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v43', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v43', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v43'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v44', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v44', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v44', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v44'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -25,42 +25,119 @@
     cloudThreshold:0.006, cloudNoiseFloor:0.001, cloudRms:0, cloudPeak:0, cloudVoiceFrames:0, cloudCalibratingUntil:0, cloudNoiseSamples:[], cloudCalibrationDone:false, cloudMeterLastPaint:0, cloudDeviceLabel:'', cloudDeviceId:'', cloudDeviceSettings:{}, cloudGeneration:0, cloudLastTranscript:'',
     wakeCapture:false, wakeText:'', wakeSession:'', wakeTimer:null, wakeLastAt:0,
     turnPrefix:'', turnSession:'', turnTimer:null, turnLastAt:0, turnCommitMs:3000, replyWindowTimer:null, replyWindowUntil:0, replyWindowMs:12000,
-    postClearUntil:0, postClearQuarantineMs:8000, postClearDiscardTimer:null, postClearMinWords:3, postClearMinChars:10, lastLocalControlEndedAt:0,
+    postClearUntil:0, postClearQuarantineMs:8000, postClearDiscardTimer:null, postClearMinWords:3, postClearMinChars:10, voiceResidueUntil:0, voiceResidueQuarantineMs:4200, lastLocalControlEndedAt:0,
     voicePhase:'BOOT', voicePhaseSince:Date.now(), voicePhaseHistory:[], recognitionStartWatchdog:null, cloudStartWatchdog:null, ambientHealthTimer:null, overlayMissingSince:0, recognitionStartedAt:0, recognitionLastResultAt:0, ambientSessionMaxMs:26000, localControlSpeaking:false, localControlGeneration:0,
     requestInFlight:false, awaitingResponse:false, requestPrompt:'', requestTitle:'',
     speaking:false, speechGeneration:0, speechChunks:[], speechIndex:0, currentUtterance:null,
     bargeRecognition:null, bargeGeneration:0,
     voices:[],
     recorderStream:null, recorder:null, recorderChunks:[], recordingActive:false, lastRecordingBlob:null, lastRecordingMime:'',
-    entertainmentTimer:null, entertainmentCount:0, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentFinishedAt:0, pendingAnswerTimer:null, lastEntertainmentIndex:-1, entertainmentDeck:[], entertainmentUsed:[], pendingEntertainmentIndex:-1, entertainmentCycle:0, entertainmentLoaded:false
+    entertainmentTimer:null, entertainmentCount:0, entertainmentIntervalMs:2500, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentFinishedAt:0, pendingAnswerTimer:null, lastEntertainmentIndex:-1, entertainmentDeck:[], entertainmentUsed:[], pendingEntertainmentIndex:-1, entertainmentCycle:0, entertainmentLoaded:false
   };
 
   var ENTERTAINMENT_PHRASES=[
-    'Tente mientras cobro…....., ya sabes {usuario}',
-    'Viva {usuario}, y el Santísimo Crito de las angustias, joder',
-    'ojo,….... si levantara la cabeza pichici, {usuario}',
-    'Vale {usuario}, pero aquí no hay más cera que la que arde…..... Amigo mio.',
-    'Tienes que europeate con Control Event {usuario}',
-    'Me quiero echar la siesta hoy {usuario}, no te enrrolles mucho anda.',
-    'oyeee {usuario}. No tienes ni puta idea…...güiiiiiiisi mooooodaaaaa',
-    'Vamos a hacerle los galgos a ese forastero,…..{usuario}',
-    'Sigo dentro, no me he ido a por café.',
-    'Estoy cuadrando las cuentas sin hacer trampas.',
-    'Despacito echando el bofe, ando con tu cosas',
-    'Te echo un guá a la verdad mientras {usuario}..…no vale pagar de acerito',
-    'Arrikitaum tan tin, arrikitaum tan tan, {usuario}…....que te la voy colar',
-    'Separo churras de merinas, pero me las como todas',
-    'Apura Millas, que son cincuenta.',
-    'Echa un cigarro {usuario} y ahora ya te digo….Rodrigo',
-    'Mi ayudante Morgan de la tubería te pondrá al día',
-    'Cantaté una por peteneras, {usuario} y ahora te corto.',
-    'Vaya vaya con {usuario}, quiere saberlo todo',
-    'Si te digo que si te miento y si te digo que no tamien…si eso',
-    'Has pagao ya?........... O solos quieres pelín de alcagüeteo',
-    'No se no se, tu me quieres marear {usuario}.',
-    'Haaastele mientras {usuario} que la vida son dos dias.',
-    '¿Recuerdas {usuario} que Paco ratón tiene novia en Tembleque?'
-  ];  function $(id){return document.getElementById(id);}
+    '{usuario}, dame un segundo que estoy haciendo encaje de bolillos.',
+    'Quieto parao, {nombre}, que esto ya viene.',
+    'Estamos en {mes_actual}, {usuario}; no me metas prisa que me despeino.',
+    'Es {diasemana}, {usuario}; día fino para sacar cuentas.',
+    '{nombre}, en {ano_actual} todavía quedan milagros informáticos.',
+    'Voy por ello, {usuario}; no me cambies las cartas ahora.',
+    '{usuario}, esto tiene más vueltas que una persiana.',
+    'Dame aire, {nombre}, que estoy juntando los cabos.',
+    'Un segundo, {usuario}, que aquí hay tomate.',
+    '{usuario}, estoy mirando debajo de las alfombras digitales.',
+    'Ahora mismo, {nombre}; no me hagas correr con los cordones sueltos.',
+    '{usuario}, la cosa pinta bien, pero déjame rematarla.',
+    'Voy fino, {usuario}; hoy es {diasemana} y se nota.',
+    '{nombre}, estoy poniendo cada oveja con su pareja.',
+    '{usuario}, dame dos meneos de rabo y te cuento.',
+    'En {mes_actual} todo parece fácil hasta que preguntas tú, {usuario}.',
+    '{nombre}, me has pillado con las manos en los datos.',
+    'Voy, voy, {usuario}; que la prisa mata al dato.',
+    '{usuario}, estoy sacando punta al lápiz electrónico.',
+    'Un momentín, {nombre}; esto merece mirar dos veces.',
+    '{usuario}, que no cunda el pánico, sigo aquí.',
+    'Con calma, {nombre}; las cuentas tienen memoria.',
+    '{usuario}, estoy peinando la información con raya al medio.',
+    'Espera un pelo, {usuario}; ya asoma la respuesta.',
+    '{nombre}, esto va más derecho que una vela.',
+    '{usuario}, hoy {diasemana} me tienes trabajando de lo lindo.',
+    'Voy a por la buena, {usuario}; las otras eran de calentamiento.',
+    '{nombre}, estoy mirando hasta el último rincón.',
+    '{usuario}, aquí no se escapa ni una miguita de dato.',
+    'Un segundo, que {ano_actual} viene cargadito, {usuario}.',
+    '{usuario}, estoy atando esto con cuerda de esparto.',
+    '{nombre}, no te me aceleres que ya llego.',
+    'Voy sacando la madeja, {usuario}.',
+    '{usuario}, esto está más entretenido que una verbena.',
+    'Dame un suspiro, {nombre}, y te lo pongo bonito.',
+    '{usuario}, a estas horas de {momento_dia} todavía funciono.',
+    '{nombre}, son las {hora_actual}; mira tú qué ganas de preguntar.',
+    '{usuario}, hoy {fecha_hoy} te has levantado preguntón.',
+    'Voy detrás del dato, {usuario}; no puede correr mucho.',
+    '{nombre}, lo tengo casi agarrado por la pechera.',
+    '{usuario}, estoy separando el grano de la paja.',
+    'Un segundo, {nombre}; aquí hay más capas que una cebolla.',
+    '{usuario}, no me distraigas que estoy en la curva buena.',
+    'Ya voy, {usuario}; esto no se arregla a martillazos.',
+    '{nombre}, estoy haciendo arqueología de datos.',
+    '{usuario}, dame un parpadeo largo y te digo.',
+    'Voy con ello, {nombre}; sin trampa ni cartón.',
+    '{usuario}, esto huele a respuesta buena.',
+    'No te vayas, {usuario}; el dato está entrando por la puerta.',
+    '{nombre}, estoy poniendo orden en este gallinero.',
+    '{usuario}, un poco de paciencia, que no soy un microondas.',
+    'En {mes_actual} y todavía me haces sudar, {nombre}.',
+    '{usuario}, le estoy dando una vuelta de llave.',
+    '{nombre}, ahora mismo te saco de dudas.',
+    '{usuario}, estoy comprobando que dos y dos sigan siendo cuatro.',
+    'Un instante, {nombre}; que aquí el detalle manda.',
+    '{usuario}, la respuesta viene andando, no en AVE.',
+    '{nombre}, estoy buscando el dato con linterna.',
+    '{usuario}, no veas cómo está el patio de números.',
+    'Dame un segundo, {usuario}; estoy cuadrando la cuadratura.',
+    '{nombre}, esto ya está cogiendo forma.',
+    '{usuario}, no he desaparecido; estoy debajo del capó.',
+    'Voy al turrón, {nombre}, pero déjame abrir la caja.',
+    '{usuario}, hoy {diasemana} tenemos faena fina.',
+    '{nombre}, estoy sacando brillo a la respuesta.',
+    '{usuario}, que luego dices que te cuento películas.',
+    'Un momento, {usuario}; quiero que salga con fundamento.',
+    '{nombre}, estoy oliendo el dato y no se me escapa.',
+    '{usuario}, a ver quién puede más, tú preguntando o yo buscando.',
+    'Ya casi, {nombre}; no saques todavía la artillería.',
+    '{usuario}, estoy poniendo los números en fila de a uno.',
+    'Un respiro, {nombre}; la criatura está pensando.',
+    '{usuario}, ahora te lo sirvo sin espinas.',
+    '{nombre}, aquí seguimos, pico y pala.',
+    '{usuario}, voy a dejarlo niquelado.',
+    'Es {diasemana}; habrá que hacer algo serio, {usuario}.',
+    '{nombre}, estoy mirando esto con ojo de notario.',
+    '{usuario}, no me vengas luego con que faltaba una coma.',
+    'Un momento, {nombre}; voy por la segunda vuelta.',
+    '{usuario}, estoy metiendo la mano hasta el fondo del cajón.',
+    '{nombre}, déjame que lo mastique antes de hablar.',
+    '{usuario}, esto ya canta por soleares.',
+    'Voy fino filipino, {nombre}.',
+    '{usuario}, la respuesta está calentando motores.',
+    '{nombre}, me faltan dos tornillos y salimos.',
+    '{usuario}, estoy revisando por si hay gato encerrado.',
+    'Un segundo, {nombre}; no quiero venderte humo.',
+    '{usuario}, hoy {fecha_hoy} vienes con hambre de datos.',
+    '{nombre}, me has puesto deberes para {mes_actual}.',
+    '{usuario}, estoy echando cuentas hasta con los dedos.',
+    'Voy, {nombre}; el ordenador también tiene sus lunes aunque sea {diasemana}.',
+    '{usuario}, esto va a quedar más claro que el agua.',
+    '{nombre}, estoy haciendo la última pasada.',
+    '{usuario}, no te me impacientes que ya se ve la meta.',
+    'Un poco más, {nombre}; estoy cerrando el círculo.',
+    '{usuario}, en {ano_actual} seguimos sin fabricar respuestas con churros.',
+    '{nombre}, voy a decirte algo con sustancia, no cualquier cosa.',
+    '{usuario}, la máquina está dándole al coco.',
+    'Ya lo tengo entre ceja y ceja, {nombre}.',
+    '{usuario}, si esto tarda es porque lo estoy mirando de verdad.'
+  ];
+  function $(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
   function clean(v){return String(v==null?'':v).replace(/\s+/g,' ').trim();}
   function norm(v){var s=clean(v);try{s=s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');}catch(_){}return s.toLowerCase().replace(/[^a-z0-9ñ ]+/g,' ').replace(/\s+/g,' ').trim();}
@@ -77,14 +154,20 @@
   function wakeInfo(v){var words=norm(v).split(' ').filter(Boolean);for(var i=0;i<words.length-1;i++){if(['hola','ola','oye','ey','eh','buenas'].indexOf(words[i])>=0&&isZuzuWord(words[i+1]))return{ok:true,index:i};}return{ok:false,index:-1};}
   function hasWake(v){return wakeInfo(v).ok;}
   function wakeOnly(v){var words=norm(v).split(' ').filter(Boolean),wi=wakeInfo(v);return wi.ok&&words.length<=wi.index+3;}
-  function hasBarge(v){return /\b(perdona|perdon|espera|esperate)\b/.test(norm(v));}
+  function controlEditDistance(a,b){a=norm(a);b=norm(b);var m=a.length,n=b.length,prev=new Array(n+1),cur=new Array(n+1);for(var j=0;j<=n;j++)prev[j]=j;for(var i=1;i<=m;i++){cur[0]=i;for(j=1;j<=n;j++)cur[j]=Math.min(cur[j-1]+1,prev[j]+1,prev[j-1]+(a.charAt(i-1)===b.charAt(j-1)?0:1));var t=prev;prev=cur;cur=t;}return prev[n];}
+  function isBargeWord(w){w=norm(w).replace(/[^a-záéíóúüñ]/g,'');if(!w)return false;var roots=['perdona','perdon','espera','esperate'];return roots.some(function(r){return w===r||(w.length>=5&&Math.abs(w.length-r.length)<=1&&controlEditDistance(w,r)<=1);});}
+  function hasBarge(v){return norm(v).split(/\s+/).some(isBargeWord);}
   function bargeTail(v){var raw=clean(v),re=/\b(perdona|perd[oó]n|espera|esp[eé]rate)\b/ig,m,last=null;while((m=re.exec(raw)))last=re.lastIndex;return last==null?'':clean(raw.slice(last).replace(/^[\s,;:.!?-]+/,''));}
+  function voiceControlResidueInfo(v){var raw=clean(v),t=norm(raw),words=t.split(' ').filter(Boolean);if(!t)return{only:false,text:''};var zuzuLike=function(w){var z=String(w||'').replace(/\s/g,'');return isZuzuWord(z)||/^(?:a)?z+u*z*u*$/.test(z)||/^(?:a)?s+u*z*u*$/.test(z);};var kept=words.filter(function(w){return !zuzuLike(w)&&!['hola','ola','oye','ey','eh'].includes(w);});var only=words.length<=3&&kept.length===0;return{only:only,text:kept.join(' ')};}
+  function meaningfulShortReply(v){var t=norm(v).replace(/[!?.,;:]/g,'').trim();return /^(?:si|no|ok|vale|[1-9]\d?)$/.test(t);}
+  function stripLeadingVoiceControl(v){var raw=clean(v),words=raw.split(/\s+/),out=words.slice();while(out.length){var n=norm(out[0]).replace(/\s/g,'');if(['hola','ola','oye','ey','eh'].includes(n)||isZuzuWord(n)||/^(?:a)?z+u*z*u*$/.test(n)||/^(?:a)?s+u*z*u*$/.test(n))out.shift();else break;}return clean(out.join(' '));}
+  function eventAlternativeTexts(ev){var out=[];try{for(var i=ev.resultIndex;i<ev.results.length;i++){var r=ev.results[i];for(var j=0;j<Math.min(5,r.length||0);j++){var t=clean(r[j]&&r[j].transcript);if(t&&!out.includes(t))out.push(t);}}}catch(_){}return out;}
   function stripReservedFromSpeech(v){return clean(v).replace(/\bperdona\b/ig,'disculpa').replace(/\bperd[oó]n\b/ig,'disculpa').replace(/\bespera\b/ig,'aguarda').replace(/\besp[eé]rate\b/ig,'aguarda');}
   function currentVoiceUser(){try{return window.authUser||window.__CONTROL_EVENT_USER__||(window.ControlEventApp&&window.ControlEventApp.authUser)||(window.ControlEventRuntime&&window.ControlEventRuntime.app&&window.ControlEventRuntime.app.authUser)||{};}catch(_){return{};}}
   function voiceUserNames(){var u=currentVoiceUser(),informal=clean(u.identificacion||u.Identificacion||u.usuario||u.user||u.nombre||u.Nombre||''),formal=clean(u.nombre||u.Nombre||u.name||informal);return{informal:informal||formal||'amigo',formal:formal||informal||'usuario'};}
   function voiceAddressName(formal){var n=voiceUserNames();return formal?n.formal:n.informal;}
   function voiceGreetingName(){var u=currentVoiceUser(),name=clean(u.nombre||u.Nombre||u.name||u.identificacion||u.Identificacion||u.usuario||u.user||'usuario');return clean(name.split(/\s+/)[0]||name||'usuario');}
-  function setVoicePhase(phase,detail){phase=clean(phase||'IDLE').toUpperCase();if(!phase)return;state.voicePhase=phase;state.voicePhaseSince=Date.now();var item={at:state.voicePhaseSince,phase:phase,detail:clean(detail||'')};state.voicePhaseHistory.push(item);if(state.voicePhaseHistory.length>40)state.voicePhaseHistory.shift();try{console.info('[CE VOZ RAW14P]',phase,item.detail||'');}catch(_){} }
+  function setVoicePhase(phase,detail){phase=clean(phase||'IDLE').toUpperCase();if(!phase)return;state.voicePhase=phase;state.voicePhaseSince=Date.now();var item={at:state.voicePhaseSince,phase:phase,detail:clean(detail||'')};state.voicePhaseHistory.push(item);if(state.voicePhaseHistory.length>40)state.voicePhaseHistory.shift();try{console.info('[CE VOZ RAW14U]',phase,item.detail||'');}catch(_){} }
   function clearRecognitionStartWatchdog(){clearTimeout(state.recognitionStartWatchdog);state.recognitionStartWatchdog=null;}
   function clearCloudStartWatchdog(){clearTimeout(state.cloudStartWatchdog);state.cloudStartWatchdog=null;}
   function armRecognitionStartWatchdog(kind,gen,r){clearRecognitionStartWatchdog();state.recognitionStartWatchdog=setTimeout(function(){state.recognitionStartWatchdog=null;if(gen!==state.recognitionGeneration||state.recognitionLive||state.recognition!==r)return;setVoicePhase('RECOVERY','Web Speech no confirmó onstart');setStatus('La escucha tarda demasiado. Cambio a Voz CE…','ok');stopRecognition();if(supportsCeVoice()){state.cloudFallback=true;startCloudRecognition(kind||'ambient',false);}else{state.needsGesture=true;setStatus('La escucha necesita rearmarse. Pulsa una vez en ControlEvent.','err');updateBadge();}},3500);}
@@ -200,7 +283,7 @@
   }
   function sessionText(ev){var parts=[];for(var i=0;i<ev.results.length;i++){var t=clean(ev.results[i]&&ev.results[i][0]&&ev.results[i][0].transcript);if(t)parts.push(t);}return clean(parts.join(' '));}
   function newRecognition(kind){
-    var C=recognitionCtor();if(!C)return null;var r=new C(),gen=++state.recognitionGeneration;r.lang='es-ES';r.continuous=true;r.interimResults=true;r.maxAlternatives=3;if(state.localSpeechReady&&'processLocally' in r)r.processLocally=true;r.__gen=gen;r.__kind=kind;
+    var C=recognitionCtor();if(!C)return null;var r=new C(),gen=++state.recognitionGeneration;r.lang='es-ES';r.continuous=true;r.interimResults=true;r.maxAlternatives=5;if(state.localSpeechReady&&'processLocally' in r)r.processLocally=true;r.__gen=gen;r.__kind=kind;
     r.onstart=function(){if(gen!==state.recognitionGeneration)return;clearRecognitionStartWatchdog();state.recognitionStarting=false;state.recognitionLive=true;state.needsGesture=false;state.lastRecognitionError='';state.recognitionStartedAt=Date.now();state.recognitionLastResultAt=0;setMic(kind==='user');if(kind==='ambient'){setVoicePhase('AMBIENT_LISTENING','Web Speech onstart');setStatus(state.wakeCapture?'Sigue hablando…':state.localSpeechReady?'Voz local activa. Di «Hola Zuzu».':'Escucha activa. Di «Hola Zuzu».','ok');}if(kind==='user'){setVoicePhase('LISTENING','Web Speech onstart');setStatus(state.localSpeechReady?'Te escucho (voz local)…':'Te escucho…','ok');}updateBadge();};
     r.onerror=function(ev){if(gen!==state.recognitionGeneration)return;clearRecognitionStartWatchdog();state.recognitionStarting=false;state.recognitionLive=false;var code=clean(ev&&ev.error),message=clean(ev&&ev.message);state.lastRecognitionError=code+(message?' · '+message:'');if(code==='network'){state.pendingRecognitionKind=kind;setVoicePhase('RECOVERY','Web Speech network');setStatus('La voz del navegador no responde. Paso a Voz CE…','ok');setTimeout(function(){fallbackToCeVoice(kind);},0);}else if(code==='language-not-supported'&&state.localSpeechReady){state.localSpeechReady=false;state.localSpeechUnavailable=false;state.pendingRecognitionKind=kind;setVoicePhase('RECOVERY','idioma local no soportado');setTimeout(function(){prepareLocalSpeech(kind);},0);}else if(code==='not-allowed'||code==='service-not-allowed'){state.needsGesture=true;setVoicePhase('RECOVERY','permiso Web Speech');setStatus('La escucha se rearmará con tu siguiente pulsación normal.','err');}else if(code&&code!=='no-speech'&&code!=='aborted'){setVoicePhase('RECOVERY','Web Speech '+code);setStatus('Micrófono: '+code+(message?' · '+message:''),'err');}updateBadge();};
     r.onend=function(){if(gen!==state.recognitionGeneration)return;clearRecognitionStartWatchdog();state.recognitionStarting=false;state.recognitionLive=false;state.recognition=null;setMic(false);if(state.needsGesture||state.localSpeechPreparing){updateBadge();return;}if(state.lastRecognitionError==='network'&&!state.localSpeechReady){updateBadge();return;}if(kind==='ambient'&&state.ambientEnabled&&!state.conversationMode)setTimeout(function(){startAmbient(false);},90);else if(kind==='user'&&state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse){var pending=clean(currentTurn());if(pending){state.turnPrefix=pending;state.turnSession='';setPrompt(pending);setVoicePhase('PAUSA_DUBITATIVA','Web Speech terminó sesión; conserva buffer');scheduleTurnIfReady(state.turnLastAt||Date.now());}setTimeout(function(){startUser(state.turnPrefix);},90);}};
@@ -295,11 +378,11 @@
   function currentTurn(){return mergeText(state.turnPrefix,state.turnSession);}
   function scheduleTurnCommit(lastAt){clearTurnTimer();state.turnLastAt=Number(lastAt)||Date.now();var wait=Math.max(40,state.turnCommitMs-(Date.now()-state.turnLastAt));state.turnTimer=setTimeout(commitUserTurn,wait+25);}
   function handleUserText(text){if(!text)return;if(hasClearTextCommand(text)){clearTextAndListen();return;}touchReplyWindow();state.turnSession=text;setPrompt(currentTurn());setVoicePhase('PAUSA_DUBITATIVA','buffer conservado; espera fin real');setStatus('Te escucho… puedes continuar.','ok');scheduleTurnIfReady(Date.now());}
-  function commitUserTurn(){var elapsed=Date.now()-state.turnLastAt,remaining=state.turnCommitMs-elapsed;if(remaining>0){clearTurnTimer();state.turnTimer=setTimeout(commitUserTurn,remaining+25);return;}var text=clean(currentTurn());if(!text)return;if(postClearFragmentNeedsMore(text)){clearTurnTimer();armPostClearDiscard();setVoicePhase('LISTENING','bloqueo final de fragmento corto tras Borra texto');setStatus('Te escucho… sigo esperando la pregunta completa.','ok');return;}state.postClearUntil=0;clearPostClearDiscardTimer();clearReplyWindow();clearTurnTimer();if(state.cloudFallback)pauseCloudListening();else stopRecognition();state.turnPrefix='';state.turnSession='';state.requestPrompt=text;state.requestInFlight=true;state.awaitingResponse=true;state.mode='request';setPrompt(text);setVoicePhase('PROCESSING','pregunta completa tras silencio');setStatus('Procesando…','ok');updateBadge();var b=$('ceAiRun');if(b)b.click();}
+  function commitUserTurn(){var elapsed=Date.now()-state.turnLastAt,remaining=state.turnCommitMs-elapsed;if(remaining>0){clearTurnTimer();state.turnTimer=setTimeout(commitUserTurn,remaining+25);return;}var text=clean(currentTurn());if(!text)return;var residue=voiceControlResidueInfo(text);if(residue.only||(!meaningfulShortReply(text)&&norm(text).replace(/\s+/g,'').length<=1)){clearDraftBuffer();state.voiceResidueUntil=Date.now()+Number(state.voiceResidueQuarantineMs||4200);setVoicePhase('LISTENING','residuo local de control descartado');setStatus('Te escucho… ese fragmento no era una pregunta completa.','ok');setTimeout(function(){if(state.conversationMode&&!state.speaking&&!state.requestInFlight)startUser('');},90);return;}if(Date.now()<=Number(state.voiceResidueUntil||0)&&isShortPostClearFragmentShape(text)){clearTurnTimer();state.turnLastAt=Date.now();setVoicePhase('LISTENING','fragmento corto tras residuo; amplía escucha');setStatus('Te escucho… continúa.','ok');scheduleTurnCommit(state.turnLastAt+1800);return;}state.voiceResidueUntil=0;if(postClearFragmentNeedsMore(text)){clearTurnTimer();armPostClearDiscard();setVoicePhase('LISTENING','bloqueo final de fragmento corto tras Borra texto');setStatus('Te escucho… sigo esperando la pregunta completa.','ok');return;}state.postClearUntil=0;clearPostClearDiscardTimer();clearReplyWindow();clearTurnTimer();if(state.cloudFallback)pauseCloudListening();else stopRecognition();state.turnPrefix='';state.turnSession='';state.requestPrompt=text;state.requestInFlight=true;state.awaitingResponse=true;state.mode='request';setPrompt(text);setVoicePhase('PROCESSING','pregunta completa tras silencio');setStatus('Procesando…','ok');updateBadge();var b=$('ceAiRun');if(b)b.click();}
   function startUser(seed){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;stopBarge();armReplyWindow(state.replyWindowMs);state.turnPrefix=clean(seed||state.turnPrefix);state.turnSession='';if(state.turnPrefix){setPrompt(state.turnPrefix);scheduleTurnIfReady(state.turnLastAt||Date.now());}state.mode='user';setVoicePhase('USER_STARTING',state.turnPrefix?'reanuda con buffer':'nueva escucha');if(state.cloudFallback||!supportsRecognition())startCloudRecognition('user',false);else startRecognition('user',false);updateBadge();}
 
   function stopBarge(){state.bargeGeneration++;var r=state.bargeRecognition;state.bargeRecognition=null;try{r&&r.abort();}catch(_){try{r&&r.stop();}catch(__){}}}
-  function startBarge(){stopRecognition();stopBarge();if(state.cloudFallback)return;if(!state.conversationMode||!state.speaking||!supportsRecognition())return;var C=recognitionCtor(),r=new C(),gen=++state.bargeGeneration;r.lang='es-ES';r.continuous=true;r.interimResults=true;r.maxAlternatives=3;state.bargeRecognition=r;r.onresult=function(ev){if(gen!==state.bargeGeneration||!state.speaking)return;var t=sessionText(ev);if(!hasBarge(t))return;var seed=bargeTail(t);stopSpeaking(true);state.turnPrefix=seed;state.turnSession='';setPrompt(seed);setStatus('Te escucho…','ok');setTimeout(function(){startUser(seed);},80);};r.onend=function(){if(gen!==state.bargeGeneration)return;state.bargeRecognition=null;if(state.speaking&&state.conversationMode)setTimeout(startBarge,80);};r.onerror=function(){};try{r.start();}catch(_){setTimeout(function(){if(state.speaking)startBarge();},120);}}
+  function startBarge(){stopRecognition();stopBarge();if(state.cloudFallback)return;if(!state.conversationMode||!state.speaking||!supportsRecognition())return;var C=recognitionCtor(),r=new C(),gen=++state.bargeGeneration;r.lang='es-ES';r.continuous=true;r.interimResults=true;r.maxAlternatives=5;state.bargeRecognition=r;r.onresult=function(ev){if(gen!==state.bargeGeneration||!state.speaking)return;var alternatives=eventAlternativeTexts(ev),t=alternatives.find(hasBarge)||sessionText(ev);if(!hasBarge(t))return;var seed=stripLeadingVoiceControl(bargeTail(t));if(voiceControlResidueInfo(seed).only)seed='';stopSpeaking(true);state.voiceResidueUntil=Date.now()+Number(state.voiceResidueQuarantineMs||4200);state.turnPrefix=seed;state.turnSession='';setPrompt(seed);setStatus('Te escucho…','ok');setVoicePhase('LISTENING','interrupción local detectada; cola limpia');setTimeout(function(){startUser(seed);},60);};r.onend=function(){if(gen!==state.bargeGeneration)return;state.bargeRecognition=null;if(state.speaking&&state.conversationMode)setTimeout(startBarge,80);};r.onerror=function(){};try{r.start();}catch(_){setTimeout(function(){if(state.speaking)startBarge();},120);}}
 
   function loadVoices(){if(!supportsSpeech())return;try{state.voices=window.speechSynthesis.getVoices()||[];}catch(_){state.voices=[];}populateVoices();}
   function spanishVoices(){return state.voices.filter(function(v){return /^es(?:-|_)/i.test(v.lang||'')||/spanish|español/i.test(v.name||'');});}
@@ -352,7 +435,9 @@
   function previewVoice(){if(!supportsSpeech())return;try{window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance('Esta es la voz de Zuzu. Estoy listo. Vamos al lío.');u.lang='es-ES';u.rate=speechRate();u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;window.speechSynthesis.speak(u);}catch(_){} }
 
   function renderEntertainmentPhrase(raw){
-    return clean(String(raw||'').replace(/\{usuario\}/g,voiceAddressName(false)).replace(/\{nombre\}/g,voiceGreetingName()));
+    var d=new Date(),months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'],days=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],h=d.getHours(),moment=h<7?'madrugada':h<13?'mañana':h<15?'mediodía':h<20?'tarde':'noche',pad=function(n){return String(n).padStart(2,'0');};
+    var vars={usuario:voiceAddressName(false),nombre:voiceGreetingName(),mes_actual:months[d.getMonth()],mes:months[d.getMonth()],diasemana:days[d.getDay()],dia_semana:days[d.getDay()],ano_actual:String(d.getFullYear()),'añoactual':String(d.getFullYear()),dia_mes:String(d.getDate()),hora_actual:pad(h)+':'+pad(d.getMinutes()),fecha_hoy:pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(),momento_dia:moment,version:'v3_0_exp'};
+    var out=String(raw||'');Object.keys(vars).forEach(function(k){out=out.replace(new RegExp('\\{'+k+'\\}','g'),vars[k]);});return clean(out);
   }
   function entertainmentRandomInt(max){
     max=Math.max(1,Number(max)||1);try{if(window.crypto&&window.crypto.getRandomValues){var a=new Uint32Array(1);window.crypto.getRandomValues(a);return a[0]%max;}}catch(_){}return Math.floor(Math.random()*max);
@@ -399,7 +484,7 @@
       state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(idx>=0&&state.entertainmentUsed.indexOf(idx)<0)requeueEntertainmentIndex(idx);state.pendingEntertainmentIndex=-1;if(was)state.entertainmentFinishedAt=Date.now();persistEntertainmentState();if(was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){}}}
   }
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Math.max(0,Number(delay)||0));}
-  function entertainmentEnded(ok,idx,started){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();if(!started)requeueEntertainmentIndex(idx);if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2000);}
+  function entertainmentEnded(ok,idx,started){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();if(!started)requeueEntertainmentIndex(idx);if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(state.entertainmentIntervalMs||2500);}
   function speakEntertainmentPhrase(){
     if(!state.conversationMode||!state.requestInFlight||!supportsSpeech()||state.entertainmentSpeaking)return;
     var idx=nextEntertainmentIndex(),phrase=renderEntertainmentPhrase(ENTERTAINMENT_PHRASES[idx]),started=false;state.entertainmentCount++;setStatus(phrase,'ok');
@@ -410,7 +495,7 @@
       window.speechSynthesis.speak(u);
     }catch(_){entertainmentEnded(false,idx,false);}
   }
-  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(2000);}
+  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(state.entertainmentIntervalMs||2500);}
   function queueAnswerAfterEntertainment(answer,autoRead){clearTimeout(state.pendingAnswerTimer);state.pendingAnswerTimer=null;var hadEntertainment=state.entertainmentSpeaking||!!state.entertainmentUtterance||(state.entertainmentFinishedAt>0&&Date.now()-state.entertainmentFinishedAt<600);function deliver(){if(!state.conversationMode)return;if(state.entertainmentSpeaking){state.pendingAnswerTimer=setTimeout(deliver,60);return;}var wait=hadEntertainment?Math.max(0,500-(Date.now()-(state.entertainmentFinishedAt||0))):0;state.pendingAnswerTimer=setTimeout(function(){state.pendingAnswerTimer=null;if(!state.conversationMode)return;if(autoRead)speakChunks(answer);else startUser();},wait);}deliver();}
 
   function resumeConversationListening(delay){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;setTimeout(function(){if(state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();},Number(delay)||180);}
@@ -466,7 +551,7 @@
   function rearmAmbientAfterAuth(){if(!state.ambientEnabled||state.conversationMode)return;setTimeout(function(){if(!state.ambientEnabled||state.conversationMode)return;state.needsGesture=false;setVoicePhase('AMBIENT_STARTING','rearme tras autenticación');if(state.cloudFallback||!supportsRecognition()){if(!state.cloudWanted)startCloudRecognition('ambient',false);return;}if(!state.recognitionLive&&!state.recognitionStarting){stopRecognition();startAmbient(false);}},180);}
 
   function install(){
-    injectStyle();injectBadge();injectPanel();setVoicePhase('BOOT','RAW14P instalado');
+    injectStyle();injectBadge();injectPanel();setVoicePhase('BOOT','RAW14U instalado');
     // FIX27: la escucha queda ACTIVA por defecto en esta compilación. Si el navegador la
     // rechaza sin gesto, NO insistimos por temporizador: esperamos el siguiente gesto normal
     // (por ejemplo Entrar) y arrancamos el reconocimiento dentro de ese mismo evento.
@@ -496,7 +581,7 @@
     endVoiceConversation:endConversation,downloadConversationRecording:toggleRecording,
     speakResponse:speakResponse,stopSpeaking:stopSpeaking,supportsRecognition:supportsRecognition,supportsDeviceSpeech:supportsSpeech,spokenPreview:function(text){return prepareSpeechText(text);},
     clearDraftText:clearTextAndListen,localGreeting:speakLocalGreeting,
-    debugState:function(){return{build:BUILD,phase:state.voicePhase,phaseSince:state.voicePhaseSince,phaseHistory:state.voicePhaseHistory.slice(),ambientEnabled:state.ambientEnabled,conversationMode:state.conversationMode,recognitionStarting:state.recognitionStarting,recognitionLive:state.recognitionLive,needsGesture:state.needsGesture,mode:state.mode,localControlSpeaking:state.localControlSpeaking,localSpeechReady:state.localSpeechReady,localSpeechPreparing:state.localSpeechPreparing,localSpeechUnavailable:state.localSpeechUnavailable,lastRecognitionError:state.lastRecognitionError,cloudFallback:state.cloudFallback,cloudWanted:state.cloudWanted,cloudRecording:state.cloudRecording,cloudBusy:state.cloudBusy,cloudLastTranscript:state.cloudLastTranscript,turnBuffer:currentTurn(),turnCommitMs:state.turnCommitMs,postClearUntil:state.postClearUntil,postClearQuarantineMs:state.postClearQuarantineMs,replyWindowUntil:state.replyWindowUntil,replyWindowMs:state.replyWindowMs,recognitionStartedAt:state.recognitionStartedAt,recognitionLastResultAt:state.recognitionLastResultAt,ambientSessionMaxMs:state.ambientSessionMaxMs,overlayOpen:!!$('ceGeminiLibreOverlay'),mic:{label:state.cloudDeviceLabel,id:state.cloudDeviceId,rms:state.cloudRms,channels:state.cloudChannelRms,peak:state.cloudPeak,noise:state.cloudNoiseFloor,threshold:state.cloudThreshold,calibrated:state.cloudCalibrationDone,settings:state.cloudDeviceSettings}};}
+    debugState:function(){return{build:BUILD,phase:state.voicePhase,phaseSince:state.voicePhaseSince,phaseHistory:state.voicePhaseHistory.slice(),ambientEnabled:state.ambientEnabled,conversationMode:state.conversationMode,recognitionStarting:state.recognitionStarting,recognitionLive:state.recognitionLive,needsGesture:state.needsGesture,mode:state.mode,localControlSpeaking:state.localControlSpeaking,localSpeechReady:state.localSpeechReady,localSpeechPreparing:state.localSpeechPreparing,localSpeechUnavailable:state.localSpeechUnavailable,lastRecognitionError:state.lastRecognitionError,cloudFallback:state.cloudFallback,cloudWanted:state.cloudWanted,cloudRecording:state.cloudRecording,cloudBusy:state.cloudBusy,cloudLastTranscript:state.cloudLastTranscript,turnBuffer:currentTurn(),turnCommitMs:state.turnCommitMs,postClearUntil:state.postClearUntil,postClearQuarantineMs:state.postClearQuarantineMs,replyWindowUntil:state.replyWindowUntil,replyWindowMs:state.replyWindowMs,entertainment:{total:ENTERTAINMENT_PHRASES.length,used:state.entertainmentUsed.length,remaining:state.entertainmentDeck.length,cycle:state.entertainmentCycle,intervalMs:state.entertainmentIntervalMs,lastIndex:state.lastEntertainmentIndex},recognitionStartedAt:state.recognitionStartedAt,recognitionLastResultAt:state.recognitionLastResultAt,ambientSessionMaxMs:state.ambientSessionMaxMs,overlayOpen:!!$('ceGeminiLibreOverlay'),mic:{label:state.cloudDeviceLabel,id:state.cloudDeviceId,rms:state.cloudRms,channels:state.cloudChannelRms,peak:state.cloudPeak,noise:state.cloudNoiseFloor,threshold:state.cloudThreshold,calibrated:state.cloudCalibrationDone,settings:state.cloudDeviceSettings}};}
   };
   window.ControlEventVoiceV2=window.ControlEventVoiceTurns;
   window.ControlEventV22Voz4=window.ControlEventVoiceTurns;
