@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp · Zuzu Voice · RAW14O VOICE LIFECYCLE · wake persistente + cierre/rearme + guard post-Borra texto
+/* ControlEvent v3_0_exp · Zuzu Voice · RAW14P VOICE COPY · wake persistente + cierre/rearme + guard post-Borra texto
    Objetivo: recuperar la escucha ambiental que sí funcionó y mantener conversación oral humana.
    Flujo deliberadamente simple:
    AMBIENTE -> "Hola Zuzu" -> USUARIO -> ESPERA IA -> ZUZU HABLA -> USUARIO.
@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v3_0_exp-RAW14O-VOICE-LIFECYCLE-FIX45';
+  var BUILD='v3_0_exp-RAW14P-VOICE-COPY-FIX46';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v42', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v42', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v42', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v42'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v43', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v43', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v43', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v43'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -36,31 +36,31 @@
   };
 
   var ENTERTAINMENT_PHRASES=[
-    'Tente mientras cobro, ya sabes {usuario}',
-    '{usuario}, y viva el cristo de las angustias joder',
-    'ojo si levantara la cabeza pichici, {nombre}',
-    'Vale {usuario}, pero qui no hay mas cera que la que arde.',
-    'Tienes que europeate con Control Event {nombre}',
+    'Tente mientras cobro…....., ya sabes {usuario}',
+    'Viva {usuario}, y el Santísimo Crito de las angustias, joder',
+    'ojo,….... si levantara la cabeza pichici, {usuario}',
+    'Vale {usuario}, pero aquí no hay más cera que la que arde…..... Amigo mio.',
+    'Tienes que europeate con Control Event {usuario}',
     'Me quiero echar la siesta hoy {usuario}, no te enrrolles mucho anda.',
-    'oyeee {usuario}. No tienes ni puta idea…...guisi moda',
-    'La tabla está hablando; la estoy escuchando.',
+    'oyeee {usuario}. No tienes ni puta idea…...güiiiiiiisi mooooodaaaaa',
+    'Vamos a hacerle los galgos a ese forastero,…..{usuario}',
     'Sigo dentro, no me he ido a por café.',
     'Estoy cuadrando las cuentas sin hacer trampas.',
-    'Esto va saliendo.',
-    'Te echo un guá mientras {usuario}..…no vale de acerito',
-    'Arrikitaum tan tin, arrikitaum tan tan, te la voy colar',
+    'Despacito echando el bofe, ando con tu cosas',
+    'Te echo un guá a la verdad mientras {usuario}..…no vale pagar de acerito',
+    'Arrikitaum tan tin, arrikitaum tan tan, {usuario}…....que te la voy colar',
     'Separo churras de merinas, pero me las como todas',
     'Apura Millas, que son cincuenta.',
-    'Echa un cigarro {usuario} y ahora te digo….Rodrigo',
+    'Echa un cigarro {usuario} y ahora ya te digo….Rodrigo',
     'Mi ayudante Morgan de la tubería te pondrá al día',
-    'Cantaté una {nombre} y ahora te corto.',
-    'Vaya vaya con {usuario}, quier saberlo todo',
+    'Cantaté una por peteneras, {usuario} y ahora te corto.',
+    'Vaya vaya con {usuario}, quiere saberlo todo',
     'Si te digo que si te miento y si te digo que no tamien…si eso',
-    'Has pagao ya?........... O solos quieres alcagueteo',
+    'Has pagao ya?........... O solos quieres pelín de alcagüeteo',
     'No se no se, tu me quieres marear {usuario}.',
-    'Hastele mientras {nombre} que la vida son dos dias.'
-  ];
-  function $(id){return document.getElementById(id);}
+    'Haaastele mientras {usuario} que la vida son dos dias.',
+    '¿Recuerdas {usuario} que Paco ratón tiene novia en Tembleque?'
+  ];  function $(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
   function clean(v){return String(v==null?'':v).replace(/\s+/g,' ').trim();}
   function norm(v){var s=clean(v);try{s=s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');}catch(_){}return s.toLowerCase().replace(/[^a-z0-9ñ ]+/g,' ').replace(/\s+/g,' ').trim();}
@@ -84,7 +84,7 @@
   function voiceUserNames(){var u=currentVoiceUser(),informal=clean(u.identificacion||u.Identificacion||u.usuario||u.user||u.nombre||u.Nombre||''),formal=clean(u.nombre||u.Nombre||u.name||informal);return{informal:informal||formal||'amigo',formal:formal||informal||'usuario'};}
   function voiceAddressName(formal){var n=voiceUserNames();return formal?n.formal:n.informal;}
   function voiceGreetingName(){var u=currentVoiceUser(),name=clean(u.nombre||u.Nombre||u.name||u.identificacion||u.Identificacion||u.usuario||u.user||'usuario');return clean(name.split(/\s+/)[0]||name||'usuario');}
-  function setVoicePhase(phase,detail){phase=clean(phase||'IDLE').toUpperCase();if(!phase)return;state.voicePhase=phase;state.voicePhaseSince=Date.now();var item={at:state.voicePhaseSince,phase:phase,detail:clean(detail||'')};state.voicePhaseHistory.push(item);if(state.voicePhaseHistory.length>40)state.voicePhaseHistory.shift();try{console.info('[CE VOZ RAW14O]',phase,item.detail||'');}catch(_){} }
+  function setVoicePhase(phase,detail){phase=clean(phase||'IDLE').toUpperCase();if(!phase)return;state.voicePhase=phase;state.voicePhaseSince=Date.now();var item={at:state.voicePhaseSince,phase:phase,detail:clean(detail||'')};state.voicePhaseHistory.push(item);if(state.voicePhaseHistory.length>40)state.voicePhaseHistory.shift();try{console.info('[CE VOZ RAW14P]',phase,item.detail||'');}catch(_){} }
   function clearRecognitionStartWatchdog(){clearTimeout(state.recognitionStartWatchdog);state.recognitionStartWatchdog=null;}
   function clearCloudStartWatchdog(){clearTimeout(state.cloudStartWatchdog);state.cloudStartWatchdog=null;}
   function armRecognitionStartWatchdog(kind,gen,r){clearRecognitionStartWatchdog();state.recognitionStartWatchdog=setTimeout(function(){state.recognitionStartWatchdog=null;if(gen!==state.recognitionGeneration||state.recognitionLive||state.recognition!==r)return;setVoicePhase('RECOVERY','Web Speech no confirmó onstart');setStatus('La escucha tarda demasiado. Cambio a Voz CE…','ok');stopRecognition();if(supportsCeVoice()){state.cloudFallback=true;startCloudRecognition(kind||'ambient',false);}else{state.needsGesture=true;setStatus('La escucha necesita rearmarse. Pulsa una vez en ControlEvent.','err');updateBadge();}},3500);}
@@ -151,7 +151,7 @@
   }
   function updateBadge(){var b=$('ceZuzuWakeBadge');if(!b)return;if(state.conversationMode){b.className='ce-zuzu-wake-badge is-conversation';b.textContent=state.speaking?'🔊 Zuzu habla':'🎙 Conversando con Zuzu';return;}if(state.ambientEnabled){b.className='ce-zuzu-wake-badge is-listening';b.textContent=state.wakeCapture?'👂 Sigue hablando…':state.needsGesture?'👂 Zuzu se arma al entrar':'👂 Hola Zuzu';}else{b.className='ce-zuzu-wake-badge';b.textContent='👂 Activar Zuzu';}}
   function injectBadge(){if($('ceZuzuWakeBadge')||!document.body)return;var b=document.createElement('button');b.id='ceZuzuWakeBadge';b.type='button';b.addEventListener('click',function(){
-    // RAW14O: el globo es un REARME, no un interruptor. Si quedó un estado conversacional
+    // RAW14P: el globo es un REARME, no un interruptor. Si quedó un estado conversacional
     // huérfano después de cerrar Zuzu, lo limpia y vuelve a escuchar en este mismo gesto.
     if(state.conversationMode&&!$('ceGeminiLibreOverlay')){forceReturnToAmbient(true,'clic en globo con Zuzu cerrada');return;}
     if(state.conversationMode){if(!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)activateDirectConversation();return;}
@@ -466,7 +466,7 @@
   function rearmAmbientAfterAuth(){if(!state.ambientEnabled||state.conversationMode)return;setTimeout(function(){if(!state.ambientEnabled||state.conversationMode)return;state.needsGesture=false;setVoicePhase('AMBIENT_STARTING','rearme tras autenticación');if(state.cloudFallback||!supportsRecognition()){if(!state.cloudWanted)startCloudRecognition('ambient',false);return;}if(!state.recognitionLive&&!state.recognitionStarting){stopRecognition();startAmbient(false);}},180);}
 
   function install(){
-    injectStyle();injectBadge();injectPanel();setVoicePhase('BOOT','RAW14O instalado');
+    injectStyle();injectBadge();injectPanel();setVoicePhase('BOOT','RAW14P instalado');
     // FIX27: la escucha queda ACTIVA por defecto en esta compilación. Si el navegador la
     // rechaza sin gesto, NO insistimos por temporizador: esperamos el siguiente gesto normal
     // (por ejemplo Entrar) y arrancamos el reconocimiento dentro de ese mismo evento.

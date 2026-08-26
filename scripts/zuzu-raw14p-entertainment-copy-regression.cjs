@@ -1,0 +1,20 @@
+const fs=require('fs');
+const v=fs.readFileSync('public/app/features/v22-voz3-zuzu.js','utf8');
+let ok=0,ko=0;function t(n,c){if(c){console.log('OK · '+n);ok++;}else{console.error('KO · '+n);ko++;}}
+const block=(v.match(/var ENTERTAINMENT_PHRASES=\[([\s\S]*?)\n  \];/)||[])[1]||'';
+const phrases=[...block.matchAll(/^\s*'([^']*)',?$/gm)].map(m=>m[1]);
+t('RAW14P build',/RAW14P-VOICE-COPY-FIX46/.test(v));
+t('24 frases exactamente',phrases.length===24);
+t('mazo v43 para invalidar el anterior',/entertainment_deck_v43/.test(v)&&/entertainment_used_v43/.test(v));
+t('frase 1 revisada',phrases[0]==='Tente mientras cobro…....., ya sabes {usuario}');
+t('frase Cristo/Crito revisada',phrases[1]==='Viva {usuario}, y el Santísimo Crito de las angustias, joder');
+t('galgos sustituye tabla hablando',phrases[7]==='Vamos a hacerle los galgos a ese forastero,…..{usuario}');
+t('bofe sustituye Esto va saliendo',phrases[10]==='Despacito echando el bofe, ando con tu cosas');
+t('frase guá revisada',phrases[11]==='Te echo un guá a la verdad mientras {usuario}..…no vale pagar de acerito');
+t('Arrikitaum incluye usuario',phrases[12].includes('{usuario}')&&phrases[12].includes('que te la voy colar'));
+t('peteneras revisada',phrases[17]==='Cantaté una por peteneras, {usuario} y ahora te corto.');
+t('alcagüeteo revisado',phrases[20].includes('pelín de alcagüeteo'));
+t('Haaastele revisado',phrases[22]==='Haaastele mientras {usuario} que la vida son dos dias.');
+t('Paco ratón añadido',phrases[23]==='¿Recuerdas {usuario} que Paco ratón tiene novia en Tembleque?');
+t('todas las variables son conocidas',!phrases.some(x=>/\{(?!usuario\}|nombre\})[^}]+\}/.test(x)));
+console.log(`TOTAL ${ok} OK / ${ko} KO`);if(ko)process.exit(1);

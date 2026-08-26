@@ -82,3 +82,31 @@ create index if not exists ce_zuzu_views_dataset_idx
 comment on table public.ce_zuzu_turns is 'Ledger inmutable de turnos Zuzu: plan Gemini bruto/normalizado y ejecución CE.';
 comment on table public.ce_zuzu_datasets is 'Snapshots de datos producidos por consultas Zuzu. Una VIEW nueva reutiliza el dataset sin duplicar filas.';
 comment on table public.ce_zuzu_views is 'Presentaciones/transformaciones locales sobre datasets Zuzu.';
+
+-- RAW14Q · MEMORIA EPISÓDICA ZUZU
+-- El ledger técnico sigue conservando todos los turnos; estas columnas marcan únicamente
+-- los que tienen sustancia suficiente para ser recordados por Zuzu.
+alter table public.ce_zuzu_conversations
+  add column if not exists memory_summary text not null default '',
+  add column if not exists memory_main_topics jsonb not null default '[]'::jsonb,
+  add column if not exists memory_main_entities jsonb not null default '[]'::jsonb,
+  add column if not exists memory_recallable_turns integer not null default 0;
+
+alter table public.ce_zuzu_turns
+  add column if not exists memory_recallable boolean not null default false,
+  add column if not exists memory_quality smallint not null default 0,
+  add column if not exists memory_summary text not null default '',
+  add column if not exists memory_entities jsonb not null default '[]'::jsonb,
+  add column if not exists memory_plan_signature jsonb not null default '{}'::jsonb,
+  add column if not exists memory_kind text not null default '';
+
+create index if not exists ce_zuzu_turns_memory_recall_idx
+  on public.ce_zuzu_turns (conversation_id, created_at asc)
+  where memory_recallable = true;
+create index if not exists ce_zuzu_turns_memory_user_time_idx
+  on public.ce_zuzu_turns (created_at desc)
+  where memory_recallable = true;
+
+comment on column public.ce_zuzu_turns.memory_recallable is 'TRUE solo para turnos con sustancia aptos para memoria episódica; errores, ruido, aclaraciones y respuestas técnicas quedan fuera.';
+comment on column public.ce_zuzu_turns.memory_summary is 'Resumen temático compacto (máximo 5 líneas) usado para localizar recuerdos sin reinyectar la respuesta completa.';
+comment on column public.ce_zuzu_turns.memory_plan_signature is 'Firma operativa del PLAN original para poder reejecutar hoy la misma consulta con datos actuales.';
