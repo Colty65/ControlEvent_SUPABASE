@@ -3,9 +3,9 @@ const ledger=fs.readFileSync('services/zuzu-conversation-ledger.service.js','utf
 const ai=fs.readFileSync('services/event-ai.service.js','utf8');
 let ok=0,ko=0;function t(n,c){if(c){console.log('OK · '+n);ok++;}else{console.error('KO · '+n);ko++;}}
 t('proactividad se amplía más allá de 4 días',/days=3650/.test(ledger));
-t('umbral de similitud sube con la antigüedad',/age<=0\.34\?2\.55:age<=4\?2\.85:age<=180\?3\.75:4\.65/.test(ledger));
+t('umbral de similitud sube con la antigüedad',/age<=0\.34\?2\.(?:55|25):age<=4\?2\.(?:85|55):age<=180\?3\.(?:75|6):4\.(?:65|5)/.test(ledger));
 t('memoria muy antigua exige entidad o similitud temática fuerte',/age<=4 \|\| overlap>0 \|\| lex>=2\.2/.test(ledger));
-t('misma entidad suma señal aunque cambie dominio',/proactiveEntityOverlap[\s\S]*Math\.min\(2,overlap\)\*1\.25/.test(ledger));
+t('misma entidad suma señal aunque cambie dominio',/proactiveEntityOverlap[\s\S]*Math\.min\(2,overlap\)\*1\.(?:25|45)/.test(ledger));
 t('conversación ociosa también puede activar memoria',/\['query','conversation'\]\.includes\(plan\.action\)/.test(ai));
 t('menos de unas horas usa cabecita',/Vaya cabecita que tienes/.test(ledger)&&/el tío Zuzu te lo recuerda/.test(ledger));
 t('hasta cuatro días usa olla y número de días',/se te ha ido un poco la olla desde hace/.test(ledger));
@@ -16,5 +16,5 @@ t('payload final transporta banda, edad e intro',/age_band:trim\(me\.age_band\)[
 t('final writer antepone memoria antes de respuesta actual',/antes de entrar de lleno en la respuesta nueva[\s\S]*Después contesta la petición ACTUAL/.test(ai));
 t('recuerdo viejo nunca sustituye dato vigente',/recuerdo antiguo nunca es fuente factual vigente/.test(ai));
 t('se evita repetir misma conversación histórica inmediatamente',/v75ProactiveMemoryUsedRecently/.test(ai));
-t('arquitectura RAW14R',/RAW14R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL/.test(ai));
+t('arquitectura memoria proactiva vigente',/RAW14(?:R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|S · MEMORIA FIABLE \+ PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA)/.test(ai));
 console.log(`\nRAW14R MEMORIA PROACTIVA HUMANA · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

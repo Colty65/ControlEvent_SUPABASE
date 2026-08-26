@@ -1,6 +1,7 @@
-/* ControlEvent v3_0_exp · RAW14R · Zuzu Conversation Ledger + Memoria episódica/proactiva humana.
+/* ControlEvent v3_0_exp · RAW14T · Zuzu Memory Core + semilla de Experiencia CE.
    Persistencia server-side, inmutable por turno. El navegador conserva solo conversation_id.
-   Prefiere tablas dedicadas; si no existen, usa ce_meta sin bloquear la conversación. */
+   MEMORIA HISTÓRICA: fuente única = tablas persistentes ce_zuzu_conversations/ce_zuzu_turns.
+   ce_meta puede seguir sirviendo al ledger técnico de compatibilidad, pero NUNCA aporta recuerdos. */
 import crypto from 'node:crypto';
 import { getSupabaseAdmin } from '../lib/supabase.js';
 
@@ -44,8 +45,8 @@ async function metaSet(key,value){const {error}=await db().from('ce_meta').upser
 async function metaDelete(key){const {error}=await db().from('ce_meta').delete().eq('key',key);if(error)throw error;}
 async function metaList(prefix,limit=200){const {data,error}=await db().from('ce_meta').select('key,value').like('key',`${prefix}%`).limit(Math.max(1,Math.min(1000,Number(limit)||200)));if(error)throw error;return arr(data).map(x=>({key:x.key,value:x.value}));}
 
-function publicConversation(r={}){return{conversationId:trim(r.conversation_id),userId:trim(r.user_id),userName:trim(r.user_name),title:trim(r.title),createdAt:trim(r.created_at),updatedAt:trim(r.updated_at),currentSeq:Number(r.current_seq)||0,currentTurnId:trim(r.current_turn_id),selectedEventId:trim(r.selected_event_id),status:trim(r.status)||'active',memorySummary:trim(r.memory_summary),memoryMainTopics:arr(r.memory_main_topics),memoryMainEntities:arr(r.memory_main_entities),memoryRecallableTurns:Number(r.memory_recallable_turns)||0};}
-function publicTurn(r={}){return{turnId:trim(r.turn_id),conversationId:trim(r.conversation_id),seq:Number(r.seq)||0,userPrompt:trim(r.user_prompt),actionType:trim(r.action_type),geminiPlan:r.gemini_plan||{},normalizedPlan:r.normalized_plan||{},execution:r.execution||{},datasetId:trim(r.dataset_id),viewId:trim(r.view_id),parentTurnId:trim(r.parent_turn_id),referencedTurnId:trim(r.referenced_turn_id),status:trim(r.status)||'OK',title:trim(r.title),answer:trim(r.answer),createdAt:trim(r.created_at),memoryRecallable:r.memory_recallable===true,memoryQuality:Number(r.memory_quality)||0,memorySummary:trim(r.memory_summary),memoryEntities:arr(r.memory_entities),memoryPlanSignature:r.memory_plan_signature||{},memoryKind:trim(r.memory_kind)};}
+function publicConversation(r={}){return{conversationId:trim(r.conversation_id),userId:trim(r.user_id),userName:trim(r.user_name),title:trim(r.title),createdAt:trim(r.created_at),updatedAt:trim(r.updated_at),currentSeq:Number(r.current_seq)||0,currentTurnId:trim(r.current_turn_id),selectedEventId:trim(r.selected_event_id),status:trim(r.status)||'active',memorySummary:trim(r.memory_summary),memoryMainTopics:arr(r.memory_main_topics),memoryMainEntities:arr(r.memory_main_entities),memoryRecallableTurns:Number(r.memory_recallable_turns)||0,memoryVisibility:trim(r.memory_visibility)||'private'};}
+function publicTurn(r={}){return{turnId:trim(r.turn_id),conversationId:trim(r.conversation_id),seq:Number(r.seq)||0,userPrompt:trim(r.user_prompt),actionType:trim(r.action_type),geminiPlan:r.gemini_plan||{},normalizedPlan:r.normalized_plan||{},execution:r.execution||{},datasetId:trim(r.dataset_id),viewId:trim(r.view_id),parentTurnId:trim(r.parent_turn_id),referencedTurnId:trim(r.referenced_turn_id),status:trim(r.status)||'OK',title:trim(r.title),answer:trim(r.answer),createdAt:trim(r.created_at),memoryRecallable:r.memory_recallable===true,memoryQuality:Number(r.memory_quality)||0,memorySummary:trim(r.memory_summary),memoryEntities:arr(r.memory_entities),memoryPlanSignature:r.memory_plan_signature||{},memoryKind:trim(r.memory_kind),memoryVisibility:trim(r.memory_visibility)||'private',memoryExperienceSignature:r.memory_experience_signature||{}};}
 function publicDataset(r={}){return{datasetId:trim(r.dataset_id),conversationId:trim(r.conversation_id),sourceTurnId:trim(r.source_turn_id),domain:trim(r.domain),scope:r.scope||{},rowCount:Number(r.row_count)||0,columns:arr(r.columns),rows:arr(r.rows),facts:r.facts||{},provenance:r.provenance||{},fingerprint:trim(r.fingerprint),createdAt:trim(r.created_at)};}
 function publicView(r={}){return{viewId:trim(r.view_id),conversationId:trim(r.conversation_id),datasetId:trim(r.dataset_id),sourceTurnId:trim(r.source_turn_id),visibleFields:arr(r.visible_fields),sort:arr(r.sort),rowFilters:arr(r.row_filters),groupBy:arr(r.group_by),metrics:arr(r.metrics),rowLimit:r.row_limit==null?null:Number(r.row_limit),presentation:r.presentation||{},title:trim(r.title),createdAt:trim(r.created_at)};}
 
@@ -111,7 +112,7 @@ export async function appendZuzuTurn({conversation,actor={},userPrompt='',action
   let savedConv=await withFallback(()=>tableEnsureConversation(crow),async()=>{await metaSet(mkey('conversation',conv.conversationId),crow);return publicConversation(crow);});
   const rawTurn=publicTurn(trow),memory=memoryProjectionForTurn(rawTurn);
   await persistTurnMemoryProjection(rawTurn.turnId,memory);
-  const savedTurn={...rawTurn,memoryRecallable:memory.recallable,memoryQuality:memory.quality,memorySummary:memory.summary,memoryEntities:memory.entities,memoryPlanSignature:memory.planSignature,memoryKind:memory.kind};
+  const savedTurn={...rawTurn,memoryRecallable:memory.recallable,memoryQuality:memory.quality,memorySummary:memory.summary,memoryEntities:memory.entities,memoryPlanSignature:memory.planSignature,memoryKind:memory.kind,memoryVisibility:memory.visibility||'private',memoryExperienceSignature:memory.experienceSignature||{}};
   await updateHistoryIndex({conversation:savedConv,turn:savedTurn,actor,memory});
   const episode=await updateConversationMemoryProjection({conversation:savedConv,turn:savedTurn,actor,memory});
   if(episode)savedConv={...savedConv,memorySummary:episode.conversation_summary,memoryMainTopics:episode.main_topics,memoryMainEntities:episode.main_entities,memoryRecallableTurns:episode.recallable_turns};
@@ -125,10 +126,17 @@ function semanticTagsFromTurn(turn={}){
     entity('person',q.person),entity('responsible',q.responsible),entity('donor',q.donor),entity('store',q.store),
     entity('ticket',q.ticket),entity('product',q.product?.text||q.product_text),entity('event',scope.event)
   ].filter(Boolean);
+  // RAW14T · NHC: una consulta multientidad debe dejar en la memoria TODAS las entidades
+  // tipadas, no solo los campos singulares. Así «Esther» sigue siendo recuperable aunque el
+  // turno original fuera people:["Colty","Esther"] o stores:[...].
+  for(const [role,key] of [['person','people'],['responsible','responsibles'],['donor','donors'],['store','stores'],['ticket','tickets']]){
+    for(const raw of arr(q?.[key])){const value=trim(raw?.text||raw);if(value)entities.push({role,value});}
+  }
   for(const e of arr(scope.events))if(trim(e?.name||e))entities.push({role:'event',value:trim(e?.name||e)});
+  const deduped=[],seen=new Set();for(const e of entities){const k=`${norm(e.role)}:${norm(e.value)}`;if(!k||seen.has(k))continue;seen.add(k);deduped.push(e);}
   return{
     action:trim(plan.action||turn.actionType),domain:trim(q.domain||arr(q.targets)[0]?.domain||exec.domain),responseKind:trim(plan.response_kind),
-    entities,scopeKind:trim(scope.kind||exec.scope?.kind),scopeEvent:trim(scope.event||exec.scope?.event),
+    entities:deduped,scopeKind:trim(scope.kind||exec.scope?.kind),scopeEvent:trim(scope.event||exec.scope?.event),
     operations:arr(plan.local?.operations).map(o=>({type:trim(o?.type),field:trim(o?.field||o?.group_field),value:trim(o?.value||o?.reference)})).filter(o=>o.type)
   };
 }
@@ -149,6 +157,25 @@ function memoryPlanSignature(turn={}){
   Object.keys(sig).forEach(k=>{if(sig[k]===''||(Array.isArray(sig[k])&&!sig[k].length))delete sig[k];});
   return sig;
 }
+function memoryRowBucket(n=0){const v=Math.max(0,Number(n)||0);if(v===0)return'0';if(v===1)return'1';if(v<=5)return'2-5';if(v<=20)return'6-20';if(v<=100)return'21-100';return'100+';}
+function memoryExperienceSignature(turn={},memory={}){
+  const plan=turn.normalizedPlan||{},q=plan.query||{},exec=turn.execution||{},tags=semanticTagsFromTurn(turn),m=memory||{};
+  const domains=uniqueNorm([...arr(q.targets).map(x=>trim(x?.domain)),trim(tags.domain),trim(exec.domain)]).filter(Boolean).sort();
+  const entityRoles=uniqueNorm(arr(tags.entities).map(e=>trim(e?.role))).filter(Boolean).sort();
+  const operations=uniqueNorm([...arr(q.operations),...arr(plan?.local?.operations)].map(o=>trim(o?.type))).filter(Boolean).sort();
+  // RAW14T · huella anónima: describe QUÉ forma de trabajo fue útil, nunca QUIÉN la hizo
+  // ni los valores literales de PERSON/EVENT/STORE/PRODUCT. Es la semilla de Experiencia CE.
+  const shape={
+    action:trim(plan.action||turn.actionType),
+    domains,scope_kind:trim(q?.scope?.kind||exec?.scope?.kind),response_kind:trim(plan.response_kind),
+    entity_roles:entityRoles,entity_count:arr(tags.entities).length,operation_types:operations,
+    memory_kind:trim(m.kind),row_bucket:memoryRowBucket(exec?.row_count)
+  };
+  Object.keys(shape).forEach(k=>{if(shape[k]===''||(Array.isArray(shape[k])&&!shape[k].length))delete shape[k];});
+  return{...shape,shape_id:fingerprint(shape)};
+}
+export function deriveZuzuExperienceSignature(turn={}){const m=memoryProjectionForTurn(turn);return memoryExperienceSignature(turn,m);}
+
 function memoryIsTechnicalTurn(turn={}){
   const action=trim(turn.actionType||turn.normalizedPlan?.action),status=trim(turn.status),exec=turn.execution||{},kind=trim(turn.normalizedPlan?.conversation?.kind),answer=norm(turn.answer),note=norm(turn.normalizedPlan?.conversation?.note);
   if(status==='KO'||action==='compile_error'||exec?.error||exec?.gemini_final_error||trim(exec?.response_mode)==='gemini_dual_presentation_failed')return true;
@@ -167,7 +194,7 @@ function memoryLocalHasSubstance(turn={}){
 }
 function memoryProjectionForTurn(turn={}){
   const action=trim(turn.actionType||turn.normalizedPlan?.action),answer=trim(turn.answer),prompt=trim(turn.userPrompt),exec=turn.execution||{},tags=semanticTagsFromTurn(turn),entities=arr(tags.entities),sig=memoryPlanSignature(turn);
-  if(memoryIsTechnicalTurn(turn))return{recallable:false,quality:0,summary:'',entities:[],planSignature:sig,kind:'technical'};
+  if(memoryIsTechnicalTurn(turn)){const base={recallable:false,quality:0,summary:'',entities:[],planSignature:sig,kind:'technical',visibility:'private'};return{...base,experienceSignature:memoryExperienceSignature(turn,base)};}
   let quality=0,kind='other';
   if(['query','reference','inspect'].includes(action)){quality=2;kind='business';if((Number(exec.row_count)||0)>0||entities.length||answer.length>220)quality=3;}
   else if(action==='local'&&memoryLocalHasSubstance(turn)){quality=2;kind='business_transform';}
@@ -177,7 +204,7 @@ function memoryProjectionForTurn(turn={}){
   }
   if(!answer||answer.length<28)quality=0;
   const recallable=quality>=2;
-  if(!recallable)return{recallable:false,quality,summary:'',entities,planSignature:sig,kind};
+  if(!recallable){const base={recallable:false,quality,summary:'',entities,planSignature:sig,kind,visibility:'private'};return{...base,experienceSignature:memoryExperienceSignature(turn,base)};}
   const scope=exec.scope||turn.normalizedPlan?.query?.scope||{},domain=trim(exec.domain||tags.domain),scopeText=trim(scope.event)||arr(scope.events).map(trim).filter(Boolean).join(' / ')||(scope.kind==='all_events'?'todos los eventos':trim(scope.kind));
   const entityText=entities.map(e=>`${trim(e.role)}=${trim(e.value)}`).filter(x=>!x.endsWith('=')).slice(0,8).join(' · ');
   const lines=[
@@ -186,33 +213,29 @@ function memoryProjectionForTurn(turn={}){
     `Pregunta: ${clip(prompt,300)}`,
     `Respuesta: ${clip(answer,520)}`
   ].filter(Boolean).slice(0,5);
-  return{recallable:true,quality,summary:lines.join('\n'),entities,planSignature:sig,kind};
+  const base={recallable:true,quality,summary:lines.join('\n'),entities,planSignature:sig,kind,visibility:'private'};return{...base,experienceSignature:memoryExperienceSignature(turn,base)};
 }
 export function deriveZuzuMemoryProjection(turn={}){return memoryProjectionForTurn(turn);}
 
 async function persistTurnMemoryProjection(turnId='',memory={}){
   const id=trim(turnId);if(!id)return;
+  const base={memory_recallable:memory.recallable===true,memory_quality:Number(memory.quality)||0,memory_summary:trim(memory.summary),memory_entities:arr(memory.entities),memory_plan_signature:memory.planSignature||{},memory_kind:trim(memory.kind)};
   try{
-    const {error}=await db().from(T_TURN).update({
-      memory_recallable:memory.recallable===true,
-      memory_quality:Number(memory.quality)||0,
-      memory_summary:trim(memory.summary),
-      memory_entities:arr(memory.entities),
-      memory_plan_signature:memory.planSignature||{},
-      memory_kind:trim(memory.kind)
-    }).eq('turn_id',id);
+    const {error}=await db().from(T_TURN).update({...base,memory_visibility:trim(memory.visibility)||'private',memory_experience_signature:memory.experienceSignature||{}}).eq('turn_id',id);
     if(error)throw error;
-  }catch(error){if(!isMissingColumn(error)&&!isMissingTable(error))throw error;}
+  }catch(error){
+    if(isMissingColumn(error)){const {error:e2}=await db().from(T_TURN).update(base).eq('turn_id',id);if(e2&&!isMissingColumn(e2)&&!isMissingTable(e2))throw e2;return;}
+    if(!isMissingTable(error))throw error;
+  }
 }
 function memoryItemFromTurn(conversation,turn,memory={}){
   const exec=turn.execution||{},m=memory?.summary!==undefined?memory:memoryProjectionForTurn(turn);
-  return{conversationId:trim(conversation?.conversationId||turn.conversationId),turnId:turn.turnId,seq:turn.seq,createdAt:turn.createdAt,userPrompt:turn.userPrompt,title:turn.title,answer:turn.answer,actionType:turn.actionType,domain:trim(exec.domain),scope:exec.scope||{},focus:exec.focus||{},semanticTags:semanticTagsFromTurn(turn),rowCount:Number(exec.row_count)||0,summary:trim(m.summary),memoryQuality:Number(m.quality)||0,memoryKind:trim(m.kind),memoryEntities:arr(m.entities),planSignature:m.planSignature||{}};
+  return{conversationId:trim(conversation?.conversationId||turn.conversationId),turnId:turn.turnId,seq:turn.seq,createdAt:turn.createdAt,userPrompt:turn.userPrompt,title:turn.title,answer:turn.answer,actionType:turn.actionType,domain:trim(exec.domain),scope:exec.scope||{},focus:exec.focus||{},semanticTags:semanticTagsFromTurn(turn),rowCount:Number(exec.row_count)||0,summary:trim(m.summary),memoryQuality:Number(m.quality)||0,memoryKind:trim(m.kind),memoryEntities:arr(m.entities),planSignature:m.planSignature||{},memoryVisibility:trim(m.visibility||turn.memoryVisibility)||'private',experienceSignature:m.experienceSignature||turn.memoryExperienceSignature||{},memorySource:'db'};
 }
-async function updateHistoryIndex({conversation,turn,actor,memory}={}){
-  const uid=actorId(actor);if(!uid||!turn)return;const key=mkey('index',uid),prior=arr(await metaGet(key)),m=memory||memoryProjectionForTurn(turn);
-  const without=prior.filter(x=>trim(x?.turnId)!==turn.turnId);
-  if(!m.recallable){await metaSet(key,without.slice(0,1500));return;}
-  const item=memoryItemFromTurn(conversation,turn,m),next=[item,...without].slice(0,1500);await metaSet(key,next);
+async function updateHistoryIndex(){
+  // RAW14T: histórico = tablas persistentes. Deliberadamente NO escribimos índice de recuerdos en ce_meta.
+  // El nombre se mantiene para no alterar el flujo de append; la proyección ya quedó persistida en ce_zuzu_turns.
+  return;
 }
 function episodeSummaryFromItems(items=[]){
   const ordered=arr(items).slice().sort((a,b)=>text(a.createdAt).localeCompare(text(b.createdAt))),topics=[],entities=[];
@@ -226,9 +249,16 @@ function episodeSummaryFromItems(items=[]){
   return{conversation_summary:lines.slice(0,5).join('\n'),main_topics:topics.slice(0,16),main_entities:entities.slice(0,24),recallable_turns:ordered.length};
 }
 async function updateConversationMemoryProjection({conversation,turn,actor,memory}={}){
-  const uid=actorId(actor);if(!uid||!conversation)return null;const key=mkey('index',uid),items=arr(await metaGet(key)).filter(x=>trim(x?.conversationId)===trim(conversation.conversationId)&&Number(x?.memoryQuality)>=2);
-  const summary=episodeSummaryFromItems(items),episode={conversation_id:conversation.conversationId,user_id:uid,user_name:actorName(actor),started_at:items.length?items.map(x=>x.createdAt).sort()[0]:trim(conversation.createdAt),updated_at:trim(conversation.updatedAt)||now(),...summary,turn_refs:items.slice().sort((a,b)=>Number(a.seq)-Number(b.seq)).map(x=>x.turnId)};
-  await metaSet(mkey('episode',conversation.conversationId),episode);
+  const uid=actorId(actor);if(!uid||!conversation)return null;
+  let turns=[];
+  try{turns=await tableListTurns(conversation.conversationId,1000);}catch(error){if(isMissingTable(error))return null;throw error;}
+  const items=[];
+  for(const t of turns){
+    const recomputed=memoryProjectionForTurn(t),stored=(t.memorySummary||t.memoryQuality)?{recallable:t.memoryRecallable,quality:t.memoryQuality,summary:t.memorySummary,entities:t.memoryEntities,planSignature:t.memoryPlanSignature,kind:t.memoryKind,visibility:t.memoryVisibility,experienceSignature:t.memoryExperienceSignature}:null;
+    const mem=recomputed.recallable?recomputed:(stored?.recallable&&Number(stored.quality)>=2&&trim(stored.summary)?stored:recomputed);
+    if(mem.recallable)items.push(memoryItemFromTurn(conversation,t,mem));
+  }
+  const summary=episodeSummaryFromItems(items),episode={conversation_id:conversation.conversationId,user_id:uid,user_name:actorName(actor),started_at:items.length?items.map(x=>x.createdAt).sort()[0]:trim(conversation.createdAt),updated_at:trim(conversation.updatedAt)||now(),memory_source:'db',memory_visibility:trim(conversation.memoryVisibility)||'private',...summary,turn_refs:items.slice().sort((a,b)=>Number(a.seq)-Number(b.seq)).map(x=>x.turnId)};
   try{
     const {error}=await db().from(T_CONV).update({memory_summary:summary.conversation_summary,memory_main_topics:summary.main_topics,memory_main_entities:summary.main_entities,memory_recallable_turns:summary.recallable_turns}).eq('conversation_id',conversation.conversationId);
     if(error)throw error;
@@ -236,7 +266,7 @@ async function updateConversationMemoryProjection({conversation,turn,actor,memor
   return episode;
 }
 
-const STOP=new Set('ahora antes despues luego este esta esto esa ese esos esas aquel aquella aquellos aquellas te acuerdas recuerdas recordar hablamos conversacion conversaciones sobre cosa cosas algo aquello volver vuelve dame dime lo la los las un una unos unas de del al en y o que me nos se si por para con ya fue era es son estuvimos estaba estaban'.split(' '));
+const STOP=new Set('ahora antes despues luego este esta esto esa ese esos esas aquel aquella aquellos aquellas te acuerdas recuerdas recordar hablamos conversacion conversaciones sobre cosa cosas algo aquello volver vuelve dame dime lo la los las un una unos unas de del al en y o que me nos se si por para con ya fue era es son estuvimos estaba estaban hoy ayer anteayer ultimamente recientemente poco minutos minuto horas hora rato semana semanas mes meses ano anos dia dias manana tarde noche'.split(' '));
 function tokens(v=''){return norm(v).split(' ').filter(x=>x.length>2&&!STOP.has(x)).map(x=>x.length>5&&x.endsWith('es')?x.slice(0,-2):x.length>4&&x.endsWith('s')?x.slice(0,-1):x); }
 function tokenHitScore(q,source,weight=1){const set=new Set(tokens(source));let n=0;for(const t of q)if(set.has(t))n+=(t.length>=6?2:1)*weight;return n;}
 function historyScore(prompt='',item={}){
@@ -260,9 +290,13 @@ function memoryUtc(y,m,d,h=0,min=0,sec=0){return Date.UTC(y,m,d,h,min,sec,0);}
 function memoryAddDays(ms,days){return ms+Number(days)*86400000;}
 export function resolveZuzuMemoryTimeWindow(prompt='',nowIso=''){
   const raw=trim(prompt),n=norm(raw),nowDate=new Date(trim(nowIso)||Date.now());if(Number.isNaN(nowDate.getTime()))return null;
-  const y=nowDate.getUTCFullYear(),m=nowDate.getUTCMonth(),d=nowDate.getUTCDate(),today=memoryUtc(y,m,d),dayWindow=(offset,label)=>({startMs:memoryAddDays(today,offset),endMs:memoryAddDays(today,offset+1)-1,label});
+  const nowMs=nowDate.getTime(),y=nowDate.getUTCFullYear(),m=nowDate.getUTCMonth(),d=nowDate.getUTCDate(),today=memoryUtc(y,m,d),dayWindow=(offset,label)=>({startMs:memoryAddDays(today,offset),endMs:memoryAddDays(today,offset+1)-1,label});
   let w=null;
-  if(/\banteayer\b/.test(n))w=dayWindow(-2,'anteayer');
+  // RAW14T: referencias humanas recientes que aparecieron en las pruebas reales.
+  if(/\b(?:hace\s+unos?\s+minutos?|hace\s+un\s+rato|hace\s+unos?\s+instantes?)\b/.test(n))w={startMs:nowMs-2*3600000,endMs:nowMs,label:'hace un rato'};
+  else if(/\bhace\s+unas?\s+horas?\b/.test(n))w={startMs:nowMs-12*3600000,endMs:nowMs,label:'hace unas horas'};
+  else if(/\b(?:ultimamente|recientemente|hace\s+poco)\b/.test(n))w={startMs:nowMs-7*86400000,endMs:nowMs,label:'últimamente'};
+  else if(/\banteayer\b/.test(n))w=dayWindow(-2,'anteayer');
   else if(/\bayer\b/.test(n))w=dayWindow(-1,'ayer');
   else if(/\bhoy\b/.test(n))w=dayWindow(0,'hoy');
   else{
@@ -288,35 +322,69 @@ export function resolveZuzuMemoryTimeWindow(prompt='',nowIso=''){
 }
 export function isRecallPrompt(prompt=''){
   const p=trim(prompt),n=norm(p);
-  if(/\b(?:te\s+acuerdas|recuerdas|recu[eé]rdame|recu[eé]rdanos|recuerda|acu[eé]rdate|recordamos|conversaci[oó]n\s+(?:pasada|anterior)|aquella\s+(?:tabla|conversaci[oó]n)|aquel\s+(?:tema|d[ií]a)|lo\s+que\s+vimos|lo\s+de\s+(?:antes|otro\s+d[ií]a)|(?:vuelve|volvamos|volver|retoma)\s+a(?:\s+lo\s+de)?)\b/i.test(p))return true;
-  return /\b(?:hablamos|estuvimos\s+(?:hablando|viendo|mirando)|te\s+pregunte|me\s+dijiste|me\s+contestaste|que\s+vimos)\b/.test(n)&&/\b(?:ayer|anteayer|hoy|semana|mes|ano|dia|manana|tarde|noche|hace|pasad[oa])\b/.test(n);
+  if(/\b(?:te\s+acuerdas|recuerdas|recu[eé]rdame|recu[eé]rdanos|recuerda|acu[eé]rdate|recordamos|recordad[oa]|recuerdos?|conversaci[oó]n\s+(?:pasada|anterior)|(?:aquella|esa)\s+(?:tabla|conversaci[oó]n)|aquel\s+(?:tema|d[ií]a)|lo\s+que\s+vimos|lo\s+de\s+(?:antes|otro\s+d[ií]a)|(?:retoma|retomemos)\b|(?:vuelve|volvamos|volver)\s+(?:a\s+)?(?:lo\s+de|aquel(?:la)?\s+(?:tema|conversaci[oó]n)|esa\s+conversaci[oó]n))\b/i.test(p))return true;
+  // «vuelve a revisarla» NO es memoria: es una orden de revisar CURRENT. Para abrir memoria
+  // exigimos una referencia humana al pasado, al hablar previo o una ventana temporal.
+  return /\b(?:hablamos|hemos\s+(?:hablado|estado\s+hablando)|estuvimos\s+(?:hablando|viendo|mirando)|te\s+pregunte|me\s+dijiste|me\s+contestaste|que\s+vimos)\b/.test(n)&&/\b(?:ayer|anteayer|hoy|semana|mes|ano|dia|manana|tarde|noche|hace|pasad[oa]|ultimamente|recientemente|minutos?|horas?|rato)\b/.test(n);
 }
 async function memoryIndexItemsForUser(uid=''){
-  let items=arr(await metaGet(mkey('index',uid))).filter(x=>Number(x?.memoryQuality)>=2&&trim(x?.summary));
-  if(items.length)return items;
+  // RAW14T · FUENTE ÚNICA. Si las tablas de memoria no están disponibles, Zuzu no "recuerda".
+  // No se consulta ce_meta ni caché del navegador para reconstruir historia.
+  const fresh=[];
   try{
-    const {data:convs,error:ce}=await db().from(T_CONV).select('conversation_id,user_id,user_name,title,created_at,updated_at').eq('user_id',uid).limit(300);if(ce)throw ce;const convMap=new Map(arr(convs).map(x=>[trim(x.conversation_id),publicConversation(x)])),ids=[...convMap.keys()].filter(Boolean);
-    if(ids.length){
-      const {data,error}=await db().from(T_TURN).select('turn_id,conversation_id,seq,user_prompt,action_type,gemini_plan,normalized_plan,execution,dataset_id,view_id,parent_turn_id,referenced_turn_id,status,title,answer,created_at').in('conversation_id',ids).order('created_at',{ascending:false}).limit(1500);if(error)throw error;
-      items=[];for(const r of arr(data)){const turn=publicTurn(r),mem=memoryProjectionForTurn(turn);if(!mem.recallable)continue;items.push(memoryItemFromTurn(convMap.get(turn.conversationId)||{conversationId:turn.conversationId},turn,mem));}
-      if(items.length)await metaSet(mkey('index',uid),items.slice(0,1500));
+    let convs=[];
+    try{const res=await db().from(T_CONV).select('conversation_id,user_id,user_name,title,created_at,updated_at,memory_summary,memory_main_topics,memory_main_entities,memory_recallable_turns,memory_visibility').eq('user_id',uid).order('updated_at',{ascending:false}).limit(240);if(res.error)throw res.error;convs=arr(res.data);}
+    catch(error){if(!isMissingColumn(error))throw error;const res=await db().from(T_CONV).select('conversation_id,user_id,user_name,title,created_at,updated_at,memory_summary,memory_main_topics,memory_main_entities,memory_recallable_turns').eq('user_id',uid).order('updated_at',{ascending:false}).limit(240);if(res.error)throw res.error;convs=arr(res.data);}
+    const convMap=new Map(arr(convs).map(x=>[trim(x.conversation_id),publicConversation(x)])),ids=[...convMap.keys()].filter(Boolean);
+    if(!ids.length)return[];
+    let data=[];
+    try{
+      const res=await db().from(T_TURN)
+        .select('turn_id,conversation_id,seq,user_prompt,action_type,gemini_plan,normalized_plan,execution,dataset_id,view_id,parent_turn_id,referenced_turn_id,status,title,answer,created_at,memory_recallable,memory_quality,memory_summary,memory_entities,memory_plan_signature,memory_kind,memory_visibility,memory_experience_signature')
+        .in('conversation_id',ids).order('created_at',{ascending:false}).limit(2000);
+      if(res.error)throw res.error;data=arr(res.data);
+    }catch(error){
+      if(!isMissingColumn(error))throw error;
+      const res=await db().from(T_TURN)
+        .select('turn_id,conversation_id,seq,user_prompt,action_type,gemini_plan,normalized_plan,execution,dataset_id,view_id,parent_turn_id,referenced_turn_id,status,title,answer,created_at,memory_recallable,memory_quality,memory_summary,memory_entities,memory_plan_signature,memory_kind')
+        .in('conversation_id',ids).order('created_at',{ascending:false}).limit(2000);
+      if(res.error)throw res.error;data=arr(res.data);
     }
-  }catch(error){if(!isMissingTable(error)&&!isMissingColumn(error))throw error;}
-  return items;
+    for(const r of data){
+      const turn=publicTurn(r),recomputed=memoryProjectionForTurn(turn),stored=(turn.memorySummary||turn.memoryQuality)?{recallable:turn.memoryRecallable,quality:turn.memoryQuality,summary:turn.memorySummary,entities:turn.memoryEntities,planSignature:turn.memoryPlanSignature,kind:turn.memoryKind,visibility:turn.memoryVisibility,experienceSignature:turn.memoryExperienceSignature}:null;
+      const mem=recomputed.recallable?recomputed:(stored?.recallable&&Number(stored.quality)>=2&&trim(stored.summary)?stored:recomputed);
+      if(!mem.recallable)continue;fresh.push(memoryItemFromTurn(convMap.get(turn.conversationId)||{conversationId:turn.conversationId},turn,mem));
+    }
+  }catch(error){
+    if(isMissingTable(error)||isMissingColumn(error))return[];
+    throw error;
+  }
+  const out=[],seen=new Set();
+  for(const item of fresh.sort((a,b)=>text(b.createdAt).localeCompare(text(a.createdAt)))){const id=trim(item?.turnId);if(!id||seen.has(id)||Number(item?.memoryQuality)<2||!trim(item?.summary))continue;seen.add(id);out.push(item);if(out.length>=2000)break;}
+  return out;
 }
 async function memoryEpisodeMeta(conversationId=''){
-  const id=trim(conversationId);if(!id)return null;const meta=await metaGet(mkey('episode',id));if(meta)return meta;
-  try{const conv=await tableGetConversation(id);if(!conv)return null;return{conversation_id:id,started_at:conv.createdAt,updated_at:conv.updatedAt,conversation_summary:conv.memorySummary,main_topics:conv.memoryMainTopics,main_entities:conv.memoryMainEntities,recallable_turns:conv.memoryRecallableTurns};}catch(error){if(!isMissingTable(error))throw error;return null;}
+  const id=trim(conversationId);if(!id)return null;
+  try{const conv=await tableGetConversation(id);if(!conv)return null;return{conversation_id:id,started_at:conv.createdAt,updated_at:conv.updatedAt,conversation_summary:conv.memorySummary,main_topics:conv.memoryMainTopics,main_entities:conv.memoryMainEntities,recallable_turns:conv.memoryRecallableTurns,memory_source:'db',memory_visibility:conv.memoryVisibility||'private'};}catch(error){if(isMissingTable(error))return null;throw error;}
 }
 function withinMemoryWindow(item={},window=null){if(!window)return true;const ms=new Date(item.createdAt).getTime();return Number.isFinite(ms)&&ms>=window.startMs&&ms<=window.endMs;}
+function memoryRecentMs(item={}){const ms=new Date(item?.createdAt).getTime();return Number.isFinite(ms)?ms:0;}
+function compareMemoryCandidates(a={},b={},preferRecent=false){
+  const sa=Number(a?.score)||0,sb=Number(b?.score)||0,delta=sa-sb;
+  // Comportamiento humano: normalmente recordamos de lo más joven a lo más viejo.
+  // Pero una pista contextual claramente mejor puede llevar el puntero más atrás.
+  const semanticMargin=preferRecent?2.25:1.25;if(Math.abs(delta)>=semanticMargin)return delta>0?-1:1;
+  const dateDelta=memoryRecentMs(b)-memoryRecentMs(a);if(dateDelta)return dateDelta;
+  return sb-sa;
+}
 export async function searchZuzuHistoryCandidates({actor={},prompt='',conversationId='',limit=8,nowIso=''}={}){
-  const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),window=resolveZuzuMemoryTimeWindow(prompt,nowIso),explicit=isRecallPrompt(prompt);
+  const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),window=resolveZuzuMemoryTimeWindow(prompt,nowIso),explicit=isRecallPrompt(prompt),n=norm(prompt),broadRecent=/\b(?:ultimamente|recientemente|hace poco|hace unos minutos|hace un rato|hace unas horas)\b/.test(n),topicTerms=tokens(prompt);
   let scored=items.filter(x=>withinMemoryWindow(x,window)).map(x=>({...x,score:historyScore(prompt,x)}));
-  if(explicit&&window)scored=scored.map(x=>({...x,score:Math.max(x.score,0.28+Math.min(0.3,(Number(x.memoryQuality)||2)*0.08))}));
-  if(explicit&&!scored.some(x=>x.score>0)&&!window)scored=items.slice(0,24).map(x=>({...x,score:0.15+Math.min(0.2,(Number(x.memoryQuality)||2)*0.05)}));
-  scored=scored.filter(x=>x.score>0).sort((a,b)=>b.score-a.score||text(b.createdAt).localeCompare(text(a.createdAt)));
+  if(explicit&&window)scored=scored.map(x=>({...x,score:Math.max(x.score,0.28+Math.min(0.3,(Number(x.memoryQuality)||2)*0.08))+(broadRecent?Math.max(0,0.95-daysAgo(x.createdAt,nowIso)*0.11):0)}));
+  if(explicit&&!scored.some(x=>x.score>0)&&!window)scored=items.slice(0,120).map(x=>({...x,score:0.15+Math.min(0.2,(Number(x.memoryQuality)||2)*0.05)}));
+  scored=scored.filter(x=>x.score>0).sort((a,b)=>compareMemoryCandidates(a,b,broadRecent||topicTerms.length===0));
   const out=[],seen=new Set();for(const x of scored){const k=trim(x.conversationId)||x.turnId;if(seen.has(k))continue;seen.add(k);const episode=await memoryEpisodeMeta(x.conversationId);out.push({...x,episode});if(out.length>=Math.max(1,Math.min(12,Number(limit)||8)))break;}
-  return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,semantic_tags:x.semanticTags||{},row_count:x.rowCount,summary:x.summary,memory_quality:Number(x.memoryQuality)||0,memory_kind:trim(x.memoryKind),plan_signature:x.planSignature||{},episode_summary:trim(x.episode?.conversation_summary),episode_started_at:trim(x.episode?.started_at),episode_updated_at:trim(x.episode?.updated_at),episode_topics:arr(x.episode?.main_topics),score:Number(x.score.toFixed(3)),time_window:window?{start:window.start,end:window.end,label:window.label}:null,same_conversation:trim(x.conversationId)===trim(conversationId)}));
+  return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,semantic_tags:x.semanticTags||{},row_count:x.rowCount,summary:x.summary,memory_quality:Number(x.memoryQuality)||0,memory_kind:trim(x.memoryKind),memory_visibility:trim(x.memoryVisibility)||'private',memory_source:'db',experience_signature:x.experienceSignature||{},plan_signature:x.planSignature||{},episode_summary:trim(x.episode?.conversation_summary),episode_started_at:trim(x.episode?.started_at),episode_updated_at:trim(x.episode?.updated_at),episode_topics:arr(x.episode?.main_topics),score:Number(x.score.toFixed(3)),time_window:window?{start:window.start,end:window.end,label:window.label}:null,same_conversation:trim(x.conversationId)===trim(conversationId)}));
 }
 function planSimilarityScore(plan={},item={}){
   const sig=item.planSignature||{},p=plan||{},q=p.query||{},domains=arr(q.targets).map(x=>trim(x?.domain)).filter(Boolean),oldDomains=arr(sig.targets).map(trim).filter(Boolean);let score=0;
@@ -362,8 +430,8 @@ function proactiveAgeMeta(createdAt='',nowIso='',user=''){
 export async function searchZuzuProactiveMemory({actor={},prompt='',plan={},conversationId='',nowIso='',days=3650,limit=3}={}){
   const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),maxDays=Math.max(4,Number(days)||3650),user=actorName(actor);
   const scored=items.filter(x=>trim(x.conversationId)!==trim(conversationId)&&daysAgo(x.createdAt,nowIso)<=maxDays).map(x=>{
-    const age=daysAgo(x.createdAt,nowIso),overlap=proactiveEntityOverlap(plan,prompt,x),lex=historyScore(prompt,x),base=planSimilarityScore(plan,x),score=base+lex*0.55+Math.min(2,overlap)*1.25;
-    const threshold=age<=0.34?2.55:age<=4?2.85:age<=180?3.75:4.65;
+    const age=daysAgo(x.createdAt,nowIso),overlap=proactiveEntityOverlap(plan,prompt,x),lex=historyScore(prompt,x),base=planSimilarityScore(plan,x),recencyBoost=age<=0.34?0.65:age<=4?0.35:0,score=base+lex*0.55+Math.min(2,overlap)*1.45+recencyBoost;
+    const threshold=age<=0.34?2.25:age<=4?2.55:age<=180?3.6:4.5;
     const eligible=score>=threshold && (age<=4 || overlap>0 || lex>=2.2);
     return{...x,score,overlap,lex,age,eligible,ageMeta:proactiveAgeMeta(x.createdAt,nowIso,user)};
   }).filter(x=>x.eligible).sort((a,b)=>b.score-a.score||a.age-b.age||text(b.createdAt).localeCompare(text(a.createdAt)));
@@ -377,16 +445,15 @@ export async function searchZuzuSocialMemoryHints({actor={},prompt='',plan={},co
 
 export async function readZuzuMemoryEpisode({conversationId='',actor={},matchedTurnId='',includeAnswers=true,limit=500}={}){
   const uid=actorId(actor),id=safeId(conversationId);if(!uid||!id)return null;
-  const conversation=await withFallback(()=>tableGetConversation(id),()=>fallbackGetConversation(id));if(!conversation||norm(conversation.userId)!==norm(uid))return null;
-  const turns=await withFallback(()=>tableListTurns(id,limit),()=>fallbackListTurns(id,limit)),memoryTurns=[];
+  let conversation=null,turns=[];try{conversation=await tableGetConversation(id);if(!conversation||norm(conversation.userId)!==norm(uid))return null;turns=await tableListTurns(id,limit);}catch(error){if(isMissingTable(error))return null;throw error;}const memoryTurns=[];
   for(const t of turns){
-    let mem=(t.memoryRecallable||t.memoryQuality||t.memorySummary)?{recallable:t.memoryRecallable,quality:t.memoryQuality,summary:t.memorySummary,entities:t.memoryEntities,planSignature:t.memoryPlanSignature,kind:t.memoryKind}:memoryProjectionForTurn(t);
+    let mem=(t.memoryRecallable||t.memoryQuality||t.memorySummary)?{recallable:t.memoryRecallable,quality:t.memoryQuality,summary:t.memorySummary,entities:t.memoryEntities,planSignature:t.memoryPlanSignature,kind:t.memoryKind,visibility:t.memoryVisibility,experienceSignature:t.memoryExperienceSignature}:memoryProjectionForTurn(t);
     if(!mem.recallable||Number(mem.quality)<2)continue;
     memoryTurns.push({
       turn_id:t.turnId,seq:t.seq,created_at:t.createdAt,question:t.userPrompt,title:t.title,
       ...(includeAnswers?{answer:t.answer}:{}),
       summary:trim(mem.summary),memory_quality:Number(mem.quality)||0,memory_kind:trim(mem.kind),
-      entities:arr(mem.entities),plan_signature:mem.planSignature||{},action_type:t.actionType,
+      entities:arr(mem.entities),plan_signature:mem.planSignature||{},experience_signature:mem.experienceSignature||memoryExperienceSignature(t,mem),memory_visibility:trim(mem.visibility||t.memoryVisibility)||'private',memory_source:'db',action_type:t.actionType,
       domain:trim(t.execution?.domain),scope:t.execution?.scope||{},focus:t.execution?.focus||{},
       matched:trim(t.turnId)===trim(matchedTurnId)
     });
@@ -394,7 +461,7 @@ export async function readZuzuMemoryEpisode({conversationId='',actor={},matchedT
   memoryTurns.sort((a,b)=>Number(a.seq)-Number(b.seq)||text(a.created_at).localeCompare(text(b.created_at)));
   let episode=await memoryEpisodeMeta(id);if(!episode){const items=memoryTurns.map(t=>({createdAt:t.created_at,title:t.title,domain:t.domain,memoryEntities:t.entities,semanticTags:{entities:t.entities}})),sum=episodeSummaryFromItems(items);episode={conversation_id:id,started_at:memoryTurns[0]?.created_at||conversation.createdAt,updated_at:memoryTurns[memoryTurns.length-1]?.created_at||conversation.updatedAt,...sum};}
   return{
-    conversation_id:id,user_id:conversation.userId,user_name:conversation.userName,
+    conversation_id:id,user_id:conversation.userId,user_name:conversation.userName,memory_source:'db',memory_visibility:conversation.memoryVisibility||'private',
     started_at:trim(episode?.started_at)||memoryTurns[0]?.created_at||conversation.createdAt,
     ended_at:memoryTurns[memoryTurns.length-1]?.created_at||conversation.updatedAt,
     conversation_summary:trim(episode?.conversation_summary)||trim(conversation.memorySummary),
@@ -416,6 +483,5 @@ export async function readZuzuConversation({conversationId='',actor={},limit=500
 export async function deleteZuzuConversation({conversationId='',actor={}}={}){
   const uid=actorId(actor),id=safeId(conversationId);if(!uid||!id)return{ok:false};const conv=await withFallback(()=>tableGetConversation(id),()=>fallbackGetConversation(id));if(!conv||norm(conv.userId)!==norm(uid))return{ok:false};
   try{for(const t of [T_VIEW,T_DATA,T_TURN]){const {error}=await db().from(t).delete().eq('conversation_id',id);if(error)throw error;}const {error}=await db().from(T_CONV).delete().eq('conversation_id',id);if(error)throw error;}catch(error){if(!isMissingTable(error))throw error;const turns=await fallbackListTurns(id,500);for(const t of turns){if(t.datasetId)await metaDelete(mkey('dataset',t.datasetId));if(t.viewId)await metaDelete(mkey('view',t.viewId));await metaDelete(mkey('turn',t.turnId));}await metaDelete(mkey('conversation',id));}
-  try{await metaDelete(mkey('episode',id));const key=mkey('index',uid),items=arr(await metaGet(key)).filter(x=>trim(x?.conversationId)!==id);await metaSet(key,items);}catch(_){}
   return{ok:true,conversationId:id};
 }

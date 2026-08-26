@@ -12,8 +12,8 @@ t('operaciones puramente visuales quedan fuera',/show_table[\s\S]*compact_table[
 t('resumen de turno tiene máximo 5 líneas',/\.filter\(Boolean\)\.slice\(0,5\)/.test(ledger));
 t('memoria conserva pregunta literal y respuesta real',/userPrompt:turn\.userPrompt[\s\S]*answer:turn\.answer/.test(ledger));
 t('firma operativa conserva targets/scope/filtros',/function memoryPlanSignature[\s\S]*sig\.targets[\s\S]*sig\.scope[\s\S]*purchase_status/.test(ledger));
-t('índice de memoria es por usuario',/mkey\('index',uid\)/.test(ledger));
-t('episodio es por conversation_id',/mkey\('episode',conversation\.conversationId\)/.test(ledger));
+t('índice de memoria es por usuario',/memoryIndexItemsForUser[\s\S]*eq\('user_id',uid\)/.test(ledger));
+t('episodio es por conversation_id',/updateConversationMemoryProjection[\s\S]*tableListTurns\(conversation\.conversationId/.test(ledger));
 t('recuperación episodio filtra solo turnos recallable',/readZuzuMemoryEpisode[\s\S]*if\(!mem\.recallable\|\|Number\(mem\.quality\)<2\)continue/.test(ledger));
 t('episodio se ordena de antiguo a reciente',/memoryTurns\.sort\(\(a,b\)=>Number\(a\.seq\)-Number\(b\.seq\)/.test(ledger));
 t('hit se deduplica por conversación, no por turno',/const k=trim\(x\.conversationId\)\|\|x\.turnId/.test(ledger));
@@ -34,7 +34,7 @@ t('recuerdo histórico nunca se presenta como dato actual',/No mezcles esas cifr
 t('recall/resume no inventan tabla ni gráfica',/action==='reference'&&\['recall_episode','resume_episode'\][\s\S]*table:false,chart:false/.test(ai));
 t('CURRENT conserva dataset al recordar',/recall_episode','resume_episode'[\s\S]*carriesActiveDataset/.test(ai)||/carriesActiveDataset=[^;]*recall_episode[^;]*resume_episode/.test(ai));
 t('traza registra si el turno entra o no en memoria',/MEMORIA EPISÓDICA · ALMACENAMIENTO/.test(ai));
-t('arquitectura identificada como RAW14R',/RAW14R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL/.test(ai));
+t('arquitectura memoria episódica/proactiva vigente',/RAW14(?:R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|S · MEMORIA FIABLE \+ PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA)/.test(ai));
 
 // Prueba funcional del parser temporal, extrayendo la función pura sin importar Supabase.
 function extractFunction(src,name){const start=src.indexOf(`function ${name}(`)>=0?src.indexOf(`function ${name}(`):src.indexOf(`export function ${name}(`);if(start<0)throw new Error(name);const brace=src.indexOf('{',start);let d=0,q='',esc=false;for(let i=brace;i<src.length;i++){const c=src[i];if(q){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===q)q='';continue;}if(c==='"'||c==="'"||c==='`'){q=c;continue;}if(c==='{')d++;else if(c==='}'&&--d===0)return src.slice(start,i+1).replace(/^export\s+/,'');}throw new Error(name);}

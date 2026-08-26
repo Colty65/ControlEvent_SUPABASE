@@ -110,3 +110,18 @@ create index if not exists ce_zuzu_turns_memory_user_time_idx
 comment on column public.ce_zuzu_turns.memory_recallable is 'TRUE solo para turnos con sustancia aptos para memoria episódica; errores, ruido, aclaraciones y respuestas técnicas quedan fuera.';
 comment on column public.ce_zuzu_turns.memory_summary is 'Resumen temático compacto (máximo 5 líneas) usado para localizar recuerdos sin reinyectar la respuesta completa.';
 comment on column public.ce_zuzu_turns.memory_plan_signature is 'Firma operativa del PLAN original para poder reejecutar hoy la misma consulta con datos actuales.';
+
+-- RAW14T · MEMORY CORE DB + SEMILLA DE EXPERIENCIA CE
+alter table public.ce_zuzu_conversations
+  add column if not exists memory_visibility text not null default 'private';
+
+alter table public.ce_zuzu_turns
+  add column if not exists memory_visibility text not null default 'private',
+  add column if not exists memory_experience_signature jsonb not null default '{}'::jsonb;
+
+create index if not exists ce_zuzu_turns_memory_visibility_time_idx
+  on public.ce_zuzu_turns (memory_visibility, created_at desc)
+  where memory_recallable = true;
+
+comment on column public.ce_zuzu_turns.memory_experience_signature is
+  'Huella operativa anónima NHC para la futura capa Experiencia CE; no contiene identidad ni valores literales de entidades.';
