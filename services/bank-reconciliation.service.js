@@ -710,7 +710,7 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
 export async function listBankReconciliation({accountId='',eventId=''} = {}){
   try{
     const event=await loadEvent(eventId);
-    const [movementRows, allRawLinkRows, stateRows, eventRows, collaboratorRows, personRows, incomeImageRows, manualIncomeLinkRows, eventPersonSnapshotRows, settlementRows] = await Promise.all([
+    const [movementRows, allRawLinkRows, stateRows, eventRows, collaboratorRows, personRows, incomeImageRows, manualIncomeLinkRows, allIncomeLinkRows, eventPersonSnapshotRows, settlementRows] = await Promise.all([
       selectPaged(MOVEMENTS_TABLE, {
         columns:'id,account_id,account_label,executed_at,value_date,description,amount,bank_balance,included,source_filename,source_hash,import_batch_id,created_by,created_at,updated_at',
         order:'executed_at', ascending:false
@@ -724,6 +724,9 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
       selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      // BANK4 · consulta histórica: conservamos también los justificantes de abonos de todos los eventos.
+      // Solo se descargan metadatos/URLs; las imágenes no se transfieren hasta que el navegador las muestra.
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true}),
       selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:query=>query.eq('event_id',event.id)}).catch(()=>[]),
       listMovementSettlementsSafe()
     ]);
@@ -742,6 +745,32 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const catalogMap=new Map(catalog.map(item=>[`${item.eventId}|${item.ticketCode}`,item]));
     const eventTitleById=new Map(eventRows.map(row=>[text(row.id),text(row.titulo)||text(row.id)]));
     eventTitleById.set(event.id,event.title);
+
+    // BANK4 · Justificantes de abonos en el histórico general de la cuenta.
+    // La relación movimiento↔ingreso ya vive en ce_bank_income_links. Para mostrar la miniatura
+    // basta resolver la URL por event_id + income_id; no se reconstruyen dossiers ni se imputa
+    // el abono al evento activo. Así el histórico sigue siendo la verdad bancaria global.
+    const globalIncomeLinks=arr(allIncomeLinkRows).map(incomeLinkFromDb);
+    const globalIncomeEventIds=[...new Set(globalIncomeLinks.map(link=>text(link.eventId)).filter(Boolean))];
+    const allIncomeImageRows=[];
+    for(let i=0;i<globalIncomeEventIds.length;i+=50){
+      const ids=globalIncomeEventIds.slice(i,i+50);
+      allIncomeImageRows.push(...await selectPaged('ce_ticket_images',{
+        columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,
+        apply:query=>query.in('event_id',ids)
+      }));
+    }
+    const globalIncomeLinksByMovement=new Map();
+    for(const link of globalIncomeLinks){
+      if(!globalIncomeLinksByMovement.has(link.movementId))globalIncomeLinksByMovement.set(link.movementId,[]);
+      globalIncomeLinksByMovement.get(link.movementId).push({
+        id:link.incomeId, incomeId:link.incomeId, movementId:link.movementId, eventId:link.eventId,
+        eventTitle:eventTitleById.get(link.eventId)||link.eventId,
+        amount:cents(link.incomeAmountSnapshot), incomeAmountSnapshot:cents(link.incomeAmountSnapshot),
+        imageUrl:incomeImageUrl(allIncomeImageRows,link.eventId,link.incomeId),
+        personName:'Ingreso', paymentMethod:'Banco', manual:link.automatic!==true, linkId:link.id
+      });
+    }
     const settlementByMovement=new Map(arr(settlementRows).map(row=>{const item=settlementFromDb(row);return [item.movementId,item];}));
     const displayLinksByMovement=new Map();
     for(const row of allLinks){
@@ -895,7 +924,8 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
           ticketCode:link.ticketCode,
           ticketAmount:cents(link.ticketAmountSnapshot??link.ticketAmount),
           ticketAmountSnapshot:cents(link.ticketAmountSnapshot??link.ticketAmount)
-        }))
+        })),
+        incomeLinks:arr(globalIncomeLinksByMovement.get(row.id))
       })),
       movements,
       summary:{...ledger.summary,cashIncome,eventIncome,economicVariation,latestBankBalance:globalSummary.latestBankBalance,latestAt:globalSummary.latestAt,globalMovementCount:globalSummary.movementCount}
@@ -1332,6 +1362,9 @@ export async function listBankIncomes({movementId='',eventId='',q=''} = {}){
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
       selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      // BANK4 · consulta histórica: conservamos también los justificantes de abonos de todos los eventos.
+      // Solo se descargan metadatos/URLs; las imágenes no se transfieren hasta que el navegador las muestra.
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true}),
       selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:query=>query.eq('event_id',event.id)}).catch(()=>[]),
       listMovementSettlementsSafe()
     ]);
@@ -1365,6 +1398,9 @@ export async function setIncomeLinks(movementId,payload={},actor={}){
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
       selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
+      // BANK4 · consulta histórica: conservamos también los justificantes de abonos de todos los eventos.
+      // Solo se descargan metadatos/URLs; las imágenes no se transfieren hasta que el navegador las muestra.
+      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true}),
       selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:query=>query.eq('event_id',event.id)}).catch(()=>[]),
       listMovementSettlementsSafe()
     ]);

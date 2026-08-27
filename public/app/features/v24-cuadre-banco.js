@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp BANK3 · Cuadre Banco multievento + histórico bancario consultable. */
+/* ControlEvent v4_0_exp BANK4 · histórico Eurocaja + abonos + responsables combinados. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -623,6 +623,11 @@
     const account=arr(store.data?.accounts).find(item=>text(item.id)===text(store.accountId));
     return text(account?.label||account?.id||store.accountId);
   }
+  function chartAccountIban(){
+    const label=chartAccountLabel();
+    const match=label.match(/\bES\d{2}(?:\s+\d{4}){5}\b/i);
+    return match?match[0].replace(/\s+/g,' ').trim():label;
+  }
   function chartDate(value){
     const d=new Date(value);
     return Number.isFinite(d.getTime())?d.toLocaleDateString('es-ES',{day:'2-digit',month:'short',year:'numeric'}):'—';
@@ -886,7 +891,15 @@
     closeButton.addEventListener('click',closeNow,true);
   }
   function bankHistoryRows(){
-    return arr(store.data?.balanceTimeline).filter(row=>parseMoment(row.executedAt)>0);
+    const currentById=new Map(arr(store.data?.movements).map(row=>[String(row.id),row]));
+    return arr(store.data?.balanceTimeline).filter(row=>parseMoment(row.executedAt)>0).map(row=>{
+      const current=currentById.get(String(row.id));
+      if(!current)return row;
+      return {...row,
+        displayLinks:arr(row.displayLinks).length?row.displayLinks:arr(current.displayLinks||current.links),
+        incomeLinks:arr(current.incomeLinks).length?current.incomeLinks:arr(row.incomeLinks)
+      };
+    });
   }
   function bankHistorySortRows(rows){
     const field=text(store.bankHistorySortField||'executedAt');
@@ -911,6 +924,15 @@
     return arr(row?.displayLinks||row?.links).filter(link=>text(link?.ticketCode));
   }
   function bankHistoryTicketHtml(row){
+    if(num(row?.amount)>=0){
+      const incomes=arr(row?.incomeLinks).filter(link=>text(link?.imageUrl));
+      if(!incomes.length)return '<span class="ce-bank-history-no-ticket">—</span>';
+      const shown=incomes.slice(0,5);
+      return `<div class="ce-bank-history-ticket-strip">${shown.map(link=>{
+        const label=text(link.personName&&link.personName!=='Ingreso'?link.personName:'ING');
+        return `<button type="button" class="ce-bank-history-ticket-mini ce-bank-history-income-mini has-image" data-ce-bank-history-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id||link.incomeId||'')}" data-event-id="${esc(link.eventId||'')}" data-event-title="${esc(link.eventTitle||'Evento')}" data-person-name="${esc(link.personName||'Ingreso')}" data-income-amount="${esc(link.amount??link.incomeAmountSnapshot??0)}" data-payment-method="${esc(link.paymentMethod||'Banco')}" data-movement-id="${esc(row.id)}" title="Justificante de ingreso · ${esc(link.eventTitle||'Evento')}"><img src="${esc(link.imageUrl)}" alt="Justificante de ingreso"><span>${esc(label)}</span></button>`;
+      }).join('')}${incomes.length>shown.length?`<i>+${incomes.length-shown.length}</i>`:''}</div>`;
+    }
     const links=bankHistoryLinks(row);
     if(!links.length)return '<span class="ce-bank-history-no-ticket">—</span>';
     const shown=links.slice(0,5);
@@ -947,7 +969,9 @@
     let view=$('ceBankHistoryOverlay');
     if(!view){view=document.createElement('div');view.id='ceBankHistoryOverlay';view.className='ce-bank-history-overlay';chartOverlay.appendChild(view);}
     const body=rows.length?rows.map(row=>`<article class="ce-bank-history-row" data-movement-id="${esc(row.id)}"><div class="date"><b>${esc(formatDate(row.executedAt))}</b><span>Valor ${esc(formatDate(row.valueDate,false))}</span></div><div class="concept">${esc(row.description||'Movimiento bancario')}</div><div class="amount ${num(row.amount)<0?'negative':'positive'}">${esc(money(row.amount))}</div><div class="balance">${esc(money(row.bankBalance))}</div><div class="tickets">${bankHistoryTicketHtml(row)}</div></article>`).join(''):'<div class="ce-bank-history-empty">No hay movimientos históricos para esta cuenta.</div>';
-    view.innerHTML=`<section class="ce-bank-history-card" role="dialog" aria-modal="true" aria-label="Consulta histórica del banco"><header><div class="ce-bank-history-account"><img src="./assets/icons/cuadre-banco.svg" alt="Banco"><div><strong>${esc(account)}</strong><span>${first&&last?`${esc(formatDate(first.executedAt,false))} — ${esc(formatDate(last.executedAt,false))}`:'Sin histórico'}</span></div></div><div class="ce-bank-history-title"><span>CONSULTA HISTÓRICA DE MOVIMIENTOS</span><b>${rows.length} movimiento${rows.length===1?'':'s'}</b></div><button type="button" data-ce-bank-close-history-list aria-label="Cerrar histórico">×</button></header><div class="ce-bank-history-sortbar"><span>Ordenar por</span><button type="button" data-ce-bank-history-sort="executedAt">Fecha${bankHistorySortIndicator('executedAt')}</button><button type="button" data-ce-bank-history-sort="description">Concepto${bankHistorySortIndicator('description')}</button><button type="button" data-ce-bank-history-sort="amount">Importe${bankHistorySortIndicator('amount')}</button><button type="button" data-ce-bank-history-sort="bankBalance">Saldo${bankHistorySortIndicator('bankBalance')}</button></div><div class="ce-bank-history-head"><span>Fecha</span><span>Concepto del movimiento</span><span>Importe</span><span>Saldo</span><span>TKxx asociados</span></div><main class="ce-bank-history-list">${body}</main></section>`;
+    const iban=chartAccountIban();
+    const range=first&&last?`${formatDate(first.executedAt,false)} — ${formatDate(last.executedAt,false)}`:'Sin histórico';
+    view.innerHTML=`<section class="ce-bank-history-card" role="dialog" aria-modal="true" aria-label="Consulta histórica del banco"><header><div class="ce-bank-history-account"><img src="./assets/icons/eurocaja-rural-user.png" alt="Eurocaja Rural"><div><strong>PEÑA EL ARRASTRE</strong><span class="iban">${esc(iban)}</span><small>${esc(range)}</small></div></div><div class="ce-bank-history-title"><span>CONSULTA HISTÓRICA DE MOVIMIENTOS</span><b>${rows.length} movimiento${rows.length===1?'':'s'}</b></div><button type="button" data-ce-bank-close-history-list aria-label="Cerrar histórico">×</button></header><div class="ce-bank-history-sortbar"><span>Ordenar por</span><button type="button" data-ce-bank-history-sort="executedAt">Fecha${bankHistorySortIndicator('executedAt')}</button><button type="button" data-ce-bank-history-sort="description">Concepto${bankHistorySortIndicator('description')}</button><button type="button" data-ce-bank-history-sort="amount">Importe${bankHistorySortIndicator('amount')}</button><button type="button" data-ce-bank-history-sort="bankBalance">Saldo${bankHistorySortIndicator('bankBalance')}</button></div><div class="ce-bank-history-head"><span>Fecha</span><span>Concepto del movimiento</span><span>Importe</span><span>Saldo</span><span>Justificantes</span></div><main class="ce-bank-history-list">${body}</main></section>`;
     store.bankHistoryOpen=true;
     hydrateBankHistoryThumbnails(view);
   }
@@ -1007,7 +1031,8 @@
     const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'}`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,showEventPoints:false,actionsHtml:'<button type="button" class="ce-bank-history-open" data-ce-bank-open-history-list="1">☰ Ver movimientos</button>'});
     const eventCountLabel=finalSnapshot?'Filas almacenadas del Cuadre':'Movimientos En saldo señalados';
     const eventCountValue=finalSnapshot?storedCount:includedRows.length;
-    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector hidden-info"></aside><aside id="ceBankBalanceInspectorMedia" class="ce-bank-balance-inspector-media hidden-info" aria-label="Justificantes del movimiento"></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>${esc(eventCountLabel)}</span><strong>${eventCountValue}</strong></div></div><div class="ce-bank-balance-stack">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span>${includedRows.length?'<span><i class="amber"></i>Intervalo del Cuadre</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span>':''}<small>${finalSnapshot?'Parte inferior: exclusivamente filas almacenadas del Cuadre al cerrar el evento. El histórico superior es solo referencia.':'Zoom: solo movimientos En saldo del evento. Histórico: cronología completa de la cuenta.'}</small></footer></section>`;
+    const accountIban=chartAccountIban();
+    overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-brand"><img src="./assets/icons/eurocaja-rural-user.png" alt="Eurocaja Rural"><div class="ce-bank-balance-title"><h3 id="ceBankBalanceChartTitle">EVOLUCIÓN TEMPORAL DEL SALDO</h3><strong>${esc(accountIban)}</strong><p>${esc(historicalRange)}</p></div></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector hidden-info"></aside><aside id="ceBankBalanceInspectorMedia" class="ce-bank-balance-inspector-media hidden-info" aria-label="Justificantes del movimiento"></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>${esc(eventCountLabel)}</span><strong>${eventCountValue}</strong></div></div><div class="ce-bank-balance-stack">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span>${includedRows.length?'<span><i class="amber"></i>Intervalo del Cuadre</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span>':''}<small>${finalSnapshot?'Parte inferior: exclusivamente filas almacenadas del Cuadre al cerrar el evento. El histórico superior es solo referencia.':'Zoom: solo movimientos En saldo del evento. Histórico: cronología completa de la cuenta.'}</small></footer></section>`;
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden','false');
     overlay.querySelectorAll('.ce-bank-balance-pane').forEach(pane=>wireBalancePane(pane,pane.dataset.paneId==='zoom'?zoomPane.meta:historyPane.meta));
@@ -1254,7 +1279,9 @@
     const incomeId=text(chip?.dataset?.incomeId);
     const found=arr(movement?.incomeLinks).find(item=>text(item.id)===incomeId)||{};
     const link={...found,id:incomeId,personName:text(found.personName||chip?.dataset?.personName||'Ingreso'),amount:num(found.amount||chip?.dataset?.incomeAmount),paymentMethod:text(found.paymentMethod||chip?.dataset?.paymentMethod||'Banco'),manual:found.manual===true};
-    const eventInfo=eventMediaData(store.eventId,store.data?.event?.title);
+    const incomeEventId=text(chip?.dataset?.eventId||found.eventId||store.eventId);
+    const incomeEventTitle=text(chip?.dataset?.eventTitle||found.eventTitle||store.data?.event?.title);
+    const eventInfo=eventMediaData(incomeEventId,incomeEventTitle);
     accountingViewer({badge:'JUSTIFICANTE DE INGRESO',title:link.personName,eventInfo,leftHtml:incomeAccountingHtml(link,movement,eventInfo),imageSrc:src,imageAlt:`Justificante de ingreso de ${link.personName}`});
   }
   async function openBankTicketPhoto(chip,event){
@@ -1622,6 +1649,8 @@
     if(historySort){stopEvent(event);changeBankHistorySort(historySort.dataset.ceBankHistorySort);return;}
     const historyTicket=event.target?.closest?.('[data-ce-bank-history-ticket="1"]');
     if(historyTicket){openBankTicketPhoto(historyTicket,event);return;}
+    const historyIncome=event.target?.closest?.('[data-ce-bank-history-income="1"]');
+    if(historyIncome){openBankIncomePhoto(historyIncome,event);return;}
     const chartClose=event.target?.closest?.('[data-ce-bank-close-balance-chart]');
     if(chartClose||event.target?.id==='ceBankBalanceChartOverlay'){stopEvent(event);closeBalanceChart();return;}
     const add=event.target?.closest?.('[data-ce-bank-add-ticket]');
