@@ -36,7 +36,8 @@
     "test:v4-bank41": "node scripts/v4-0-exp-bank41-entertainment-unfinished-regression.cjs",
     "test:v4-bank42": "node scripts/v4-0-exp-bank42-donaciones-situacion-responsables-regression.cjs",
     "test:v4-bank43": "node scripts/v4-0-exp-bank43-donaciones-rural-regression.cjs",
-    "test:v4-bank44": "node scripts/v4-0-exp-bank44-donaciones-backup-infoevento-regression.cjs"
+    "test:v4-bank44": "node scripts/v4-0-exp-bank44-donaciones-backup-infoevento-regression.cjs",
+    "test:zuzu-z1": "node scripts/zuzu-z1-context-continuity-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

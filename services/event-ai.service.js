@@ -14299,6 +14299,57 @@ function v73RecentReferents(session={}){
   return out.slice(0,12);
 }
 
+
+// Z1 · CONTEXTO Y CONTINUIDAD
+// CE NO interpreta expresiones como «el anterior», «el primero» o «esa persona».
+// Solo conserva un índice factual, tipado y ordenado de los asuntos ya resueltos. Gemini
+// sigue siendo la única autoridad lingüística y decide si CURRENT_USER apunta a alguno de ellos.
+function v78TurnSemanticPacket(turn={}){
+  const p=turn?.normalizedPlan||{},q=p?.query||{},e=turn?.execution||{},act=trim(p?.action||turn?.actionType),scope=v73NormalizeScope(e?.scope||q?.scope||{}),domains=v73NormalizeTargets(q).map(x=>trim(x?.domain)).filter(Boolean),entities={};
+  const add=(k,v)=>{const vals=[...new Set((Array.isArray(v)?v:[v]).map(x=>trim(x?.text||x?.name||x)).filter(Boolean))].slice(0,12);if(vals.length)entities[k]=vals;};
+  add('event',scope?.event||scope?.events);add('person',q?.person||q?.people);add('responsible',q?.responsible||q?.responsibles);add('donor',q?.donor||q?.donors);add('product',q?.product||q?.products);add('store',q?.store||q?.stores);add('ticket',q?.ticket||q?.tickets);
+  const ef=e?.focus||{};for(const k of ['event','person','responsible','donor','product','store','ticket'])if(!entities[k])add(k,ef?.[k]);
+  if(act==='set_context'&&p?.context&&!p.context.clear_all)add(trim(p.context.type),p.context.values);
+  return{ref:`T${Number(turn?.seq)||0}`,seq:Number(turn?.seq)||0,action:act,domains:domains.length?domains:[trim(e?.domain)].filter(Boolean),scope,entities,response_kind:trim(p?.response_kind),title:trim(turn?.title).slice(0,120),prompt:trim(turn?.userPrompt).slice(0,180)};
+}
+function v78TopicStack(session={},limit=10){
+  const out=[],seen=new Set();
+  for(const t of arr(session?.recentTurns).slice(-24).reverse()){
+    if(trim(t?.status)==='KO')continue;const x=v78TurnSemanticPacket(t);if(!['query','local','reference','set_context'].includes(x.action))continue;
+    const meaningful=x.domains.length||Object.keys(x.entities).length||trim(x.scope?.kind);if(!meaningful)continue;
+    const key=JSON.stringify([x.domains,x.scope,x.entities,x.response_kind]);if(seen.has(key))continue;seen.add(key);out.push({...x,recency_index:out.length});if(out.length>=limit)break;
+  }
+  return out;
+}
+function v78EventTrail(session={},limit=8){
+  const out=[],seen=new Set();
+  for(const x of v78TopicStack(session,16)){
+    let values=[];if(trim(x?.scope?.kind)==='named_event'&&trim(x?.scope?.event))values=[trim(x.scope.event)];else if(trim(x?.scope?.kind)==='named_events')values=arr(x.scope.events).map(trim).filter(Boolean);else values=arr(x?.entities?.event).map(trim).filter(Boolean);
+    for(const name of values){const k=norm(name);if(!k||seen.has(k))continue;seen.add(k);out.push({name,ref:x.ref,seq:x.seq,recency_index:out.length});if(out.length>=limit)return out;}
+  }
+  return out;
+}
+function v78DistinctOrderedValues(rows=[],field='',limit=12){
+  const out=[],seen=new Set();for(const r of arr(rows)){const raw=trim(r?.[field]);if(!raw)continue;const k=norm(raw);if(!k||seen.has(k))continue;seen.add(k);out.push(raw);if(out.length>=limit)break;}return out;
+}
+function v78CurrentResultReferents(session={}){
+  const ds=session?.dataset,view=session?.view;if(!ds)return null;const rows=v73RowsForStored(ds,view||{}),by_role={},specs=[['person','Persona'],['responsible','Responsable'],['donor','Donante'],['event','Evento'],['product','Producto'],['store','Tienda'],['ticket','Ticket u otros gastos']];
+  for(const [role,field] of specs){const values=v78DistinctOrderedValues(rows,field,12);if(values.length)by_role[role]={field,values};}
+  const first=rows[0]&&typeof rows[0]==='object'?Object.fromEntries(Object.entries(rows[0]).slice(0,18).map(([k,v])=>[k,v73CompactFinalValue(v,1)])):null;
+  return{domain:trim(ds?.domain),row_count:rows.length,ordered_by_role:by_role,first_row:first};
+}
+function v78OrdinalSets(session={},currentContext={}){
+  const oper=v73LastOperationalTurn(session),q=oper?.normalizedPlan?.query||oper?.execution?.resolved_query||{},scope=q?.scope||oper?.execution?.scope||{},out={};
+  const put=(k,v)=>{const vals=[...new Set((Array.isArray(v)?v:[v]).map(x=>trim(x?.text||x?.name||x)).filter(Boolean))].slice(0,16);if(vals.length)out[k]=vals;};
+  if(trim(scope?.kind)==='named_events')put('events',scope.events);else if(trim(scope?.kind)==='named_event')put('events',scope.event);
+  put('people',q.people||q.person);put('responsibles',q.responsibles||q.responsible);put('donors',q.donors||q.donor);put('products',q.products||q.product);put('stores',q.stores||q.store);put('tickets',q.tickets||q.ticket);
+  const rr=v78CurrentResultReferents(session);if(rr?.ordered_by_role)out.current_result=rr.ordered_by_role;
+  return out;
+}
+function v78ThreadNavigation(session={},currentContext={}){
+  return{version:'Z1',topics_recent_first:v78TopicStack(session,10),events_recent_first:v78EventTrail(session,8),ordinal_sets:v78OrdinalSets(session,currentContext),current_result_referents:v78CurrentResultReferents(session)};
+}
+
 // RAW14V · Foco humano independiente de CURRENT.
 // MEMORY_FOCUS conserva el episodio señalado aunque CURRENT cambie por una respuesta local,
 // una inspección o una consulta derivada. DISCOURSE_FOCUS conserva de quién/de qué se habla
@@ -14538,7 +14589,8 @@ function v73CurrentSummary(session={}){
   const activeDataset=cleared?null:(ds?{dataset_id:trim(ds.datasetId),domain:trim(ds.domain),scope:ds.scope||{},row_count:Number(ds.rowCount)||0,available_fields:arr(ds.columns).slice(0,28),visible_fields:arr(view?.visibleFields).slice(0,24),current_sorting:arr(view?.sort).slice(0,6),current_filters:arr(view?.rowFilters).slice(0,8),current_grouping:arr(view?.groupBy).slice(0,6),presentation:view?.presentation||{},compatible_with_active_scope:scopeCompatible(ds.scope||{},effectiveScope)}:null);
   const viewState=activeDataset?{presentation_type:activeDataset?.presentation?.chart===true?'chart':(activeDataset?.presentation?.table===true?'table':'summary'),chart_config:activeDataset?.presentation?.chart_config||null,available_fields:activeDataset.available_fields,visible_fields:activeDataset.visible_fields,current_sorting:activeDataset.current_sorting,current_filters:activeDataset.current_filters,current_grouping:activeDataset.current_grouping}:null;
   const memoryEpisode=cleared?null:v76MemoryFocus(session),memoryAnchor=cleared?null:v77MemoryAnchor(session),memoryReplay=cleared?null:v77MemoryReplay(session),discourseFocus=cleared?{}:v76DiscourseFocus(session),lastProvenance=cleared?'':trim(t?.execution?.data_provenance||t?.execution?.provenance);
-  return{has_active_dataset:!!activeDataset,dataset_target:activeDataset?'CURRENT':null,last_command:trim(t?.actionType),last_intent:lastIntent,active_entities:cleared?{}:focus,active_entity_sources:cleared?{}:focus_source,scope:effectiveScope,scope_authority:cleared?'cleared':(eventScopeSource||'conversation'),active_dataset:activeDataset,view_state:viewState,recent_referents:cleared?[]:v73RecentReferents(session),discourse_focus:discourseFocus,memory_focus:memoryEpisode,recalled_episode:memoryEpisode,memory_anchor:memoryAnchor,memory_replay:memoryReplay,last_data_provenance:lastProvenance};
+  const base={has_active_dataset:!!activeDataset,dataset_target:activeDataset?'CURRENT':null,last_command:trim(t?.actionType),last_intent:lastIntent,active_entities:cleared?{}:focus,active_entity_sources:cleared?{}:focus_source,scope:effectiveScope,scope_authority:cleared?'cleared':(eventScopeSource||'conversation'),active_dataset:activeDataset,view_state:viewState,recent_referents:cleared?[]:v73RecentReferents(session),discourse_focus:discourseFocus,memory_focus:memoryEpisode,recalled_episode:memoryEpisode,memory_anchor:memoryAnchor,memory_replay:memoryReplay,last_data_provenance:lastProvenance};
+  return cleared?{...base,thread_navigation:{version:'Z1',topics_recent_first:[],events_recent_first:[],ordinal_sets:{},current_result_referents:null}}:{...base,thread_navigation:v78ThreadNavigation(session,base)};
 }
 function v73RecentHomogeneous(session={}){
   return{
@@ -14569,6 +14621,9 @@ PRIORIDAD
 5. Usuario logado «${display}» = PERSONA.
 6. Fecha/hora actual: ${localNow} (${tz}). Resuelve expresiones relativas respecto a esta fecha.
 7. CURRENT_CONTEXT.discourse_focus es el referente humano de «él/ella/su/esto/esa persona» y es INDEPENDIENTE de CURRENT/dataset. CURRENT_CONTEXT.memory_focus es el episodio histórico señalado y persiste hasta un cambio claro de tema; para referencias a «aquella conversación/tu respuesta/lo que te pregunté» manda sobre CURRENT.
+8. Z1 · CONTINUIDAD: CURRENT_CONTEXT.thread_navigation es un ÍNDICE FACTUAL creado por CE, no una interpretación. topics_recent_first conserva asuntos previos con ref Tn; events_recent_first conserva eventos visitados; ordinal_sets conserva el orden original de conjuntos explícitos; current_result_referents conserva el orden físico del resultado actual. TÚ decides lingüísticamente si «el anterior», «el primero», «el segundo», «lo primero», «de esas», «esa persona», «el siguiente» o cualquier referencia natural apunta a uno de esos elementos. CE no aplica diccionarios de frases ni reinterpreta después tu decisión.
+9. Si el usuario SOLO quiere cambiar de foco a un evento/persona/etc. ya presente en thread_navigation, usa ce_set_context con el valor canónico resuelto. Si quiere VOLVER A VER un resultado anterior, usa ce_reference/restore_snapshot con su Tn. Si además pide datos nuevos, usa ce_query con el scope/entidad resuelto. No preguntes de nuevo qué evento/persona es cuando thread_navigation deja un único referente plausible.
+10. El orden de ordinal_sets es semánticamente significativo y no se debe reordenar. En una comparación con events:[A,B], «primero» puede referirse a A y «segundo» a B si el hilo lo sostiene. En current_result_referents, «siguiente» se resuelve por el orden materializado de la vista actual, no por catálogo ni alfabeto salvo que la vista esté así ordenada.
 
 COMANDOS Y ARGUMENTOS COMPACTOS
 - ce_query: datos nuevos. arguments.targets = array de dominios distintos, mínimo uno. scope_kind es obligatorio. Los demás filtros van en campos planos.
@@ -15715,6 +15770,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   zuzuTracePush(flowTrace,'v4_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
   if(historyCandidates.length)zuzuTracePush(flowTrace,'v4_0_exp · MEMORIA EPISÓDICA · FUENTE','INFO',`DB persistente · ${historyCandidates.length} candidato(s) · prioridad natural más joven→más viejo salvo contexto claramente más fuerte.`);
   zuzuTracePush(flowTrace,'v4_0_exp · Ledger · CANDIDATOS TIPADOS RAW14V','INFO',JSON.stringify(entityCandidates).slice(0,2800));
+  {const nav=v78ThreadNavigation(session,v73CurrentSummary(session));zuzuTracePush(flowTrace,'v4_0_exp · Z1 · CONTEXTO DE ENTRADA','INFO',`scope=${JSON.stringify(v73CurrentSummary(session)?.scope||{})} · temas=${arr(nav.topics_recent_first).map(x=>`${x.ref}:${arr(x.domains).join('+')||x.action}`).slice(0,6).join(' | ')||'—'} · eventos=${arr(nav.events_recent_first).map(x=>x.name).join(' → ')||'—'} · resultados=${JSON.stringify(nav.current_result_referents?.ordered_by_role||{}).slice(0,900)}`);}
 
   let compiled;
   try{
@@ -15728,7 +15784,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     const execution={summary:cleanGeminiError(error),error:cleanGeminiError(error),debug_trace:arr(flowTrace).slice(0,160)};
     const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'},execution,datasetId:session?.currentTurn?.datasetId||'',viewId:session?.currentTurn?.viewId||'',parentTurnId:session?.currentTurn?.turnId||'',status:'WARN',title:'Zuzu no pudo interpretar el turno',answer,selectedEventId});
     const resultContext=v73LightContext(saved.conversation,saved.turn,session?.dataset||null,session?.view||null),usage=summarizeGeminiUsageFromTrace(flowTrace);
-    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · RAW14V · DISCOURSE + MEMORY FOCUS + EVENT COVERAGE',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · RAW14V · DISCOURSE + MEMORY FOCUS + EVENT COVERAGE · Z1 CONTEXT AUTHORITY',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
   }
 
   const raw=compiled.raw;let normalizedPlan=v76ApplyFocusBindings(compiled.plan,userPrompt,v73CurrentSummary(session),flowTrace,historyCandidates);
@@ -15900,7 +15956,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14V · DISCOURSE + MEMORY FOCUS + EVENT COVERAGE',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14V · DISCOURSE + MEMORY FOCUS + EVENT COVERAGE · Z1 CONTEXT AUTHORITY',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
@@ -21649,6 +21705,12 @@ export const __zuzuStructuralTesting = Object.freeze({
   v40CanonicalEnumerationAnswer,
   v40SccResultContext,
   v337ContextIsolationPolicy,
+  v78TurnSemanticPacket,
+  v78TopicStack,
+  v78EventTrail,
+  v78CurrentResultReferents,
+  v78OrdinalSets,
+  v78ThreadNavigation,
   v337DonationContinuationRequest,
   v337FullResetRequest,
   v337ForgetPersonRequest,
