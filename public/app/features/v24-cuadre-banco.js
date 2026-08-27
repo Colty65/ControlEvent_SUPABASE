@@ -148,7 +148,7 @@
       if(footer){
         desktop=document.createElement('button');
         desktop.type='button'; desktop.id='btnOpenBankReconciliation'; desktop.className='iconbtn outline ce-bank-entry hidden';
-        desktop.innerHTML='<img class="footer-img" alt="Cuadre Banco" src="./assets/icons/cuadre-banco.svg">';
+        desktop.innerHTML='<img class="footer-img" alt="Eurocaja Rural · Cuadre Banco" src="./assets/icons/eurocaja-rural-user.png">';
         footer.insertBefore(desktop,maintenance||null);
       }
     }
@@ -159,7 +159,7 @@
       overlay.innerHTML=`<section class="ce-bank-window" role="dialog" aria-modal="true" aria-labelledby="ceBankTitle">
         <div class="ce-bank-ambient" aria-hidden="true"><span></span><span></span><span></span></div>
         <header class="ce-bank-header">
-          <div class="ce-bank-brand-orbit"><img src="./assets/icons/cuadre-banco.svg" alt=""><i></i></div>
+          <div class="ce-bank-brand-orbit"><img src="./assets/icons/eurocaja-rural-user.png" alt="Eurocaja Rural"><i></i></div>
           <div class="ce-bank-title-block">
             <div class="ce-bank-eyebrow"><span>CONTROL FINANCIERO</span><b><i></i> CONCILIACIÓN POR EVENTO</b></div>
             <h2 id="ceBankTitle">Cuadre Banco</h2>
@@ -222,7 +222,7 @@
       const tools=grids.find(grid=>grid.querySelector('[data-target="btnExportExcel"],[data-target="btnExportSeed"],[data-target="btnOpenImport"]')) || grids[1] || grids[0];
       if(!tools) return;
       btn=document.createElement('button');
-      btn.type='button'; btn.className='mobile-menu-action ce-bank-entry hidden'; btn.dataset.ceOpenBank='1'; btn.innerHTML='<span class="mi">🏦</span>Cuadre Banco';
+      btn.type='button'; btn.className='mobile-menu-action ce-bank-entry hidden'; btn.dataset.ceOpenBank='1'; btn.innerHTML='<span class="mi"><img src="./assets/icons/eurocaja-rural-user.png" alt="" style="width:24px;height:24px;object-fit:cover;border-radius:6px;vertical-align:middle"></span>Cuadre Banco';
       tools.appendChild(btn);
     }
     prepareEntry(btn);

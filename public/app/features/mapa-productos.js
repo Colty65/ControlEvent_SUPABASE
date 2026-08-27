@@ -258,7 +258,7 @@
     if(!id) return '';
     const situacion = donationStatus(item?.row || item);
     const delivered = situacion === 'Entregada';
-    return `<button type="button" class="mapa-donation-delivered ${delivered ? 'is-delivered' : ''}" data-mapa-donation-toggle="1" data-donation-id="${esc(id)}" aria-pressed="${delivered ? 'true' : 'false'}" title="Situación actual: ${esc(situacion)}">${delivered ? '✓ Entregada' : '○ Marcar entregada'}</button>`;
+    return `<button type="button" class="mapa-donation-delivered ${delivered ? 'is-delivered' : ''}" data-mapa-donation-toggle="1" data-donation-id="${esc(id)}" aria-pressed="${delivered ? 'true' : 'false'}" title="Situación actual: ${esc(situacion)}" onclick="try{window.ControlEventMapaProductos&&window.ControlEventMapaProductos.toggleDonationDelivered&&window.ControlEventMapaProductos.toggleDonationDelivered('${esc(id)}')}catch(_e){};return false;">${delivered ? '✓ Entregada' : '○ Marcar entregada'}</button>`;
   }
   function toggleShoppingChecked(key){
     const k = String(key || '');

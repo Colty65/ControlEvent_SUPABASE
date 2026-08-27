@@ -15,7 +15,7 @@ t('histórico ordena por fecha',/data-ce-bank-history-sort="executedAt"/.test(ba
 t('histórico ordena por concepto',/data-ce-bank-history-sort="description"/.test(bank));
 t('histórico ordena por importe',/data-ce-bank-history-sort="amount"/.test(bank));
 t('histórico ordena por saldo',/data-ce-bank-history-sort="bankBalance"/.test(bank));
-t('cabecera histórico lleva icono banco',/assets\/icons\/cuadre-banco\.svg/.test(bank));
+t('cabecera histórico lleva icono banco',/assets\/icons\/eurocaja-rural-user\.png/.test(bank));
 t('cabecera histórico lleva cuenta y rango',/ce-bank-history-account/.test(bank)&&/formatDate\(first\.executedAt,false\)/.test(bank));
 t('backend histórico incluye TKxx',/balanceTimeline:[\s\S]*displayLinks:arr\(displayLinksByMovement/.test(svc));
 t('histórico pinta miniaturas TKxx',/ce-bank-history-ticket-mini/.test(bank)&&/hydrateBankHistoryThumbnails/.test(bank));
@@ -29,6 +29,6 @@ t('detalle incluye tienda producto uds precio importe',/Tienda/.test(rep)&&/Prod
 t('grupos muestran total',/g\.total/.test(rep)&&/money\(g\.total\)/.test(rep));
 t('PDF individual por responsable',/data-ce-resp-pdf=/.test(rep)&&/printGroups\(\[g\]/.test(rep));
 t('PDF de todos los responsables',/data-ce-resp-pdf-all/.test(rep)&&/printGroups\(m\?\.__ceGroups/.test(rep));
-t('donaciones declaran valor estimado',/VALORACIÓN ESTIMADA/.test(rep)&&/Valor estimado/.test(rep));
-t('donaciones muestran origen/donante',/Origen \/ tienda/.test(rep)&&/donorName/.test(rep));
+t('donaciones declaran valor estimado',/valoración estimada/i.test(rep)&&/Valor estimado/.test(rep));
+t('donaciones muestran origen/donante',/Origen \/ donante/.test(rep)&&/donorName/.test(rep));
 console.log(`\nV4.0_exp BANK3 · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

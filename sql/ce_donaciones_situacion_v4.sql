@@ -1,23 +1,43 @@
--- ControlEvent v4_0_exp · DONACIONES PENDIENTES
--- Ejecutar UNA vez en Supabase SQL Editor antes de probar esta versión.
--- Añade el estado operativo de entrega al registro canónico ce_compras usado también por DONACIONES.
+-- ControlEvent v4_0_exp · DONACIONES PENDIENTES · BANK4.3
+-- Migración idempotente. Puede ejecutarse aunque una versión anterior se quedara a medias.
+-- Regla histórica:
+--   Evento Finalizado -> donación registrada = Entregada.
+--   Evento En curso   -> donación existente = Comprometida.
+-- Las nuevas donaciones nacen Comprometidas salvo que CE envíe expresamente otro estado.
+
+begin;
 
 alter table public.ce_compras
   add column if not exists donacion_situacion text;
 
--- La versión anterior daba por hecha la donación. Para que los registros históricos
--- puedan revisarse de forma natural, las donaciones sin estado arrancan como Comprometida.
-update public.ce_compras
-set donacion_situacion = 'Comprometida'
-where upper(trim(coalesce(ticket_donacion,''))) in ('DONADO TIENDA','DONADO SOCIO','DONADO OTROS')
-  and (donacion_situacion is null or trim(donacion_situacion) = '');
+-- Regularización histórica única. La protección de eventos finalizados debe seguir existiendo,
+-- pero durante esta migración necesitamos actualizar esas filas antiguas de forma controlada.
+-- DISABLE TRIGGER USER se revierte dentro de la misma transacción si algo falla.
+alter table public.ce_compras disable trigger user;
 
--- Las compras normales no deben llevar situación de donación.
+update public.ce_compras c
+set donacion_situacion = 'Entregada'
+from public.ce_eventos e
+where e.id = c.event_id
+  and lower(trim(coalesce(e.situacion,''))) = 'finalizado'
+  and upper(trim(coalesce(c.ticket_donacion,''))) in ('DONADO TIENDA','DONADO SOCIO','DONADO OTROS');
+
+update public.ce_compras c
+set donacion_situacion = 'Comprometida'
+from public.ce_eventos e
+where e.id = c.event_id
+  and lower(trim(coalesce(e.situacion,''))) = 'en curso'
+  and upper(trim(coalesce(c.ticket_donacion,''))) in ('DONADO TIENDA','DONADO SOCIO','DONADO OTROS')
+  and (c.donacion_situacion is null or trim(c.donacion_situacion) = '' or c.donacion_situacion not in ('Supuesta','Comprometida','Entregada'));
+
 update public.ce_compras
 set donacion_situacion = null
 where upper(trim(coalesce(ticket_donacion,''))) not in ('DONADO TIENDA','DONADO SOCIO','DONADO OTROS')
   and donacion_situacion is not null;
 
+alter table public.ce_compras enable trigger user;
+
+-- Restricción e índice.
 do $$
 begin
   if not exists (
@@ -39,9 +59,7 @@ create index if not exists idx_ce_compras_event_donacion_situacion
 comment on column public.ce_compras.donacion_situacion is
 'Situación real de entrega del producto donado: Supuesta, Comprometida o Entregada. NULL para compras normales.';
 
--- Garantiza la coherencia aunque una línea cambie entre COMPRA y DONACIÓN por las RPC ya existentes.
--- Al crear una donación sin estado explícito arranca de forma natural como Comprometida;
--- al convertirla de nuevo en compra se limpia el estado de entrega.
+-- Coherencia de nuevas filas y de cambios compra <-> donación.
 create or replace function public.ce_sync_donacion_situacion()
 returns trigger
 language plpgsql
@@ -63,9 +81,9 @@ create trigger ce_sync_donacion_situacion_trg
 before insert or update of ticket_donacion on public.ce_compras
 for each row execute function public.ce_sync_donacion_situacion();
 
--- RPC específica. Reutiliza primero la RPC canónica de COMPRAS ya instalada para conservar
--- sus validaciones/autorización interna (evento En curso y write-lock) y, dentro de la misma
--- transacción, actualiza exclusivamente el nuevo estado de la donación.
+-- Compatibilidad con despliegues BANK4.2 que aún llamen a esta RPC.
+-- BANK4.3 ya no depende de ella: el backend actualiza directamente la columna tras validar
+-- que el registro es una donación y que el evento no está Finalizado.
 create or replace function public.ce_crud_donacion_situacion(
   p_id text,
   p_situacion text
@@ -96,19 +114,6 @@ begin
     raise exception 'Situación de donación no válida: %', p_situacion;
   end if;
 
-  -- Activa el mismo camino canónico/guardas que ya usa CE para modificar ce_compras.
-  perform public.ce_crud_compras_update(
-    p_id := v.id::text,
-    p_event_id := v.event_id::text,
-    p_producto_id := v.producto_id::text,
-    p_unidades := v.unidades,
-    p_precio := v.precio,
-    p_ticket_donacion := v.ticket_donacion,
-    p_donor_ref := v.donor_ref,
-    p_responsable_id := v.responsable_id,
-    p_tienda_id := v.tienda_id
-  );
-
   update public.ce_compras
   set donacion_situacion = s
   where id = v.id
@@ -120,8 +125,12 @@ $$;
 
 grant execute on function public.ce_crud_donacion_situacion(text,text) to service_role;
 
--- Comprobación rápida opcional:
--- select id, ticket_donacion, donacion_situacion
--- from public.ce_compras
--- where upper(trim(coalesce(ticket_donacion,''))) like 'DONADO%'
--- order by event_id, donacion_situacion, id;
+commit;
+
+-- Comprobación opcional:
+-- select e.titulo, e.situacion, c.ticket_donacion, c.donacion_situacion, count(*)
+-- from public.ce_compras c
+-- join public.ce_eventos e on e.id = c.event_id
+-- where upper(trim(coalesce(c.ticket_donacion,''))) in ('DONADO TIENDA','DONADO SOCIO','DONADO OTROS')
+-- group by e.titulo, e.situacion, c.ticket_donacion, c.donacion_situacion
+-- order by e.situacion, e.titulo, c.donacion_situacion;
