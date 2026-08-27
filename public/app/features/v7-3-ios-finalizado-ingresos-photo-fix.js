@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp - iOS/iPadOS Finalizado: INGRESOS en grande con información y retorno al globo origen.
+/* ControlEvent v4_0_exp - iOS/iPadOS Finalizado: INGRESOS en grande con información y retorno al globo origen.
    Alcance: solo visor iOS/iPadOS para fotos de INGRESOS en evento Finalizado. Sin cambios de datos, Excel, cache ni render general. */
 (function(){
   'use strict';

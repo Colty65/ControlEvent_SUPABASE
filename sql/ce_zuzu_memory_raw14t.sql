@@ -1,4 +1,4 @@
--- ControlEvent v3_0_exp · RAW14T · Memory Core DB + semilla de Experiencia CE
+-- ControlEvent v4_0_exp · RAW14T · Memory Core DB + semilla de Experiencia CE
 -- Ejecutar UNA vez en Supabase después de RAW14Q. Idempotente.
 -- Objetivo: memoria histórica con fuente única en tablas persistentes y dejar preparada
 -- una huella operativa ANÓNIMA para aprendizaje futuro sin compartir conversaciones.

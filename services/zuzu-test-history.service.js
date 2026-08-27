@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp · Histórico persistente ITV Zuzu.
+/* ControlEvent v4_0_exp · Histórico persistente ITV Zuzu.
    Prefiere tabla dedicada ce_zuzu_test_runs. Si todavía no se ha creado,
    usa ce_meta como compatibilidad inmediata sin bloquear la ITV. */
 import { getSupabaseAdmin } from '../lib/supabase.js';
@@ -23,7 +23,7 @@ function normalizeRun(payload={},actor={}){
     run_key:runKey,
     seed,
     battery_clock:trim(payload.batteryClock),
-    app_version:trim(payload.appVersion)||'v3_0_exp',
+    app_version:trim(payload.appVersion)||'v4_0_exp',
     created_by:trim(actor.identificacion||actor.Identificacion),
     generated_at:trim(payload.generatedAt||payload.generatedBattery?.generatedAt)||now(),
     data_counts:payload.dataCounts||payload.generatedBattery?.dataCounts||{},

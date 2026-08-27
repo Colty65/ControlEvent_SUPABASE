@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp FIX9.3.1 · PERSONAS históricas corregidas por EVENTO. */
+/* ControlEvent v4_0_exp FIX9.3.1 · PERSONAS históricas corregidas por EVENTO. */
 (function(root){
   'use strict';
   if(root.__ceV25Fix93HistoricalPeople) return;

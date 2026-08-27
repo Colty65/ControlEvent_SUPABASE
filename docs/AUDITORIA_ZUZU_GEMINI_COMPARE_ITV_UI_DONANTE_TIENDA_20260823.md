@@ -1,4 +1,4 @@
-# Auditoría ControlEvent v3_0_exp · Gemini/CE + ITV + COMPRAS/DONACIONES
+# Auditoría ControlEvent v4_0_exp · Gemini/CE + ITV + COMPRAS/DONACIONES
 
 Fecha: 23/08/2026
 
@@ -87,12 +87,12 @@ Esto permite que la validación estructural del servidor compruebe realmente dom
 
 Se normaliza la versión antes de construir el nombre de archivo:
 
-- `v3_0_exp_exp_exp_exp` => `v3_0_exp`
-- prefijo => `ControlEvent_v3_0_exp`
+- `v4_0_exp_exp_exp_exp` => `v4_0_exp`
+- prefijo => `ControlEvent_v4_0_exp`
 
 Ejemplo esperado:
 
-`ControlEvent_v3_0_exp_ITV_Zuzu_2026-08-23T...-FULL_CERT.json`
+`ControlEvent_v4_0_exp_ITV_Zuzu_2026-08-23T...-FULL_CERT.json`
 
 La corrección se hace en el generador de nombre, no renombrando archivos a posteriori.
 

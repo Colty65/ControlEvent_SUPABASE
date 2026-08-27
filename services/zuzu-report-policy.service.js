@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp - Política estructural de informes Zuzu.
+/* ControlEvent v4_0_exp - Política estructural de informes Zuzu.
    Centraliza alcance, profundidad, módulos y reglas de no redundancia. */
 
 function text(value){ return value == null ? '' : String(value); }

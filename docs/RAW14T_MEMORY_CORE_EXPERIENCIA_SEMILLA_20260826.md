@@ -1,4 +1,4 @@
-# ControlEvent v3_0_exp · RAW14T · Memory Core DB + semilla de Experiencia CE
+# ControlEvent v4_0_exp · RAW14T · Memory Core DB + semilla de Experiencia CE
 
 Fecha: 26/08/2026
 

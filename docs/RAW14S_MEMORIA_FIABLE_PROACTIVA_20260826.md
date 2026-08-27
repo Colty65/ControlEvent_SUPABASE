@@ -1,4 +1,4 @@
-# ControlEvent v3_0_exp · RAW14S · Memoria fiable + proactiva humana
+# ControlEvent v4_0_exp · RAW14S · Memoria fiable + proactiva humana
 
 Fecha: 26/08/2026
 

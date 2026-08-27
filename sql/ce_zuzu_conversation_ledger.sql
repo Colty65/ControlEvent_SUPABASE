@@ -1,4 +1,4 @@
--- ControlEvent v3_0_exp · Zuzu Ledger Inmutable v1
+-- ControlEvent v4_0_exp · Zuzu Ledger Inmutable v1
 -- Ejecutar una vez en Supabase. Es idempotente.
 -- El backend usa la conexión administrativa de ControlEvent; la app cliente no accede directamente a estas tablas.
 

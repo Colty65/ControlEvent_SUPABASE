@@ -1,8 +1,8 @@
-/* ControlEvent v3_0_exp - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
+/* ControlEvent v4_0_exp - guardado inmediato, buscadores en compras/donaciones y nuevas gráficas. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v3_0_exp';
-  const VERSION_FILE = 'ControlEvent_v3_0_exp';
+  const VERSION = 'ControlEvent v4_0_exp';
+  const VERSION_FILE = 'ControlEvent_v4_0_exp';
   const $ = id => document.getElementById(id);
   const norm = v => String(v ?? '').trim();
   const up = v => norm(v).toUpperCase();

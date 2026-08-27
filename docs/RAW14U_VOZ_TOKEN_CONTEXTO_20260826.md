@@ -1,4 +1,4 @@
-# ControlEvent v3_0_exp · RAW14U · Voz, Token Budget y contexto estricto
+# ControlEvent v4_0_exp · RAW14U · Voz, Token Budget y contexto estricto
 
 Base: RAW14T Memory Core + Experiencia semilla.
 

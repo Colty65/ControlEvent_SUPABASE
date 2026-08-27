@@ -1,9 +1,9 @@
-/* ControlEvent v3_0_exp - Fotos TKxx/INGRESOS con claves vivas y exportación limpia.
+/* ControlEvent v4_0_exp - Fotos TKxx/INGRESOS con claves vivas y exportación limpia.
    Sin intervalos: normaliza solo en carga, cambio de evento, refresco, foto cambiada o descarga. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v3_0_exp';
-  const VERSION_FILE = 'ControlEvent_v3_0_exp';
+  const VERSION = 'ControlEvent v4_0_exp';
+  const VERSION_FILE = 'ControlEvent_v4_0_exp';
   const INSTALLED = '__ceV82TicketScopeFix';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

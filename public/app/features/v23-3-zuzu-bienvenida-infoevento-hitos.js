@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp · Zuzu sin mensaje de bienvenida.
+/* ControlEvent v4_0_exp · Zuzu sin mensaje de bienvenida.
    Módulo de compatibilidad: se conserva el nombre público por si algún código antiguo
    lo consulta, pero ya NO bloquea el textarea, NO reproduce locución y NO fuerza la escobita.
    La escobita queda reservada exclusivamente para iniciar una conversación nueva. */

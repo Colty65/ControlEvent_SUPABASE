@@ -11,7 +11,7 @@ t('catálogo y tiendas usadas quedan separados en presentación',/domain=stores_
 
 t('MEMORY_FOCUS independiente de CURRENT',/function v76MemoryFocus/.test(ai)&&/MEMORY FOCUS PERSISTENTE/.test(ai));
 t('MEMORY_FOCUS conserva esquema del episodio',/turn_outline:arr\(me\.turns\)\.slice\(0,16\)/.test(ai));
-t('CURRENT de memoria se liga al matched_turn',/out\.reference\.target_ref=trim\(mf\.matched_turn_id\)/.test(ai));
+t('CURRENT de memoria se liga al memory anchor/matched_turn',/anchorTurn=trim\(ma\?\.turn_id\|\|mf\?\.matched_turn_id\)/.test(ai)&&/out\.reference\.target_ref=anchorTurn/.test(ai));
 t('todo esto asciende a reexecute_episode',/out\.reference\.action='reexecute_episode'/.test(ai));
 t('reexecute_episode es acción tipada',/reexecute_episode/.test(ai)&&/v76ReexecuteEpisode/.test(ai));
 t('episodio reejecuta PLAN distintos con datos actuales',/Reejecutados \$\{okCount\} PLAN distintos del episodio/.test(ai)&&/No se reutilizan cifras históricas/.test(ai));
@@ -40,6 +40,6 @@ t('tickets/highlights se limitan para token budget',/purchase_ticket_context\)\.
 t('final obliga narrativa Description DOCxx en pregunta general',/CORE\/NARRATIVE\/DOCUMENTS son la base humana/.test(ai)&&/Descripción y los DOCxx\/comentarios/.test(ai));
 
 t('corrección conversacional no finge mutación',/CORRECCIONES NO SON MUTACIONES/.test(ai)&&/Una observación del usuario no altera la BBDD/.test(ai));
-t('foco y coverage viajan a resultado final',/discourse_focus','memory_focus','event_coverage','episode_reexecution','literal_memory_turn/.test(ai));
+t('foco, ancla, replay y coverage viajan a resultado final',/discourse_focus','memory_focus','memory_anchor','memory_replay','data_provenance','memory_compare','event_coverage','episode_reexecution','literal_memory_turn/.test(ai));
 
 console.log(`\nRAW14V FOCO/MEMORIA/COVERAGE · ${ok}/${total} comprobaciones OK`);if(ok!==total)process.exitCode=1;

@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp - Entrada asistida de COMPRAS mediante foto de ticket e IA.
+/* ControlEvent v4_0_exp - Entrada asistida de COMPRAS mediante foto de ticket e IA.
    FIX Gemini SDK: foto grande izquierda, responsables SOCIO, aviso TK usado, precio automático de producto y orden visual del ticket. */
 (function(){
   'use strict';

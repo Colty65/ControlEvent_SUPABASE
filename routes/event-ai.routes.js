@@ -21,7 +21,7 @@ router.post('/event-ai/conversations/turn', asyncHandler(async (req,res)=>{
   const body=req.body||{};const data=await readZuzuLedgerTurnPresentation({turnId:body.turnId,actor:body.usuarioLogado||body.user||body.authUser||body.ce_acceso||{}});if(!data)return res.status(404).json({ok:false,error:'Turno Zuzu no encontrado.'});res.json({ok:true,data});
 }));
 
-// v3_0_exp · nueva arquitectura en SOMBRA: clasifica la misma pregunta, pero NO interviene
+// v4_0_exp · nueva arquitectura en SOMBRA: clasifica la misma pregunta, pero NO interviene
 // en la respuesta actual ni consulta/modifica datos de ControlEvent. La UI la ejecuta después
 // de recibir la respuesta principal para no añadir latencia ni riesgo al Zuzu vigente.
 router.post('/event-ai/router-shadow', asyncHandler(async (req, res) => {

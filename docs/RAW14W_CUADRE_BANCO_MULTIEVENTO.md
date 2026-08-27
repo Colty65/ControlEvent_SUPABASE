@@ -17,7 +17,7 @@ Si los justificantes suman 118,56 € frente a una retirada de 120 €, los 1,44
 
 ## Implementación
 
-- `ce_bank_ticket_links` mantiene un vínculo por `movement_id + event_id + ticket_code` y admite varios eventos para el mismo movimiento.
+- `ce_bank_ticket_links` mantiene un vínculo por `movement_id + event_id + ticket_code` y admite varios TKxx del mismo o de distintos eventos para el mismo movimiento. Si la BBDD procede de una versión antigua, ejecutar `sql/ce_bank_ticket_links_multi_v4.sql` para retirar restricciones UNIQUE históricas demasiado restrictivas.
 - Nueva tabla `ce_bank_movement_settlements` para diferencias residuales aceptadas globalmente.
 - La suma global de TKxx nunca puede superar el importe absoluto del movimiento.
 - Añadir un TKxx invalida cualquier diferencia aceptada anterior y obliga a recalcular el cierre.

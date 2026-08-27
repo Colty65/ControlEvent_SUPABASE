@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp OPT2J - bloqueo duro de gráficas antiguas + anti segundo repintado.
+/* ControlEvent v4_0_exp OPT2J - bloqueo duro de gráficas antiguas + anti segundo repintado.
    Objetivo: que nunca se vea la gráfica antigua de 4 quesos / 2 columnas.
    Estrategia:
    - Se carga muy pronto y también al final para reengancharse.
@@ -7,7 +7,7 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'v3_0_exp_opt_2j';
+  const VERSION = 'v4_0_exp_opt_2j';
   const now = () => Date.now();
   const $ = id => document.getElementById(id);
   const text = v => String(v == null ? '' : v).trim();
@@ -245,8 +245,8 @@
       return;
     }
     metrics.finalRuns++;
-    try{ fn.call(window.ControlEventV462 || window.ControlEventV461 || window.ControlEventV460 || window, {force:true, reason:'v3_0_exp_opt_2h_' + (reason || 'final')}); }
-    catch(err){ console.warn('[v3_0_exp_opt_2h] render V46', err); }
+    try{ fn.call(window.ControlEventV462 || window.ControlEventV461 || window.ControlEventV460 || window, {force:true, reason:'v4_0_exp_opt_2h_' + (reason || 'final')}); }
+    catch(err){ console.warn('[v4_0_exp_opt_2h] render V46', err); }
     const html = rawGet(w) || '';
     if(!commitIfStrict(html, reason || 'final')){
       if(isWrongChartHtml(html) || isBlankChartHtml(html)){
@@ -299,7 +299,7 @@
         }
       });
       w.__ceOpt2HHardLocked = true;
-    }catch(err){ console.warn('[v3_0_exp_opt_2h] patch wrap', err); }
+    }catch(err){ console.warn('[v4_0_exp_opt_2h] patch wrap', err); }
   }
 
   function makeWrapper(){

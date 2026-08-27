@@ -15,7 +15,7 @@ function test(name,pass){total++; if(pass){ok++;console.log('OK',name);}else{con
 test('se elimina la exclusividad de movimiento por otro evento',!service.includes('BANK_MOVEMENT_OTHER_EVENT'));
 test('selector de TKxx usa catálogo de todos los eventos',/ticketCatalog\('\s*','\s*'\)/.test(service)&&/Selector multievento/.test(service));
 test('clave UI TKxx es eventId + ticketCode',/key:`\$\{text\(item\.eventId\)\}\|\$\{text\(item\.ticketCode\)\}`/.test(ui));
-test('la suma global de TKxx no puede superar el movimiento',/BANK_TICKETS_EXCEED_MOVEMENT/.test(service)&&/attempted>target\+\.01/.test(service));
+test('la suma global puede quedar por encima sin perder justificantes',!/BANK_TICKETS_EXCEED_MOVEMENT/.test(service)&&/NO se impide asociar justificantes/.test(service));
 test('añadir TKxx marca En saldo su evento',/EVENT_MOVEMENT_STATE_TABLE[\s\S]{0,300}included:true/.test(service));
 test('vínculo fuera de periodo sigue visible',/inPeriod\(row,period\)\|\|storedMovementIds\.has/.test(service));
 test('cargo con TKxx solo de otros eventos no hereda un En saldo antiguo',/displayLinks\.length&&num\(row\.amount\)<0[\s\S]{0,450}included=false/.test(service));
@@ -52,6 +52,8 @@ x=state(-120,[94,24.56]);
 test('118,56/120 no cierra sin aceptación',x.diff===1.44&&!x.closed);
 x=state(-120,[94,24.56],true);
 test('118,56/120 cierra tras aceptar 1,44 sin imputarlo a eventos',x.diff===1.44&&x.closed&&94+24.56===118.56);
+x=state(-135,[130.68,5]);
+test('135,68 de TKxx sobre 135 de banco queda pendiente por diferencia inversa',x.justified===135.68&&x.diff===-0.68&&!x.closed);
 
 console.log(`${ok}/${total} comprobaciones OK`);
 if(ok!==total)process.exit(1);

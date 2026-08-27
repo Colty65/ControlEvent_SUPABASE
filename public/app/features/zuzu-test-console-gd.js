@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp · PRUEBAS ZUZU · Consola GD.
+/* ControlEvent v4_0_exp · PRUEBAS ZUZU · Consola GD.
    Batería autogenerada desde datos reales. Solo lectura. */
 (function(){
   'use strict';
@@ -54,7 +54,7 @@
   function storedAuth(){
     const direct=window.ControlEventLoginUser||window.__CONTROL_EVENT_LOGIN_USER__||window.__CONTROL_EVENT_CE_ACCESO__||null;
     if(direct)return direct;
-    for(const key of ['ControlEvent_v3_0_exp_login_user','ControlEvent_ce_acceso_usuario','ControlEvent_auth_user_v509']){
+    for(const key of ['ControlEvent_v4_0_exp_login_user','ControlEvent_ce_acceso_usuario','ControlEvent_auth_user_v509']){
       try{const raw=sessionStorage.getItem(key)||localStorage.getItem(key);if(raw){const u=JSON.parse(raw);if(u)return u;}}catch(_){ }
     }
     return null;
@@ -433,7 +433,7 @@
     if(!processed)return;
     try{
       const summary=Object.fromEntries(MODES.map(m=>[m,modeCache[m]?.summary||null]));
-      const payload={runKey:currentRunKey,seed:batterySeed,batteryClock,appVersion:'v3_0_exp',generatedAt:preview?.generatedAt,dataCounts:preview?.dataCounts||{},generatedBattery:preview,report:reportPayload(),summary};
+      const payload={runKey:currentRunKey,seed:batterySeed,batteryClock,appVersion:'v4_0_exp',generatedAt:preview?.generatedAt,dataCounts:preview?.dataCounts||{},generatedBattery:preview,report:reportPayload(),summary};
       const d=await fetchJson('/api/zuzu-tests/history',{method:'POST',headers:apiHeaders(),body:JSON.stringify(payload)},30000);
       historyStorage=d?.storage||historyStorage;if($('ztHistoryStorage'))$('ztHistoryStorage').textContent=`Histórico persistente: ${historyStorage||'guardado'} · clave ${currentRunKey}`;await loadServerHistory();
     }catch(e){if($('ztHistoryStorage'))$('ztHistoryStorage').textContent=`Histórico: no se pudo guardar (${e.message||e}). La prueba actual sigue disponible en esta sesión.`;}
@@ -495,14 +495,14 @@
 
 
   function itvVersionToken(){
-    const candidates=[window.ControlEventVersion?.version,window.ControlEventVersion?.versionFile,window.__ceVersion,document.querySelector?.('[data-ce-version-label]')?.textContent,'v3_0_exp'];
+    const candidates=[window.ControlEventVersion?.version,window.ControlEventVersion?.versionFile,window.__ceVersion,document.querySelector?.('[data-ce-version-label]')?.textContent,'v4_0_exp'];
     for(const candidate of candidates){
       let raw=trim(candidate);if(!raw)continue;
       raw=raw.replace(/^ControlEvent[\s_-]+/i,'').replace(/\s+/g,'_');
       const match=raw.match(/v\d+(?:[._]\d+)*(?:(?:_exp)+)?/i);if(!match)continue;
       return match[0].replace(/\./g,'_').replace(/(?:_exp){2,}/ig,'_exp');
     }
-    return 'v3_0_exp';
+    return 'v4_0_exp';
   }
   function itvFilePrefix(){return `ControlEvent_${itvVersionToken()}`;}
   function reportPayload(){

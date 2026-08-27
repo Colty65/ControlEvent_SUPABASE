@@ -24,7 +24,7 @@ t('búsqueda proactiva conserva memoria histórica amplia con umbral por antigü
 t('memoria social limitada a dos pistas',/searchZuzuSocialMemoryHints[\s\S]*Math\.min\(2/.test(ledger));
 t('compiler conoce recall_episode/resume_episode',/recall_episode/.test(ai)&&/resume_episode/.test(ai));
 t('CURRENT_CONTEXT conserva esquema cronológico del episodio retomado',/turn_outline:arr\(me\.turns\)\.slice\(0,(?:12|16)\)/.test(ai));
-t('recuerdo explícito recupera conversación completa',/MEMORIA EPISÓDICA · RECALL/.test(ai)&&/readZuzuMemoryEpisode/.test(ai));
+t('recuerdo explícito recupera episodio y evidencia anclada',/MEMORY FLASHBACK|MEMORIA EPISÓDICA · RECALL/.test(ai)&&/readZuzuMemoryEpisode/.test(ai)&&/v77MemoryEvidence/.test(ai));
 t('retomar no reejecuta automáticamente datos antiguos',/Conversación histórica retomada desde el principio[\s\S]*las cifras antiguas NO se convierten en datos actuales/.test(ai));
 t('reexecute_plan se conserva para actualización actual',/reexecute_plan/.test(ai));
 t('memoria proactiva se busca tras compilar consulta',/searchZuzuProactiveMemory/.test(ai)&&/MEMORIA ASOCIATIVA · SUGERENCIA PROACTIVA/.test(ai));

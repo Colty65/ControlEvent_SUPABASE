@@ -1,10 +1,10 @@
-/* ControlEvent v3_0_exp RAW14W · Cuadre Banco multievento: movimiento único, imputación proporcional y cierre global. */
+/* ControlEvent v4_0_exp RAW14W · Cuadre Banco multievento: movimiento único, imputación proporcional y cierre global. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v3_0_exp';
+  const VERSION = 'v4_0_exp';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -71,8 +71,8 @@
     if(status==='CUADRADO_DIFERENCIA_ACEPTADA') return {className:'ok',label:`Cuadrado · diferencia aceptada ${money(row.acceptedDifference)}`};
     if(status==='CUADRADO_FORZADO') return {className:'forced',label:'Cuadrado forzado · legado'};
     if(status==='CUADRADO') return {className:'ok',label:'Cuadrado'};
-    if(status==='PENDIENTE_GLOBAL'||row.justificationStatus==='PARTE_EVENTO_OK_GLOBAL_PENDIENTE') return {className:'pending',label:`Pendiente global ${money(Math.max(0,num(row.globalDifference??row.difference)))}`};
-    if(status==='EXCESO') return {className:'excess',label:`Exceso ${money(Math.abs(num(row.globalDifference??row.difference)))}`};
+    if(status==='PENDIENTE_GLOBAL'||row.justificationStatus==='PARTE_EVENTO_OK_GLOBAL_PENDIENTE') return {className:'pending',label:`Pendiente global ${money(Math.abs(num(row.globalDifference??row.difference)))}`};
+    if(status==='EXCESO') return {className:'pending',label:`Diferencia global ${money(Math.abs(num(row.globalDifference??row.difference)))}`};
     if(row.justificationStatus==='OTRO_EVENTO') return {className:'other-event',label:'Sin parte imputada a este evento'};
     if(status==='SIN_JUSTIFICAR') return {className:'none',label:'Sin justificar'};
     return {className:'na',label:'Ingreso / abono'};
@@ -247,7 +247,7 @@
     }
     if(target.id==='ceBankFilter'){
       const next=text(target.value)||'TODOS';
-      // v3_0_exp · Un evento FINALIZADO es una foto definitiva: la vista queda siempre
+      // v4_0_exp · Un evento FINALIZADO es una foto definitiva: la vista queda siempre
       // en «Incluidos en saldo». El selector está además deshabilitado en solo lectura.
       store.filter=store.readOnly?'INCLUIDOS':next;
       target.value=store.filter; store.page=1; invalidateMovementCache(); scheduleBodyRender(true);
@@ -447,7 +447,7 @@
       invalidateMovementCache();
       store.accountId=data.selectedAccount||store.accountId;
       store.readOnly=data.readOnly===true;
-      // v3_0_exp · Al consultar un FINALIZADO se muestran siempre las filas «En saldo».
+      // v4_0_exp · Al consultar un FINALIZADO se muestran siempre las filas «En saldo».
       // Evita que quede heredado «Todos los movimientos» de una sesión/evento anterior.
       if(store.readOnly||data?.event?.finalized===true) store.filter='INCLUIDOS';
       store.dateFrom=text(data?.period?.dateFrom); store.dateTo=text(data?.period?.dateTo);
@@ -1029,10 +1029,10 @@
       const incomeChips=incomeLinks.map(link=>`<span class="ce-bank-income-chip ${link.imageUrl?'has-photo':''} ${link.manual?'manual':''}" ${link.imageUrl?`role="button" tabindex="0" data-ce-bank-view-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id)}" data-person-name="${esc(link.personName)}" data-income-amount="${esc(link.amount)}" data-payment-method="${esc(link.paymentMethod)}" data-movement-id="${esc(row.id)}" title="Ver justificante de ingreso de ${esc(link.personName)}"`:''}><i>ING</i><b>${esc(link.personName)}</b><strong>${money(link.amount)}</strong>${link.imageUrl?`<img src="${esc(link.imageUrl)}" alt="Justificante de ${esc(link.personName)}">`:'<em aria-hidden="true">📷</em>'}</span>`).join('');
       const legacyForce=row.amount<0&&row.forcedSquare
         ?`<label class="ce-bank-force-square checked"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" checked ${actionDisabled}><span>✓</span><b>Cuadre forzado antiguo</b><small>Compatibilidad con conciliaciones anteriores</small></label>`:'';
-      const acceptedControl=row.amount<0&&displayLinks.length&&num(row.globalDifference)>.01
+      const acceptedControl=row.amount<0&&displayLinks.length&&Math.abs(num(row.globalDifference))>.01
         ?(row.acceptedDifference>0
           ?`<button type="button" class="ce-bank-accept-difference accepted" data-ce-bank-accept-diff="${esc(row.id)}" data-accepted="1" ${actionDisabled}><span>✓</span><b>Diferencia aceptada ${money(row.acceptedDifference)}</b><small>Movimiento global cerrado · pulsar para reabrir</small></button>`
-          :`<button type="button" class="ce-bank-accept-difference" data-ce-bank-accept-diff="${esc(row.id)}" data-accepted="0" ${actionDisabled}><span>≈</span><b>Aceptar diferencia ${money(Math.max(0,num(row.globalDifference)))}</b><small>Solo cuando ya no haya más justificantes que asociar</small></button>`)
+          :`<button type="button" class="ce-bank-accept-difference" data-ce-bank-accept-diff="${esc(row.id)}" data-accepted="0" ${actionDisabled}><span>≈</span><b>Aceptar diferencia ${money(Math.abs(num(row.globalDifference)))}</b><small>Solo cuando ya no haya más justificantes que asociar</small></button>`)
         :'';
       const forceControl=`${acceptedControl}${legacyForce}`;
       const includeLabel=row.included?(row.sharedMovement?'En saldo · compartido':'En saldo'):'Inactivo';
@@ -1346,9 +1346,13 @@
     if(mutationBlocked()) return;
     const row=arr(store.data?.movements).find(item=>String(item.id)===String(id));
     if(!row) return;
-    const difference=Math.max(0,num(row.globalDifference));
+    const signedDifference=num(row.globalDifference);
+    const difference=Math.abs(signedDifference);
     if(accepted){
-      if(!confirm(`Quedan ${money(difference)} sin imputar a ningún evento. ¿Aceptar esta diferencia y cerrar globalmente el movimiento bancario?`)) return;
+      const detail=signedDifference>=0
+        ? `Quedan ${money(difference)} sin imputar a ningún evento.`
+        : `Los TKxx asociados superan el movimiento bancario en ${money(difference)}.`;
+      if(!confirm(`${detail} ¿Aceptar esta diferencia y cerrar globalmente el movimiento bancario?`)) return;
     }else if(!confirm('¿Reabrir este movimiento y retirar la diferencia aceptada?')) return;
     if(button) button.disabled=true;
     try{
@@ -1367,7 +1371,7 @@
     store.ticketOriginalLinks=arr(row.displayLinks||row.links).map(link=>({id:text(link.id),eventId:text(link.eventId||store.eventId),ticketCode:text(link.ticketCode),key:`${text(link.eventId||store.eventId)}|${text(link.ticketCode)}`}));
     const originalKeys=new Set(store.ticketOriginalLinks.map(link=>link.key));
     const modal=$('ceBankTicketModal'); modal.classList.remove('hidden');
-    modal.innerHTML=`<div class="ce-bank-ticket-modal ce-bank-ticket-edit-modal"><div class="ce-bank-ticket-modal-head"><div class="ce-bank-ticket-modal-icon">TK</div><div><span>JUSTIFICANTES DEL MOVIMIENTO · MULTIEVENTO</span><h3>Revisar o modificar TKxx</h3><p>Este movimiento bancario es único. Puedes asociar TKxx de varios eventos hasta justificar ${money(Math.abs(num(row.amount)))}. Cada evento verá solo su parte proporcional.</p></div><button type="button" data-ce-bank-close-tickets aria-label="Cerrar">×</button></div><label class="ce-bank-ticket-search"><i>⌕</i><input id="ceBankTicketSearch" autocomplete="off" placeholder="Buscar por evento, TKxx, tienda o responsable"></label><div id="ceBankTicketChoices" class="ce-bank-ticket-choices ce-bank-ticket-edit-choices"><div class="ce-bank-empty"><span class="ce-bank-loader"></span><strong>Cargando TKxx de todos los eventos…</strong></div></div><div class="ce-bank-ticket-edit-footer"><div><span>Justificado global</span><strong id="ceBankTicketSelectedTotal">${money(0)}</strong><small>Movimiento banco: ${money(Math.abs(num(row.amount)))}</small></div><button type="button" class="outline" data-ce-bank-close-tickets>Cancelar</button><button type="button" data-ce-bank-save-tickets>Guardar cambios</button></div></div>`;
+    modal.innerHTML=`<div class="ce-bank-ticket-modal ce-bank-ticket-edit-modal"><div class="ce-bank-ticket-modal-head"><div class="ce-bank-ticket-modal-icon">TK</div><div><span>JUSTIFICANTES DEL MOVIMIENTO · MULTIEVENTO</span><h3>Revisar o modificar TKxx</h3><p>Este movimiento bancario es único. Puedes asociar TKxx de varios eventos En curso hasta justificar ${money(Math.abs(num(row.amount)))}. Cada evento verá solo su parte proporcional.</p></div><button type="button" data-ce-bank-close-tickets aria-label="Cerrar">×</button></div><label class="ce-bank-ticket-search"><i>⌕</i><input id="ceBankTicketSearch" autocomplete="off" placeholder="Buscar TKxx En curso por evento, código, tienda o responsable"></label><div id="ceBankTicketChoices" class="ce-bank-ticket-choices ce-bank-ticket-edit-choices"><div class="ce-bank-empty"><span class="ce-bank-loader"></span><strong>Cargando TKxx de eventos En curso…</strong></div></div><div class="ce-bank-ticket-edit-footer"><div><span>Justificado global</span><strong id="ceBankTicketSelectedTotal">${money(0)}</strong><small>Movimiento banco: ${money(Math.abs(num(row.amount)))} · <b id="ceBankTicketSelectedDifference">Diferencia ${money(Math.abs(num(row.amount)))}</b></small></div><button type="button" class="outline" data-ce-bank-close-tickets>Cancelar</button><button type="button" data-ce-bank-save-tickets>Guardar cambios</button></div></div>`;
     modal.querySelectorAll('[data-ce-bank-close-tickets]').forEach(button=>button.addEventListener('click',()=>{modal.classList.add('hidden');store.ticketMovement=null;store.ticketOriginalLinks=[];restorePosition(movementId,false);}));
     const input=$('ceBankTicketSearch'); input.addEventListener('input',()=>renderTicketChoices(input.value));
     try{
@@ -1381,12 +1385,20 @@
     const node=$('ceBankTicketChoices'); if(!node) return;
     const q=text(query).toLowerCase();
     const items=store.tickets.filter(item=>!q||[item.eventTitle,item.ticketCode,...arr(item.stores),...arr(item.responsibles)].join(' ').toLowerCase().includes(q));
-    node.innerHTML=items.map(item=>`<label class="ce-bank-ticket-choice ce-bank-ticket-edit-choice ${item.selected?'selected':''} ${item.activeEvent?'active-event':''}"><input type="checkbox" data-ce-bank-ticket-choice="${esc(item.key)}" ${item.selected?'checked':''}><i>TK</i><span><b>${esc(item.ticketCode)}</b><strong>${esc(item.eventTitle)}</strong><small>${esc(arr(item.stores).join(', ')||'Sin tienda')} · ${item.lineCount} línea(s)</small></span><em>${money(item.amount)}</em><u>${item.selected?'Incluido':(item.activeEvent?'Evento actual':'Otro evento')}</u></label>`).join('')||'<div class="ce-bank-empty"><strong>No hay TKxx pagados disponibles.</strong></div>';
+    node.innerHTML=items.map(item=>`<label class="ce-bank-ticket-choice ce-bank-ticket-edit-choice ${item.selected?'selected':''} ${item.activeEvent?'active-event':''}"><input type="checkbox" data-ce-bank-ticket-choice="${esc(item.key)}" ${item.selected?'checked':''}><i>TK</i><span><b>${esc(item.ticketCode)}</b><strong>${esc(item.eventTitle)}</strong><small>${esc(arr(item.stores).join(', ')||'Sin tienda')} · ${item.lineCount} línea(s)</small></span><em>${money(item.amount)}</em><u>${item.selected?'Incluido':(item.activeEvent?'Evento actual':'En curso')}</u></label>`).join('')||'<div class="ce-bank-empty"><strong>No hay TKxx pagados en eventos En curso.</strong></div>';
     updateTicketPickerTotal();
   }
   function updateTicketPickerTotal(){
     const total=store.tickets.filter(item=>item.selected).reduce((sum,item)=>sum+num(item.amount),0);
-    const node=$('ceBankTicketSelectedTotal'); if(node){node.textContent=money(total);node.classList.toggle('excess',total>num(store.ticketTarget)+.01);}
+    const target=num(store.ticketTarget);
+    const diff=Math.round((target-total)*100)/100;
+    const node=$('ceBankTicketSelectedTotal'); if(node){node.textContent=money(total);node.classList.toggle('excess',Math.abs(diff)>.01);}
+    const delta=$('ceBankTicketSelectedDifference');
+    if(delta){
+      if(Math.abs(diff)<=.01) delta.textContent='Cuadre exacto';
+      else if(diff>0) delta.textContent=`Faltan ${money(diff)}`;
+      else delta.textContent=`TKxx superan banco en ${money(Math.abs(diff))}`;
+    }
   }
   async function saveTicketSelection(){
     if(mutationBlocked()) return;
@@ -1394,10 +1406,15 @@
     const button=$('ceBankTicketModal')?.querySelector('[data-ce-bank-save-tickets]');
     if(button){button.disabled=true;button.textContent='Guardando…';}
     const selectedTotal=store.tickets.filter(item=>item.selected).reduce((sum,item)=>sum+num(item.amount),0);
-    if(selectedTotal>num(store.ticketTarget)+.01){notice(`Los TKxx seleccionados suman ${money(selectedTotal)} y superan los ${money(store.ticketTarget)} del movimiento bancario.`,'warning',true);if(button){button.disabled=false;button.textContent='Guardar cambios';}return;}
+    // v4.0_exp BANK2 · una diferencia en cualquiera de los dos sentidos NO impide guardar
+    // los justificantes reales. El movimiento seguirá pendiente globalmente hasta cuadrar o
+    // hasta que el usuario acepte expresamente el residual.
     const selectedKeys=new Set(store.tickets.filter(item=>item.selected).map(item=>item.key));
     const originalByKey=new Map(store.ticketOriginalLinks.map(link=>[link.key,link]));
-    const removeRows=[...originalByKey.values()].filter(link=>!selectedKeys.has(link.key));
+    // Solo se pueden retirar desde este selector los vínculos que realmente se han mostrado.
+    // Si existiera un vínculo histórico de un evento ya Finalizado, queda intacto y fuera del selector.
+    const editableKeys=new Set(store.tickets.map(item=>item.key));
+    const removeRows=[...originalByKey.values()].filter(link=>editableKeys.has(link.key)&&!selectedKeys.has(link.key));
     const addItems=store.tickets.filter(item=>item.selected&&!originalByKey.has(item.key));
     try{
       for(const link of removeRows){

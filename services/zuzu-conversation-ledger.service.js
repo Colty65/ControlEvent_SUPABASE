@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp · RAW14T · Zuzu Memory Core + semilla de Experiencia CE.
+/* ControlEvent v4_0_exp · RAW14T · Zuzu Memory Core + semilla de Experiencia CE.
    Persistencia server-side, inmutable por turno. El navegador conserva solo conversation_id.
    MEMORIA HISTÓRICA: fuente única = tablas persistentes ce_zuzu_conversations/ce_zuzu_turns.
    ce_meta puede seguir sirviendo al ledger técnico de compatibilidad, pero NUNCA aporta recuerdos. */

@@ -1,7 +1,7 @@
 # Auditoría · Zuzu ITV ORÁCULO de ejecución + capabilities + COMPRAS/DONACIONES
 
 Fecha: 23/08/2026
-Versión: ControlEvent v3_0_exp
+Versión: ControlEvent v4_0_exp
 
 ## Cambios auditados
 

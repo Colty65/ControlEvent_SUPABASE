@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp - estabilización rol/menús, estado de evento, justificantes de ingresos en iPad/móvil y negrita PRODUCTOS.
+/* ControlEvent v4_0_exp - estabilización rol/menús, estado de evento, justificantes de ingresos en iPad/móvil y negrita PRODUCTOS.
    - RW no ve Planificación inicial ni hay parpadeo de menú.
    - En móvil/iPhone/Android las opciones disponibles quedan siempre visibles; se oculta el botón Menú.
    - Botones inferiores visibles también en móvil para GD/RW, compactos y solo pulsables en el icono.
@@ -9,8 +9,8 @@
 */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v3_0_exp';
-  const VERSION_FILE = 'ControlEvent_v3_0_exp';
+  const VERSION = 'ControlEvent v4_0_exp';
+  const VERSION_FILE = 'ControlEvent_v4_0_exp';
   const INSTALLED = '__ceV502FinalFixes';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

@@ -171,7 +171,7 @@ async function ticketCatalog(eventId='', eventTitle='', suppliedLinks=null){
   const selectedEvent=text(eventId);
   const [purchases, events, stores, persons, links] = await Promise.all([
     selectPaged('ce_compras', {order:'created_at',apply:query=>selectedEvent?query.eq('event_id',selectedEvent):query}),
-    selectedEvent ? Promise.resolve([{id:selectedEvent,titulo:eventTitle}]) : selectPaged('ce_eventos', {order:'fecha_ini'}),
+    selectedEvent ? Promise.resolve([{id:selectedEvent,titulo:eventTitle,situacion:'En curso'}]) : selectPaged('ce_eventos', {order:'fecha_ini'}),
     selectPaged('ce_tiendas', {order:'nombre'}),
     selectPaged('ce_personas', {order:'nombre'}),
     Array.isArray(suppliedLinks) ? Promise.resolve(suppliedLinks) : selectPaged(LINKS_TABLE, {order:'created_at',apply:query=>selectedEvent?query.eq('event_id',selectedEvent):query})
@@ -202,6 +202,8 @@ async function ticketCatalog(eventId='', eventTitle='', suppliedLinks=null){
       eventId:item.eventId,
       eventTitle:text(eventById.get(item.eventId)?.titulo) || eventTitle || item.eventId,
       eventDate:text(eventById.get(item.eventId)?.fecha_ini),
+      eventStatus:text(eventById.get(item.eventId)?.situacion || eventById.get(item.eventId)?.estado || 'En curso'),
+      eventFinalized:/FINALIZADO/i.test(text(eventById.get(item.eventId)?.situacion || eventById.get(item.eventId)?.estado)),
       ticketCode:item.ticketCode,
       amount:cents(item.amount),
       lineCount:item.lineCount,
@@ -211,7 +213,7 @@ async function ticketCatalog(eventId='', eventTitle='', suppliedLinks=null){
       linkedMovementId:text(link?.movement_id),
       linkedId:text(link?.id)
     };
-  }).sort((a,b) => String(b.eventDate).localeCompare(String(a.eventDate)) || a.eventTitle.localeCompare(b.eventTitle,'es') || ticketNumber(a.ticketCode)-ticketNumber(b.ticketCode));
+  }).sort((a,b) => b.amount-a.amount || a.eventTitle.localeCompare(b.eventTitle,'es') || ticketNumber(a.ticketCode)-ticketNumber(b.ticketCode));
 }
 
 function movementFromDb(row){
@@ -287,17 +289,18 @@ function movementGlobalState(row,allLinks=[],settlement=null){
   const eventIds=[...new Set(links.map(link=>text(link.eventId)).filter(Boolean))];
   const shared=eventIds.length>1;
   const legacyForced=!shared&&links.some(link=>link.forcedSquare===true);
-  const accepted=settlement&&difference>.01&&Math.abs(num(settlement.acceptedDifference)-difference)<=.01;
+  const absoluteDifference=cents(Math.abs(difference));
+  const accepted=settlement&&absoluteDifference>.01&&Math.abs(num(settlement.acceptedDifference)-absoluteDifference)<=.01;
   let status='NO_APLICA';
   if(row.amount<0){
     if(!links.length) status='SIN_JUSTIFICAR';
-    else if(difference<-.01) status='EXCESO';
     else if(Math.abs(difference)<=.01) status=shared?'CUADRADO_COMPARTIDO':'CUADRADO';
     else if(accepted) status=shared?'CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA':'CUADRADO_DIFERENCIA_ACEPTADA';
     else if(legacyForced) status='CUADRADO_FORZADO';
+    else if(difference<-.01) status='EXCESO';
     else status='PENDIENTE_GLOBAL';
   }
-  return {target,justified,difference,eventIds,shared,legacyForced,accepted,status};
+  return {target,justified,difference,absoluteDifference,eventIds,shared,legacyForced,accepted,status};
 }
 
 function batchFromDb(row){
@@ -523,7 +526,7 @@ function reconcileMovement(row,currentLinks=[],allLinks=[],settlement=null){
     justificationStatus:localStatus,eventAppliedAmount,eventJustifiedAmount:eventJustified,eventParticipates,
     globalTargetAmount:global.target,globalJustifiedAmount:global.justified,globalDifference:global.difference,
     globalJustificationStatus:global.status,globalReconciled:closedBankStatus(global.status),sharedMovement:global.shared,
-    sharedEventCount:global.eventIds.length,sharedEventIds:global.eventIds,acceptedDifference:global.accepted?global.difference:0,
+    sharedEventCount:global.eventIds.length,sharedEventIds:global.eventIds,acceptedDifference:global.accepted?global.absoluteDifference:0,
     acceptedDifferenceNote:global.accepted?text(settlement?.note):'',acceptedDifferenceBy:global.accepted?text(settlement?.acceptedBy):'',acceptedDifferenceAt:global.accepted?text(settlement?.acceptedAt):''};
 }
 function eventTicketSummary(catalog,eventId,movements=[]){
@@ -590,7 +593,7 @@ function buildIncomeCatalog(event,collaborators,persons,images,snapshots=[]){
     return {
       id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName,
       paymentMethod:text(row.situacion),amount,imageUrl:incomeImageUrl(images,event.id,text(row.id)),createdAt:text(row.created_at),updatedAt:text(row.updated_at),
-      // v3_0_exp · La aportación interna de Peña El Arrastre puede no corresponder a un
+      // v4_0_exp · La aportación interna de Peña El Arrastre puede no corresponder a un
       // abono bancario justificable. Se conserva visible, pero NO condiciona el estado
       // completo/incompleto del Cuadre Banco ni su porcentaje de ingresos conciliados.
       ignoredForReconciliation:isPenaElArrastre(personName)
@@ -689,7 +692,7 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
   const movementReconciled=positiveRequired.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
   const allCatalogLinked=total===0||reconciled===total;
   const allMovementsReconciled=positiveRequired.length===0||movementReconciled===positiveRequired.length;
-  // v3_0_exp · Si el evento no tiene NINGÚN ingreso computable, no existe nada que
+  // v4_0_exp · Si el evento no tiene NINGÚN ingreso computable, no existe nada que
   // conciliar en este bloque. Ese 0/0 es funcionalmente un requisito cumplido, no un
   // pendiente. Las aportaciones internas de Peña El Arrastre ya están fuera del catálogo
   // computable y tampoco deben impedir el cierre del Cuadre.
@@ -756,7 +759,7 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     }
     const eventLinkedMovements=all.filter(row=>arr(displayLinksByMovement.get(row.id)).some(link=>link.isActiveEvent));
     const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
-    // v3_0_exp FIX10 · Estado REAL del Cuadre Banco.
+    // v4_0_exp FIX10 · Estado REAL del Cuadre Banco.
     // Una fecha/periodo guardado NO significa que el cuadre haya empezado. Para considerar
     // iniciado el mantenimiento tiene que existir al menos un movimiento con una fila/evidencia
     // persistida para ESTE evento: estado En saldo/excluido, vínculo TKxx o vínculo manual de ingreso.
@@ -895,7 +898,7 @@ async function persistAppliedPeriodMovementSnapshot(eventId,accountId='',actor={
   const actorName=text(actor.identificacion||actor.nombre)||'SISTEMA';
   const snapshotTag=`PERIODO_APLICADO:${actorName}`;
 
-  // v3_0_exp FIX2 · Aplicar fechas debe congelar también la selección En saldo/excluido
+  // v4_0_exp FIX2 · Aplicar fechas debe congelar también la selección En saldo/excluido
   // del periodo. En curso la UI puede reconstruir candidatos desde el histórico, pero al
   // Finalizar solo se permite leer la foto persistida. Sin esta instantánea desaparecían
   // precisamente los cargos todavía sin TKxx, aunque el usuario los hubiera dejado En saldo.
@@ -1293,11 +1296,16 @@ export async function listPaidTickets({movementId='',eventId='',q=''} = {}){
     const catalog=await ticketCatalog('','');
     const query=text(q).toLowerCase();
     const items=catalog.filter(item=>{
+      // v4.0_exp: el selector operativo solo enseña TKxx de eventos realmente En curso.
+      // Los vínculos históricos de eventos ya Finalizados pueden seguir existiendo en BBDD,
+      // pero no se ofrecen como nuevas imputaciones ni se mezclan en la búsqueda diaria.
+      if(!/^EN\s+CURSO$/i.test(text(item.eventStatus).replace(/\s+/g,' ').trim())) return false;
       if(item.linked&&item.linkedMovementId!==text(movementId)) return false;
       if(!query) return true;
-      return [item.ticketCode,item.eventTitle,...item.stores,...item.responsibles].join(' ').toLowerCase().includes(query);
-    }).map(item=>({...item,activeEvent:item.eventId===selectedEvent,selected:item.linked&&item.linkedMovementId===text(movementId)}));
-    return {ok:true,eventId:selectedEvent,movementId:text(movementId),items};
+      return [item.ticketCode,item.eventTitle,item.amount,...item.stores,...item.responsibles].join(' ').toLowerCase().includes(query);
+    }).map(item=>({...item,activeEvent:item.eventId===selectedEvent,selected:item.linked&&item.linkedMovementId===text(movementId)}))
+      .sort((a,b)=>num(b.amount)-num(a.amount)||text(a.eventTitle).localeCompare(text(b.eventTitle),'es')||ticketNumber(a.ticketCode)-ticketNumber(b.ticketCode));
+    return {ok:true,eventId:selectedEvent,movementId:text(movementId),scope:'in_progress_events_only',sort:'amount_desc',items};
   }catch(error){ throw friendlyDbError(error); }
 }
 
@@ -1391,7 +1399,11 @@ export async function addTicketLink(movementId, payload = {}, actor = {}){
     const globalBefore=cents(existing.reduce((sum,link)=>sum+num(link.ticketAmountSnapshot),0));
     const target=cents(Math.abs(num(movement.amount)));
     const attempted=cents(globalBefore+ticket.amount);
-    if(attempted>target+.01) fail(`Los TKxx seleccionados sumarían ${attempted.toLocaleString('es-ES',{style:'currency',currency:'EUR'})}, por encima de los ${target.toLocaleString('es-ES',{style:'currency',currency:'EUR'})} del movimiento bancario.`,409,'BANK_TICKETS_EXCEED_MOVEMENT');
+    // v4.0_exp BANK2 · NO se impide asociar justificantes aunque la suma supere ligeramente
+    // el movimiento bancario. La realidad humana puede producir diferencias en ambos sentidos
+    // (retirada 120 € / TKxx 118,56 € o retirada 135 € / TKxx 135,68 €). CE conserva TODOS
+    // los justificantes y mantiene el movimiento globalmente pendiente hasta que la diferencia
+    // quede a cero o un usuario la acepte expresamente. Nunca se recorta ni se reparte a eventos.
     const row={movement_id:id,event_id:eventId,ticket_code:ticketCode,ticket_amount_snapshot:ticket.amount,created_by:text(actor.identificacion||actor.nombre)};
     const {data,error}=await db().from(LINKS_TABLE).insert(row).select('*').single();
     if(error) throw error;
@@ -1402,7 +1414,13 @@ export async function addTicketLink(movementId, payload = {}, actor = {}){
     try{await db().from(MOVEMENT_SETTLEMENTS_TABLE).delete().eq('movement_id',id);}catch(settleError){if(!settlementSchemaMissing(settleError)) throw settleError;}
     return {ok:true,link:linkFromDb(data)};
   }catch(error){
-    if(String(error?.code||'')==='23505') fail(`${ticketCode} ya está utilizado en otro movimiento bancario.`,409,'BANK_TICKET_ALREADY_LINKED');
+    if(String(error?.code||'')==='23505'){
+      const constraint=text(error?.constraint||error?.details||error?.message);
+      if(/movement_id.*event_id|event_id.*movement_id|movement.*unique|one.*movement/i.test(constraint)){
+        fail('La BBDD conserva una restricción antigua que solo permite un TKxx por movimiento/evento. Ejecuta sql/ce_bank_ticket_links_multi_v4.sql una sola vez y vuelve a intentarlo.',503,'BANK_TICKET_LINK_SCHEMA_RESTRICTIVE');
+      }
+      fail(`${ticketCode} ya está utilizado en otro movimiento bancario.`,409,'BANK_TICKET_ALREADY_LINKED');
+    }
     throw friendlyDbError(error);
   }
 }
@@ -1446,16 +1464,17 @@ export async function setMovementAcceptedDifference(movementId,payload={},actor=
     const target=cents(Math.abs(num(movement.amount)));
     const justified=cents(links.reduce((sum,link)=>sum+num(link.ticketAmountSnapshot),0));
     const difference=cents(target-justified);
+    const absoluteDifference=cents(Math.abs(difference));
     if(!accept){
       const {error}=await db().from(MOVEMENT_SETTLEMENTS_TABLE).delete().eq('movement_id',id);
       if(error) throw error;
-      return {ok:true,accepted:false,movementId:id,difference};
+      return {ok:true,accepted:false,movementId:id,difference,absoluteDifference};
     }
-    if(difference<=.01) fail('El movimiento ya está cuadrado exactamente; no hay diferencia positiva que aceptar.',409,'BANK_NO_DIFFERENCE_TO_ACCEPT');
-    const row={movement_id:id,accepted_difference:difference,note:text(payload.note),accepted_by:text(actor.identificacion||actor.nombre),accepted_at:new Date().toISOString(),updated_at:new Date().toISOString()};
+    if(absoluteDifference<=.01) fail('El movimiento ya está cuadrado exactamente; no hay diferencia que aceptar.',409,'BANK_NO_DIFFERENCE_TO_ACCEPT');
+    const row={movement_id:id,accepted_difference:absoluteDifference,note:text(payload.note),accepted_by:text(actor.identificacion||actor.nombre),accepted_at:new Date().toISOString(),updated_at:new Date().toISOString()};
     const {data,error}=await db().from(MOVEMENT_SETTLEMENTS_TABLE).upsert(row,{onConflict:'movement_id'}).select('*').single();
     if(error) throw error;
-    return {ok:true,accepted:true,settlement:settlementFromDb(data),target,justified,difference};
+    return {ok:true,accepted:true,settlement:settlementFromDb(data),target,justified,difference,absoluteDifference};
   }catch(error){
     if(settlementSchemaMissing(error)) fail('Falta la ampliación SQL para conciliación multievento. Ejecuta ce_bank_multievento_raw14w.sql en Supabase.',503,'BANK_SHARED_SCHEMA_MISSING');
     throw friendlyDbError(error);
