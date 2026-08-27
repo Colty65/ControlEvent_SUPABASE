@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp RAW14W · Cuadre Banco multievento: movimiento único, imputación proporcional y cierre global. */
+/* ControlEvent v4_0_exp BANK3 · Cuadre Banco multievento + histórico bancario consultable. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -43,7 +43,7 @@
     ticketMovement:null, tickets:[], ticketOriginalLinks:[], incomeMovement:null, incomes:[], openGestureAt:0, lastAction:'', lastActionAt:0, readOnly:false,
     lastBodyScroll:0, pendingFocusId:'', noticeLocked:false, sort:'DESC', dateFrom:'', dateTo:'',
     page:1, pageSize:60, dataRevision:0, filteredCacheKey:'', filteredCacheRows:[], searchTimer:0, renderFrame:0,
-    loadSeq:0, loadController:null, totalPages:1, balanceChartOpen:false
+    loadSeq:0, loadController:null, totalPages:1, balanceChartOpen:false, bankHistoryOpen:false, bankHistorySortField:'executedAt', bankHistorySortDirection:'desc'
   };
   const TIP_ATTRS = ['title','data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','data-ce-tip-layout-v21','data-tip-bg-v21'];
 
@@ -662,6 +662,7 @@
   function closeBalanceChart(){
     const overlay=$('ceBankBalanceChartOverlay');
     if(!overlay) return;
+    closeBankHistory();
     store.balanceChartOpen=false;
     overlay.classList.remove('visible');
     overlay.classList.add('hidden');
@@ -702,7 +703,7 @@
   }
   let balanceInspectorMediaToken=0,balanceInspectorMovementId='';
   function chartPane(config){
-    const {id,title,subtitle,status,statusClass,series,eventIds,minTime,maxTime,width,height,shadeStart,shadeEnd,shade,zoom,showEventPoints=true}=config;
+    const {id,title,subtitle,status,statusClass,series,eventIds,minTime,maxTime,width,height,shadeStart,shadeEnd,shade,zoom,showEventPoints=true,actionsHtml=''}=config;
     const narrow=width<620;
     const left=narrow?54:64,right=narrow?12:20,top=18,bottom=narrow?44:48;
     const plotW=width-left-right,plotH=height-top-bottom;
@@ -727,7 +728,8 @@
       return `<circle class="ce-bank-balance-event-point ${amount<0?'negative':'positive'}" cx="${x(point.time).toFixed(2)}" cy="${y(point.balance).toFixed(2)}" r="6.5" tabindex="0" role="button" data-ce-bank-balance-point="1" data-movement-id="${esc(point.movement.id)}" aria-label="${esc(formatDate(point.movement.executedAt))}, ${esc(money(amount))}"></circle>`;
     }).join('');
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
-    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${statusHtml}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}"><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
+    const actionBlock=(actionsHtml||statusHtml)?`<div class="ce-bank-balance-pane-actions">${actionsHtml||''}${statusHtml}</div>`:'';
+    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}"><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
     return {html,meta:{id,width,height,left,right,top,bottom,points:interactivePoints.map(point=>({cx:x(point.time),cy:y(point.balance),point}))}};
   }
   function resetBalanceInspector(){
@@ -883,6 +885,79 @@
     closeButton.addEventListener('pointerdown',closeNow,true);
     closeButton.addEventListener('click',closeNow,true);
   }
+  function bankHistoryRows(){
+    return arr(store.data?.balanceTimeline).filter(row=>parseMoment(row.executedAt)>0);
+  }
+  function bankHistorySortRows(rows){
+    const field=text(store.bankHistorySortField||'executedAt');
+    const direction=text(store.bankHistorySortDirection||'desc').toLowerCase()==='asc'?1:-1;
+    return [...rows].sort((a,b)=>{
+      let av,bv;
+      if(field==='description'){
+        av=text(a.description).toLocaleLowerCase('es');bv=text(b.description).toLocaleLowerCase('es');
+        const cmp=av.localeCompare(bv,'es',{numeric:true,sensitivity:'base'});return cmp*direction||((parseMoment(a.executedAt)-parseMoment(b.executedAt))*-1);
+      }
+      if(field==='amount'){av=num(a.amount);bv=num(b.amount);}
+      else if(field==='bankBalance'){av=num(a.bankBalance);bv=num(b.bankBalance);}
+      else {av=parseMoment(a.executedAt);bv=parseMoment(b.executedAt);}
+      return (av===bv?String(a.id).localeCompare(String(b.id)):(av-bv))*direction;
+    });
+  }
+  function bankHistorySortIndicator(field){
+    if(text(store.bankHistorySortField)!==field)return '';
+    return text(store.bankHistorySortDirection).toLowerCase()==='asc'?' ↑':' ↓';
+  }
+  function bankHistoryLinks(row){
+    return arr(row?.displayLinks||row?.links).filter(link=>text(link?.ticketCode));
+  }
+  function bankHistoryTicketHtml(row){
+    const links=bankHistoryLinks(row);
+    if(!links.length)return '<span class="ce-bank-history-no-ticket">—</span>';
+    const shown=links.slice(0,5);
+    return `<div class="ce-bank-history-ticket-strip">${shown.map((link,index)=>{
+      const eventId=text(link.eventId);const code=text(link.ticketCode||'TKxx');
+      return `<button type="button" class="ce-bank-history-ticket-mini" data-ce-bank-history-ticket="1" data-event-id="${esc(eventId)}" data-ticket-code="${esc(code)}" data-event-title="${esc(link.eventTitle||'Evento')}" data-ticket-amount="${esc(link.ticketAmount??link.ticketAmountSnapshot??0)}" data-movement-id="${esc(row.id)}" title="${esc(code)} · ${esc(link.eventTitle||'Evento')}"><span>${esc(code)}</span></button>`;
+    }).join('')}${links.length>shown.length?`<i>+${links.length-shown.length}</i>`:''}</div>`;
+  }
+  async function hydrateBankHistoryThumbnails(container){
+    if(!container?.isConnected)return;
+    const buttons=[...container.querySelectorAll('[data-ce-bank-history-ticket="1"]')];
+    if(!buttons.length)return;
+    const eventIds=[...new Set(buttons.map(b=>text(b.dataset.eventId)).filter(Boolean))];
+    const bags={};
+    await Promise.all(eventIds.map(async eventId=>{try{bags[eventId]=await balanceTicketImages(eventId);}catch(_){bags[eventId]={};}}));
+    for(const button of buttons){
+      if(!button.isConnected)continue;
+      const eventId=text(button.dataset.eventId),code=text(button.dataset.ticketCode);
+      const src=ticketImageFromBag(bags[eventId]||{},eventId,code);
+      if(src){button.classList.add('has-image');button.innerHTML=`<img src="${esc(src)}" alt="${esc(code)}"><span>${esc(code)}</span>`;}
+    }
+  }
+  function closeBankHistory(){
+    const view=$('ceBankHistoryOverlay');
+    store.bankHistoryOpen=false;
+    if(view)view.remove();
+  }
+  function renderBankHistory(){
+    const chartOverlay=$('ceBankBalanceChartOverlay');if(!chartOverlay)return;
+    const rows=bankHistorySortRows(bankHistoryRows());
+    const first=[...rows].sort((a,b)=>parseMoment(a.executedAt)-parseMoment(b.executedAt))[0];
+    const last=[...rows].sort((a,b)=>parseMoment(b.executedAt)-parseMoment(a.executedAt))[0];
+    const account=chartAccountLabel();
+    let view=$('ceBankHistoryOverlay');
+    if(!view){view=document.createElement('div');view.id='ceBankHistoryOverlay';view.className='ce-bank-history-overlay';chartOverlay.appendChild(view);}
+    const body=rows.length?rows.map(row=>`<article class="ce-bank-history-row" data-movement-id="${esc(row.id)}"><div class="date"><b>${esc(formatDate(row.executedAt))}</b><span>Valor ${esc(formatDate(row.valueDate,false))}</span></div><div class="concept">${esc(row.description||'Movimiento bancario')}</div><div class="amount ${num(row.amount)<0?'negative':'positive'}">${esc(money(row.amount))}</div><div class="balance">${esc(money(row.bankBalance))}</div><div class="tickets">${bankHistoryTicketHtml(row)}</div></article>`).join(''):'<div class="ce-bank-history-empty">No hay movimientos históricos para esta cuenta.</div>';
+    view.innerHTML=`<section class="ce-bank-history-card" role="dialog" aria-modal="true" aria-label="Consulta histórica del banco"><header><div class="ce-bank-history-account"><img src="./assets/icons/cuadre-banco.svg" alt="Banco"><div><strong>${esc(account)}</strong><span>${first&&last?`${esc(formatDate(first.executedAt,false))} — ${esc(formatDate(last.executedAt,false))}`:'Sin histórico'}</span></div></div><div class="ce-bank-history-title"><span>CONSULTA HISTÓRICA DE MOVIMIENTOS</span><b>${rows.length} movimiento${rows.length===1?'':'s'}</b></div><button type="button" data-ce-bank-close-history-list aria-label="Cerrar histórico">×</button></header><div class="ce-bank-history-sortbar"><span>Ordenar por</span><button type="button" data-ce-bank-history-sort="executedAt">Fecha${bankHistorySortIndicator('executedAt')}</button><button type="button" data-ce-bank-history-sort="description">Concepto${bankHistorySortIndicator('description')}</button><button type="button" data-ce-bank-history-sort="amount">Importe${bankHistorySortIndicator('amount')}</button><button type="button" data-ce-bank-history-sort="bankBalance">Saldo${bankHistorySortIndicator('bankBalance')}</button></div><div class="ce-bank-history-head"><span>Fecha</span><span>Concepto del movimiento</span><span>Importe</span><span>Saldo</span><span>TKxx asociados</span></div><main class="ce-bank-history-list">${body}</main></section>`;
+    store.bankHistoryOpen=true;
+    hydrateBankHistoryThumbnails(view);
+  }
+  function openBankHistory(event){stopEvent(event);renderBankHistory();}
+  function changeBankHistorySort(field){
+    const next=text(field||'executedAt');
+    if(store.bankHistorySortField===next)store.bankHistorySortDirection=store.bankHistorySortDirection==='asc'?'desc':'asc';
+    else{store.bankHistorySortField=next;store.bankHistorySortDirection=next==='description'?'asc':'desc';}
+    renderBankHistory();
+  }
   function renderBalanceChart(){
     const overlay=$('ceBankBalanceChartOverlay');
     if(!overlay) return;
@@ -929,7 +1004,7 @@
     const zoomPane=includedRows.length
       ?chartPane({id:'zoom',title:eventData.title,subtitle:finalSnapshot?`${includedRows.length} movimiento(s) En saldo almacenado(s) al cierre · foto definitiva`:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom del periodo de trabajo`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,showEventPoints:true})
       :{html:`<section class="ce-bank-balance-pane zoom" data-pane-id="zoom"><div class="ce-bank-balance-pane-head"><div><strong>${esc(eventData.title)}</strong><span>${finalSnapshot?'Foto definitiva del Cuadre Banco al cierre':'Cuadre Banco del evento'}</span></div><span class="ce-bank-balance-pane-status ${esc(eventData.statusClass)}">${esc(eventData.status)}</span></div><div class="ce-bank-balance-chart-empty"><strong>${finalSnapshot&&storedCount<=0?'SIN CUADRE BANCARIO AL CIERRE':'SIN MOVIMIENTOS EN SALDO'}</strong><span>${esc(emptyZoomMessage)}</span></div></section>`,meta:{id:'zoom',width:chartWidth,height:zoomHeight,points:[]}};
-    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'}`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,showEventPoints:false});
+    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'}`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,showEventPoints:false,actionsHtml:'<button type="button" class="ce-bank-history-open" data-ce-bank-open-history-list="1">☰ Ver movimientos</button>'});
     const eventCountLabel=finalSnapshot?'Filas almacenadas del Cuadre':'Movimientos En saldo señalados';
     const eventCountValue=finalSnapshot?storedCount:includedRows.length;
     overlay.innerHTML=`<section class="ce-bank-balance-chart-card refined vertical-layout" role="dialog" aria-modal="true" aria-labelledby="ceBankBalanceChartTitle"><header class="ce-bank-balance-main-head"><div class="ce-bank-balance-title"><span>EVOLUCIÓN TEMPORAL DEL SALDO</span><h3 id="ceBankBalanceChartTitle">${esc(accountLabel)}</h3><p>${esc(historicalRange)}</p></div><aside id="ceBankBalanceInspector" class="ce-bank-balance-inspector hidden-info"></aside><aside id="ceBankBalanceInspectorMedia" class="ce-bank-balance-inspector-media hidden-info" aria-label="Justificantes del movimiento"></aside><button type="button" data-ce-bank-close-balance-chart aria-label="Cerrar gráfica">×</button></header><div class="ce-bank-balance-chart-stats"><div><span>Saldo inicial histórico</span><strong>${money(firstValue)}</strong></div><div><span>Saldo final histórico</span><strong>${money(lastValue)}</strong></div><div class="${variation<0?'negative':'positive'}"><span>Variación histórica</span><strong>${variation>=0?'+':''}${money(variation)}</strong></div><div><span>${esc(eventCountLabel)}</span><strong>${eventCountValue}</strong></div></div><div class="ce-bank-balance-stack">${historyPane.html}${zoomPane.html}</div><footer><span><i class="blue"></i>Saldo histórico</span>${includedRows.length?'<span><i class="amber"></i>Intervalo del Cuadre</span><span><i class="green"></i>Abono del evento</span><span><i class="red"></i>Cargo del evento</span>':''}<small>${finalSnapshot?'Parte inferior: exclusivamente filas almacenadas del Cuadre al cerrar el evento. El histórico superior es solo referencia.':'Zoom: solo movimientos En saldo del evento. Histórico: cronología completa de la cuenta.'}</small></footer></section>`;
@@ -1126,7 +1201,9 @@
   }
   function movementForMedia(node){
     const movementId=text(node?.dataset?.movementId||node?.closest?.('[data-movement-id]')?.dataset?.movementId);
-    return arr(store.data?.movements).find(row=>String(row.id)===String(movementId))||null;
+    return arr(store.data?.movements).find(row=>String(row.id)===String(movementId))
+      ||arr(store.data?.balanceTimeline).find(row=>String(row.id)===String(movementId))
+      ||null;
   }
   function ticketLinkForMedia(movement,eventId,ticketCode){
     const code=normalizeTicketUi(ticketCode);
@@ -1537,6 +1614,14 @@
   document.addEventListener('click',event=>{
     const chartTrigger=event.target?.closest?.('[data-ce-bank-open-balance-chart="1"]');
     if(chartTrigger){openBalanceChart(event);return;}
+    const historyOpen=event.target?.closest?.('[data-ce-bank-open-history-list="1"]');
+    if(historyOpen){openBankHistory(event);return;}
+    const historyClose=event.target?.closest?.('[data-ce-bank-close-history-list]');
+    if(historyClose||event.target?.id==='ceBankHistoryOverlay'){stopEvent(event);closeBankHistory();return;}
+    const historySort=event.target?.closest?.('[data-ce-bank-history-sort]');
+    if(historySort){stopEvent(event);changeBankHistorySort(historySort.dataset.ceBankHistorySort);return;}
+    const historyTicket=event.target?.closest?.('[data-ce-bank-history-ticket="1"]');
+    if(historyTicket){openBankTicketPhoto(historyTicket,event);return;}
     const chartClose=event.target?.closest?.('[data-ce-bank-close-balance-chart]');
     if(chartClose||event.target?.id==='ceBankBalanceChartOverlay'){stopEvent(event);closeBalanceChart();return;}
     const add=event.target?.closest?.('[data-ce-bank-add-ticket]');
@@ -1572,6 +1657,7 @@
   },true);
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&!$('ceBankOverlay')?.classList.contains('hidden')){
+      if(store.bankHistoryOpen){closeBankHistory();return;}
       if(store.balanceChartOpen){closeBalanceChart();return;}
       if($('ceBankTicketPhoto')){closeBankTicketPhoto();return;}
       if(!$('ceBankTicketModal')?.classList.contains('hidden')){const movement=store.incomeMovement||store.ticketMovement;$('ceBankTicketModal').classList.add('hidden');store.incomeMovement=null;store.ticketMovement=null;restorePosition(movement,false);}else close();

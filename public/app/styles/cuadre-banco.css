@@ -1996,3 +1996,66 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 #ceBankOverlay .ce-bank-justify-amounts b{font-weight:950;color:#264b60}
 @media(max-width:850px){#ceBankOverlay .ce-bank-accept-difference{flex:1}}
 @media(max-width:520px){#ceBankOverlay .ce-bank-accept-difference{width:100%}}
+
+/* v4_0_exp BANK3 · cabecera estable + consulta histórica bancaria */
+@media (min-width:761px){
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>.ce-bank-balance-main-head{
+    height:104px!important;min-height:104px!important;max-height:104px!important;box-sizing:border-box!important;overflow:hidden!important;
+  }
+  #ceBankOverlay .ce-bank-balance-inspector{
+    height:74px!important;min-height:74px!important;max-height:74px!important;box-sizing:border-box!important;overflow:hidden!important;
+  }
+  #ceBankOverlay .ce-bank-balance-inspector-media{
+    height:70px!important;min-height:70px!important;max-height:70px!important;box-sizing:border-box!important;
+  }
+}
+#ceBankOverlay .ce-bank-balance-pane-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+#ceBankOverlay .ce-bank-history-open{border:1px solid #bfd7e7;border-radius:999px;background:#eef7fc;color:#174a70;padding:6px 11px;font-size:10px;font-weight:950;cursor:pointer;white-space:nowrap}
+#ceBankOverlay .ce-bank-history-open:hover{background:#dff1fb;border-color:#85bedf}
+#ceBankOverlay .ce-bank-history-overlay{position:absolute;inset:0;z-index:410;display:flex;align-items:stretch;justify-content:stretch;background:rgba(4,18,31,.58);backdrop-filter:blur(8px)}
+#ceBankOverlay .ce-bank-history-card{width:100%;height:100%;display:flex;flex-direction:column;min-width:0;min-height:0;background:linear-gradient(180deg,#f7fbfd 0%,#eef5f8 100%);overflow:hidden}
+#ceBankOverlay .ce-bank-history-card>header{display:grid;grid-template-columns:minmax(420px,1.05fr) minmax(300px,.75fr) 48px;align-items:center;gap:18px;flex:0 0 auto;min-height:92px;padding:12px 18px;background:linear-gradient(105deg,#082238,#0d3857 65%,#14637a);color:#fff;border-bottom:1px solid rgba(255,255,255,.18)}
+#ceBankOverlay .ce-bank-history-account{display:flex;align-items:center;gap:10px;min-width:0}
+#ceBankOverlay .ce-bank-history-account img{width:56px;height:56px;flex:0 0 56px;border-radius:14px;box-shadow:0 8px 20px rgba(0,0,0,.18)}
+#ceBankOverlay .ce-bank-history-account div{min-width:0}
+#ceBankOverlay .ce-bank-history-account strong{display:block;font-size:19px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:.01em}
+#ceBankOverlay .ce-bank-history-account span{display:block;margin-top:4px;color:#c7e2f0;font-size:11px;font-weight:800}
+#ceBankOverlay .ce-bank-history-title{text-align:right;min-width:0}
+#ceBankOverlay .ce-bank-history-title span{display:block;color:#7ee1c2;font-size:9px;font-weight:950;letter-spacing:.16em}
+#ceBankOverlay .ce-bank-history-title b{display:block;margin-top:4px;font-size:15px;font-weight:950;color:#fff}
+#ceBankOverlay .ce-bank-history-card>header>button{width:44px;height:44px;border:1px solid rgba(255,255,255,.32);border-radius:14px;background:rgba(255,255,255,.1);color:#fff;font-size:29px;line-height:1;cursor:pointer}
+#ceBankOverlay .ce-bank-history-sortbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;flex:0 0 auto;padding:9px 16px;border-bottom:1px solid #d7e4eb;background:#fff}
+#ceBankOverlay .ce-bank-history-sortbar>span{margin-right:3px;color:#708493;font-size:9px;font-weight:950;letter-spacing:.08em;text-transform:uppercase}
+#ceBankOverlay .ce-bank-history-sortbar button{border:1px solid #cfdde6;border-radius:999px;background:#f8fbfd;color:#274b64;padding:5px 10px;font-size:10px;font-weight:900;cursor:pointer}
+#ceBankOverlay .ce-bank-history-sortbar button:hover{border-color:#83bdd9;background:#edf8fc}
+#ceBankOverlay .ce-bank-history-head,#ceBankOverlay .ce-bank-history-row{display:grid;grid-template-columns:150px minmax(300px,1fr) 130px 130px minmax(160px,.65fr);gap:10px;align-items:center}
+#ceBankOverlay .ce-bank-history-head{flex:0 0 auto;padding:7px 18px;background:#eaf2f6;border-bottom:1px solid #d5e2e9;color:#5c7282;font-size:9px;font-weight:950;letter-spacing:.07em;text-transform:uppercase}
+#ceBankOverlay .ce-bank-history-list{flex:1 1 auto;min-height:0;overflow:auto;padding:5px 10px 12px;scrollbar-width:thin}
+#ceBankOverlay .ce-bank-history-row{min-height:64px;padding:7px 8px;margin:4px 0;border:1px solid #d9e6ed;border-radius:13px;background:#fff;box-shadow:0 2px 8px rgba(21,55,78,.04)}
+#ceBankOverlay .ce-bank-history-row:hover{border-color:#a9cfe0;box-shadow:0 5px 14px rgba(21,55,78,.08)}
+#ceBankOverlay .ce-bank-history-row .date b{display:block;color:#173a63;font-size:11px;font-weight:950}
+#ceBankOverlay .ce-bank-history-row .date span{display:block;margin-top:2px;color:#7b8f9e;font-size:8px;font-weight:800}
+#ceBankOverlay .ce-bank-history-row .concept{min-width:0;color:#344b5c;font-size:12px;font-weight:850;line-height:1.25}
+#ceBankOverlay .ce-bank-history-row .amount,#ceBankOverlay .ce-bank-history-row .balance{text-align:right;font-size:14px;font-weight:950;white-space:nowrap}
+#ceBankOverlay .ce-bank-history-row .amount.positive{color:#16805b}
+#ceBankOverlay .ce-bank-history-row .amount.negative{color:#c74a56}
+#ceBankOverlay .ce-bank-history-row .balance{color:#315d78}
+#ceBankOverlay .ce-bank-history-ticket-strip{display:flex;align-items:center;gap:4px;min-width:0;overflow:hidden}
+#ceBankOverlay .ce-bank-history-ticket-strip>i{font-size:9px;font-style:normal;font-weight:950;color:#5c7485}
+#ceBankOverlay .ce-bank-history-ticket-mini{position:relative;width:38px;height:38px;flex:0 0 38px;padding:0;border:1px solid #cbdde7;border-radius:8px;background:linear-gradient(145deg,#eef6fa,#dcebf2);overflow:hidden;cursor:pointer}
+#ceBankOverlay .ce-bank-history-ticket-mini img{display:block;width:100%;height:100%;object-fit:cover}
+#ceBankOverlay .ce-bank-history-ticket-mini span{position:absolute;left:1px;right:1px;bottom:1px;padding:1px 2px;border-radius:4px;background:rgba(8,35,57,.82);color:#fff;font-size:7px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ceBankOverlay .ce-bank-history-ticket-mini:not(.has-image) span{position:static;display:flex;align-items:center;justify-content:center;width:100%;height:100%;padding:0;background:transparent;color:#1e5a7d;font-size:8px}
+#ceBankOverlay .ce-bank-history-ticket-mini:hover{outline:2px solid rgba(22,128,91,.25);border-color:#58b69b}
+#ceBankOverlay .ce-bank-history-no-ticket{color:#9aabb6}
+#ceBankOverlay .ce-bank-history-empty{padding:40px;text-align:center;color:#647c8d;font-weight:850}
+@media (max-width:900px){
+  #ceBankOverlay .ce-bank-history-card>header{grid-template-columns:minmax(0,1fr) 44px;gap:8px;padding:9px 10px;min-height:78px}
+  #ceBankOverlay .ce-bank-history-title{display:none}
+  #ceBankOverlay .ce-bank-history-account img{width:46px;height:46px;flex-basis:46px}
+  #ceBankOverlay .ce-bank-history-account strong{font-size:14px}
+  #ceBankOverlay .ce-bank-history-head,#ceBankOverlay .ce-bank-history-row{grid-template-columns:118px minmax(230px,1fr) 105px 105px 145px}
+  #ceBankOverlay .ce-bank-history-head{min-width:760px}
+  #ceBankOverlay .ce-bank-history-list{overflow:auto}
+  #ceBankOverlay .ce-bank-history-row{min-width:760px}
+}

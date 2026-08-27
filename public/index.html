@@ -218,7 +218,7 @@
                 
               </div>
             </div>
-            <button type="button" class="outline hidden" id="toggleComprasEvent" aria-hidden="true" tabindex="-1">🧰</button>
+            <div style="display:flex;align-items:center;gap:8px;margin-left:auto"><button type="button" class="outline ce-resp-launch" id="btnComprasResponsables" title="Ver compras agrupadas por responsable y preparar PDF"><span>👤</span> Responsables / PDF</button><button type="button" class="outline hidden" id="toggleComprasEvent" aria-hidden="true" tabindex="-1">🧰</button></div>
           </div>
           <div id="comprasEventBody" class="collapsed-body">
             <div class="row-purchase-form entry-zone">
@@ -263,12 +263,15 @@
 
       <div id="tabDonaciones" class="hidden app-lockable">
         <div class="card">
-          <div class="section-title">
-            <div class="icon-badge">🎁</div>
-            <div>
-              <h2>Donaciones de producto</h2>
-              <p>Mantén las donaciones DONADO TIENDA, DONADO SOCIO y DONADO OTROS.</p>
+          <div class="toggle-row">
+            <div class="section-title" style="margin:0">
+              <div class="icon-badge">🎁</div>
+              <div>
+                <h2>Donaciones de producto</h2>
+                <p>Mantén las donaciones DONADO TIENDA, DONADO SOCIO y DONADO OTROS.</p>
+              </div>
             </div>
+            <button type="button" class="outline ce-resp-launch" id="btnDonacionesResponsables" title="Ver donaciones agrupadas por responsable y preparar PDF"><span>👤</span> Responsables / PDF</button>
           </div>
           <div class="row-purchase-form entry-zone">
             <div class="field">
@@ -576,7 +579,7 @@
   </div></div>
 
 <!-- v4_0_exp FIX9.1.4: histórico superior, zoom inferior y cursor exacto. -->
-<script src="./app/features/v24-cuadre-banco.js?v=20260827-RAW14W-BANK-MULTIEVENTO"></script>
+<script src="./app/features/v24-cuadre-banco.js?v=20260827-V4_0_EXP-BANK3-HISTORY"></script>
 <script src="./app/features/v7-3-graficas-photo-restore-thumbs.js?v=20260827-V4_0_EXP-MEMORY-FLASHBACK-BANK2-JUSTIFICANTE-FINAL"></script>
 <script>window.__ceDisableLegacyBarGraficas=true;window.__ceV16Opt2HGraphHardLock=true;</script>
 <script src="./app/performance/low-resource-boot.js"></script>
@@ -706,6 +709,7 @@
     <script src="./app/features/v26-prod-fix1-conciliacion-backup.js?v=20260827-RAW14W-BANK-MULTIEVENTO"></script>
     <script src="./app/features/v26-prod-fix9-3-personas-historicas.js?v=20260827-V4_0_EXP-MEMORY-FLASHBACK-BANK2"></script>
   <script src="./app/features/v28-5-1-prod-detail-globes.js?v=20260827-V4_0_EXP-MEMORY-FLASHBACK-BANK2"></script>
+  <script src="./app/features/v4-0-exp-responsables-pdf.js?v=20260827-V4_0_EXP-BANK3-RESP-PDF"></script>
   <script src="./app/features/v4-0-exp-version-hardlock.js?v=20260827-V4_0_EXP-MEMORY-FLASHBACK-BANK2"></script>
   </body>
 </html>

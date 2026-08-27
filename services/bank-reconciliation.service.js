@@ -884,7 +884,18 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         valueDate:row.valueDate,
         description:row.description,
         amount:row.amount,
-        bankBalance:row.bankBalance
+        bankBalance:row.bankBalance,
+        // BANK3 · El histórico general conserva también los vínculos TKxx del movimiento.
+        // No imputa nada al evento actual: solo permite consultar el movimiento bancario real
+        // y abrir sus justificantes desde la lista histórica de la cuenta.
+        displayLinks:arr(displayLinksByMovement.get(row.id)).map(link=>({
+          movementId:link.movementId,
+          eventId:link.eventId,
+          eventTitle:link.eventTitle||eventTitleById.get(link.eventId)||link.eventId,
+          ticketCode:link.ticketCode,
+          ticketAmount:cents(link.ticketAmountSnapshot??link.ticketAmount),
+          ticketAmountSnapshot:cents(link.ticketAmountSnapshot??link.ticketAmount)
+        }))
       })),
       movements,
       summary:{...ledger.summary,cashIncome,eventIncome,economicVariation,latestBankBalance:globalSummary.latestBankBalance,latestAt:globalSummary.latestAt,globalMovementCount:globalSummary.movementCount}

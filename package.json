@@ -30,7 +30,8 @@
     "test:zuzu-raw14v": "node scripts/zuzu-raw14v-focus-coverage-regression.cjs",
     "test:bank-multievento": "node scripts/cuadre-banco-multievento-raw14w-regression.cjs",
     "test:v4": "node scripts/v4-0-exp-memory-bank-regression.cjs",
-    "test:bank2": "node scripts/v4-0-exp-bank2-multi-ticket-regression.cjs"
+    "test:bank2": "node scripts/v4-0-exp-bank2-multi-ticket-regression.cjs",
+    "test:bank3": "node scripts/v4-0-exp-bank3-history-responsables-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
