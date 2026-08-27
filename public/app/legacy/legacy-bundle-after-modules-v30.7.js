@@ -2988,11 +2988,29 @@ window.__ceDisableLegacyBarGraficas = true;
     if(!movements.length){ x.text(ws,r,1,'Sin movimientos incluidos en saldo','soft',true); ws.mergeCells(r,2,r,7); x.text(ws,r,2,'No hay movimientos marcados «En saldo» para este evento.','soft'); }
     for(const movement of movements){
       const links=(Array.isArray(movement?.links)?movement.links:[]).slice().sort((a,b)=>(Number(String(a?.ticketCode||'').replace(/\D/g,''))||0)-(Number(String(b?.ticketCode||'').replace(/\D/g,''))||0));
-      const ticketText=links.map(link=>`${link.ticketCode||'TK'} · ${money(link.ticketAmount||link.ticketAmountSnapshot||0)}`).join(' | ');
+      const displayLinks=(Array.isArray(movement?.displayLinks)?movement.displayLinks:links).slice();
+      const foreignLinks=displayLinks.filter(link=>link?.isActiveEvent===false || (link?.eventId && String(link.eventId)!==String(ev?.id||''))).sort((a,b)=>(Number(String(a?.ticketCode||'').replace(/\D/g,''))||0)-(Number(String(b?.ticketCode||'').replace(/\D/g,''))||0));
+      const ownTicketText=links.map(link=>`${link.ticketCode||'TK'} · ${money(link.ticketAmount||link.ticketAmountSnapshot||0)}`).join(' | ');
+      const foreignTicketText=foreignLinks.map(link=>`${link.ticketCode||'TK'} · ${money(link.ticketAmount||link.ticketAmountSnapshot||0)}${link.eventTitle?` (${link.eventTitle})`:''}`).join(' | ');
+      const ticketText=[ownTicketText,foreignTicketText?`Otros eventos: ${foreignTicketText}`:''].filter(Boolean).join(' · ');
       const positive=num(movement.amount)>=0;
-      const justified=['CUADRADO','CUADRADO_FORZADO'].includes(String(movement.justificationStatus||''));
-      const status=positive?'Movimiento positivo conciliado':justified?'Justificado':movement.justificationStatus==='PENDIENTE'?`Pendiente ${money(Math.max(0,num(movement.difference)))}`:movement.justificationStatus==='EXCESO'?`Exceso ${money(Math.abs(num(movement.difference)))}`:'Sin justificar';
-      const fill=(positive||justified)?'ok':'bad';
+      const closedStatuses=['CUADRADO','CUADRADO_COMPARTIDO','CUADRADO_DIFERENCIA_ACEPTADA','CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA','CUADRADO_FORZADO'];
+      const globalStatus=String(movement.globalJustificationStatus||movement.justificationStatus||'');
+      const localStatus=String(movement.justificationStatus||'');
+      const justified=closedStatuses.includes(globalStatus)||closedStatuses.includes(localStatus)||movement.globalReconciled===true;
+      const accepted=num(movement.acceptedDifference||0);
+      let status;
+      if(positive) status='Movimiento positivo conciliado';
+      else if(justified&&foreignLinks.length){
+        const own=num(movement.eventJustifiedAmount??movement.justifiedAmount??0);
+        status=`Justificado. Parte de este evento: ${money(own)}. Resto con TKxx de otros eventos${accepted>0?` · Diferencia aceptada ${money(accepted)}`:''}`;
+      }else if(justified){
+        status=accepted>0?`Justificado · Diferencia aceptada ${money(accepted)}`:'Justificado';
+      }else if(localStatus==='PARTE_EVENTO_OK_GLOBAL_PENDIENTE'||globalStatus==='PENDIENTE_GLOBAL'){
+        status=`Parte de este evento justificada; movimiento global pendiente ${money(Math.max(0,num(movement.globalDifference??movement.difference)))}`;
+      }else if(localStatus==='EXCESO'||globalStatus==='EXCESO') status=`Exceso ${money(Math.abs(num(movement.globalDifference??movement.difference)))}`;
+      else status='Sin justificar';
+      const fill=(positive||justified)?'ok':((localStatus==='PARTE_EVENTO_OK_GLOBAL_PENDIENTE'||globalStatus==='PENDIENTE_GLOBAL')?'warn':'bad');
       x.text(ws,r,1,bankDateV24(movement.executedAt),fill);
       x.text(ws,r,2,movement.description||'',fill);
       x.euro(ws,r,3,movement.amount,fill,true);

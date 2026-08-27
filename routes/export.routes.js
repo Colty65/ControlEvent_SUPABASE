@@ -10,6 +10,29 @@ const BACKUP_VERSION = 'ControlEvent v4_0_exp';
 const BACKUP_VERSION_FILE = 'ControlEvent_v4_0_exp';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
+// Excel admite como máximo 32.767 caracteres de texto por celda. Dejamos margen y,
+// en vez de truncar datos del BACKUP, enviamos cualquier texto largo a TEXTOS_LARGOS.
+const EXCEL_SAFE_TEXT_LIMIT = 30000;
+const EXCEL_LONG_TEXT_CHUNK = 8000;
+function excelXmlSafeText(value){
+  const input=String(value ?? '');
+  let out='';
+  for(let i=0;i<input.length;i++){
+    const code=input.charCodeAt(i);
+    // XML 1.0 no permite estos controles (sí permite TAB, LF y CR).
+    if((code>=0x00&&code<=0x08)||code===0x0B||code===0x0C||(code>=0x0E&&code<=0x1F)){ out+=' '; continue; }
+    // Sustituye surrogates huérfanos para no generar sharedStrings.xml inválido.
+    if(code>=0xD800&&code<=0xDBFF){
+      const next=input.charCodeAt(i+1);
+      if(next>=0xDC00&&next<=0xDFFF){ out+=input[i]+input[i+1]; i++; }
+      else out+='�';
+      continue;
+    }
+    if(code>=0xDC00&&code<=0xDFFF){ out+='�'; continue; }
+    out+=input[i];
+  }
+  return out;
+}
 
 const norm = value => String(value ?? '').trim();
 const num = value => {
@@ -523,13 +546,34 @@ function setupWorkbook(){
   wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`;
   wb.created = new Date();
   const border = {top:{style:'thin', color:{argb:'FFDDE2EA'}},left:{style:'thin', color:{argb:'FFDDE2EA'}},bottom:{style:'thin', color:{argb:'FFDDE2EA'}},right:{style:'thin', color:{argb:'FFDDE2EA'}}};
+  const longTextParts=[];
+  let longTextSeq=0;
+  let longTextFlushed=false;
+  function safeCellValue(value){
+    if(value==null) return '';
+    if(value instanceof Date) return value;
+    if(typeof value==='number') return Number.isFinite(value)?value:'';
+    if(typeof value==='boolean') return value;
+    let raw=value;
+    if(typeof raw!=='string'){
+      try{ raw=JSON.stringify(raw); }catch(_){ raw=String(raw); }
+    }
+    const clean=excelXmlSafeText(raw);
+    if(clean.length<=EXCEL_SAFE_TEXT_LIMIT) return clean;
+    const token=`__CE_LONGTEXT__:LT${String(++longTextSeq).padStart(7,'0')}`;
+    const total=Math.ceil(clean.length/EXCEL_LONG_TEXT_CHUNK);
+    for(let pos=0,part=1;pos<clean.length;pos+=EXCEL_LONG_TEXT_CHUNK,part++){
+      longTextParts.push([token,part,total,clean.slice(pos,pos+EXCEL_LONG_TEXT_CHUNK)]);
+    }
+    return token;
+  }
   function sheet(name, headers){
     const ws = wb.addWorksheet(name);
     ws.properties.defaultRowHeight = 21;
     ws.columns = headers.map(h => ({width: Math.max(14, Math.min(42, String(h).length + 4))}));
     headers.forEach((h,i) => {
       const c = ws.getCell(1, i + 1);
-      c.value = h;
+      c.value = safeCellValue(h);
       c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF111827'}};
       c.font = {bold:true, color:{argb:'FFFFFFFF'}};
       c.border = border;
@@ -541,7 +585,7 @@ function setupWorkbook(){
   }
   function addRows(name, headers, data){
     const ws = sheet(name, headers);
-    data.forEach(row => ws.addRow(row.map(v => v == null ? '' : v)));
+    data.forEach(row => ws.addRow(row.map(safeCellValue)));
     ws.eachRow(row => row.eachCell(cell => {
       cell.border = border;
       cell.alignment = {vertical:'middle', horizontal:'left', wrapText:true};
@@ -549,11 +593,17 @@ function setupWorkbook(){
     ws.columns.forEach((col, idx) => {
       let width = col.width || 14;
       col.eachCell({includeEmpty:true}, cell => { width = Math.max(width, Math.min(70, String(cell.value ?? '').length + 3)); });
-      col.width = headers[idx] === 'IMAGEN_BASE64_PARTE' ? 72 : Math.min(70, width);
+      col.width = headers[idx] === 'IMAGEN_BASE64_PARTE' || headers[idx] === 'TEXTO' ? 72 : Math.min(70, width);
     });
     return ws;
   }
-  return {wb, addRows};
+  function flushLongTextParts(){
+    if(longTextFlushed) return longTextParts.length;
+    longTextFlushed=true;
+    if(longTextParts.length) addRows('TEXTOS_LARGOS',['TOKEN','PARTE','TOTAL','TEXTO'],longTextParts.slice());
+    return longTextParts.length;
+  }
+  return {wb, addRows, flushLongTextParts};
 }
 async function protectWorkbook(wb){
   for(const ws of wb.worksheets){
@@ -606,7 +656,7 @@ async function buildBackupWorkbook(fullState, scope){
   const selectedCode = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.id || scope || '');
   const selectedTitle = scope === 'TODOS' ? 'TODOS' : (selectedEvent?.titulo || selectedCode || 'EVENTO');
   const now = stamp();
-  const {wb, addRows} = setupWorkbook();
+  const {wb, addRows, flushLongTextParts} = setupWorkbook();
   const scopedCounts = countsFor(scoped);
   const totalCounts = countsFor(fullState);
   const rawTicketImageRows = await rawTicketImageRowsForBackup(scope);
@@ -752,9 +802,12 @@ async function buildBackupWorkbook(fullState, scope){
     console.warn('[ControlEvent v4_0_exp] No se pudo añadir Cuadre Banco al BACKUP de servidor.',bankError?.message||bankError);
     ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_INGRESOS_LINKS','BANCO_CIERRE_MVTO','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));
   }
+  // BANK4.4: antes de proteger/escribir, materializa fuera de sharedStrings cualquier
+  // celda que exceda el límite de Excel. El lector de BACKUP la recompone por TOKEN.
+  const longTextCount=flushLongTextParts();
   await protectWorkbook(wb);
   enforceBackupVersion(wb);
-  return {wb, filename: backupFileName(scope, selectedTitle), counts: {...scopedCounts, compras: backupCompraCount, ticketImages: backupTicketCount}};
+  return {wb, filename: backupFileName(scope, selectedTitle), counts: {...scopedCounts, compras: backupCompraCount, ticketImages: backupTicketCount, longTexts: longTextCount}};
 }
 
 router.get('/export/backup', asyncHandler(async (req, res) => {

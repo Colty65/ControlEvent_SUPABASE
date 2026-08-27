@@ -186,7 +186,8 @@
     ['click','pointerup','touchend'].forEach(type => {
       document.addEventListener(type, function(event){
         if(event.target?.closest?.('#ceMapaFloatingHomeButton,#ceMaintFloatingTopV40')) return handleHomeEvent(event);
-        if(event.target?.closest?.('#tabMapaProductos [data-mapa-donation-toggle="1"]')) return handleDonationDelivered(event);
+        // BANK4.4: la situación de una donación ya no se toca desde este interceptor visual.
+        // La escritura única/persistente la captura v8-5-compras-rpc-head-fix40.js.
       }, {capture:true, passive:false});
     });
   }

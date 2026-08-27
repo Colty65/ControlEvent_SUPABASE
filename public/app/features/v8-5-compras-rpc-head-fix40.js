@@ -576,6 +576,10 @@
   function action(ev){
     const btn=ev.target?.closest?.('button'); if(!btn) return null;
     const a=btn.dataset?.action||'';
+    // BANK4.4: este listener vive en HEAD y es el primer capturador de click de la app.
+    // Aprovechamos ese punto único para que «Marcar entregada» no vuelva a quedar secuestrado
+    // por interceptores visuales v41.x que antiguamente solo cambiaban una marca local.
+    if(btn.matches?.('[data-mapa-donation-toggle="1"]')) return {type:'map-donation-situacion', id:btn.getAttribute('data-donation-id')||'', btn};
     if(btn.id==='btnAddCompra') return {type:'add', btn};
     if(btn.id==='btnAddDonacion') return {type:'add-donacion', btn};
     if(a==='save-compra') return {type:'save', id:btn.dataset.id||'', btn};
@@ -586,6 +590,32 @@
     if(btn.id==='btnTogglePower') return {type:'event-power', id:selectedEventId(), btn};
     return null;
   }
+  async function toggleDonationSituationFromMap(id, btn){
+    const row=compraById(id);
+    if(!row) throw new Error('No se ha encontrado la donación que intentas actualizar.');
+    const current=text(row.donacionSituacion||row.donacion_situacion||'Comprometida').toLowerCase();
+    const delivered=current==='entregada'||row.donacionEntregada===true||row.entregadoDonacion===true||row.entregado===true||text(row.entregado).toUpperCase()==='SI'||text(row.entregado).toUpperCase()==='SÍ';
+    const next=delivered?'Comprometida':'Entregada';
+    const oldText=btn?.textContent||'';
+    if(btn){ btn.disabled=true; btn.textContent='Guardando…'; btn.setAttribute('aria-busy','true'); }
+    try{
+      const item=await persistDonationSituation(id,next);
+      replaceCompraLocal(item);
+      try{ persistLocalNow(); }catch(_){ }
+      await syncStateNoRender();
+      try{ window.ControlEventDonationStatus?.refresh?.(); }catch(_){ }
+      try{ if(typeof window.renderDonaciones==='function') window.renderDonaciones(); }catch(_){ }
+      try{ if(typeof window.renderBudget==='function') window.renderBudget(); }catch(_){ }
+      try{ if(typeof window.renderMapaProductos==='function') window.renderMapaProductos(); else window.ControlEventMapaProductos?.render?.(); }catch(_){ }
+      return item;
+    }finally{
+      if(btn && document.body.contains(btn)){
+        btn.disabled=false; btn.removeAttribute('aria-busy');
+        if(btn.textContent==='Guardando…') btn.textContent=oldText||'Marcar entregada';
+      }
+    }
+  }
+
   async function handleClick(ev){
     const info=action(ev); if(!info) return;
     ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation();
@@ -597,7 +627,8 @@
     if(busy) return false;
     busy=true;
     try{
-      if(info.type==='add') await addCompra();
+      if(info.type==='map-donation-situacion') await toggleDonationSituationFromMap(info.id, info.btn);
+      else if(info.type==='add') await addCompra();
       else if(info.type==='add-donacion') await addDonacion();
       else if(info.type==='save') await saveCompra(info.id);
       else if(info.type==='delete') await deleteCompra(info.id, info.btn);

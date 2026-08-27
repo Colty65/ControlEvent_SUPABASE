@@ -308,7 +308,8 @@
     ['click','pointerup','touchend'].forEach(type => {
       window.addEventListener(type, function(event){
         if(handleHomeEvent(event)) return false;
-        if(handleDonationDelivered(event)) return false;
+        // BANK4.4: no interceptar [data-mapa-donation-toggle]. El handler de HEAD
+        // persiste donacion_situacion en BBDD y evita el antiguo doble toggle pointerup+click.
         if(type === 'click' && handleSaveEvent(event)) return false;
       }, {capture:true, passive:false});
     });

@@ -2155,3 +2155,21 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   /* En móvil se conserva la solución compacta anterior. */
   #ceBankOverlay .ce-bank-history-head{font-size:10.5px!important}
 }
+
+/* v4_0_exp BANK4.4 · histórico: el aspa debe permanecer en el extremo derecho aunque el título esté centrado en posición absoluta. */
+@media (min-width:901px){
+  #ceBankOverlay .ce-bank-history-card>header>button[data-ce-bank-close-history-list]{
+    grid-column:3!important;
+    justify-self:end!important;
+    margin-left:auto!important;
+    position:relative!important;
+    z-index:3!important;
+  }
+}
+@media (max-width:900px){
+  #ceBankOverlay .ce-bank-history-card>header>button[data-ce-bank-close-history-list]{
+    grid-column:2!important;
+    justify-self:end!important;
+    margin-left:auto!important;
+  }
+}

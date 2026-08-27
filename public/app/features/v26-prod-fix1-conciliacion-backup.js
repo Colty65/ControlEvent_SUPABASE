@@ -52,10 +52,39 @@
     if(!window.XLSX) throw new Error('No se ha podido cargar el lector de Excel.');
     return window.XLSX;
   }
+  const longTextCache=new WeakMap();
+  function longTextMap(wb){
+    if(!wb||typeof wb!=='object') return new Map();
+    if(longTextCache.has(wb)) return longTextCache.get(wb);
+    const map=new Map();
+    const key=(wb.SheetNames||[]).find(n=>up(n)==='TEXTOS_LARGOS');
+    if(key){
+      const rows=window.XLSX.utils.sheet_to_json(wb.Sheets[key],{defval:'',raw:false});
+      const grouped=new Map();
+      rows.forEach(row=>{
+        const token=norm(row?.TOKEN??row?.Token??row?.token);
+        const part=Number(row?.PARTE??row?.Parte??row?.parte)||0;
+        const total=Number(row?.TOTAL??row?.Total??row?.total)||0;
+        const text=String(row?.TEXTO??row?.Texto??row?.texto??'');
+        if(!token||!part) return;
+        if(!grouped.has(token)) grouped.set(token,{total,chunks:[]});
+        const rec=grouped.get(token); rec.total=Math.max(rec.total||0,total||0); rec.chunks[part-1]=text;
+      });
+      grouped.forEach((rec,token)=>{
+        const expected=rec.total||rec.chunks.length;
+        if(expected>0&&rec.chunks.filter(v=>v!==undefined).length===expected) map.set(token,rec.chunks.slice(0,expected).join(''));
+      });
+    }
+    longTextCache.set(wb,map); return map;
+  }
   function sheetRows(wb,name){
     const key=(wb.SheetNames||[]).find(n=>up(n)===up(name)); if(!key) return [];
+    const longMap=up(name)==='TEXTOS_LARGOS'?new Map():longTextMap(wb);
     return window.XLSX.utils.sheet_to_json(wb.Sheets[key],{defval:'',raw:false}).map(row=>{
-      const out={};Object.entries(row||{}).forEach(([k,v])=>out[up(k).replace(/[^A-Z0-9_]+/g,'_')]=v);return out;
+      const out={};Object.entries(row||{}).forEach(([k,v])=>{
+        const cell=(typeof v==='string'&&longMap.has(v))?longMap.get(v):v;
+        out[up(k).replace(/[^A-Z0-9_]+/g,'_')]=cell;
+      });return out;
     });
   }
   function pick(row,...keys){for(const k of keys){const key=up(k).replace(/[^A-Z0-9_]+/g,'_');if(row?.[key]!==undefined&&norm(row[key])!=='')return row[key];}return '';}
@@ -74,7 +103,7 @@
     const tiendas=sheetRows(wb,'TIENDAS').map(r=>({id:norm(pick(r,'TIENDA_ID')),nombre:norm(pick(r,'TIENDA_NOMBRE'))})).filter(r=>r.id);
     const productos=sheetRows(wb,'PRODUCTOS').map(r=>({id:norm(pick(r,'PRODUCTO_ID')),nombre:norm(pick(r,'PRODUCTO_NOMBRE')),segmento:norm(pick(r,'PRODUCTO_SEGMENTO')),destino:norm(pick(r,'PRODUCTO_DESTINO')),defaultPrecio:number(pick(r,'PRODUCTO_PRECIO_REFERENCIA')),precio:number(pick(r,'PRODUCTO_PRECIO_REFERENCIA'))})).filter(r=>r.id);
     const colaboradores=sheetRows(wb,'INGRESOS').map(r=>{const code=norm(pick(r,'PERSONA_CODIGO'));return {id:norm(pick(r,'INGRESO_ID')),eventId:resolveEventId(pick(r,'EVENTO_CODIGO')),personaId:personCodeToId.get(code)||code,numero:number(pick(r,'NUMERO')),situacion:norm(pick(r,'INGRESO')),importe:number(pick(r,'IMPORTE_VOLUNTARIO')),personaNombreSnapshot:norm(pick(r,'PERSONA_NOMBRE_EVENTO')),personaRangoSnapshot:up(pick(r,'PERSONA_RANGO_EVENTO'))};}).filter(r=>r.id&&r.eventId&&r.personaId);
-    const compras=sheetRows(wb,'CE_COMPRAS_BBDD').map(r=>({id:norm(pick(r,'COMPRA_ID')),eventId:norm(pick(r,'EVENT_ID')),productoId:norm(pick(r,'PRODUCTO_ID')),unidades:number(pick(r,'UNIDADES')),precio:number(pick(r,'PRECIO')),ticketDonacion:norm(pick(r,'TICKET_DONACION')),tiendaId:norm(pick(r,'TIENDA_ID')),responsableId:norm(pick(r,'RESPONSABLE_ID')),donorRef:norm(pick(r,'DONOR_REF')),createdAt:norm(pick(r,'CREATED_AT')),updatedAt:norm(pick(r,'UPDATED_AT'))})).filter(r=>r.id);
+    const compras=sheetRows(wb,'CE_COMPRAS_BBDD').map(r=>({id:norm(pick(r,'COMPRA_ID')),eventId:norm(pick(r,'EVENT_ID')),productoId:norm(pick(r,'PRODUCTO_ID')),unidades:number(pick(r,'UNIDADES')),precio:number(pick(r,'PRECIO')),ticketDonacion:norm(pick(r,'TICKET_DONACION')),donacionSituacion:norm(pick(r,'DONACION_SITUACION'))||undefined,tiendaId:norm(pick(r,'TIENDA_ID')),responsableId:norm(pick(r,'RESPONSABLE_ID')),donorRef:norm(pick(r,'DONOR_REF')),createdAt:norm(pick(r,'CREATED_AT')),updatedAt:norm(pick(r,'UPDATED_AT'))})).filter(r=>r.id);
     const eventDocuments=sheetRows(wb,'DOCUMENTOS').map(r=>({eventId:resolveEventId(pick(r,'EVENTO_CODIGO')),id:norm(pick(r,'DOC_ID')),codigo:norm(pick(r,'DOC_CODIGO')),fecha:norm(pick(r,'FECHA')),descripcion:norm(pick(r,'DESCRIPCION')),imageKey:norm(pick(r,'CLAVE_IMAGEN')),imageUrl:norm(pick(r,'FOTO_URL'))})).filter(r=>r.eventId&&(r.id||r.codigo));
     const ticketImages={};sheetRows(wb,'CE_TICKET_IMAGES_BBDD').forEach(r=>{const key=norm(pick(r,'IMAGE_KEY'));const value=norm(pick(r,'PUBLIC_URL'))||norm(pick(r,'PATHNAME'))||norm(pick(r,'STORAGE_PATH'));if(key&&value)ticketImages[key]=value;});
     return {__forceReplaceAll:true,__allowEmptyReplace:true,eventos,personas,tiendas,productos,colaboradores,compras,eventDocuments,ticketImages,selectedEventId:eventos[0]?.id||''};
