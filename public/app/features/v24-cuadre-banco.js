@@ -794,9 +794,12 @@
     const bankAmount=num(movement.amount);
     const eventAmount=num(movement.eventAppliedAmount??movement.amount);
     inspector.className=`ce-bank-balance-inspector ${eventAmount<0?'negative':'positive'}`;
+    // BANK4.1 · la cabecera ya muestra el importe aplicado. Eliminamos la línea redundante
+    // «Movimiento banco» para ganar altura y legibilidad; solo conservamos la parte del evento
+    // cuando el movimiento realmente está repartido entre eventos.
     const allocation=movement.sharedMovement||Math.abs(eventAmount-bankAmount)>.01
-      ?`<small>Parte del evento: <b>${esc(chartAmount(eventAmount))}</b> · Movimiento banco: ${esc(chartAmount(bankAmount))}</small>`
-      :`<small>Movimiento banco: ${esc(chartAmount(bankAmount))}</small>`;
+      ?`<small>Parte del evento: <b>${esc(chartAmount(eventAmount))}</b></small>`
+      :'';
     inspector.innerHTML=`<span>INFORMACIÓN DEL MOVIMIENTO</span><strong>${esc(formatDate(movement.executedAt))}</strong><div><b class="${eventAmount<0?'negative':'positive'}">${esc(chartAmount(eventAmount))}</b><em>Saldo evento ${esc(chartAmount(point.balance))}</em></div>${allocation}<small>${esc(movement.description||'Movimiento bancario')}</small>`;
     const movementId=String(movement.id||'');
     if(balanceInspectorMovementId!==movementId){balanceInspectorMovementId=movementId;renderBalanceInspectorMedia(movement);}

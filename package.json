@@ -32,7 +32,8 @@
     "test:v4": "node scripts/v4-0-exp-memory-bank-regression.cjs",
     "test:bank2": "node scripts/v4-0-exp-bank2-multi-ticket-regression.cjs",
     "test:bank3": "node scripts/v4-0-exp-bank3-history-responsables-regression.cjs",
-    "test:v4-bank4": "node scripts/v4-0-exp-bank4-estetica-responsables-regression.cjs"
+    "test:v4-bank4": "node scripts/v4-0-exp-bank4-estetica-responsables-regression.cjs",
+    "test:v4-bank41": "node scripts/v4-0-exp-bank41-entertainment-unfinished-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

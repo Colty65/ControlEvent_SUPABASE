@@ -2098,3 +2098,60 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   #ceBankOverlay .ce-bank-history-account .iban{font-size:8.5px!important}
   #ceBankOverlay .ce-bank-history-account small{font-size:7.5px!important}
 }
+
+
+/* v4_0_exp BANK4.1 · petición 27/08/2026 · legibilidad cabeceras sin tocar lógica bancaria */
+@media (min-width:901px){
+  /* Desplaza el inspector del movimiento claramente hacia la derecha, casi pegado a las miniaturas. */
+  #ceBankOverlay .ce-bank-balance-chart-card.refined.vertical-layout>.ce-bank-balance-main-head{
+    grid-template-columns:minmax(620px,1.48fr) minmax(285px,.58fr) minmax(145px,.34fr) 48px!important;
+    gap:7px!important;
+  }
+  #ceBankOverlay .ce-bank-balance-inspector{
+    padding:1px 3px 1px 9px!important;
+  }
+  /* Las líneas de información ganan un punto largo de cuerpo al desaparecer «Movimiento banco». */
+  #ceBankOverlay .ce-bank-balance-inspector>span{font-size:8.6px!important;line-height:1.08!important}
+  #ceBankOverlay .ce-bank-balance-inspector>strong{font-size:12.4px!important;line-height:1.12!important}
+  #ceBankOverlay .ce-bank-balance-inspector>div{gap:9px!important;margin-top:3px!important}
+  #ceBankOverlay .ce-bank-balance-inspector>div b{font-size:15.2px!important;line-height:1.05!important}
+  #ceBankOverlay .ce-bank-balance-inspector>div em{font-size:10px!important;line-height:1.05!important}
+  #ceBankOverlay .ce-bank-balance-inspector>small{margin-top:3px!important;font-size:9.4px!important;line-height:1.12!important}
+
+  /* Título histórico centrado de verdad respecto a toda la cabecera, no al hueco derecho del grid. */
+  #ceBankOverlay .ce-bank-history-card>header{position:relative!important}
+  #ceBankOverlay .ce-bank-history-title{
+    position:absolute!important;
+    left:50%!important;
+    top:50%!important;
+    width:min(560px,42vw)!important;
+    transform:translate(-50%,-50%)!important;
+    text-align:center!important;
+    pointer-events:none!important;
+  }
+  #ceBankOverlay .ce-bank-history-title span{
+    color:#8ff0d1!important;
+    font-size:17px!important;
+    line-height:1.08!important;
+    font-weight:1000!important;
+    letter-spacing:.085em!important;
+  }
+  #ceBankOverlay .ce-bank-history-title b{
+    margin-top:6px!important;
+    font-size:15px!important;
+    line-height:1!important;
+  }
+}
+#ceBankOverlay .ce-bank-history-head{
+  min-height:31px!important;
+  padding-top:8px!important;
+  padding-bottom:8px!important;
+  font-size:12px!important;
+  line-height:1.12!important;
+  font-weight:1000!important;
+  letter-spacing:.055em!important;
+}
+@media (max-width:900px){
+  /* En móvil se conserva la solución compacta anterior. */
+  #ceBankOverlay .ce-bank-history-head{font-size:10.5px!important}
+}

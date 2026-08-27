@@ -69,12 +69,48 @@ async function fallbackGetView(id){const v=id?await metaGet(mkey('view',id)):nul
 
 async function withFallback(tableFn,fallbackFn){try{return await tableFn();}catch(error){if(!isMissingTable(error))throw error;return fallbackFn();}}
 
+function conversationClosingSignal(turn={}){
+  const p=norm(turn?.userPrompt),a=norm(turn?.answer);
+  if(/\b(?:adios|hasta luego|hasta manana|gracias y|muchas gracias|cerramos|terminamos|acabamos|lo dejamos aqui|nada mas|eso es todo)\b/.test(p))return true;
+  return /\b(?:cuando quieras seguimos|hasta luego|con esto queda cerrado|lo dejamos aqui)\b/.test(a)&&/\b(?:gracias|vale|perfecto|cerramos|terminamos|nada mas)\b/.test(p);
+}
+async function setConversationStatus(id='',status='active'){
+  id=trim(id);status=trim(status)||'active';if(!id)return null;
+  try{const {data,error}=await db().from(T_CONV).update({status}).eq('conversation_id',id).select('*').maybeSingle();if(error)throw error;return data?publicConversation(data):null;}
+  catch(error){if(isMissingColumn(error)||isMissingTable(error))return null;throw error;}
+}
+async function classifyPreviousActiveConversations(uid='',excludeId=''){
+  uid=trim(uid);excludeId=trim(excludeId);if(!uid)return;
+  try{
+    const {data,error}=await db().from(T_CONV).select('conversation_id,status,updated_at').eq('user_id',uid).eq('status','active').order('updated_at',{ascending:false}).limit(12);if(error)throw error;
+    for(const row of arr(data)){
+      const id=trim(row?.conversation_id);if(!id||id===excludeId)continue;
+      let last=null;try{const turns=await tableListTurns(id,1);last=turns[turns.length-1]||null;}catch(_){last=null;}
+      // Al arrancar una conversación nueva, una anterior que seguía "active" quedó interrumpida.
+      // Si el último intercambio cerraba expresamente el tema, la marcamos completed; en caso
+      // contrario, unfinished. Si el usuario vuelve a aquella conversación, ensure la reactiva.
+      await setConversationStatus(id,conversationClosingSignal(last)?'completed':'unfinished');
+    }
+  }catch(error){if(!isMissingColumn(error)&&!isMissingTable(error))throw error;}
+}
+export function isUnfinishedRecallPrompt(prompt=''){
+  const n=norm(prompt);
+  return /\b(?:a medias|sin terminar|sin acabar|inacabada|inacabado|interrumpida|interrumpido|cortamos en seco|se corto|se cortó|dejamos a medias|quedo a medias|quedó a medias|pendiente de seguir|retomar lo pendiente)\b/.test(n);
+}
+
 export async function ensureZuzuConversation({conversationId='',actor={},selectedEventId='',title=''}={}){
   const uid=actorId(actor);if(!uid){const e=new Error('No puedo persistir la conversación Zuzu sin usuario identificado.');e.status=401;throw e;}
   let id=safeId(conversationId)||newConversationId();
   const existing=await withFallback(()=>tableGetConversation(id),()=>fallbackGetConversation(id));
   if(existing&&existing.userId&&norm(existing.userId)!==norm(uid)){id=newConversationId();}
-  if(existing&&norm(existing.userId)===norm(uid))return existing;
+  if(existing&&norm(existing.userId)===norm(uid)){
+    if(trim(existing.status)!=='active'){const resumed=await setConversationStatus(id,'active');return resumed||{...existing,status:'active'};}
+    return existing;
+  }
+  // Una conversación nueva convierte cualquier conversación anterior que aún figuraba active en
+  // una conversación cerrada (completed) o dejada a medias (unfinished). No crea tablas nuevas:
+  // reutiliza el campo status ya existente en ce_zuzu_conversations.
+  await classifyPreviousActiveConversations(uid,id);
   const stamp=now(),row={conversation_id:id,user_id:uid,user_name:actorName(actor),title:trim(title)||'Conversación Zuzu',created_at:stamp,updated_at:stamp,current_seq:0,current_turn_id:'',selected_event_id:trim(selectedEventId),status:'active'};
   return withFallback(()=>tableEnsureConversation(row),async()=>{await metaSet(mkey('conversation',id),row);return publicConversation(row);});
 }
@@ -230,7 +266,7 @@ async function persistTurnMemoryProjection(turnId='',memory={}){
 }
 function memoryItemFromTurn(conversation,turn,memory={}){
   const exec=turn.execution||{},m=memory?.summary!==undefined?memory:memoryProjectionForTurn(turn);
-  return{conversationId:trim(conversation?.conversationId||turn.conversationId),turnId:turn.turnId,seq:turn.seq,createdAt:turn.createdAt,userPrompt:turn.userPrompt,title:turn.title,answer:turn.answer,actionType:turn.actionType,domain:trim(exec.domain),scope:exec.scope||{},focus:exec.focus||{},semanticTags:semanticTagsFromTurn(turn),rowCount:Number(exec.row_count)||0,summary:trim(m.summary),memoryQuality:Number(m.quality)||0,memoryKind:trim(m.kind),memoryEntities:arr(m.entities),planSignature:m.planSignature||{},memoryVisibility:trim(m.visibility||turn.memoryVisibility)||'private',experienceSignature:m.experienceSignature||turn.memoryExperienceSignature||{},memorySource:'db'};
+  return{conversationId:trim(conversation?.conversationId||turn.conversationId),conversationStatus:trim(conversation?.status)||'active',turnId:turn.turnId,seq:turn.seq,createdAt:turn.createdAt,userPrompt:turn.userPrompt,title:turn.title,answer:turn.answer,actionType:turn.actionType,domain:trim(exec.domain),scope:exec.scope||{},focus:exec.focus||{},semanticTags:semanticTagsFromTurn(turn),rowCount:Number(exec.row_count)||0,summary:trim(m.summary),memoryQuality:Number(m.quality)||0,memoryKind:trim(m.kind),memoryEntities:arr(m.entities),planSignature:m.planSignature||{},memoryVisibility:trim(m.visibility||turn.memoryVisibility)||'private',experienceSignature:m.experienceSignature||turn.memoryExperienceSignature||{},memorySource:'db'};
 }
 async function updateHistoryIndex(){
   // RAW14T: histórico = tablas persistentes. Deliberadamente NO escribimos índice de recuerdos en ce_meta.
@@ -322,6 +358,7 @@ export function resolveZuzuMemoryTimeWindow(prompt='',nowIso=''){
 }
 export function isRecallPrompt(prompt=''){
   const p=trim(prompt),n=norm(p);
+  if(isUnfinishedRecallPrompt(p))return true;
   if(/\b(?:te\s+acuerdas|recuerdas|recu[eé]rdame|recu[eé]rdanos|recuerda|acu[eé]rdate|recordamos|recordad[oa]|recuerdos?|conversaci[oó]n\s+(?:pasada|anterior)|(?:aquella|esa)\s+(?:tabla|conversaci[oó]n)|aquel\s+(?:tema|d[ií]a)|lo\s+que\s+vimos|lo\s+de\s+(?:antes|otro\s+d[ií]a)|(?:retoma|retomemos)\b|(?:vuelve|volvamos|volver)\s+(?:a\s+)?(?:lo\s+de|aquel(?:la)?\s+(?:tema|conversaci[oó]n)|esa\s+conversaci[oó]n))\b/i.test(p))return true;
   // «vuelve a revisarla» NO es memoria: es una orden de revisar CURRENT. Para abrir memoria
   // exigimos una referencia humana al pasado, al hablar previo o una ventana temporal.
@@ -333,8 +370,8 @@ async function memoryIndexItemsForUser(uid=''){
   const fresh=[];
   try{
     let convs=[];
-    try{const res=await db().from(T_CONV).select('conversation_id,user_id,user_name,title,created_at,updated_at,memory_summary,memory_main_topics,memory_main_entities,memory_recallable_turns,memory_visibility').eq('user_id',uid).order('updated_at',{ascending:false}).limit(240);if(res.error)throw res.error;convs=arr(res.data);}
-    catch(error){if(!isMissingColumn(error))throw error;const res=await db().from(T_CONV).select('conversation_id,user_id,user_name,title,created_at,updated_at,memory_summary,memory_main_topics,memory_main_entities,memory_recallable_turns').eq('user_id',uid).order('updated_at',{ascending:false}).limit(240);if(res.error)throw res.error;convs=arr(res.data);}
+    try{const res=await db().from(T_CONV).select('conversation_id,user_id,user_name,title,created_at,updated_at,status,memory_summary,memory_main_topics,memory_main_entities,memory_recallable_turns,memory_visibility').eq('user_id',uid).order('updated_at',{ascending:false}).limit(240);if(res.error)throw res.error;convs=arr(res.data);}
+    catch(error){if(!isMissingColumn(error))throw error;const res=await db().from(T_CONV).select('conversation_id,user_id,user_name,title,created_at,updated_at,status,memory_summary,memory_main_topics,memory_main_entities,memory_recallable_turns').eq('user_id',uid).order('updated_at',{ascending:false}).limit(240);if(res.error)throw res.error;convs=arr(res.data);}
     const convMap=new Map(arr(convs).map(x=>[trim(x.conversation_id),publicConversation(x)])),ids=[...convMap.keys()].filter(Boolean);
     if(!ids.length)return[];
     let data=[];
@@ -365,7 +402,7 @@ async function memoryIndexItemsForUser(uid=''){
 }
 async function memoryEpisodeMeta(conversationId=''){
   const id=trim(conversationId);if(!id)return null;
-  try{const conv=await tableGetConversation(id);if(!conv)return null;return{conversation_id:id,started_at:conv.createdAt,updated_at:conv.updatedAt,conversation_summary:conv.memorySummary,main_topics:conv.memoryMainTopics,main_entities:conv.memoryMainEntities,recallable_turns:conv.memoryRecallableTurns,memory_source:'db',memory_visibility:conv.memoryVisibility||'private'};}catch(error){if(isMissingTable(error))return null;throw error;}
+  try{const conv=await tableGetConversation(id);if(!conv)return null;return{conversation_id:id,conversation_status:conv.status||'active',started_at:conv.createdAt,updated_at:conv.updatedAt,conversation_summary:conv.memorySummary,main_topics:conv.memoryMainTopics,main_entities:conv.memoryMainEntities,recallable_turns:conv.memoryRecallableTurns,memory_source:'db',memory_visibility:conv.memoryVisibility||'private'};}catch(error){if(isMissingTable(error))return null;throw error;}
 }
 function withinMemoryWindow(item={},window=null){if(!window)return true;const ms=new Date(item.createdAt).getTime();return Number.isFinite(ms)&&ms>=window.startMs&&ms<=window.endMs;}
 function memoryRecentMs(item={}){const ms=new Date(item?.createdAt).getTime();return Number.isFinite(ms)?ms:0;}
@@ -378,13 +415,18 @@ function compareMemoryCandidates(a={},b={},preferRecent=false){
   return sb-sa;
 }
 export async function searchZuzuHistoryCandidates({actor={},prompt='',conversationId='',limit=8,nowIso=''}={}){
-  const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),window=resolveZuzuMemoryTimeWindow(prompt,nowIso),explicit=isRecallPrompt(prompt),n=norm(prompt),broadRecent=/\b(?:ultimamente|recientemente|hace poco|hace unos minutos|hace un rato|hace unas horas)\b/.test(n),topicTerms=tokens(prompt);
-  let scored=items.filter(x=>withinMemoryWindow(x,window)).map(x=>({...x,score:historyScore(prompt,x)}));
+  const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),window=resolveZuzuMemoryTimeWindow(prompt,nowIso),explicit=isRecallPrompt(prompt),unfinishedHint=isUnfinishedRecallPrompt(prompt),n=norm(prompt),broadRecent=/\b(?:ultimamente|recientemente|hace poco|hace unos minutos|hace un rato|hace unas horas)\b/.test(n),topicTerms=tokens(prompt);
+  let pool=items.filter(x=>withinMemoryWindow(x,window));
+  // «La conversación que dejamos a medias» es una pista de estado, no una palabra temática.
+  // Si hay episodios unfinished, reducimos la búsqueda a ellos; si no, conservamos el ranking
+  // histórico normal para no dejar al usuario sin salida por datos antiguos sin status.
+  if(unfinishedHint){const pending=pool.filter(x=>trim(x.conversationStatus)==='unfinished');if(pending.length)pool=pending;}
+  let scored=pool.map(x=>({...x,score:historyScore(prompt,x)+(unfinishedHint&&trim(x.conversationStatus)==='unfinished'?5.5:0)}));
   if(explicit&&window)scored=scored.map(x=>({...x,score:Math.max(x.score,0.28+Math.min(0.3,(Number(x.memoryQuality)||2)*0.08))+(broadRecent?Math.max(0,0.95-daysAgo(x.createdAt,nowIso)*0.11):0)}));
   if(explicit&&!scored.some(x=>x.score>0)&&!window)scored=items.slice(0,120).map(x=>({...x,score:0.15+Math.min(0.2,(Number(x.memoryQuality)||2)*0.05)}));
   scored=scored.filter(x=>x.score>0).sort((a,b)=>compareMemoryCandidates(a,b,broadRecent||topicTerms.length===0));
   const out=[],seen=new Set();for(const x of scored){const k=trim(x.conversationId)||x.turnId;if(seen.has(k))continue;seen.add(k);const episode=await memoryEpisodeMeta(x.conversationId);out.push({...x,episode});if(out.length>=Math.max(1,Math.min(12,Number(limit)||8)))break;}
-  return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,semantic_tags:x.semanticTags||{},row_count:x.rowCount,summary:x.summary,memory_quality:Number(x.memoryQuality)||0,memory_kind:trim(x.memoryKind),memory_visibility:trim(x.memoryVisibility)||'private',memory_source:'db',experience_signature:x.experienceSignature||{},plan_signature:x.planSignature||{},episode_summary:trim(x.episode?.conversation_summary),episode_started_at:trim(x.episode?.started_at),episode_updated_at:trim(x.episode?.updated_at),episode_topics:arr(x.episode?.main_topics),score:Number(x.score.toFixed(3)),time_window:window?{start:window.start,end:window.end,label:window.label}:null,same_conversation:trim(x.conversationId)===trim(conversationId)}));
+  return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,semantic_tags:x.semanticTags||{},row_count:x.rowCount,summary:x.summary,memory_quality:Number(x.memoryQuality)||0,memory_kind:trim(x.memoryKind),memory_visibility:trim(x.memoryVisibility)||'private',memory_source:'db',experience_signature:x.experienceSignature||{},plan_signature:x.planSignature||{},episode_summary:trim(x.episode?.conversation_summary),episode_started_at:trim(x.episode?.started_at),episode_updated_at:trim(x.episode?.updated_at),episode_topics:arr(x.episode?.main_topics),score:Number(x.score.toFixed(3)),time_window:window?{start:window.start,end:window.end,label:window.label}:null,conversation_status:trim(x.conversationStatus||x.episode?.conversation_status)||'active',unfinished_hint:unfinishedHint,same_conversation:trim(x.conversationId)===trim(conversationId)}));
 }
 function planSimilarityScore(plan={},item={}){
   const sig=item.planSignature||{},p=plan||{},q=p.query||{},domains=arr(q.targets).map(x=>trim(x?.domain)).filter(Boolean),oldDomains=arr(sig.targets).map(trim).filter(Boolean);let score=0;
@@ -461,7 +503,7 @@ export async function readZuzuMemoryEpisode({conversationId='',actor={},matchedT
   memoryTurns.sort((a,b)=>Number(a.seq)-Number(b.seq)||text(a.created_at).localeCompare(text(b.created_at)));
   let episode=await memoryEpisodeMeta(id);if(!episode){const items=memoryTurns.map(t=>({createdAt:t.created_at,title:t.title,domain:t.domain,memoryEntities:t.entities,semanticTags:{entities:t.entities}})),sum=episodeSummaryFromItems(items);episode={conversation_id:id,started_at:memoryTurns[0]?.created_at||conversation.createdAt,updated_at:memoryTurns[memoryTurns.length-1]?.created_at||conversation.updatedAt,...sum};}
   return{
-    conversation_id:id,user_id:conversation.userId,user_name:conversation.userName,memory_source:'db',memory_visibility:conversation.memoryVisibility||'private',
+    conversation_id:id,conversation_status:conversation.status||'active',user_id:conversation.userId,user_name:conversation.userName,memory_source:'db',memory_visibility:conversation.memoryVisibility||'private',
     started_at:trim(episode?.started_at)||memoryTurns[0]?.created_at||conversation.createdAt,
     ended_at:memoryTurns[memoryTurns.length-1]?.created_at||conversation.updatedAt,
     conversation_summary:trim(episode?.conversation_summary)||trim(conversation.memorySummary),

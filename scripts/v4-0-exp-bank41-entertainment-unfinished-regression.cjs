@@ -1,0 +1,27 @@
+const fs=require('fs');const path=require('path');const root=path.resolve(__dirname,'..');
+const bank=fs.readFileSync(path.join(root,'public/app/features/v24-cuadre-banco.js'),'utf8');
+const css=fs.readFileSync(path.join(root,'public/app/styles/cuadre-banco.css'),'utf8');
+const voice=fs.readFileSync(path.join(root,'public/app/features/v22-voz3-zuzu.js'),'utf8');
+const ledger=fs.readFileSync(path.join(root,'services/zuzu-conversation-ledger.service.js'),'utf8');
+const ai=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const index=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+let ok=0,ko=0;function t(n,c){if(c){ok++;console.log('OK · '+n)}else{ko++;console.error('KO · '+n)}}
+t('inspector banco desplazado a la derecha',/grid-template-columns:minmax\(620px,1\.48fr\)/.test(css));
+t('inspector banco gana tamaño de letra',/font-size:12\.4px!important/.test(css)&&/font-size:15\.2px!important/.test(css)&&/font-size:9\.4px!important/.test(css));
+t('línea Movimiento banco eliminada del inspector normal',/const allocation[\s\S]*Parte del evento[\s\S]*:\s*'';/.test(bank)&&!/\?`<small>Parte del evento:[^\n]*Movimiento banco/.test(bank));
+t('cabecera histórica centrada de verdad',/\.ce-bank-history-title\{[\s\S]*position:absolute!important[\s\S]*left:50%!important/.test(css));
+t('título histórico mucho mayor',/\.ce-bank-history-title span\{[\s\S]*font-size:17px!important/.test(css));
+t('cabeceras de columnas históricas mayores',/\.ce-bank-history-head\{[\s\S]*font-size:12px!important/.test(css));
+t('entretenimiento arranca a 3 segundos',voice.includes('entertainmentInitialDelayMs:3000'));
+t('entretenimiento contextual usa prompt',voice.includes('function entertainmentPromptContext')&&voice.includes('contextualEntertainmentPhrase(state.requestPrompt'));
+t('entretenimiento máximo dos frases',voice.includes('entertainmentMaxPerRequest:2')&&voice.includes('state.entertainmentCount>=state.entertainmentMaxPerRequest'));
+t('personalización no se repite en cada pregunta',voice.includes('nextEntertainmentRequestCounter()%4===1'));
+t('memoria reconoce pista a medias',ledger.includes('function isUnfinishedRecallPrompt')||ledger.includes('export function isUnfinishedRecallPrompt'));
+t('conversación anterior se clasifica unfinished al abrir una nueva',ledger.includes("conversationClosingSignal(last)?'completed':'unfinished'"));
+t('una conversación recuperada vuelve a active',ledger.includes("setConversationStatus(id,'active')"));
+t('búsqueda con pista unfinished prioriza estado',ledger.includes("trim(x.conversationStatus)==='unfinished'?5.5:0"));
+t('índice histórico conserva status de conversación',ledger.includes('updated_at,status,memory_summary'));
+t('kernel recibe conversation_status unfinished',ai.includes('conversation_status:trim(x.conversation_status)')&&ai.includes('ESTADO DE CONVERSACIÓN'));
+t('outline verbaliza que quedó a medias',ai.includes('conversación que dejamos a medias'));
+t('cache bust aplicado',index.includes('BANK4-1-LEGIBILIDAD')&&index.includes('RAW14U-CONTEXTUAL-ENTERTAINMENT'));
+console.log(`PETICIÓN 27/08/2026 · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

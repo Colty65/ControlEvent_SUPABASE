@@ -10,12 +10,13 @@ function phraseCount(){const a=voice.indexOf('var ENTERTAINMENT_PHRASES=['),b=vo
 function phraseUnique(){const a=voice.indexOf('var ENTERTAINMENT_PHRASES=['),b=voice.indexOf('\n  ];',a);const p=(voice.slice(a,b).match(/^\s*'(?:[^'\\]|\\.)*',?\s*$/gm)||[]).map(x=>x.trim());return new Set(p).size===p.length;}
 
 t('build RAW14U voz',voice.includes('RAW14U-VOICE-GUARD-CAROUSEL'));
-t('caché index RAW14U',index.includes('v22-voz3-zuzu.js?v=20260826-RAW14U-VOICE-GUARD-CAROUSEL'));
+t('caché index entretenimiento contextual',index.includes('v22-voz3-zuzu.js?v=20260827-RAW14U-CONTEXTUAL-ENTERTAINMENT'));
 t('carrusel tiene exactamente 100 frases nuevas',phraseCount()===100);
 t('las 100 frases no se repiten en fuente',phraseUnique());
 t('storage v44 fuerza mazo limpio',voice.includes('entertainment_deck_v44')&&voice.includes('entertainment_used_v44'));
-t('intervalo entretenimiento 2500 ms',voice.includes('entertainmentIntervalMs:2500'));
-t('siguiente frase se agenda tras acabar la anterior',voice.includes("entertainmentEnded(ok,idx,started)")&&voice.includes('scheduleEntertainment(state.entertainmentIntervalMs||2500)'));
+t('entretenimiento empieza a los 3 s',voice.includes('entertainmentInitialDelayMs:3000'));
+t('entretenimiento espaciado y limitado',voice.includes('entertainmentIntervalMs:6000')&&voice.includes('entertainmentMaxPerRequest:2'));
+t('siguiente frase se agenda solo si queda cupo',voice.includes('state.entertainmentCount<state.entertainmentMaxPerRequest')&&voice.includes('scheduleEntertainment(state.entertainmentIntervalMs||6000)'));
 t('respuesta espera a que termine frase en curso',voice.includes('if(state.entertainmentSpeaking){state.pendingAnswerTimer=setTimeout(deliver,60);return;}'));
 t('variables usuario/nombre',voice.includes('usuario:voiceAddressName(false)')&&voice.includes('nombre:voiceGreetingName()'));
 t('variables temporales locales',voice.includes('mes_actual:')&&voice.includes('diasemana:')&&voice.includes('ano_actual:')&&voice.includes('hora_actual:')&&voice.includes('fecha_hoy:')&&voice.includes('momento_dia:'));
