@@ -724,6 +724,7 @@ async function buildBackupWorkbook(fullState, scope){
     const bankSettings=Array.isArray(bank?.eventSettings)?bank.eventSettings:[];
     const bankStates=Array.isArray(bank?.movementStates)?bank.movementStates:[];
     const bankIncomeLinks=Array.isArray(bank?.incomeLinks)?bank.incomeLinks:[];
+    const bankSettlements=Array.isArray(bank?.movementSettlements)?bank.movementSettlements:[];
     addRows('BANCO_IMPORTACIONES', ['ID','SOURCE_FILENAME','ACCOUNT_ID','ACCOUNT_LABEL','DATE_FROM','DATE_TO','PARSED_COUNT','INSERTED_COUNT','DUPLICATE_COUNT','WARNING_COUNT','IMPORTED_BY','IMPORTED_AT'], (Array.isArray(bank?.batches)?bank.batches:[]).map(row=>[
       row.id||'',row.sourceFilename||'',row.accountId||'',row.accountLabel||'',row.dateFrom||'',row.dateTo||'',num(row.parsedCount),num(row.insertedCount),num(row.duplicateCount),num(row.warningCount),row.importedBy||'',row.importedAt||''
     ]));
@@ -736,6 +737,9 @@ async function buildBackupWorkbook(fullState, scope){
     addRows('BANCO_INGRESOS_LINKS', ['ID','MOVEMENT_ID','EVENT_ID','INCOME_ID','INCOME_AMOUNT_SNAPSHOT','CREATED_BY','CREATED_AT'], bankIncomeLinks.map(row=>[
       row.id||'',row.movementId||'',row.eventId||'',row.incomeId||'',num(row.incomeAmountSnapshot),row.createdBy||'',row.createdAt||''
     ]));
+    addRows('BANCO_CIERRE_MVTO', ['MOVEMENT_ID','ACCEPTED_DIFFERENCE','NOTE','ACCEPTED_BY','ACCEPTED_AT','UPDATED_AT'], bankSettlements.map(row=>[
+      row.movementId||'',num(row.acceptedDifference),row.note||'',row.acceptedBy||'',row.acceptedAt||'',row.updatedAt||''
+    ]));
     addRows('BANCO_PERIODOS', ['EVENT_ID','DATE_FROM','DATE_TO','UPDATED_BY','UPDATED_AT'], bankSettings.map(row=>[
       row.eventId||'',row.dateFrom||'',row.dateTo||'',row.updatedBy||'',row.updatedAt||''
     ]));
@@ -744,7 +748,7 @@ async function buildBackupWorkbook(fullState, scope){
     ]));
   }catch(bankError){
     console.warn('[ControlEvent v3_0_exp] No se pudo añadir Cuadre Banco al BACKUP de servidor.',bankError?.message||bankError);
-    ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_INGRESOS_LINKS','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));
+    ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_INGRESOS_LINKS','BANCO_CIERRE_MVTO','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));
   }
   await protectWorkbook(wb);
   enforceBackupVersion(wb);
@@ -779,6 +783,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
   }
   if(all){
     await deleteRowsByPk('ce_bank_income_links','id');
+    await deleteRowsByPk('ce_bank_movement_settlements','movement_id');
     await deleteRowsByPk('ce_bank_ticket_links','id');
     await deleteRowsByPk('ce_bank_event_movement_state','movement_id');
     await deleteRowsByPk('ce_bank_event_settings','event_id');
@@ -811,6 +816,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
   counts.bankMovementStates=await upsertChunks('ce_bank_event_movement_state',tables.bankMovementStates,'event_id,movement_id');
   counts.bankTicketLinks=await upsertChunks('ce_bank_ticket_links',tables.bankTicketLinks,'id');
   counts.bankIncomeLinks=await upsertChunks('ce_bank_income_links',tables.bankIncomeLinks,'id');
+  counts.bankMovementSettlements=await upsertChunks('ce_bank_movement_settlements',tables.bankMovementSettlements,'movement_id');
   counts.hitos=await upsertChunks('ce_hitos',tables.hitos,'id');
   counts.lgs=await upsertChunks('ce_lg',tables.lgs,'id');
   counts.eventPersonSnapshots=await upsertChunks('ce_event_person_snapshots',tables.eventPersonSnapshots,'event_id,persona_id');

@@ -15,7 +15,7 @@ test('fecha inicial existente permanece inalterada',/const nextDateFrom=validIso
 test('movimiento global nuevo nace fuera de saldo',/RAW14H[\s\S]{0,500}included:false,[\s\S]{0,250}source_hash:row\.sourceHash/.test(service));
 test('evento seleccionado recibe estado específico EN SALDO',/AUTO_IMPORT_EVENTO_SELECCIONADO[\s\S]{0,250}included:true|included:true[\s\S]{0,250}AUTO_IMPORT_EVENTO_SELECCIONADO/.test(service));
 test('solo fresh recibe la presunción activa del evento seleccionado',/const insertedIds=new Set\(arr\(insertedRows\)/.test(service)&&/const selectedOnRows=\[\.\.\.insertedIds\]/.test(service));
-test('otros eventos En curso heredan global OFF si no tienen estado propio',/included=eventInclusionExplicit\?stateByMovement\.get\(row\.id\):row\.included/.test(service)&&/otro evento En curso[\s\S]{0,160}global FALSE/i.test(service));
+test('otros eventos En curso heredan global OFF si no tienen estado propio',/included=row\.included/.test(service)&&/otro evento En curso[\s\S]{0,160}global FALSE/i.test(service));
 test('Finalizado solo muestra su foto persistida',/event\.finalized\s*\? accountMovements\.filter\(row=>storedMovementIds\.has/.test(service));
 test('la Fecha final se aplica con el mismo flujo que Aplicar fechas',/const appliedPeriod=await setBankEventPeriod\(selectedEvent,nextPeriod\.dateFrom,nextPeriod\.dateTo,autoActor,selectedAccount\)/.test(service));
 test('estado EN SALDO del evento seleccionado se escribe antes de aplicar periodo',service.indexOf('AUTO_IMPORT_EVENTO_SELECCIONADO')<service.indexOf('const appliedPeriod=await setBankEventPeriod'));

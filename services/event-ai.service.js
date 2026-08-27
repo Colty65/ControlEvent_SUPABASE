@@ -3510,6 +3510,7 @@ function plannerDatabaseSchemaText() {
 - ce_bank_income_links(id, movement_id, event_id, income_id, income_amount_snapshot, created_by, created_at)
 - ce_bank_event_settings(event_id, date_from, date_to, updated_by, updated_at)
 - ce_bank_event_movement_state(event_id, movement_id, included, updated_by, created_at, updated_at)
+- ce_bank_movement_settlements(movement_id, accepted_difference, note, accepted_by, accepted_at, updated_at)
 - ce_users(identificacion, nombre, clave, nivel, created_at, updated_at) [NO consultar clave]
 
 MAPEO_DE_DOMINIO:
@@ -3526,14 +3527,16 @@ MAPEO_DE_DOMINIO:
 - DOCUMENTOS = metadatos en ce_meta (eventDocuments/eventDocumentMeta) + imagen/evidencia en ce_ticket_images.
 - HITOS = ce_hitos, enlazados al evento por event_id.
 - LG = ce_lg, enlazadas a su Hito por hito_id y al evento por event_id. Son las tareas o Líneas de Gestión.
-- CONCILIACION_BANCARIA = ce_bank_movements + ce_bank_ticket_links + ce_bank_income_links + ce_bank_event_settings + ce_bank_event_movement_state. Los lotes CSV están en ce_bank_import_batches.
+- CONCILIACION_BANCARIA = ce_bank_movements + ce_bank_ticket_links + ce_bank_income_links + ce_bank_event_settings + ce_bank_event_movement_state + ce_bank_movement_settlements. Los lotes CSV están en ce_bank_import_batches.
 
 SEMANTICA_CONTROL_EVENT:
 - ce_bank_event_settings define el período bancario inclusivo de cada evento, PERO una fila con updated_by=INICIALIZACION_AUTOMATICA solo prepara la ventana y NO acredita que exista un Cuadre Banco real.
 - CUADRE BANCO REAL: solo existe para Zuzu si ControlEvent confirma configuración/evidencia específica del evento (periodo guardado manualmente, ce_bank_event_movement_state, ce_bank_ticket_links o ce_bank_income_links). Si no existe, responde que no consta Cuadre Banco para ese evento.
 - PROHIBIDO reconstruir un Cuadre Banco desde el histórico general de ce_bank_movements. El primer/último saldo del histórico NO son saldo inicial/final del evento y no deben presentarse como tales si el cuadre no está configurado.
 - ce_bank_event_movement_state.included es la decisión «En saldo» específica del evento y prevalece sobre ce_bank_movements.included.
-- ce_bank_ticket_links enlaza exclusivamente TKxx del evento con movimientos bancarios. forced_square=true significa cuadre aceptado manualmente y cuenta como justificado igual que un cuadre exacto.
+- ce_bank_ticket_links puede enlazar UN MISMO movimiento bancario con TKxx de VARIOS eventos. Cada evento solo imputa la suma de sus propios TKxx; nunca el importe bancario completo si el movimiento es compartido.
+- El cuadre de un movimiento compartido es GLOBAL: solo está cerrado cuando la suma de TKxx de todos los eventos alcanza el importe bancario o existe una diferencia residual aceptada en ce_bank_movement_settlements. Mientras falte parte global, ningún evento implicado lo cuenta como movimiento cuadrado.
+- ce_bank_movement_settlements.accepted_difference es residual global aceptado y NO se atribuye a ningún evento. forced_square queda como compatibilidad de conciliaciones antiguas de un solo evento.
 - ce_bank_movements.amount > 0 es un abono/entrada. Se justifica con registros bancarios de ce_colaboradores; la asociación manual corregida se guarda en ce_bank_income_links y prevalece sobre la asociación automática por importe, nombre y fecha.
 - Para saber si todos los TKxx están conciliados, compara los TKxx contables de ce_compras del evento con ce_bank_ticket_links del mismo event_id.
 - Solo cuando ControlEvent confirme un Cuadre Banco real puede calcularse el saldo inicial del periodo como saldo_banco del primer movimiento incluido menos su importe y el saldo final aplicando cronológicamente los movimientos «En saldo».
@@ -4550,13 +4553,13 @@ async function attachBankState(baseState, userPrompt, flowTrace = []) {
     const bank=await exportBankData({accountId:'TODOS'});
     const next={...current,
       bankMovements:arr(bank?.movements), bankTicketLinks:arr(bank?.links), bankImportBatches:arr(bank?.batches),
-      bankEventSettings:arr(bank?.eventSettings), bankMovementStates:arr(bank?.movementStates)
+      bankEventSettings:arr(bank?.eventSettings), bankMovementStates:arr(bank?.movementStates), bankMovementSettlements:arr(bank?.movementSettlements)
     };
-    zuzuTracePush(flowTrace,'Paso 0b · Conciliación bancaria','OK',`Cargados movimientos=${next.bankMovements.length}, vínculos TKxx=${next.bankTicketLinks.length}, períodos=${next.bankEventSettings.length}, estados=${next.bankMovementStates.length}.`);
+    zuzuTracePush(flowTrace,'Paso 0b · Conciliación bancaria','OK',`Cargados movimientos=${next.bankMovements.length}, vínculos TKxx=${next.bankTicketLinks.length}, períodos=${next.bankEventSettings.length}, estados=${next.bankMovementStates.length}, cierresGlobales=${next.bankMovementSettlements.length}.`);
     return next;
   }catch(error){
     zuzuTracePush(flowTrace,'Paso 0b · Conciliación bancaria','INFO',`No se pudieron cargar las tablas bancarias: ${cleanGeminiError(error)}. Zuzu continúa con el resto de módulos.`);
-    return {...current,bankMovements:arr(current.bankMovements),bankTicketLinks:arr(current.bankTicketLinks),bankImportBatches:arr(current.bankImportBatches),bankEventSettings:arr(current.bankEventSettings),bankMovementStates:arr(current.bankMovementStates)};
+    return {...current,bankMovements:arr(current.bankMovements),bankTicketLinks:arr(current.bankTicketLinks),bankImportBatches:arr(current.bankImportBatches),bankEventSettings:arr(current.bankEventSettings),bankMovementStates:arr(current.bankMovementStates),bankMovementSettlements:arr(current.bankMovementSettlements)};
   }
 }
 
@@ -7671,7 +7674,7 @@ async function v261EventBankTool(tool,state,selectedEventId=''){
   const periodCandidateMovements=arr(bank?.movements);
   const rawMovements=periodCandidateMovements.filter(x=>x?.included!==false&&v271BankMovementEvidence(x).length>0);
   const movementJustification=x=>{
-    const amount=v26Money(x?.amount||x?.importe),ticketLinks=arr(x?.links),incomeLinks=arr(x?.incomeLinks).filter(link=>link?.manual===true||trim(link?.linkId)),parts=[];
+    const amount=v26Money(x?.eventAppliedAmount??x?.amount??x?.importe),ticketLinks=arr(x?.links),incomeLinks=arr(x?.incomeLinks).filter(link=>link?.manual===true||trim(link?.linkId)),parts=[];
     if(amount>0&&incomeLinks.length){
       const items=incomeLinks.map(link=>{
         const who=trim(link?.personName)||'Ingreso';
@@ -7692,16 +7695,16 @@ async function v261EventBankTool(tool,state,selectedEventId=''){
     if(!parts.length&&x?.eventInclusionExplicit===true)parts.push('Incluido explícitamente en el Cuadre Banco');
     return parts.join(' · ')||'Sin vínculo justificativo registrado';
   };
-  const movements=rawMovements.map(x=>({Fecha:trim(x?.executedAt||x?.executed_at||x?.fecha),Concepto:trim(x?.concept||x?.concepto||x?.description),Importe:v26Money(x?.amount||x?.importe),Incluido:x?.included!==false?'Sí':'No',Justificación:movementJustification(x),'Tickets vinculados':arr(x?.links).map(l=>trim(l?.ticketCode)).filter(Boolean).join(', '),'Ingresos vinculados':arr(x?.incomeLinks).length}));
+  const movements=rawMovements.map(x=>({Fecha:trim(x?.executedAt||x?.executed_at||x?.fecha),Concepto:trim(x?.concept||x?.concepto||x?.description),'Importe banco':v26Money(x?.amount||x?.importe),'Importe evento':v26Money(x?.eventAppliedAmount??x?.amount??x?.importe),Incluido:x?.included!==false?'Sí':'No',Justificación:movementJustification(x),'Tickets vinculados':arr(x?.links).map(l=>trim(l?.ticketCode)).filter(Boolean).join(', '),'Ingresos vinculados':arr(x?.incomeLinks).length}));
   const links=arr(bank?.links).map(x=>({TKxx:trim(x?.ticketCode),Importe:v26Money(x?.ticketAmountSnapshot||x?.amount||x?.importe),Forzado:x?.forcedSquare===true?'Sí':'No'}));
   const included=rawMovements.filter(x=>x?.included!==false).slice().sort((a,b)=>trim(a?.executedAt||a?.executed_at||a?.fecha).localeCompare(trim(b?.executedAt||b?.executed_at||b?.fecha))||trim(a?.id).localeCompare(trim(b?.id)));
   // v3_0_exp · resumen bancario compacto para razonamiento: Gemini no necesita recibir
   // las mismas líneas en cuatro tablas distintas para conocer magnitudes y calidad del cuadre.
-  const includedIncomeTotal=v26Money(included.filter(x=>num(x?.amount||x?.importe)>0).reduce((a,x)=>a+num(x?.amount||x?.importe),0));
-  const includedChargeTotal=v26Money(included.filter(x=>num(x?.amount||x?.importe)<0).reduce((a,x)=>a+Math.abs(num(x?.amount||x?.importe)),0));
+  const includedIncomeTotal=v26Money(included.filter(x=>num(x?.eventAppliedAmount??x?.amount??x?.importe)>0).reduce((a,x)=>a+num(x?.eventAppliedAmount??x?.amount??x?.importe),0));
+  const includedChargeTotal=v26Money(included.filter(x=>num(x?.eventAppliedAmount??x?.amount??x?.importe)<0).reduce((a,x)=>a+Math.abs(num(x?.eventAppliedAmount??x?.amount??x?.importe)),0));
   const movementIsJustified=x=>{
-    const amount=num(x?.amount||x?.importe);
-    if(amount<0)return ['CUADRADO','CUADRADO_FORZADO'].includes(trim(x?.justificationStatus));
+    const amount=num(x?.eventAppliedAmount??x?.amount??x?.importe);
+    if(amount<0)return x?.globalReconciled===true||['CUADRADO','CUADRADO_COMPARTIDO','CUADRADO_DIFERENCIA_ACEPTADA','CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA','CUADRADO_FORZADO'].includes(trim(x?.globalJustificationStatus||x?.justificationStatus));
     if(amount>0)return trim(x?.incomeJustificationStatus)==='CUADRADO';
     return x?.eventInclusionExplicit===true;
   };
@@ -7711,7 +7714,7 @@ async function v261EventBankTool(tool,state,selectedEventId=''){
   const openingBalance=v271ExplicitBankOpeningBalance(included);
   let impact=0;
   const timeline=included.map((x,index)=>{
-    const amount=v26Money(x?.amount||x?.importe),type=amount>0?'INGRESO':amount<0?'CARGO':'NEUTRO';impact=v26Money(impact+amount);
+    const amount=v26Money(x?.eventAppliedAmount??x?.amount??x?.importe),type=amount>0?'INGRESO':amount<0?'CARGO':'NEUTRO';impact=v26Money(impact+amount);
     const dt=trim(x?.executedAt||x?.executed_at||x?.fecha),isoDate=v272DateOnly(dt),short=isoDate?`${isoDate.slice(8,10)}/${isoDate.slice(5,7)}/${isoDate.slice(0,4)}${dt.length>10?' '+dt.slice(11,16):''}`:dt;
     // eventBalanceAfter del servicio puede incorporar candidatos históricos no atribuibles
     // al evento. La serie de Zuzu se recalcula solo con el conjunto explícito del Cuadre.
@@ -7734,7 +7737,7 @@ async function v261EventBankTool(tool,state,selectedEventId=''){
     v26Table('event_window_timeline',`Movimientos bancarios entre fechas del evento · ${rr.nombre}`,eventWindowTimeline,timelineSchema),
     v26Table('reconciliation_timeline',`Conciliación bancaria · ${rr.nombre}`,timeline,timelineSchema),
     {...v26Table('reconciliation_justified_movements',`Movimientos y justificación de la conciliación · ${rr.nombre}`,timeline,timelineSchema),chartable:false},
-    {...v26Table('movements',`Movimientos bancarios · ${rr.nombre}`,movements,{Fecha:v26DateSchema(),Concepto:v26TextSchema(),Importe:v26MoneySchema('Importe bancario'),Incluido:v26StatusSchema(),Justificación:v26TextSchema('Ingreso o TKxx que justifica el movimiento'),'Tickets vinculados':v26TextSchema(),'Ingresos vinculados':v26CountSchema('registros')}),chartable:false},
+    {...v26Table('movements',`Movimientos bancarios · ${rr.nombre}`,movements,{Fecha:v26DateSchema(),Concepto:v26TextSchema(),'Importe banco':v26MoneySchema('Importe real del movimiento bancario'),'Importe evento':v26MoneySchema('Parte proporcional imputada al evento'),Incluido:v26StatusSchema(),Justificación:v26TextSchema('Ingreso o TKxx que justifica el movimiento'),'Tickets vinculados':v26TextSchema(),'Ingresos vinculados':v26CountSchema('registros')}),chartable:false},
     {...v26Table('ticket_links',`Vínculos con tickets · ${rr.nombre}`,links,{TKxx:v26TextSchema(),Importe:v26MoneySchema(),Forzado:v26StatusSchema()}),chartable:false}
   ].filter(t=>t.rows.length)};
 }
@@ -7790,7 +7793,7 @@ async function v271EventBankTimelineTool(tool,state,selectedEventId=''){
   const openingBalance=v271ExplicitBankOpeningBalance(chosen);
   let impact=0;
   const rows=chosen.map((x,index)=>{
-    const amount=v26Money(x?.amount),type=amount>0?'INGRESO':amount<0?'CARGO':'NEUTRO';impact=v26Money(impact+amount);
+    const amount=v26Money(x?.eventAppliedAmount??x?.amount),type=amount>0?'INGRESO':amount<0?'CARGO':'NEUTRO';impact=v26Money(impact+amount);
     const dt=trim(x?.executedAt),isoDate=v272DateOnly(dt),short=isoDate?`${isoDate.slice(8,10)}/${isoDate.slice(5,7)}/${isoDate.slice(0,4)}${dt.length>10?' '+dt.slice(11,16):''}`:dt;
     const ledgerBalance=v26Money(openingBalance+impact);
     return {Orden:index+1,Momento:short||dt,Fecha:dt,Tipo:type,Movimiento:amount,'Impacto bancario acumulado':impact,'Saldo bancario del periodo':ledgerBalance,Concepto:trim(x?.description||x?.concept||x?.concepto),Evidencia:v271BankMovementEvidence(x).join(' + ')||(relation.status==='overlap'?'En saldo dentro del periodo configurado':'Sin evidencia específica')};

@@ -1251,7 +1251,7 @@ export function buildZuzuPlanningCatalog(state, selectedEventId = '', userPrompt
       PERSONAS: 'catálogo maestro de personas y rango',
       HITOS: 'hitos del evento, descripción, fechas calculadas, responsable general y avance',
       LG: 'líneas de gestión/tareas, fechas, responsable, cumplimiento y dependencias previas/posteriores',
-      BANCO: 'conciliación bancaria por evento: período, movimientos En saldo, abonos, cargos, TKxx asociados, cuadre exacto o forzado y evolución del saldo'
+      BANCO: 'conciliación bancaria por evento: período, movimientos, imputación proporcional por evento, TKxx asociados, estado global compartido, diferencia aceptada y evolución del saldo'
     },
     eventoActivo: selected,
     eventos: events,
@@ -1585,41 +1585,58 @@ function zuzuModuleLg(state, eventIds) {
 function zuzuModuleBanco(state, eventIds) {
   const ids=new Set(arr(eventIds).map(trim).filter(Boolean));
   const movements=arr(state?.bankMovements);
-  const links=arr(state?.bankTicketLinks).filter(link=>ids.has(trim(link?.eventId||link?.event_id)));
+  const allLinks=arr(state?.bankTicketLinks);
   const settings=arr(state?.bankEventSettings).filter(row=>ids.has(trim(row?.eventId||row?.event_id)));
   const states=arr(state?.bankMovementStates).filter(row=>ids.has(trim(row?.eventId||row?.event_id)));
+  const settlements=arr(state?.bankMovementSettlements);
   const eventById=new Map(arr(state?.eventos).map(ev=>[trim(ev?.id),ev]));
-  const linksByEventMovement=new Map();
-  links.forEach(link=>{
-    const key=`${trim(link?.eventId||link?.event_id)}|${trim(link?.movementId||link?.movement_id)}`;
-    if(!linksByEventMovement.has(key)) linksByEventMovement.set(key,[]);
-    linksByEventMovement.get(key).push(link);
+  const linksByMovement=new Map();
+  allLinks.forEach(link=>{
+    const mid=trim(link?.movementId||link?.movement_id);if(!mid)return;
+    if(!linksByMovement.has(mid))linksByMovement.set(mid,[]);
+    linksByMovement.get(mid).push(link);
   });
   const stateMap=new Map(states.map(row=>[`${trim(row?.eventId||row?.event_id)}|${trim(row?.movementId||row?.movement_id)}`,row?.included!==false]));
+  const settlementMap=new Map(settlements.map(row=>[trim(row?.movementId||row?.movement_id),row]));
   const out=[];
   for(const eventId of ids){
     const setting=settings.find(row=>trim(row?.eventId||row?.event_id)===eventId)||null;
     const from=trim(setting?.dateFrom||setting?.date_from); const to=trim(setting?.dateTo||setting?.date_to);
     const relevant=movements.filter(m=>{
       const mid=trim(m?.id); const day=trim(m?.executedAt||m?.executed_at).slice(0,10);
-      return (!!from&&!!to&&day>=from&&day<=to)||linksByEventMovement.has(`${eventId}|${mid}`)||stateMap.has(`${eventId}|${mid}`);
+      const ownLinks=arr(linksByMovement.get(mid)).some(link=>trim(link?.eventId||link?.event_id)===eventId);
+      return (!!from&&!!to&&day>=from&&day<=to)||ownLinks||stateMap.has(`${eventId}|${mid}`);
     }).sort((a,b)=>trim(a?.executedAt||a?.executed_at).localeCompare(trim(b?.executedAt||b?.executed_at)));
     for(const m of relevant){
-      const mid=trim(m?.id); const eventLinks=linksByEventMovement.get(`${eventId}|${mid}`)||[];
-      const included=stateMap.has(`${eventId}|${mid}`)?stateMap.get(`${eventId}|${mid}`):m?.included!==false;
+      const mid=trim(m?.id); const movementLinks=arr(linksByMovement.get(mid));
+      const eventLinks=movementLinks.filter(link=>trim(link?.eventId||link?.event_id)===eventId);
+      const linkedEvents=[...new Set(movementLinks.map(link=>trim(link?.eventId||link?.event_id)).filter(Boolean))];
       const amount=num(m?.amount); const target=amount<0?Math.abs(amount):0;
-      const justified=eventLinks.reduce((sum,link)=>sum+num(link?.ticketAmountSnapshot??link?.ticket_amount_snapshot??link?.ticketAmount),0);
-      const forced=eventLinks.some(link=>link?.forcedSquare===true||link?.forced_square===true);
-      const diff=Math.round((target-justified)*100)/100;
+      const eventJustified=eventLinks.reduce((sum,link)=>sum+num(link?.ticketAmountSnapshot??link?.ticket_amount_snapshot??link?.ticketAmount),0);
+      const globalJustified=movementLinks.reduce((sum,link)=>sum+num(link?.ticketAmountSnapshot??link?.ticket_amount_snapshot??link?.ticketAmount),0);
+      const diff=Math.round((target-globalJustified)*100)/100;
+      const settlement=settlementMap.get(mid)||null;
+      const accepted=settlement&&diff>0.01&&Math.abs(num(settlement?.acceptedDifference??settlement?.accepted_difference)-diff)<=0.01;
+      const shared=linkedEvents.length>1;
+      const forced=!shared&&movementLinks.some(link=>link?.forcedSquare===true||link?.forced_square===true);
+      const globalStatus=amount>=0?'NO_APLICA':(!movementLinks.length?'SIN_JUSTIFICAR':(diff<-.01?'EXCESO':(Math.abs(diff)<=.01?(shared?'CUADRADO_COMPARTIDO':'CUADRADO'):(accepted?(shared?'CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA':'CUADRADO_DIFERENCIA_ACEPTADA'):(forced?'CUADRADO_FORZADO':'PENDIENTE_GLOBAL')))));
+      let included;
+      if(eventLinks.length) included=true;
+      else if(movementLinks.length) included=false;
+      else included=stateMap.has(`${eventId}|${mid}`)?stateMap.get(`${eventId}|${mid}`):m?.included!==false;
+      const eventAmount=amount<0&&movementLinks.length?-Math.round(eventJustified*100)/100:amount;
       const status=amount>=0?(included?'Movimiento positivo conciliado':'Abono fuera de saldo'):
-        (!eventLinks.length?'Sin justificar':(forced?'Justificado (cuadre forzado)':(Math.abs(diff)<=0.01?'Justificado':'Pendiente de cuadre')));
+        (!eventLinks.length?(movementLinks.length?'Sin parte imputada a este evento':'Sin justificar'):
+          (['CUADRADO','CUADRADO_COMPARTIDO','CUADRADO_DIFERENCIA_ACEPTADA','CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA','CUADRADO_FORZADO'].includes(globalStatus)?globalStatus:'Parte del evento justificada; movimiento global pendiente'));
       out.push({
         Evento:trim(eventById.get(eventId)?.titulo||eventId), 'Evento ID':eventId,
-        'Fecha movimiento':trim(m?.executedAt||m?.executed_at), Descripción:trim(m?.description), Importe:amount,
-        'Saldo banco':num(m?.bankBalance??m?.bank_balance), 'En saldo':included?'Sí':'No',
+        'Fecha movimiento':trim(m?.executedAt||m?.executed_at), Descripción:trim(m?.description),
+        'Importe banco':amount,'Importe evento':eventAmount,'Saldo banco':num(m?.bankBalance??m?.bank_balance), 'En saldo':included?'Sí':'No',
         TKxx:eventLinks.map(link=>trim(link?.ticketCode||link?.ticket_code)).filter(Boolean).join(', '),
-        'Importe TKxx':Math.round(justified*100)/100, 'Cuadre forzado':forced?'Sí':'No', Estado:status,
-        'Fecha inicio bancaria':from, 'Fecha final bancaria':to
+        'Importe TKxx evento':Math.round(eventJustified*100)/100,'Justificado global':Math.round(globalJustified*100)/100,
+        'Pendiente global':Math.max(0,diff),'Eventos implicados':linkedEvents.length,'Diferencia aceptada':accepted?Math.max(0,diff):0,
+        'Cuadre forzado legado':forced?'Sí':'No','Estado global':globalStatus,Estado:status,
+        'Fecha inicio bancaria':from,'Fecha final bancaria':to
       });
     }
   }
@@ -2031,7 +2048,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       { id: 'EXP-7-SELECTS-ZUZU', regla: 'En v3_0_exp experimental, si planZuzu.selectsPropuestos contiene SELECTs válidos, ControlEvent intenta ejecutarlos literalmente como SELECT de solo lectura mediante ce_zuzu_select. Si modulosExtraidos.SELECTS_SQL_ZUZU existe, úsalo como fuente principal de esos SELECTs.' },
       { id: 'V23_1-ASISTENCIA-UNICA', regla: 'Toda cifra o listado de asistentes y no asistentes sale exclusivamente de asistenciaCanonica.porEvento. Numero>0 confirma; Numero=0 solo cuenta con estado explícito de asistencia/exención/invitación. Registros de ingreso son filas administrativas, no personas.' },
       { id: 'V23_1-COBERTURA-INFORME', regla: 'politicaInforme define todos los módulos exigidos por la petición. Un informe general o con detalles incluye descripción, ingresos, compras, donaciones, saldos, tickets/facturas, documentos y asistencia; METEO si se pide. No cerrar la respuesta si falta uno.' },
-      { id: 'V25-CONCILIACION-BANCO', regla: 'BANCO es la fuente de conciliación por evento. En saldo es específico del evento; los abonos incluidos son movimientos positivos conciliados; forced_square cuenta como justificado; el saldo se calcula cronológicamente solo con movimientos incluidos.' },
+      { id: 'V25-CONCILIACION-BANCO', regla: 'BANCO es la fuente de conciliación por evento. Un movimiento negativo puede compartirse entre varios eventos: cada evento imputa solo la suma de sus TKxx. El estado cuadrado es global al movimiento y solo se cierra cuando la suma total lo justifica o existe diferencia residual aceptada. forced_square queda como legado de conciliaciones antiguas.' },
       { id: 'V23_R2-HITOS-LG', regla: 'HITOS y LG son las fuentes del Control de Hitos. HITOS resume cada bloque; LG contiene cada tarea, responsable, estado y dependencias. Las dependencias posteriores son derivadas de las previas canónicas y no deben inventarse.' },
       { id: 'V23_1-NO-REDUNDANCIA', regla: 'En un solo evento, nombrar el título completo una vez. Cada persona o pareja se menciona una sola vez. No repetir en prosa listados que ya se muestran en una tabla.' }
     ],
@@ -2042,7 +2059,7 @@ export function buildZuzuModuleContext(state, selectedEventId = '', userPrompt =
       donaciones: 'DONACIONES usa la salida probada: Evento; Producto; Unidades; Precio; Valor; Tipo de donación; Donante; Responsable. El donante se resuelve por P:/T:/id contra personas o tiendas y nunca debe mostrarse como código técnico.',
       tickets: 'TICKETS contiene datos contables agrupados por TKxx y sus líneas contables.',
       hitos: 'HITOS resume los Hitos del evento, sus fechas calculadas desde las LG, responsable general y avance.',
-      banco: 'BANCO contiene el período bancario, cargos y abonos, decisión En saldo, saldo real, TKxx asociados y estado exacto/forzado. Para conciliación usa esta fuente y no infieras desde INGRESOS.',
+      banco: 'BANCO contiene el período, movimiento bancario real, importe proporcional del evento, TKxx propios, justificación global entre eventos y diferencia aceptada. Para conciliación usa esta fuente y no dupliques el importe íntegro de un movimiento compartido en cada evento.',
       lg: 'LG contiene las tareas/Líneas de Gestión con fechas, responsable, cumplimiento y dependencias previas/posteriores humanizadas. Usa esta fuente para responder sobre trabajo pendiente, responsables y secuencia.',
       legibilidad: 'No hay claves internas p_id/pr_id/t_id; todos los nombres son texto humano.',
       metricasCanonicas: 'Para comparativas, saldos y totales globales usa metricasCanonicas.porEvento como fuente preferente porque replica las reglas de RESUMEN PRESUPUESTARIO. Si hay discrepancia entre una suma que calcules y metricasCanonicas, prevalece metricasCanonicas.',

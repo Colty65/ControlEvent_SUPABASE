@@ -1,4 +1,4 @@
-/* ControlEvent v3_0_exp FIX9.3.14 · Cuadre Banco: importación contextual En curso, auto-fecha y revisión. */
+/* ControlEvent v3_0_exp RAW14W · Cuadre Banco multievento: movimiento único, imputación proporcional y cierre global. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -65,16 +65,16 @@
     return `${m[3]}/${m[2]}/${m[1]}${includeTime&&m[4]?` ${m[4]}:${m[5]}`:''}`;
   }
   function statusInfo(row){
-    if(row.justificationStatus==='CUADRADO_FORZADO') return {className:'forced',label:'Cuadrado de forma forzada'};
-    if(row.justificationStatus==='CUADRADO') return {className:'ok',label:'Cuadrado'};
-    if(row.justificationStatus==='PENDIENTE') return {className:'pending',label:`Faltan ${money(Math.max(0,row.difference))}`};
-    if(row.justificationStatus==='EXCESO') return {className:'excess',label:`Exceso ${money(Math.abs(row.difference))}`};
-    if(row.justificationStatus==='SIN_JUSTIFICAR') return {className:'none',label:'Sin justificar'};
-    if(row.justificationStatus==='OTRO_EVENTO'){
-      const events=arr(row.foreignEvents).join(', ')||'otro evento';
-      const state=row.foreignJustificationStatus==='CUADRADO_FORZADO'?'Cuadre forzado':(row.foreignJustificationStatus==='CUADRADO'?'Cuadrado':'Conciliado');
-      return {className:'other-event',label:`${state} en ${events}`};
-    }
+    const status=text(row.globalJustificationStatus||row.justificationStatus);
+    if(status==='CUADRADO_COMPARTIDO') return {className:'ok',label:`Cuadrado · compartido entre ${num(row.sharedEventCount)} eventos`};
+    if(status==='CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA') return {className:'ok',label:`Cuadrado compartido · diferencia aceptada ${money(row.acceptedDifference)}`};
+    if(status==='CUADRADO_DIFERENCIA_ACEPTADA') return {className:'ok',label:`Cuadrado · diferencia aceptada ${money(row.acceptedDifference)}`};
+    if(status==='CUADRADO_FORZADO') return {className:'forced',label:'Cuadrado forzado · legado'};
+    if(status==='CUADRADO') return {className:'ok',label:'Cuadrado'};
+    if(status==='PENDIENTE_GLOBAL'||row.justificationStatus==='PARTE_EVENTO_OK_GLOBAL_PENDIENTE') return {className:'pending',label:`Pendiente global ${money(Math.max(0,num(row.globalDifference??row.difference)))}`};
+    if(status==='EXCESO') return {className:'excess',label:`Exceso ${money(Math.abs(num(row.globalDifference??row.difference)))}`};
+    if(row.justificationStatus==='OTRO_EVENTO') return {className:'other-event',label:'Sin parte imputada a este evento'};
+    if(status==='SIN_JUSTIFICAR') return {className:'none',label:'Sin justificar'};
     return {className:'na',label:'Ingreso / abono'};
   }
   function trafficInfo(summary={}){
@@ -182,7 +182,7 @@
           </div>
           <div class="ce-bank-command-fields">
             <label><span>Cuenta bancaria</span><select id="ceBankAccount"></select></label>
-            <label><span>Vista de control</span><select id="ceBankFilter"><option value="TODOS">Todos los movimientos</option><option value="INCLUIDOS">En saldo</option><option value="EXCLUIDOS">Fuera del saldo</option><option value="PENDIENTES">Pendientes de justificar</option><option value="CUADRADOS">Cuadrados</option><option value="FORZADOS">Cuadrados forzados</option></select></label>
+            <label><span>Vista de control</span><select id="ceBankFilter"><option value="TODOS">Todos los movimientos</option><option value="INCLUIDOS">En saldo</option><option value="EXCLUIDOS">Fuera del saldo</option><option value="PENDIENTES">Pendientes de justificar</option><option value="CUADRADOS">Cuadrados</option><option value="DIFERENCIA">Diferencia aceptada</option><option value="FORZADOS">Forzados antiguos</option></select></label>
             <label><span>Orden temporal</span><select id="ceBankSort"><option value="DESC">Más joven → más antiguo</option><option value="ASC">Más antiguo → más joven</option></select></label>
             <label class="ce-bank-search"><span>Buscar movimiento</span><div><i>⌕</i><input id="ceBankSearch" autocomplete="off" placeholder="Fecha, concepto, importe, saldo o TKxx"></div></label>
           </div>
@@ -573,7 +573,7 @@
     if(finalSnapshot){
       notice(rec.message||'Evento finalizado: el Cuadre Banco se presenta como foto definitiva de las filas almacenadas.','warning',false);
     }else if(num(period.linkedOutsidePeriodCount)>0){
-      notice(`Hay ${num(period.linkedOutsidePeriodCount)} movimiento(s) con TKxx asociados fuera del periodo bancario seleccionado. Amplía las fechas para revisarlos.`,'warning',false);
+      notice(`Hay ${num(period.linkedOutsidePeriodCount)} movimiento(s) con TKxx de este evento fuera del periodo bancario. RAW14W los mantiene visibles porque el vínculo contable tiene prioridad sobre la ventana de fechas.`,'warning',false);
     }else if(!store.noticeLocked){
       notice(rec.message||'');
     }
@@ -723,7 +723,7 @@
     // movimientos En saldo del evento pueden ser interactivos o abrir el inspector/justificantes.
     const interactivePoints=showEventPoints?movementPoints.filter(point=>eventIds.has(String(point.movement.id))):[];
     const eventPoints=interactivePoints.map(point=>{
-      const amount=num(point.movement.amount);
+      const amount=num(point.movement.eventAppliedAmount??point.movement.amount);
       return `<circle class="ce-bank-balance-event-point ${amount<0?'negative':'positive'}" cx="${x(point.time).toFixed(2)}" cy="${y(point.balance).toFixed(2)}" r="6.5" tabindex="0" role="button" data-ce-bank-balance-point="1" data-movement-id="${esc(point.movement.id)}" aria-label="${esc(formatDate(point.movement.executedAt))}, ${esc(money(amount))}"></circle>`;
     }).join('');
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
@@ -784,9 +784,13 @@
     const timelineMovement=point?.movement;
     const movement=arr(store.data?.movements).find(row=>String(row.id)===String(timelineMovement?.id))||timelineMovement;
     if(!inspector||!movement) return;
-    const amount=num(movement.amount);
-    inspector.className=`ce-bank-balance-inspector ${amount<0?'negative':'positive'}`;
-    inspector.innerHTML=`<span>INFORMACIÓN DEL MOVIMIENTO</span><strong>${esc(formatDate(movement.executedAt))}</strong><div><b class="${amount<0?'negative':'positive'}">${esc(chartAmount(amount))}</b><em>Saldo ${esc(chartAmount(point.balance))}</em></div><small>${esc(movement.description||'Movimiento bancario')}</small>`;
+    const bankAmount=num(movement.amount);
+    const eventAmount=num(movement.eventAppliedAmount??movement.amount);
+    inspector.className=`ce-bank-balance-inspector ${eventAmount<0?'negative':'positive'}`;
+    const allocation=movement.sharedMovement||Math.abs(eventAmount-bankAmount)>.01
+      ?`<small>Parte del evento: <b>${esc(chartAmount(eventAmount))}</b> · Movimiento banco: ${esc(chartAmount(bankAmount))}</small>`
+      :`<small>Movimiento banco: ${esc(chartAmount(bankAmount))}</small>`;
+    inspector.innerHTML=`<span>INFORMACIÓN DEL MOVIMIENTO</span><strong>${esc(formatDate(movement.executedAt))}</strong><div><b class="${eventAmount<0?'negative':'positive'}">${esc(chartAmount(eventAmount))}</b><em>Saldo evento ${esc(chartAmount(point.balance))}</em></div>${allocation}<small>${esc(movement.description||'Movimiento bancario')}</small>`;
     const movementId=String(movement.id||'');
     if(balanceInspectorMovementId!==movementId){balanceInspectorMovementId=movementId;renderBalanceInspectorMedia(movement);}
   }
@@ -884,7 +888,7 @@
     if(!overlay) return;
     const series=buildBalanceSeries();
     const eventRows=arr(store.data?.movements);
-    const includedRows=eventRows.filter(row=>Boolean(row.included)&&row.inclusionLocked!==true&&row.linkedToOtherEvent!==true);
+    const includedRows=eventRows.filter(row=>Boolean(row.included));
     const eventIds=new Set(includedRows.map(row=>String(row.id)));
     const rec=store.data?.reconciliation||{},event=store.data?.event||{},finalSnapshot=event.finalized===true,storedCount=num(rec.rowCount);
     const accountLabel=chartAccountLabel();
@@ -900,7 +904,10 @@
     // ZOOM = exclusivamente los movimientos En saldo del evento. El histórico superior conserva
     // la cronología bancaria completa, pero ningún movimiento ajeno vuelve a colarse en la línea
     // del zoom, en sus puntos, en el inspector ni en sus justificantes.
-    const zoomSeries=series.filter(point=>point.movement&&eventIds.has(String(point.movement.id)));
+    const orderedEventRows=[...includedRows].sort((a,b)=>parseMoment(a.executedAt)-parseMoment(b.executedAt)||String(a.id).localeCompare(String(b.id)));
+    const zoomSeries=orderedEventRows.length
+      ?[{time:parseMoment(orderedEventRows[0].executedAt)-1,balance:num(orderedEventRows[0].eventBalanceBefore),opening:true},...orderedEventRows.map(row=>({time:parseMoment(row.executedAt),balance:num(row.eventBalanceAfter),movement:row}))]
+      :[];
     const firstValue=series[0].balance,lastValue=series[series.length-1].balance,variation=lastValue-firstValue;
     const firstMovement=series.find(point=>point.movement)?.movement;
     const lastMovement=[...series].reverse().find(point=>point.movement)?.movement;
@@ -949,8 +956,9 @@
     let rows=arr(store.data?.movements);
     if(store.filter==='INCLUIDOS') rows=rows.filter(row=>row.included);
     else if(store.filter==='EXCLUIDOS') rows=rows.filter(row=>!row.included);
-    else if(store.filter==='PENDIENTES') rows=rows.filter(row=>row.amount<0?!['CUADRADO','CUADRADO_FORZADO'].includes(row.justificationStatus):row.incomeJustificationStatus!=='CUADRADO');
-    else if(store.filter==='CUADRADOS') rows=rows.filter(row=>row.amount<0?['CUADRADO','CUADRADO_FORZADO'].includes(row.justificationStatus):row.incomeJustificationStatus==='CUADRADO');
+    else if(store.filter==='PENDIENTES') rows=rows.filter(row=>row.amount<0?!['CUADRADO','CUADRADO_COMPARTIDO','CUADRADO_DIFERENCIA_ACEPTADA','CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA','CUADRADO_FORZADO'].includes(text(row.globalJustificationStatus||row.justificationStatus)):row.incomeJustificationStatus!=='CUADRADO');
+    else if(store.filter==='CUADRADOS') rows=rows.filter(row=>row.amount<0?['CUADRADO','CUADRADO_COMPARTIDO','CUADRADO_DIFERENCIA_ACEPTADA','CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA','CUADRADO_FORZADO'].includes(text(row.globalJustificationStatus||row.justificationStatus)):row.incomeJustificationStatus==='CUADRADO');
+    else if(store.filter==='DIFERENCIA') rows=rows.filter(row=>['CUADRADO_DIFERENCIA_ACEPTADA','CUADRADO_COMPARTIDO_DIFERENCIA_ACEPTADA'].includes(text(row.globalJustificationStatus)));
     else if(store.filter==='FORZADOS') rows=rows.filter(row=>row.justificationStatus==='CUADRADO_FORZADO');
     const q=text(store.search).toLowerCase();
     if(q) rows=rows.filter(row=>[
@@ -1001,10 +1009,12 @@
       const displayLinks=arr(row.displayLinks||row.links);
       const activeLinks=displayLinks.filter(link=>link.isActiveEvent!==false);
       const incomeLinks=arr(row.incomeLinks);
-      const target=row.amount>=0?Math.max(0,num(row.incomeTargetAmount||row.amount)):Math.max(0,num(row.targetAmount));
-      const justified=row.amount>=0?Math.max(0,num(row.incomeJustifiedAmount)):(row.linkedToOtherEvent?Math.max(0,num(row.foreignJustifiedAmount)):Math.max(0,num(row.justifiedAmount)));
-      const progress=target?Math.min(100,Math.round(justified/target*100)):0;
-      const rowLocked=store.readOnly||row.inclusionLocked===true;
+      const target=row.amount>=0?Math.max(0,num(row.incomeTargetAmount||row.amount)):Math.max(0,num(row.globalTargetAmount||row.targetAmount));
+      const globalJustified=row.amount>=0?Math.max(0,num(row.incomeJustifiedAmount)):Math.max(0,num(row.globalJustifiedAmount));
+      const eventJustified=row.amount>=0?globalJustified:Math.max(0,num(row.eventJustifiedAmount||row.justifiedAmount));
+      const justified=globalJustified;
+      const progress=target?Math.min(100,Math.round(globalJustified/target*100)):0;
+      const rowLocked=store.readOnly;
       const disabled=rowLocked?'disabled aria-disabled="true"':'';
       const actionDisabled=store.readOnly?'disabled aria-disabled="true"':'';
       const orderedLinks=displayLinks.slice().sort((a,b)=>
@@ -1017,26 +1027,34 @@
         return `<span class="ce-bank-ticket-chip ${link.forcedSquare?'forced':''} ${link.isActiveEvent===false?'foreign':''}" role="button" tabindex="0" data-ce-bank-view-ticket="1" data-event-id="${esc(link.eventId||store.eventId)}" data-ticket-code="${esc(link.ticketCode)}" data-event-title="${esc(link.eventTitle)}" data-ticket-amount="${esc(link.ticketAmount)}" data-movement-id="${esc(row.id)}" title="Ver foto de ${esc(link.ticketCode)} · ${esc(link.eventTitle)} · ${money(link.ticketAmount)}"><i>TK</i><b>${esc(link.ticketCode)}</b><span>${esc(link.eventTitle)}</span><strong>${money(link.ticketAmount)}</strong><em aria-hidden="true">📷</em>${removable?`<button type="button" data-ce-bank-remove-link="${esc(link.id)}" data-movement-id="${esc(row.id)}" aria-label="Quitar ${esc(link.ticketCode)}">×</button>`:''}</span>`;
       }).join('');
       const incomeChips=incomeLinks.map(link=>`<span class="ce-bank-income-chip ${link.imageUrl?'has-photo':''} ${link.manual?'manual':''}" ${link.imageUrl?`role="button" tabindex="0" data-ce-bank-view-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id)}" data-person-name="${esc(link.personName)}" data-income-amount="${esc(link.amount)}" data-payment-method="${esc(link.paymentMethod)}" data-movement-id="${esc(row.id)}" title="Ver justificante de ingreso de ${esc(link.personName)}"`:''}><i>ING</i><b>${esc(link.personName)}</b><strong>${money(link.amount)}</strong>${link.imageUrl?`<img src="${esc(link.imageUrl)}" alt="Justificante de ${esc(link.personName)}">`:'<em aria-hidden="true">📷</em>'}</span>`).join('');
-      const forceControl=row.amount<0&&!row.linkedToOtherEvent&&activeLinks.length&&(Math.abs(num(row.difference))>.01||row.forcedSquare)
-        ?`<label class="ce-bank-force-square ${row.forcedSquare?'checked':''}"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" ${row.forcedSquare?'checked':''} ${actionDisabled}><span>✓</span><b>Cuadrar de manera forzada</b><small>Aceptar la diferencia de ${money(Math.abs(num(row.difference)))}</small></label>`:'';
-      const includeLabel=row.inclusionLocked?'Otro evento':(row.included?'En saldo':'Inactivo');
-      const justificationTitle=row.amount>=0?'Trazabilidad del INGRESO':(row.linkedToOtherEvent?'Conciliado en otro evento':'Trazabilidad de la COMPRA');
-      const amountSummary=`<small class="ce-bank-justify-amounts">${money(justified)} de ${money(target)}</small>`;
-      const addAction=row.amount<0&&!row.linkedToOtherEvent
+      const legacyForce=row.amount<0&&row.forcedSquare
+        ?`<label class="ce-bank-force-square checked"><input type="checkbox" data-ce-bank-forced="${esc(row.id)}" checked ${actionDisabled}><span>✓</span><b>Cuadre forzado antiguo</b><small>Compatibilidad con conciliaciones anteriores</small></label>`:'';
+      const acceptedControl=row.amount<0&&displayLinks.length&&num(row.globalDifference)>.01
+        ?(row.acceptedDifference>0
+          ?`<button type="button" class="ce-bank-accept-difference accepted" data-ce-bank-accept-diff="${esc(row.id)}" data-accepted="1" ${actionDisabled}><span>✓</span><b>Diferencia aceptada ${money(row.acceptedDifference)}</b><small>Movimiento global cerrado · pulsar para reabrir</small></button>`
+          :`<button type="button" class="ce-bank-accept-difference" data-ce-bank-accept-diff="${esc(row.id)}" data-accepted="0" ${actionDisabled}><span>≈</span><b>Aceptar diferencia ${money(Math.max(0,num(row.globalDifference)))}</b><small>Solo cuando ya no haya más justificantes que asociar</small></button>`)
+        :'';
+      const forceControl=`${acceptedControl}${legacyForce}`;
+      const includeLabel=row.included?(row.sharedMovement?'En saldo · compartido':'En saldo'):'Inactivo';
+      const justificationTitle=row.amount>=0?'Trazabilidad del INGRESO':(row.sharedMovement?'Trazabilidad de la COMPRA · movimiento compartido':'Trazabilidad de la COMPRA');
+      const amountSummary=row.amount<0
+        ?`<small class="ce-bank-justify-amounts">Este evento: <b>${money(eventJustified)}</b> · Global: <b>${money(globalJustified)}</b> de ${money(target)}${row.sharedEventCount>1?` · ${num(row.sharedEventCount)} eventos`:''}</small>`
+        :`<small class="ce-bank-justify-amounts">${money(justified)} de ${money(target)}</small>`;
+      const addAction=row.amount<0
         ?`<button type="button" class="ce-bank-add-ticket" data-ce-bank-add-ticket="${esc(row.id)}" ${actionDisabled}><span>↔</span><b>Revisar / modificar TKxx</b></button>`
         :'';
       const incomeAction=row.amount>=0&&row.included
         ?`<button type="button" class="ce-bank-add-ticket ce-bank-edit-income" data-ce-bank-edit-income="${esc(row.id)}" ${actionDisabled}><span>↔</span><b>${row.incomeAssociationMode==='MANUAL'?'Cambiar justificación del INGRESO':'Revisar justificación del INGRESO'}</b></button>`
         :'';
-      const emptyText=row.linkedToOtherEvent?'Este movimiento está justificado en otro evento.':'Todavía no hay TKxx asociados a este movimiento.';
+      const emptyText=row.linkedToOtherEvent?'Este movimiento ya tiene justificantes de otro evento; puedes añadir aquí la parte que corresponda a este evento.':'Todavía no hay TKxx asociados a este movimiento.';
       const incomeEmpty=row.included?'No se ha encontrado un ingreso bancario del evento que coincida con este abono.':'Este abono está fuera del saldo del evento.';
-      return `<article class="ce-bank-movement ${row.included?'included':'excluded'} ${amountClass} ${row.linkedToOtherEvent?'belongs-other-event':''}" data-movement-id="${esc(row.id)}" style="--ce-bank-progress:${progress}%">
+      return `<article class="ce-bank-movement ${row.included?'included':'excluded'} ${amountClass} ${row.sharedMovement?'shared-movement':''}" data-movement-id="${esc(row.id)}" style="--ce-bank-progress:${progress}%">
         <div class="ce-bank-ledger-node"><span>${String(start+index+1).padStart(2,'0')}</span><i></i></div>
         <div class="ce-bank-movement-main">
-          <label class="ce-bank-include ${row.inclusionLocked?'locked':''}" title="${row.inclusionLocked?'Este movimiento ya está conciliado en otro evento.':''}"><input type="checkbox" data-ce-bank-included="${esc(row.id)}" ${row.included?'checked':''} ${disabled}><span><i></i></span><b>${includeLabel}</b></label>
+          <label class="ce-bank-include" title="${row.sharedMovement?'Movimiento compartido: este evento solo aplica su parte proporcional.':''}"><input type="checkbox" data-ce-bank-included="${esc(row.id)}" ${row.included?'checked':''} ${disabled}><span><i></i></span><b>${includeLabel}</b></label>
           <div class="ce-bank-date"><strong>${formatDate(row.executedAt)}</strong><small>Valor ${formatDate(row.valueDate,false)}</small></div>
           <div class="ce-bank-description"><div><span>${row.amount<0?'SALIDA':'ENTRADA'}</span><strong>${esc(row.description)}</strong></div></div>
-          <div class="ce-bank-amount ${amountClass}"><small>${row.amount<0?'CARGO':'ABONO'}</small><strong>${money(row.amount)}</strong><span>Banco: <b>${money(row.bankBalance)}</b></span><span class="ce-bank-event-running">Evento: <b>${money(row.eventBalanceAfter)}</b>${row.included?'':' · sin aplicar'}</span></div>
+          <div class="ce-bank-amount ${amountClass}"><small>${row.amount<0?'CARGO BANCO':'ABONO'}</small><strong>${money(row.amount)}</strong>${row.amount<0&&Math.abs(num(row.eventAppliedAmount)-num(row.amount))>.01?`<span>Parte de este evento: <b>${money(row.eventAppliedAmount)}</b></span>`:''}<span>Banco: <b>${money(row.bankBalance)}</b></span><span class="ce-bank-event-running">Saldo evento: <b>${money(row.eventBalanceAfter)}</b>${row.included?'':' · sin aplicar'}</span></div>
         </div>
         <div class="ce-bank-justification ${status.className}">
           <div class="ce-bank-justify-left">
@@ -1324,56 +1342,74 @@
     catch(error){ input.checked=!forced; notice(error.message,'error',true); }
     finally{input.disabled=false;}
   }
+  async function toggleAcceptedDifference(id,accepted,button){
+    if(mutationBlocked()) return;
+    const row=arr(store.data?.movements).find(item=>String(item.id)===String(id));
+    if(!row) return;
+    const difference=Math.max(0,num(row.globalDifference));
+    if(accepted){
+      if(!confirm(`Quedan ${money(difference)} sin imputar a ningún evento. ¿Aceptar esta diferencia y cerrar globalmente el movimiento bancario?`)) return;
+    }else if(!confirm('¿Reabrir este movimiento y retirar la diferencia aceptada?')) return;
+    if(button) button.disabled=true;
+    try{
+      const note=accepted?'Diferencia residual aceptada en conciliación multievento.':'';
+      await api(`/api/bank-reconciliation/movements/${encodeURIComponent(id)}/accepted-difference`,{method:'PATCH',body:JSON.stringify({eventId:store.eventId,accepted,note})});
+      await load({force:true,preserveMovementId:id});
+      notice(accepted?`Diferencia de ${money(difference)} aceptada. El movimiento queda globalmente cuadrado.`:'Diferencia aceptada retirada; el movimiento vuelve a quedar pendiente.','ok',false);
+    }catch(error){notice(error.message,'error',true);if(button)button.disabled=false;}
+  }
   async function openTicketPicker(movementId){
     if(mutationBlocked()) return;
     const row=arr(store.data?.movements).find(item=>String(item.id)===String(movementId));
     if(!row||num(row.amount)>=0) return;
     store.ticketMovement=movementId;
-    store.ticketOriginalLinks=arr(row.displayLinks||row.links).filter(link=>link.isActiveEvent!==false).map(link=>({id:text(link.id),ticketCode:text(link.ticketCode)}));
-    const originalCodes=new Set(store.ticketOriginalLinks.map(link=>link.ticketCode));
+    store.ticketTarget=Math.abs(num(row.amount));
+    store.ticketOriginalLinks=arr(row.displayLinks||row.links).map(link=>({id:text(link.id),eventId:text(link.eventId||store.eventId),ticketCode:text(link.ticketCode),key:`${text(link.eventId||store.eventId)}|${text(link.ticketCode)}`}));
+    const originalKeys=new Set(store.ticketOriginalLinks.map(link=>link.key));
     const modal=$('ceBankTicketModal'); modal.classList.remove('hidden');
-    const eventTitle=store.data?.event?.title||'evento activo';
-    modal.innerHTML=`<div class="ce-bank-ticket-modal ce-bank-ticket-edit-modal"><div class="ce-bank-ticket-modal-head"><div class="ce-bank-ticket-modal-icon">TK</div><div><span>JUSTIFICANTES DEL MOVIMIENTO</span><h3>Revisar o modificar TKxx</h3><p>Marca todos los TKxx de «${esc(eventTitle)}» que justifican ${money(Math.abs(num(row.amount)))}.</p></div><button type="button" data-ce-bank-close-tickets aria-label="Cerrar">×</button></div><label class="ce-bank-ticket-search"><i>⌕</i><input id="ceBankTicketSearch" autocomplete="off" placeholder="Buscar por TKxx, tienda o responsable"></label><div id="ceBankTicketChoices" class="ce-bank-ticket-choices ce-bank-ticket-edit-choices"><div class="ce-bank-empty"><span class="ce-bank-loader"></span><strong>Cargando TKxx del evento…</strong></div></div><div class="ce-bank-ticket-edit-footer"><div><span>Seleccionado</span><strong id="ceBankTicketSelectedTotal">${money(0)}</strong><small>Objetivo: ${money(Math.abs(num(row.amount)))}</small></div><button type="button" class="outline" data-ce-bank-close-tickets>Cancelar</button><button type="button" data-ce-bank-save-tickets>Guardar cambios</button></div></div>`;
+    modal.innerHTML=`<div class="ce-bank-ticket-modal ce-bank-ticket-edit-modal"><div class="ce-bank-ticket-modal-head"><div class="ce-bank-ticket-modal-icon">TK</div><div><span>JUSTIFICANTES DEL MOVIMIENTO · MULTIEVENTO</span><h3>Revisar o modificar TKxx</h3><p>Este movimiento bancario es único. Puedes asociar TKxx de varios eventos hasta justificar ${money(Math.abs(num(row.amount)))}. Cada evento verá solo su parte proporcional.</p></div><button type="button" data-ce-bank-close-tickets aria-label="Cerrar">×</button></div><label class="ce-bank-ticket-search"><i>⌕</i><input id="ceBankTicketSearch" autocomplete="off" placeholder="Buscar por evento, TKxx, tienda o responsable"></label><div id="ceBankTicketChoices" class="ce-bank-ticket-choices ce-bank-ticket-edit-choices"><div class="ce-bank-empty"><span class="ce-bank-loader"></span><strong>Cargando TKxx de todos los eventos…</strong></div></div><div class="ce-bank-ticket-edit-footer"><div><span>Justificado global</span><strong id="ceBankTicketSelectedTotal">${money(0)}</strong><small>Movimiento banco: ${money(Math.abs(num(row.amount)))}</small></div><button type="button" class="outline" data-ce-bank-close-tickets>Cancelar</button><button type="button" data-ce-bank-save-tickets>Guardar cambios</button></div></div>`;
     modal.querySelectorAll('[data-ce-bank-close-tickets]').forEach(button=>button.addEventListener('click',()=>{modal.classList.add('hidden');store.ticketMovement=null;store.ticketOriginalLinks=[];restorePosition(movementId,false);}));
     const input=$('ceBankTicketSearch'); input.addEventListener('input',()=>renderTicketChoices(input.value));
     try{
       const params=new URLSearchParams({movementId,eventId:store.eventId});
       const result=await api(`/api/bank-reconciliation/paid-tickets?${params}`);
-      store.tickets=arr(result.items).map(item=>({...item,selected:originalCodes.has(text(item.ticketCode))}));
+      store.tickets=arr(result.items).map(item=>({...item,key:`${text(item.eventId)}|${text(item.ticketCode)}`,selected:originalKeys.has(`${text(item.eventId)}|${text(item.ticketCode)}`)}));
       renderTicketChoices(''); input.focus();
     }catch(error){ $('ceBankTicketChoices').innerHTML=`<div class="ce-bank-empty error"><strong>${esc(error.message)}</strong></div>`; }
   }
   function renderTicketChoices(query){
     const node=$('ceBankTicketChoices'); if(!node) return;
     const q=text(query).toLowerCase();
-    const items=store.tickets.filter(item=>!q||[item.ticketCode,...arr(item.stores),...arr(item.responsibles)].join(' ').toLowerCase().includes(q));
-    node.innerHTML=items.map(item=>`<label class="ce-bank-ticket-choice ce-bank-ticket-edit-choice ${item.selected?'selected':''}"><input type="checkbox" data-ce-bank-ticket-choice="${esc(item.ticketCode)}" ${item.selected?'checked':''}><i>TK</i><span><b>${esc(item.ticketCode)}</b><strong>${esc(item.eventTitle)}</strong><small>${esc(arr(item.stores).join(', ')||'Sin tienda')} · ${item.lineCount} línea(s)</small></span><em>${money(item.amount)}</em><u>${item.selected?'Incluido':'Disponible'}</u></label>`).join('')||'<div class="ce-bank-empty"><strong>No hay TKxx pagados disponibles en este evento.</strong></div>';
+    const items=store.tickets.filter(item=>!q||[item.eventTitle,item.ticketCode,...arr(item.stores),...arr(item.responsibles)].join(' ').toLowerCase().includes(q));
+    node.innerHTML=items.map(item=>`<label class="ce-bank-ticket-choice ce-bank-ticket-edit-choice ${item.selected?'selected':''} ${item.activeEvent?'active-event':''}"><input type="checkbox" data-ce-bank-ticket-choice="${esc(item.key)}" ${item.selected?'checked':''}><i>TK</i><span><b>${esc(item.ticketCode)}</b><strong>${esc(item.eventTitle)}</strong><small>${esc(arr(item.stores).join(', ')||'Sin tienda')} · ${item.lineCount} línea(s)</small></span><em>${money(item.amount)}</em><u>${item.selected?'Incluido':(item.activeEvent?'Evento actual':'Otro evento')}</u></label>`).join('')||'<div class="ce-bank-empty"><strong>No hay TKxx pagados disponibles.</strong></div>';
     updateTicketPickerTotal();
   }
   function updateTicketPickerTotal(){
     const total=store.tickets.filter(item=>item.selected).reduce((sum,item)=>sum+num(item.amount),0);
-    const node=$('ceBankTicketSelectedTotal'); if(node) node.textContent=money(total);
+    const node=$('ceBankTicketSelectedTotal'); if(node){node.textContent=money(total);node.classList.toggle('excess',total>num(store.ticketTarget)+.01);}
   }
   async function saveTicketSelection(){
     if(mutationBlocked()) return;
     const movementId=store.ticketMovement; if(!movementId) return;
     const button=$('ceBankTicketModal')?.querySelector('[data-ce-bank-save-tickets]');
     if(button){button.disabled=true;button.textContent='Guardando…';}
-    const selectedCodes=new Set(store.tickets.filter(item=>item.selected).map(item=>text(item.ticketCode)));
-    const originalByCode=new Map(store.ticketOriginalLinks.map(link=>[text(link.ticketCode),link]));
-    const removeRows=[...originalByCode.values()].filter(link=>!selectedCodes.has(link.ticketCode));
-    const addCodes=[...selectedCodes].filter(code=>!originalByCode.has(code));
+    const selectedTotal=store.tickets.filter(item=>item.selected).reduce((sum,item)=>sum+num(item.amount),0);
+    if(selectedTotal>num(store.ticketTarget)+.01){notice(`Los TKxx seleccionados suman ${money(selectedTotal)} y superan los ${money(store.ticketTarget)} del movimiento bancario.`,'warning',true);if(button){button.disabled=false;button.textContent='Guardar cambios';}return;}
+    const selectedKeys=new Set(store.tickets.filter(item=>item.selected).map(item=>item.key));
+    const originalByKey=new Map(store.ticketOriginalLinks.map(link=>[link.key,link]));
+    const removeRows=[...originalByKey.values()].filter(link=>!selectedKeys.has(link.key));
+    const addItems=store.tickets.filter(item=>item.selected&&!originalByKey.has(item.key));
     try{
       for(const link of removeRows){
-        await api(`/api/bank-reconciliation/ticket-links/${encodeURIComponent(link.id)}?eventId=${encodeURIComponent(store.eventId)}`,{method:'DELETE'});
+        await api(`/api/bank-reconciliation/ticket-links/${encodeURIComponent(link.id)}?eventId=${encodeURIComponent(link.eventId)}`,{method:'DELETE'});
       }
-      for(const ticketCode of addCodes){
-        await api(`/api/bank-reconciliation/movements/${encodeURIComponent(movementId)}/tickets`,{method:'POST',body:JSON.stringify({eventId:store.eventId,ticketCode})});
+      for(const item of addItems){
+        await api(`/api/bank-reconciliation/movements/${encodeURIComponent(movementId)}/tickets`,{method:'POST',body:JSON.stringify({eventId:item.eventId,ticketCode:item.ticketCode})});
       }
       $('ceBankTicketModal').classList.add('hidden');
-      store.ticketMovement=null; store.ticketOriginalLinks=[];
+      store.ticketMovement=null; store.ticketTarget=0; store.ticketOriginalLinks=[];
       await load({force:true,preserveMovementId:movementId});
-      notice('Justificación de compra actualizada. Se muestran todos los TKxx asociados.','ok',false);
+      notice('Justificación multievento actualizada. El movimiento se cerrará solo cuando la suma global quede justificada o se acepte expresamente la diferencia residual.','ok',false);
     }catch(error){
       notice(error.message,'error',true);
       await load({force:true,preserveMovementId:movementId});
@@ -1384,7 +1420,8 @@
     if(mutationBlocked()) return;
     const movementId=store.ticketMovement; button.disabled=true;
     try{
-      await api(`/api/bank-reconciliation/movements/${encodeURIComponent(movementId)}/tickets`,{method:'POST',body:JSON.stringify({eventId:store.eventId,ticketCode})});
+      const item=store.tickets.find(x=>text(x.ticketCode)===text(ticketCode)&&x.selected!==false)||store.tickets.find(x=>text(x.ticketCode)===text(ticketCode));
+      await api(`/api/bank-reconciliation/movements/${encodeURIComponent(movementId)}/tickets`,{method:'POST',body:JSON.stringify({eventId:text(item?.eventId)||store.eventId,ticketCode})});
       $('ceBankTicketModal').classList.add('hidden'); await load({force:true,preserveMovementId:movementId});
     }catch(error){ notice(error.message,'error',true); button.disabled=false; }
   }
@@ -1497,6 +1534,8 @@
     if(included){stopEvent(event);toggleIncluded(included.dataset.ceBankIncluded,included.checked,included);return;}
     const forced=event.target?.closest?.('[data-ce-bank-forced]');
     if(forced){stopEvent(event);toggleForced(forced.dataset.ceBankForced,forced.checked,forced);return;}
+    const acceptedDiff=event.target?.closest?.('[data-ce-bank-accept-diff]');
+    if(acceptedDiff){stopEvent(event);toggleAcceptedDifference(acceptedDiff.dataset.ceBankAcceptDiff,acceptedDiff.dataset.accepted!=='1',acceptedDiff);return;}
     const editIncome=event.target?.closest?.('[data-ce-bank-edit-income]');
     if(editIncome){openIncomePicker(editIncome.dataset.ceBankEditIncome);return;}
     const remove=event.target?.closest?.('[data-ce-bank-remove-link]');
@@ -1529,8 +1568,8 @@
   document.addEventListener('change',event=>{
     const ticketChoice=event.target?.closest?.('[data-ce-bank-ticket-choice]');
     if(ticketChoice){
-      const item=store.tickets.find(row=>text(row.ticketCode)===text(ticketChoice.dataset.ceBankTicketChoice));
-      if(item){item.selected=ticketChoice.checked;ticketChoice.closest('.ce-bank-ticket-edit-choice')?.classList.toggle('selected',item.selected);const tag=ticketChoice.closest('.ce-bank-ticket-edit-choice')?.querySelector('u');if(tag)tag.textContent=item.selected?'Incluido':'Disponible';updateTicketPickerTotal();}
+      const item=store.tickets.find(row=>text(row.key)===text(ticketChoice.dataset.ceBankTicketChoice));
+      if(item){item.selected=ticketChoice.checked;ticketChoice.closest('.ce-bank-ticket-edit-choice')?.classList.toggle('selected',item.selected);const tag=ticketChoice.closest('.ce-bank-ticket-edit-choice')?.querySelector('u');if(tag)tag.textContent=item.selected?'Incluido':(item.activeEvent?'Evento actual':'Otro evento');updateTicketPickerTotal();}
       return;
     }
     const incomeChoice=event.target?.closest?.('[data-ce-bank-income-choice]');

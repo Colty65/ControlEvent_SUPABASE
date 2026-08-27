@@ -14,6 +14,7 @@ import {
   setIncomeLinks,
   setBankEventPeriod,
   setMovementForced,
+  setMovementAcceptedDifference,
   setMovementIncluded
 } from '../services/bank-reconciliation.service.js';
 
@@ -91,6 +92,12 @@ router.patch('/bank-reconciliation/movements/:id/forced', asyncHandler(async (re
   const eventId = eventIdFrom(req);
   await assertBankEventWritable(eventId);
   res.json(await setMovementForced(req.params.id,eventId,req.body?.forced === true));
+}));
+router.patch('/bank-reconciliation/movements/:id/accepted-difference', asyncHandler(async (req,res) => {
+  const actor=requireBankRole(req);
+  const eventId=eventIdFrom(req);
+  await assertBankEventWritable(eventId);
+  res.json(await setMovementAcceptedDifference(req.params.id,req.body||{},actor));
 }));
 router.post('/bank-reconciliation/movements/:id/tickets', asyncHandler(async (req,res) => {
   const actor = requireBankRole(req);
