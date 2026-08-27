@@ -64,6 +64,13 @@
     if(!res.ok || data?.ok===false){ throw new Error(data?.error || data?.message || ('HTTP '+res.status+' '+url)); }
     return data;
   }
+  async function persistDonationSituation(id, situacion){
+    const value=text(situacion||'Comprometida')||'Comprometida';
+    const data=await apiJson('/api/crud/compras/'+encodeURIComponent(id)+'/donacion-situacion', {
+      method:'PUT', headers:headers(), body:JSON.stringify({situacion:value,__crudRowOnly:true})
+    });
+    return normalizeItem(data?.item,{id,donacionSituacion:value});
+  }
   function validate(payload, action){
     if(!canWrite()) throw new Error('Usuario sin permiso de escritura en COMPRAS.');
     if(isFinalizado()) throw new Error('Evento Finalizado: no se permite '+action+' compras. Cambia antes la situación a En curso.');
@@ -114,6 +121,7 @@
       unidades:num(val('edit-donacion-unidades',id,old.unidades||0)),
       precio: rawPrecio!=='' ? num(rawPrecio) : num(old.precio ?? old.precioCalc ?? p.precio ?? p.defaultPrecio ?? 0),
       ticketDonacion:text(val('edit-donacion-ticket',id,old.ticketDonacion||'DONADO TIENDA')) || 'DONADO TIENDA',
+      donacionSituacion:text(val('edit-donacion-situacion',id,old.donacionSituacion||old.donacion_situacion||'Comprometida')) || 'Comprometida',
       donorRef:text(val('edit-donacion-donante',id,old.donorRef||'')),
       tiendaId:'',
       responsableId:text(val('edit-donacion-responsable',id,old.responsableId||''))
@@ -130,6 +138,7 @@
       unidades:num(elVal('donUnidades','0')),
       precio: rawPrecio!=='' ? num(rawPrecio) : num(p.precio ?? p.defaultPrecio ?? 0),
       ticketDonacion:text(elVal('donTicket','DONADO TIENDA')) || 'DONADO TIENDA',
+      donacionSituacion:text(elVal('donSituacion','Comprometida')) || 'Comprometida',
       donorRef:text(elVal('donDonante','')),
       tiendaId:'',
       responsableId:text(elVal('donResponsable',''))
@@ -140,6 +149,7 @@
     setElVal('donUnidades','1.00');
     setElVal('donPrecio','0,00 €');
     setElVal('donImporte','');
+    setElVal('donSituacion','Comprometida');
     try{
       const el=$('donTicket');
       if(el && (!el.value || !/^DONADO/i.test(String(el.value)))) el.value='DONADO TIENDA';
@@ -157,7 +167,8 @@
       ticketDonacion:text(item?.ticketDonacion ?? item?.ticket_donacion ?? fallback?.ticketDonacion),
       donorRef:text(item?.donorRef ?? item?.donor_ref ?? fallback?.donorRef),
       tiendaId:text(item?.tiendaId ?? item?.tienda_id ?? fallback?.tiendaId),
-      responsableId:text(item?.responsableId ?? item?.responsable_id ?? fallback?.responsableId)
+      responsableId:text(item?.responsableId ?? item?.responsable_id ?? fallback?.responsableId),
+      donacionSituacion:text(item?.donacionSituacion ?? item?.donacion_situacion ?? fallback?.donacionSituacion ?? fallback?.donacion_situacion)
     };
   }
   function replaceCompraLocal(row){
@@ -469,7 +480,10 @@
     validate(payload,'añadir donaciones');
     if(!/^DONADO/i.test(text(payload.ticketDonacion))) payload.ticketDonacion='DONADO TIENDA';
     const data=await apiJson('/api/crud/compras', {method:'POST', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})});
-    const item=normalizeItem(data?.item,payload); replaceCompraLocal(item); resetDonationInputs();
+    let item=normalizeItem(data?.item,payload); replaceCompraLocal(item);
+    const desired=payload.donacionSituacion||'Comprometida';
+    if(text(item.donacionSituacion)!==text(desired)){ item=await persistDonationSituation(item.id,desired); replaceCompraLocal(item); }
+    resetDonationInputs();
     try{ currentMainTab='donaciones'; }catch(_){ }
     await syncStateNoRender();
     renderCompraViewsFull({flashId:item.id, flashClass:'ce-crud-flash-add'});
@@ -486,7 +500,9 @@
     const payload=donationRowPayload(id); validate(payload,'modificar donaciones');
     if(!/^DONADO/i.test(text(payload.ticketDonacion))) payload.ticketDonacion='DONADO TIENDA';
     const data=await apiJson('/api/crud/compras/'+encodeURIComponent(id), {method:'PUT', headers:headers(), body:JSON.stringify({...payload,__crudRowOnly:true})});
-    const item=normalizeItem(data?.item,payload); replaceCompraLocal(item);
+    let item=normalizeItem(data?.item,payload); replaceCompraLocal(item);
+    const desired=payload.donacionSituacion||'Comprometida';
+    if(text(item.donacionSituacion)!==text(desired)){ item=await persistDonationSituation(id,desired); replaceCompraLocal(item); }
     await syncStateNoRender();
     renderCompraViewsFull({flashId:id, flashClass:'ce-crud-flash-update'});
   }

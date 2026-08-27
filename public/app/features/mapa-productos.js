@@ -203,27 +203,62 @@
   function writeShoppingChecked(set){
     try{ localStorage.setItem(shoppingStorageKey(), JSON.stringify(Array.from(set || []))); }catch(_){ }
   }
-  function isDonationDelivered(row){
-    return !!(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÍ'));
+  const DONATION_STATUS_VALUES = ['Supuesta','Comprometida','Entregada'];
+  function donationStatus(row){
+    const raw = String(row?.donacionSituacion || row?.donacion_situacion || '').trim().toLowerCase();
+    if(raw === 'supuesta') return 'Supuesta';
+    if(raw === 'entregada') return 'Entregada';
+    if(raw === 'comprometida') return 'Comprometida';
+    // Compatibilidad con datos anteriores al nuevo campo. Una marca local antigua de entrega
+    // se interpreta como Entregada; el resto de donaciones históricas parte de Comprometida.
+    if(row && (row.donacionEntregada || row.entregadoDonacion || row.entregado === true || row.entregado === 'SI' || row.entregado === 'SÍ')) return 'Entregada';
+    return 'Comprometida';
   }
-  function setDonationDelivered(row, delivered){
-    if(!row) return false;
-    row.donacionEntregada = !!delivered;
-    try{ if(typeof saveState === 'function') saveState(); else if(window.saveState) window.saveState(); }catch(_){ }
-    try{ if(typeof render === 'function') render(); else if(window.render) window.render(); }catch(_){ renderMapaProductos(); }
-    return true;
+  function isDonationDelivered(row){ return donationStatus(row) === 'Entregada'; }
+  async function setDonationDelivered(row, delivered){
+    if(!row?.id) return false;
+    const situacion = delivered ? 'Entregada' : 'Comprometida';
+    const button = Array.from(document.querySelectorAll('#tabMapaProductos [data-mapa-donation-toggle="1"]')).find(el => String(el.getAttribute('data-donation-id') || '') === String(row.id)) || null;
+    try{
+      if(button){ button.disabled=true; button.textContent='Guardando…'; }
+      const res = await fetch('/api/crud/compras/'+encodeURIComponent(row.id)+'/donacion-situacion', {
+        method:'PUT',
+        cache:'no-store',
+        headers:{'Content-Type':'application/json','X-ControlEvent-Write-Scope':'row-crud-v8-5-compras-directo','X-ControlEvent-Row-Only':'1'},
+        body:JSON.stringify({situacion,__crudRowOnly:true})
+      });
+      const data = await res.json().catch(async()=>({error:await res.text().catch(()=>res.statusText)}));
+      if(!res.ok || data?.ok===false) throw new Error(data?.error || data?.message || ('HTTP '+res.status));
+      const saved = data?.item || {};
+      row.donacionSituacion = donationStatus(saved?.donacionSituacion || saved?.donacion_situacion ? saved : {donacionSituacion:situacion});
+      row.donacion_situacion = row.donacionSituacion;
+      row.donacionEntregada = row.donacionSituacion === 'Entregada';
+      try{
+        const local = arr('compras').find(item => String(item?.id || '') === String(row.id));
+        if(local && local !== row){ local.donacionSituacion=row.donacionSituacion; local.donacion_situacion=row.donacionSituacion; local.donacionEntregada=row.donacionEntregada; }
+      }catch(_){ }
+      try{ window.ControlEventDonationStatus?.refresh?.(); }catch(_){ }
+      try{ if(typeof window.renderDonaciones === 'function') window.renderDonaciones(); }catch(_){ }
+      try{ if(typeof window.renderBudget === 'function') window.renderBudget(); }catch(_){ }
+      renderMapaProductos();
+      return true;
+    }catch(error){
+      if(button){ button.disabled=false; button.textContent=isDonationDelivered(row)?'✓ Entregada':'○ Marcar entregada'; }
+      alert('No se ha podido guardar la situación de la donación. '+String(error?.message||error||''));
+      return false;
+    }
   }
-  function toggleDonationDelivered(id){
+  async function toggleDonationDelivered(id){
     const row = arr('compras').find(item => String(item?.id || '') === String(id || ''));
     if(!row) return false;
-    setDonationDelivered(row, !isDonationDelivered(row));
-    return true;
+    return setDonationDelivered(row, !isDonationDelivered(row));
   }
   function renderDonationDeliveredButton(item){
     const id = item?.row?.id || item?.id || '';
     if(!id) return '';
-    const delivered = isDonationDelivered(item?.row);
-    return `<button type="button" class="mapa-donation-delivered ${delivered ? 'is-delivered' : ''}" data-mapa-donation-toggle="1" data-donation-id="${esc(id)}" aria-pressed="${delivered ? 'true' : 'false'}">${delivered ? '✓ Entregado' : '○ Marcar entregado'}</button>`;
+    const situacion = donationStatus(item?.row || item);
+    const delivered = situacion === 'Entregada';
+    return `<button type="button" class="mapa-donation-delivered ${delivered ? 'is-delivered' : ''}" data-mapa-donation-toggle="1" data-donation-id="${esc(id)}" aria-pressed="${delivered ? 'true' : 'false'}" title="Situación actual: ${esc(situacion)}">${delivered ? '✓ Entregada' : '○ Marcar entregada'}</button>`;
   }
   function toggleShoppingChecked(key){
     const k = String(key || '');
@@ -288,6 +323,9 @@
     const eventTotalCompraTk = eventBuys.filter(row => isResolvedPurchaseTicket(ticketLabel(row))).reduce((sum, row) => sum + rowValue(row), 0);
     const eventTotalCompraPte = eventBuys.filter(row => !isResolvedPurchaseTicket(ticketLabel(row))).reduce((sum, row) => sum + rowValue(row), 0);
     const eventTotalDonado = eventDonations.reduce((sum, row) => sum + rowValue(row), 0);
+    const eventTotalDonadoEntregado = eventDonations.filter(row => donationStatus(row) === 'Entregada').reduce((sum, row) => sum + rowValue(row), 0);
+    const eventTotalDonadoComprometido = eventDonations.filter(row => donationStatus(row) === 'Comprometida').reduce((sum, row) => sum + rowValue(row), 0);
+    const eventTotalDonadoSupuesto = eventDonations.filter(row => donationStatus(row) === 'Supuesta').reduce((sum, row) => sum + rowValue(row), 0);
     const eventProductsWithDonations = new Set(eventDonations.map(row => String(row.productoId || '')).filter(Boolean)).size;
 
     // Listado: sí respeta el filtro de responsables.
@@ -310,6 +348,7 @@
         precioUnitario: unitPriceFrom(unidades, valor),
         tipo: row.ticketDonacion || 'Donación',
         responsable: responsibleName(row),
+        situacion: donationStatus(row),
         entregada: isDonationDelivered(row)
       });
     });
@@ -420,6 +459,9 @@
         totalCompraTk: eventTotalCompraTk,
         totalCompraPte: eventTotalCompraPte,
         totalDonado: eventTotalDonado,
+        totalDonadoEntregado: eventTotalDonadoEntregado,
+        totalDonadoComprometido: eventTotalDonadoComprometido,
+        totalDonadoSupuesto: eventTotalDonadoSupuesto,
         productsWithDonations: eventProductsWithDonations,
         filteredDonationValue,
         filteredProductsWithDonations,
@@ -502,7 +544,7 @@
     if(!items.length) return '<div class="mapa-donation-empty">Sin donaciones registradas de este producto para el filtro actual.</div>';
     return `<div class="mapa-donation-list">${items.map(item => `
       <div class="mapa-donation-row">
-        <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)}</span></div>
+        <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)} · ${esc(item.situacion || donationStatus(item.row))}</span></div>
         <div><strong>${esc(qtyFmt(item.unidades))}</strong><span>uds.</span></div>
         <div><strong>${esc(unitPriceFmtFrom(item.unidades, item.valor))}</strong><span>precio</span></div>
         <div><strong>${esc(moneyFmt(item.valor))}</strong><span>valor</span></div>
@@ -515,7 +557,7 @@
     if(!items.length) return '';
     return `<div class="mapa-donation-list donation-only-compact-list">${items.map(item => `
       <div class="mapa-donation-row donation-only-row">
-        <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)}${item.responsable ? ' · Resp. ' + esc(item.responsable) : ''}</span></div>
+        <div class="donor"><strong>${esc(item.donor)}</strong><span>${esc(item.tipo)} · ${esc(item.situacion || donationStatus(item.row))}${item.responsable ? ' · Resp. ' + esc(item.responsable) : ''}</span></div>
         <div><strong>${esc(qtyFmt(item.unidades))}</strong><span>${esc(unitPriceFmtFrom(item.unidades, item.valor))}</span></div>
         <div><strong>${esc(moneyFmt(item.valor))}</strong><span>valor</span></div>
         <div class="donation-delivered-cell">${renderDonationDeliveredButton(item)}</div>
@@ -829,7 +871,7 @@
       ${renderProductSearch()}
       <div class="mapa-summary-metrics">
         ${renderMetric('VALORACION DEL EVENTO (estimada)', moneyFmt(eventSummary.necesidadValor || 0), 'Total del evento, no cambia por responsable', 'ok')}
-        ${renderMetric('DONACIONES DE PRODUCTO (estimado)', moneyFmt(eventSummary.totalDonado || 0), `${qtyFmt(eventSummary.productsWithDonations || 0)} producto(s) con donación`, 'ok donation')}
+        ${renderMetric('DONACIONES DE PRODUCTO (estimado)', moneyFmt(eventSummary.totalDonado || 0), `Entregadas: ${moneyFmt(eventSummary.totalDonadoEntregado || 0)} · Comprometidas: ${moneyFmt(eventSummary.totalDonadoComprometido || 0)} · Supuestas: ${moneyFmt(eventSummary.totalDonadoSupuesto || 0)}`, 'ok donation')}
         ${renderMetric('COMPRAS', moneyFmt(eventSummary.totalCompra || 0), `GASTADO: ${moneyFmt(eventSummary.totalCompraTk || 0)} - Pte.Compra: ${moneyFmt(eventSummary.totalCompraPte || 0)}`, 'warn split')}
         ${renderMetric('SALDO LÍMITE', moneyFmt(eventSummary.saldoLimite || 0), 'Ingresos totales previstos: ingresados + pendientes', 'ok saldo-limite')}
       </div>`;

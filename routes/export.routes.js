@@ -171,7 +171,7 @@ async function rawCompraRowsForBackup(scope){
     const data = await fetchAllSupabaseRows(() => {
       let query = getSupabaseAdmin()
         .from('ce_compras')
-        .select('id,event_id,producto_id,unidades,precio,ticket_donacion,tienda_id,responsable_id,donor_ref,created_at,updated_at')
+        .select('id,event_id,producto_id,unidades,precio,ticket_donacion,donacion_situacion,tienda_id,responsable_id,donor_ref,created_at,updated_at')
         .order('event_id')
         .order('id');
       if(!scopeIsAll) query = query.eq('event_id', scopeText);
@@ -184,6 +184,7 @@ async function rawCompraRowsForBackup(scope){
       unidades: row?.unidades == null ? '' : row.unidades,
       precio: row?.precio == null ? '' : row.precio,
       ticket_donacion: norm(row?.ticket_donacion),
+      donacion_situacion: norm(row?.donacion_situacion),
       tienda_id: norm(row?.tienda_id),
       responsable_id: norm(row?.responsable_id),
       donor_ref: norm(row?.donor_ref),
@@ -247,6 +248,7 @@ function dbCompraToStateRow(row){
     unidades: row?.unidades,
     precio: row?.precio,
     ticketDonacion: row?.ticket_donacion || row?.ticketDonacion || '',
+    donacionSituacion: row?.donacion_situacion || row?.donacionSituacion || '',
     tiendaId: row?.tienda_id || row?.tiendaId || '',
     responsableId: row?.responsable_id || row?.responsableId || '',
     donorRef: row?.donor_ref || row?.donorRef || '',
@@ -646,11 +648,11 @@ async function buildBackupWorkbook(fullState, scope){
   addRows('PERSONAS_EVENTO', ['EVENT_ID','PERSONA_ID','NOMBRE_SNAPSHOT','RANGO_SNAPSHOT','CAPTURED_AT','UPDATED_AT'], (scoped.eventPersonSnapshots || []).map(row => [
     row.eventId || row.event_id || '', row.personaId || row.persona_id || '', row.nombreSnapshot || row.nombre_snapshot || '', row.rangoSnapshot || row.rango_snapshot || 'SOCIO', row.capturedAt || row.captured_at || '', row.updatedAt || row.updated_at || ''
   ]));
-  addRows('CE_COMPRAS_BBDD', ['COMPRA_ID','EVENT_ID','PRODUCTO_ID','UNIDADES','PRECIO','TICKET_DONACION','TIENDA_ID','RESPONSABLE_ID','DONOR_REF','CREATED_AT','UPDATED_AT'], rawCompraRows.map(c => [
-    c.id || '', c.event_id || '', c.producto_id || '', c.unidades == null ? '' : c.unidades, c.precio == null ? '' : c.precio, c.ticket_donacion || '', c.tienda_id || '', c.responsable_id || '', c.donor_ref || '', c.created_at || '', c.updated_at || ''
+  addRows('CE_COMPRAS_BBDD', ['COMPRA_ID','EVENT_ID','PRODUCTO_ID','UNIDADES','PRECIO','TICKET_DONACION','DONACION_SITUACION','TIENDA_ID','RESPONSABLE_ID','DONOR_REF','CREATED_AT','UPDATED_AT'], rawCompraRows.map(c => [
+    c.id || '', c.event_id || '', c.producto_id || '', c.unidades == null ? '' : c.unidades, c.precio == null ? '' : c.precio, c.ticket_donacion || '', c.donacion_situacion || '', c.tienda_id || '', c.responsable_id || '', c.donor_ref || '', c.created_at || '', c.updated_at || ''
   ]));
   addRows('COMPRAS', ['EVENTO_CODIGO','COMPRA_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'], backupCompras.filter(c => !isDonation(ticket(c))).map(c => [eventCode[c.eventId] || c.eventId || '', c.id || '', productCode[c.productoId] || c.productoId || '', num(c.unidades), price(c, productMap), ticket(c), storeCode[c.tiendaId] || c.tiendaId || '', personCode[c.responsableId] || c.responsableId || '']));
-  addRows('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], backupCompras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || c.eventId || '', c.id || '', productCode[c.productoId] || c.productoId || '', num(c.unidades), price(c, productMap), ticket(c), kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || id || '') : (kind === 'T' ? (storeCode[id] || id || '') : ''), personCode[c.responsableId] || c.responsableId || '']; }));
+  addRows('DONACIONES', ['EVENTO_CODIGO','DONACION_ID','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','SITUACION_ENTREGA','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'], backupCompras.filter(c => isDonation(ticket(c))).map(c => { const parts = String(c.donorRef || '').split(':'); const kind = parts[0], id = parts[1]; return [eventCode[c.eventId] || c.eventId || '', c.id || '', productCode[c.productoId] || c.productoId || '', num(c.unidades), price(c, productMap), ticket(c), c.donacionSituacion || c.donacion_situacion || 'Comprometida', kind === 'P' ? 'PERSONA' : (kind === 'T' ? 'TIENDA' : ''), kind === 'P' ? (personCode[id] || id || '') : (kind === 'T' ? (storeCode[id] || id || '') : ''), personCode[c.responsableId] || c.responsableId || '']; }));
   addRows('DOCUMENTOS', ['EVENTO_CODIGO','DOC_CODIGO','DOC_ID','FECHA','DESCRIPCION','CLAVE_IMAGEN','FOTO_URL'], (scoped.eventDocuments || []).map(doc => {
     const code = documentToken(doc?.codigo || doc?.imageKey || doc?.id);
     const key = doc?.eventId && code ? `${doc.eventId}|${code}` : '';

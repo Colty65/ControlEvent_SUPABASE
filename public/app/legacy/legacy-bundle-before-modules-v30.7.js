@@ -3345,6 +3345,7 @@ function donorOptions(){
           unidades: Number(pick(row, ['UNIDADES','UD'], 0)) || 0,
           precio: parseEuroInput(pick(row, ['PRECIO'], 0)),
           ticketDonacion: String(pick(row, ['TIPO_DONACION','TICKET_DONACION'], 'DONADO OTROS')).trim(),
+          donacionSituacion: (()=>{ const v=String(pick(row,['SITUACION_ENTREGA','DONACION_SITUACION'],'Comprometida')).trim().toLowerCase(); return v==='supuesta'?'Supuesta':v==='entregada'?'Entregada':'Comprometida'; })(),
           donorRef,
           responsableId: personMap[respCode] || ''
         });
@@ -3442,10 +3443,10 @@ function donorOptions(){
       state.colaboradores.map(c => [eventCode[c.eventId] || '', personCode[c.personaId] || '', Number(c.numero || 0), c.situacion || 'Pendiente', Number(c.importe || 0)]));
     makeSheet('COMPRAS', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TICKET_U_OTROS_GASTOS','TIENDA_CODIGO','RESPONSABLE_PERSONA_CODIGO'],
       state.compras.filter(c => !isDonationTicket(c.ticketDonacion)).map(c => [eventCode[c.eventId] || '', productCode[c.productoId] || '', Number(c.unidades || 0), Number(c.precio || 0), c.ticketDonacion || '', storeCode[c.tiendaId] || '', personCode[c.responsableId] || '']));
-    makeSheet('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'],
+    makeSheet('DONACIONES', ['EVENTO_CODIGO','PRODUCTO_CODIGO','UNIDADES','PRECIO','TIPO_DONACION','SITUACION_ENTREGA','DONANTE_TIPO','DONANTE_CODIGO','RESPONSABLE_PERSONA_CODIGO'],
       state.compras.filter(c => isDonationTicket(c.ticketDonacion)).map(c => {
         const [kind,id] = String(c.donorRef || '').split(':');
-        return [eventCode[c.eventId] || '', productCode[c.productoId] || '', Number(c.unidades || 0), Number(c.precio || 0), c.ticketDonacion || '', kind==='P'?'PERSONA':(kind==='T'?'TIENDA':''), kind==='P' ? (personCode[id] || '') : (kind==='T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || ''];
+        return [eventCode[c.eventId] || '', productCode[c.productoId] || '', Number(c.unidades || 0), Number(c.precio || 0), c.ticketDonacion || '', c.donacionSituacion || c.donacion_situacion || 'Comprometida', kind==='P'?'PERSONA':(kind==='T'?'TIENDA':''), kind==='P' ? (personCode[id] || '') : (kind==='T' ? (storeCode[id] || '') : ''), personCode[c.responsableId] || ''];
       }));
     const ticketRows = [];
     Object.entries(state.ticketImages || {}).forEach(([fullKey,image]) => {

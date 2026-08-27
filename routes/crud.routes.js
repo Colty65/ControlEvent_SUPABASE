@@ -1,6 +1,6 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { closeEventCorrection, deleteRecord, openComprasCorrection, updateEventSituation, updateProductPrice, upsertRecord } from '../services/crud.service.js';
+import { closeEventCorrection, deleteRecord, openComprasCorrection, updateDonationSituation, updateEventSituation, updateProductPrice, upsertRecord } from '../services/crud.service.js';
 
 const router = express.Router();
 
@@ -41,6 +41,11 @@ router.put('/crud/productos/:id/precio', asyncHandler(async (req, res) => {
 router.put('/crud/eventos/:id/situacion', asyncHandler(async (req, res) => {
   requireRowWrite(req);
   res.json(await updateEventSituation(req.params.id, req.body?.situacion));
+}));
+
+router.put('/crud/compras/:id/donacion-situacion', asyncHandler(async (req, res) => {
+  requireRowWrite(req);
+  res.json(await updateDonationSituation(req.params.id, req.body?.situacion));
 }));
 
 

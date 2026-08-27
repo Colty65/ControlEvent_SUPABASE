@@ -71,6 +71,14 @@
   function rowProducto(row){ const id=txt(row?.productoId||row?.producto_id||''); return id?arr('productos').find(p=>String(p?.id||'')===id):null; }
   function ticketText(row){return up([row?.ticketDonacion,row?.ticket,row?.ticket_donacion,row?.ticketOtrosGastos,row?.situacion,row?.estado,row?.tipo,row?.tipoCompra,row?.categoria].filter(Boolean).join(' '));}
   function isDonation(row){ const t=ticketText(row); return t.startsWith('DONADO') || t.includes('DONACION'); }
+  function donationStatus(row){
+    const raw=up(row?.donacionSituacion||row?.donacion_situacion||'');
+    if(raw==='SUPUESTA') return 'Supuesta';
+    if(raw==='ENTREGADA') return 'Entregada';
+    if(raw==='COMPROMETIDA') return 'Comprometida';
+    if(row && (row.donacionEntregada||row.entregadoDonacion||row.entregado===true||up(row.entregado)==='SI'||up(row.entregado)==='SÍ')) return 'Entregada';
+    return 'Comprometida';
+  }
   function isTk(row){ return /\bTK\s*\d+/.test(ticketText(row)); }
   function isGastoCorriente(row){ const t=ticketText(row); return /GASTOS?\s+CORRIENTES?/.test(t) || (/GASTO/.test(t)&&/CORRIENTE/.test(t)); }
   function isPteCompra(row){ if(isDonation(row) || isTk(row) || isGastoCorriente(row)) return false; return true; }
@@ -335,6 +343,11 @@
     const tkGastos=comp.filter(c=>isTk(c)||isGastoCorriente(c));
     const ptes=comp.filter(isPteCompra);
     const totalDon=don.reduce((s,r)=>s+rowValue(r),0);
+    const donEntregadas=don.filter(r=>donationStatus(r)==='Entregada');
+    const donComprometidas=don.filter(r=>donationStatus(r)==='Comprometida');
+    const donSupuestas=don.filter(r=>donationStatus(r)==='Supuesta');
+    const totalDonEntregado=donEntregadas.reduce((s,r)=>s+rowValue(r),0);
+    const donPct=don.length?(totalDon>0?Math.min(100,totalDonEntregado/totalDon*100):donEntregadas.length/don.length*100):0;
     const totalTk=tkGastos.reduce((s,r)=>s+rowValue(r),0);
     const totalPte=ptes.reduce((s,r)=>s+rowValue(r),0);
     const totalComp=comp.reduce((s,r)=>s+rowValue(r),0);
@@ -350,7 +363,7 @@
       bankRow(id),
       {t:'INGRESOS',color:'blue',p:previsto?Math.min(100,ingresado/previsto*100):0,d:`${eur(ingresado)} de ${eur(previsto)} ingresados`},
       {t:'JUSTIFICANTES DE INGRESOS',color:'green',p:col.length?fotosIng/col.length*100:0,d:`${fotosIng} de ${col.length} ingresos con justificante`},
-      {t:'DONACIONES',color:'orange',p:don.length?100:0,d:`Donaciones registradas: ${don.length} · Valor estimado: ${eur(totalDon)}`},
+      {t:'DONACIONES',color:'orange',p:donPct,d:`Entregadas: ${donEntregadas.length} de ${don.length} · ${eur(totalDonEntregado)} de ${eur(totalDon)} · Comprometidas: ${donComprometidas.length} · Supuestas: ${donSupuestas.length}`},
       {t:'COMPRAS',color:'red',p:comp.length?tkGastos.length/comp.length*100:0,d:`TKxx/gastos corrientes: ${tkGastos.length} · ${eur(totalTk)} · Pte. compra: ${ptes.length} · ${eur(totalPte)} · Total líneas: ${comp.length} · ${eur(totalComp)}`},
       {t:'JUSTIFICANTES DE COMPRA',color:'purple',p:tickets.length?ticketPhotos/tickets.length*100:0,d:`${ticketPhotos} de ${tickets.length} tickets contables con foto adjunta`},
       {t:'DOCUMENTOS',color:'green',p:docKeys.size?100:0,d:`${docKeys.size} documento(s) adjunto(s)`}

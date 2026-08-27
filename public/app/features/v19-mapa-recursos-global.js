@@ -128,6 +128,14 @@
     try{ if(typeof window.isDonationTicket === 'function') return !!window.isDonationTicket(ticket); }catch(_){ }
     return DONATION_TYPES.includes(up(ticket));
   }
+  function donationStatus(row){
+    const raw=up(row?.donacionSituacion||row?.donacion_situacion||'');
+    if(raw==='SUPUESTA') return 'Supuesta';
+    if(raw==='ENTREGADA') return 'Entregada';
+    if(raw==='COMPROMETIDA') return 'Comprometida';
+    if(row&&(row.donacionEntregada||row.entregadoDonacion||row.entregado===true||up(row.entregado)==='SI')) return 'Entregada';
+    return 'Comprometida';
+  }
   function isCurrentExpense(ticket){
     try{ if(typeof window.isCurrentExpenseTicket === 'function') return !!window.isCurrentExpenseTicket(ticket); }catch(_){ }
     return up(ticket) === 'GASTOS CORRIENTES' || up(ticket).includes('GASTOS CORRIENTES');
@@ -226,7 +234,7 @@
         tiendaNombre:norm(t.nombre || row.tienda?.nombre || row.tienda || 'Sin tienda'),
         responsableNombre:norm(resp.nombre || row.responsableNombre || ''),
         donanteNombre: donorName(row, t),
-        ticket, donation, kind, subtype, color, statusClass, value, unidades,
+        ticket, donation, kind, subtype, color, statusClass, value, unidades, donationSituation: donation ? donationStatus(row) : '',
         precioUnitario: unitPriceFrom(unidades, value) || unitPrice(row)
       };
     });
@@ -433,7 +441,7 @@
   function rowTicket(row){ return norm(row.ticket || row.ticketDonacion || 'Pte.Compra'); }
   function productLineClass(row){ if(row.kind === 'donacion') return 'donacion'; return row.statusClass === 'pending' ? 'pending' : 'ok'; }
   function rowSituacion(row){
-    if(row.kind === 'donacion') return rowTicket(row) || 'DONACIÓN';
+    if(row.kind === 'donacion') return row.donationSituation || donationStatus(row) || 'Comprometida';
     if(isCurrentExpense(rowTicket(row))) return 'GASTOS CORRIENTES';
     if(isPendingTicket(rowTicket(row))) return 'Pte.Compra';
     return rowTicket(row) || row.subtype || 'Compra';

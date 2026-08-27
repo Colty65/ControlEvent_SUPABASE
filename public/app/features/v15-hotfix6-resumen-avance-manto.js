@@ -100,6 +100,7 @@
   function isPendingIngreso(row){ return up(row?.situacion || '') === 'PENDIENTE'; }
   function ticketCode(value){ return norm(value || ''); }
   function isDonationTicket(value){ return up(value || '').startsWith('DONADO'); }
+  function donationStatus(row){ const raw=up(row?.donacionSituacion||row?.donacion_situacion||''); if(raw==='SUPUESTA')return'Supuesta'; if(raw==='ENTREGADA')return'Entregada'; if(raw==='COMPROMETIDA')return'Comprometida'; if(row&&(row.donacionEntregada||row.entregadoDonacion||row.entregado===true||up(row.entregado)==='SI'))return'Entregada'; return'Comprometida'; }
   function isCurrentExpenseTicket(value){ return up(value || '') === 'GASTOS CORRIENTES'; }
 
   function computeProgress(){
@@ -109,6 +110,9 @@
     const tkRows = buyRows.filter(r => /^TK\d+/i.test(ticketCode(r?.ticketDonacion)));
     const uniqueTks = Array.from(new Set(tkRows.map(r => ticketCode(r.ticketDonacion)).filter(Boolean))).sort();
     const donRows = buyRows.filter(r => isDonationTicket(ticketCode(r?.ticketDonacion)));
+    const donDelivered = donRows.filter(r => donationStatus(r)==='Entregada');
+    const donCommitted = donRows.filter(r => donationStatus(r)==='Comprometida');
+    const donSupposed = donRows.filter(r => donationStatus(r)==='Supuesta');
     const totalIngresos = ing.reduce((a,r) => a + totalIngreso(r), 0);
     const doneIngresos = ing.filter(r => !isPendingIngreso(r)).reduce((a,r) => a + totalIngreso(r), 0);
     const ingresoRowsForReceipt = ing.filter(r => !isPendingIngreso(r));
@@ -125,8 +129,8 @@
       ingresosText: `${money(doneIngresos)} de ${money(totalIngresos)} ingresados`,
       ingresosReceiptPct: ingresoRowsForReceipt.length > 0 ? Math.max(0, Math.min(100, (ingresoReceiptDone / ingresoRowsForReceipt.length) * 100)) : 0,
       ingresosReceiptText: `${num(ingresoReceiptDone)} de ${num(ingresoRowsForReceipt.length)} ingresos realizados con justificante`,
-      donacionesPct: donRows.length > 0 ? 100 : 0,
-      donacionesText: donRows.length > 0 ? `Donaciones registradas: ${num(donRows.length)}` : 'Aún no hay donaciones registradas',
+      donacionesPct: donRows.length > 0 ? Math.max(0,Math.min(100,(donDelivered.length/donRows.length)*100)) : 0,
+      donacionesText: donRows.length > 0 ? `Entregadas: ${num(donDelivered.length)} de ${num(donRows.length)} · Comprometidas: ${num(donCommitted.length)} · Supuestas: ${num(donSupposed.length)}` : 'Aún no hay donaciones registradas',
       comprasPct: plannedBuys.length > 0 ? Math.max(0, Math.min(100, (comprasDoneRows.length / plannedBuys.length) * 100)) : 0,
       comprasText: `${num(comprasDoneRows.length)} de ${num(plannedBuys.length)} líneas ya asignadas a TKxx o gastos corrientes`,
       docsPct: docRows.length > 0 ? 100 : 0,

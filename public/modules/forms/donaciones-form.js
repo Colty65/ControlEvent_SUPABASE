@@ -1,6 +1,6 @@
 import { FORMS_VERSION, addDataWarning, buttonInfo, currentEventId, detectProblems, formFieldInfo, parseEuro, printReport, requiredActions, toNumber, valueOf } from './_forms-runtime.js';
 
-const FIELD_IDS = ['donProducto','donUnidades','donPrecio','donImporte','donTicket','donDonante','donResponsable'];
+const FIELD_IDS = ['donProducto','donUnidades','donPrecio','donImporte','donTicket','donSituacion','donDonante','donResponsable'];
 const ACTIONS = ['addDonation','renderDonaciones','renderBudget'];
 
 export function read(){
@@ -11,6 +11,7 @@ export function read(){
     precio: parseEuro(valueOf('donPrecio')),
     importe: parseEuro(valueOf('donImporte')),
     ticketDonacion: valueOf('donTicket'),
+    donacionSituacion: valueOf('donSituacion') || 'Comprometida',
     donanteId: valueOf('donDonante'),
     responsableId: valueOf('donResponsable')
   };
