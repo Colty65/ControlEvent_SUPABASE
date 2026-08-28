@@ -1,0 +1,17 @@
+const fs=require('fs'),path=require('path');
+const root=path.resolve(__dirname,'..');
+const ai=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const bank=fs.readFileSync(path.join(root,'services/bank-reconciliation.service.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'public/app/features/zuzu-test-console-gd.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+let ok=0,ko=0;const t=(n,c)=>{if(c){ok++;console.log('OK · '+n)}else{ko++;console.error('KO · '+n)}};
+t('Z1R usa instrucción compacta de compilación',ai.includes('v79KernelInstructionCompact')&&ai.includes('return v79KernelInstructionCompact'));
+t('Z1R usa instrucción compacta final',ai.includes('v79RawFinalInstructionCompact')&&ai.includes('return v79RawFinalInstructionCompact'));
+t('Z1R permite cierre local de preguntas simples',ai.includes('v79FastLocalPresentation')&&ai.includes("response_mode:'local_fast_fact'"));
+t('Z1R mide fases del turno',ai.includes('performance:{...perf,totalMs:Date.now()-perfStarted}')&&ai.includes('perf.compileMs')&&ai.includes('perf.executeMs')&&ai.includes('perf.presentMs')&&ai.includes('perf.commitMs')&&ai.includes('const commitT0=Date.now();\n  const saved=await appendZuzuTurn'));
+t('ITV tiene oráculo activo',ui.includes("ITV_BUILD='20260828-Z1R-PERFORMANCE-ORACLE'")&&ui.includes("itvObservationMode:'ORACLE_ACTIVE'")&&ui.includes('oracleEnabled:true'));
+t('ITV muestra mediana y P90',ui.includes('medianMs')&&ui.includes('p90Ms')&&ui.includes('over12s'));
+t('Banco: estado explícito del evento se evalúa antes que foreignLinks',(()=>{const base=bank.indexOf('let included;'),explicit=bank.indexOf('}else if(eventInclusionExplicit){',base),foreign=bank.indexOf('}else if(displayLinks.length&&num(row.amount)<0){',base);return explicit>base&&foreign>explicit;})());
+t('Banco: selección event-specific se persiste por evento',bank.includes("upsert(row,{onConflict:'event_id,movement_id'})")&&bank.includes('EVENT_MOVEMENT_STATE_TABLE'));
+t('Cache bust BANK4.7 aplicado',html.includes('BANK47-PERSIST-INCLUDED')&&html.includes('Z1R-PERFORMANCE-ORACLE'));
+console.log(`BANK4.7 / Z1R · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

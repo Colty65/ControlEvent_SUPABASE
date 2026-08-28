@@ -43,6 +43,6 @@ t('muestra final limitada a 12 filas',svc.includes('slice(0,12),limit=12'));
 t('recuerdo actual no carga histórico DB',svc.includes('currentConversationRecall=v73IsCurrentConversationRecallPrompt')&&svc.includes("isRecallPrompt(userPrompt)&&!currentConversationRecall"));
 t('resumen actual compila local',svc.includes('TOKEN BUDGET · COMPILACIÓN LOCAL')&&svc.includes("conversation_summary"));
 t('acuse simple compila local',svc.includes('v73IsSimpleAcknowledgement')&&svc.includes('Acuse breve: CE evita la primera llamada Gemini'));
-t('turnos locales también evitan presentación Gemini',svc.includes('if(compiled.local_compile||execution?.local_authoritative_presentation===true)')&&svc.includes("'local_memory_literal':'local_token_budget'"));
-t('arquitectura RAW14U',/RAW14(?:U · TOKEN BUDGET \+ CONTEXTO ESTRICTO|V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE)/.test(svc));
+t('turnos locales también evitan presentación Gemini',svc.includes('if(compiled.local_compile||execution?.local_authoritative_presentation===true||fastLocal)')&&svc.includes("response_mode:'local_fast_fact'")&&svc.includes("response_mode:'local_memory_literal'"));
+t('arquitectura RAW14U/Z1R',/(?:RAW14(?:U · TOKEN BUDGET \+ CONTEXTO ESTRICTO|V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE)|Z1R PERFORMANCE · CONTEXT AUTHORITY)/.test(svc));
 console.log(`RAW14U · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp BANK4 · histórico Eurocaja + abonos + responsables combinados. */
+/* ControlEvent v4_0_exp BANK4.7 · histórico Eurocaja + persistencia de selección por evento. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;

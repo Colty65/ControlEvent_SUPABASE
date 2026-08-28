@@ -6745,7 +6745,7 @@ async function v26ToolPersonDossier(tool,state,selectedEventId=''){
   const purchaseRows=arr(state?.compras).filter(c=>inScope(c?.eventId||c?.event_id)&&operationalIds.has(trim(c?.responsableId||c?.responsable_id))&&!isDonationTicket(ticketText(c))).map(c=>{const ev=eventMap.get(trim(c?.eventId||c?.event_id))||{},pid=trim(c?.responsableId||c?.responsable_id),productId=trim(c?.productoId||c?.producto_id),prod=products.get(productId)||{},tt=ticketText(c),realized=isRealizedPurchaseTicket(tt);return{Evento:trim(ev?.titulo),Responsable:trim(h.people.get(pid)?.nombre)||r.nombre,Estado:realized?'Realizada':'Pendiente',TKxx:v26TicketToken(tt)||(realized?tt:''),Producto:trim(c?.productoNombre||c?.producto||c?.nombreProducto||c?.nombre||prod?.nombre||productId||'Sin producto'),Unidades:round(num(c?.unidades??c?.cantidad??c?.uds),3),Precio:v26Money(c?.precio??prod?.defaultPrecio??prod?.precio),Importe:valueOfLine(c)};});
   purchaseRows.sort((a,b)=>text(b.Evento).localeCompare(text(a.Evento),'es')||text(a.TKxx).localeCompare(text(b.TKxx),'es',{numeric:true})||text(a.Producto).localeCompare(text(b.Producto),'es'));
   const donationRows=arr(state?.compras).filter(c=>inScope(c?.eventId||c?.event_id)&&isDonationTicket(ticketText(c))&&ids.has(trim(text(c?.donorRef||c?.donor_ref).replace(/^P:/,'')))).map(c=>{const ev=eventMap.get(trim(c?.eventId||c?.event_id))||{},pid=trim(text(c?.donorRef||c?.donor_ref).replace(/^P:/,'')),productId=trim(c?.productoId||c?.producto_id),prod=products.get(productId)||{};return{Evento:trim(ev?.titulo),Donante:trim(h.people.get(pid)?.nombre)||r.nombre,Tipo:ticketText(c),Producto:trim(c?.productoNombre||c?.producto||c?.nombreProducto||c?.nombre||prod?.nombre||productId||'Sin producto'),Unidades:round(num(c?.unidades??c?.cantidad??c?.uds),3),Precio:v26Money(c?.precio??prod?.defaultPrecio??prod?.precio),Importe:valueOfLine(c)};});
-  let hitos=[],lgs=[];try{const localHitos=arr(state?.hitos),localLgs=arr(state?.lgs);const hs=(localHitos.length||localLgs.length)?{hitos:localHitos,lgs:localLgs}:await listAllHitosState();const isOperationalOwner=x=>operationalIds.has(trim(x?.responsableId||x?.responsable_id))||operationalNameKeys.has(canonicalNameKey(x?.responsableNombre||x?.responsable_nombre));hitos=arr(hs?.hitos).filter(x=>inScope(x?.eventId||x?.event_id)&&isOperationalOwner(x));lgs=arr(hs?.lgs).filter(x=>inScope(x?.eventId||x?.event_id)&&isOperationalOwner(x));}catch(_){ }
+  let hitos=[],lgs=[];try{const localHitos=arr(state?.hitos),localLgs=arr(state?.lgs);const hs=(Array.isArray(state?.hitos)&&Array.isArray(state?.lgs))?{hitos:localHitos,lgs:localLgs}:await listAllHitosState();const isOperationalOwner=x=>operationalIds.has(trim(x?.responsableId||x?.responsable_id))||operationalNameKeys.has(canonicalNameKey(x?.responsableNombre||x?.responsable_nombre));hitos=arr(hs?.hitos).filter(x=>inScope(x?.eventId||x?.event_id)&&isOperationalOwner(x));lgs=arr(hs?.lgs).filter(x=>inScope(x?.eventId||x?.event_id)&&isOperationalOwner(x));}catch(_){ }
   const taskRows=[...hitos.map(x=>({Tipo:'HITO',Evento:trim(eventMap.get(trim(x?.eventId||x?.event_id))?.titulo),Responsable:trim(x?.responsableNombre),Descripción:trim(x?.nombreHito||x?.descripcion),Estado:''})),...lgs.map(x=>({Tipo:'LG',Evento:trim(eventMap.get(trim(x?.eventId||x?.event_id))?.titulo),Responsable:trim(x?.responsableNombre),Descripción:trim(x?.descripcion),Estado:x?.cumplida?'Cumplida':'Pendiente'}))];
   const uniqueEvents=new Set([...participation.map(x=>x.Evento),...purchaseRows.map(x=>x.Evento),...donationRows.map(x=>x.Evento),...taskRows.map(x=>x.Evento)].filter(Boolean));
   const purchaseRefs=semanticUnique(purchaseRows.map(x=>trim(x.TKxx)).filter(Boolean));const purchaseByEventMap=new Map();for(const row of purchaseRows){const key=trim(row.Evento)||'Sin evento',g=purchaseByEventMap.get(key)||{event:key,records:0,total:0,realized_records:0,realized_total:0,pending_records:0,pending_total:0,tickets:[]};g.records+=1;g.total+=num(row.Importe);if(norm(row.Estado)==='realizada'){g.realized_records+=1;g.realized_total+=num(row.Importe);}else{g.pending_records+=1;g.pending_total+=num(row.Importe);}if(trim(row.TKxx)&&!g.tickets.includes(trim(row.TKxx)))g.tickets.push(trim(row.TKxx));purchaseByEventMap.set(key,g);}const purchaseByEvent=[...purchaseByEventMap.values()].map(g=>({event:g.event,records:g.records,total:v26Money(g.total),realized_records:g.realized_records,realized_total:v26Money(g.realized_total),pending_records:g.pending_records,pending_total:v26Money(g.pending_total),ticket_count:g.tickets.length,tickets:g.tickets})).sort((a,b)=>num(b.total)-num(a.total)||text(a.event).localeCompare(text(b.event),'es'));
@@ -14631,7 +14631,44 @@ function v73IsPendingHistoryChoiceReply(prompt='',choices=[]){
   if(/^(?:esa|ese|aquella|aquel|la\s+de|el\s+de)\b/i.test(p))return true;
   return opts.some(c=>norm(c.ref)===n);
 }
+function v79KernelInstructionCompact(state={},selectedEventId='',display='usuario',timeContext={}){
+  const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'';
+  return `Eres Zuzu, compilador semántico de ControlEvent. Decide el significado del turno y emite EXACTAMENTE UNA tool CE. ControlEvent ejecuta; NO reinterpretará tu decisión.
+
+PRINCIPIOS
+- Gemini/Zuzu es la autoridad lingüística. CURRENT_CONTEXT, thread_navigation, CANDIDATES y HISTORY_CANDIDATES son evidencia factual, no decisiones.
+- Conserva el hilo: una continuación elíptica hereda el scope/tema compatible del contexto. El evento de pantalla «${screen}» solo es fallback cuando no existe scope conversacional compatible.
+- Un cambio explícito de foco se hace sin narrarlo: si además hay una pregunta, consulta directamente; si solo cambia el foco, ce_set_context.
+- current_result_referents contiene el orden real del último resultado. Úsalo para «ese», «esa persona», «el primero», «el siguiente», etc. Nunca saltes a asistencia/personas generales si el referente anterior ya identifica producto/responsable/donación.
+- CANDIDATES son Top-K mecánicos. Prefiere coincidencia exacta/tipada; un fuzzy solo ayuda si encaja semánticamente. No conviertas palabras comunes en eventos/productos.
+- Si el usuario corrige una desviación y el contexto permite reparar, ejecuta la consulta correcta; no te limites a pedir perdón.
+- Memoria histórica: usa HISTORY_CANDIDATES solo cuando el usuario pide recordar/retomar o el turno realmente depende de un episodio anterior. No metas recuerdos espontáneos en un hilo operativo vivo.
+
+DOMINIOS
+- purchases = compras. Pte.Compra/otros gastos = pendiente; TKxx/Gastos corrientes = realizada.
+- donations = donaciones. Situación entrega: Supuesta (no confirmada), Comprometida (prometida pero NO recibida físicamente), Entregada (producto físicamente recibido). Nunca uses compras realizadas/pendientes para responder estados de donación.
+- person = dossier abierto de una persona; people = asistencia/registro de personas dentro de evento.
+- documentation = DOC, justificantes de ingresos y TKxx/fototickets. bank = Cuadre Banco solo si existe evidencia canónica.
+- comparison = comparar eventos. event_summary = resumen/dossier de evento.
+
+CONSULTAS
+- Toda ce_query lleva scope explícito. named_event requiere event; named_events requiere events; all_events para global; event_series usa series.
+- Si CURRENT_CONTEXT.scope ya fija evento(s) y el usuario no introduce otro, consérvalo.
+- response_kind: amount, units, count, who, what, whether, which_event, compare, summary, table, context, conversation_summary.
+- Cálculos, orden, ranking y agrupación van en operations_json. CE calcula; no delegues sumas/Top-N a la redacción.
+- Si CURRENT/DATASET ya puede responder mediante filtro/sort/group/proyección, PREFIERE ce_local: reutiliza el dataset y evita otra consulta de negocio.
+- fields solo cuando el usuario pide columnas concretas; no lo uses para expresar «por responsable/tienda».
+- Si pide varios sujetos del mismo dominio, consérvalos en una sola consulta multi-entidad.
+- Tabla/gráfica es presentación de la MISMA consulta, no otra tool.
+
+NHC
+No uses listas de frases concretas del usuario para decidir semántica. Resuelve por contexto, entidades, roles, dominio y operaciones. Si quedan dos interpretaciones materialmente plausibles, ce_clarify; si una domina, actúa.
+
+Usuario actual: ${trim(display)||'usuario'}. Hora: ${trim(timeContext?.local)||trim(timeContext?.iso)||''}.`;
+}
+
 function v73KernelInstruction(state={},selectedEventId='',display='usuario',timeContext={}){
+  return v79KernelInstructionCompact(state,selectedEventId,display,timeContext);
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'ninguno',localNow=trim(timeContext?.local)||trim(timeContext?.iso)||new Date().toISOString(),tz=trim(timeContext?.timezone)||'Europe/Madrid';
   return`Eres el COMPILADOR SEMÁNTICO de Zuzu para ControlEvent. Traduce CURRENT_USER a EXACTAMENTE UNA tool CE. No expliques nada y no emitas una segunda tool. CE ejecutará literalmente tu orden.
 
@@ -15001,7 +15038,31 @@ function v73ApplyRequestedChartType(charts=[],intent={}){
 }
 function v73FinalPresentationSchema(){return{type:'object',properties:{title:{type:'string'},written_answer:{type:'string'},spoken_answer:{type:'string'},presentation:{type:'object',properties:{table:{type:'boolean'},chart:{type:'boolean'},chart_type:{type:'string',enum:['bar','line','pie','donut','horizontalBar','none']}},required:['table','chart','chart_type']}},required:['title','written_answer','spoken_answer','presentation']};}
 function v73FinalPresentationTool(){return{type:'function',name:'zuzu_final_presentation',description:'Entrega las dos redacciones finales y la decisión de artefactos.',parameters:v73FinalPresentationSchema()};}
+function v79RawFinalInstructionCompact(){
+  return `Eres Zuzu, fase FINAL de ControlEvent. El plan ya está decidido y CE ya devolvió hechos canónicos. Presenta SOLO esos hechos; no abras otra investigación ni inventes cifras.
+
+ESTILO HUMANO
+- Zuzu es masculino. Natural, directo y breve en voz. No narres cambios de foco ni digas «he cambiado el contexto»; simplemente responde en el nuevo foco.
+- Evita prefacios serviciales y repetir el nombre del usuario/evento sin necesidad. spoken_answer puede ser más corto que written_answer salvo que el usuario pida una lista completa.
+- Si no hay dato suficiente, dilo con normalidad; no rellenes con suposiciones.
+
+AUTORIDAD FACTUAL
+- plan_executed/compiled_action = intención del turno. resultado_ce.authoritative_payload y facts = verdad completa. rows_sample puede estar truncada; no la uses para afirmar que una lista está completa.
+- Totales/recuentos salen de facts/column_stats, no de sumar mentalmente una muestra. Si la VIEW está agrupada, grupos no son registros físicos.
+- purchases y donations son dominios distintos. En donations: Supuesta/Comprometida NO están físicamente recibidas; Entregada SÍ. Nunca traduzcas esos estados a Pte.Compra/TKxx.
+- Para persona individual no atribuyas íntegro un registro compartido si CE distingue importe del registro e imputación personal.
+- Asistencia usa los recuentos/nombres canónicos de facts, no row_count.
+- Memoria: respeta data_provenance. Histórico literal/snapshot no es dato recién consultado; current_reexecution sí lo es. No metas memoria proactiva si no está en resultado_ce.execution.
+- temporal_context manda sobre tiempo verbal. Un evento «En curso» no prueba que ya haya sucedido. mandatory_event_notice se conserva en written_answer; no hace falta repetirlo oralmente.
+
+PRESENTACIÓN
+- Si el usuario pidió relato/análisis, prosa cohesionada. Si pidió quién/cuánto/cuál, ve al dato primero.
+- presentation.table/chart solo cuando la petición/plan lo justifica. CE pintará la tabla/gráfica canónica: no copies listas masivas en texto salvo petición explícita.
+- Devuelve EXACTAMENTE una zuzu_final_presentation válida con title, written_answer, spoken_answer y presentation.`;
+}
+
 function v73RawFinalInstruction(){
+  return v79RawFinalInstructionCompact();
   return `Eres Zuzu. Estás en la fase FINAL de un turno de ControlEvent. Zuzu ya interpretó la petición y ControlEvent ejecutó exactamente ese plan. Tu trabajo ahora es PRESENTAR el resultado con calidad humana. Zuzu es MASCULINO: habla siempre de ti en masculino. Tu carácter es directo, rudo en el buen sentido, seguro y con presencia; cercano cuando toca, pero sin sonar blando, cursi ni servicial en exceso. La voz debe imaginarse grave y potente, con frases naturales y firmes.
 
 CONTRATO DE PRESENTACIÓN
@@ -15795,11 +15856,30 @@ function v76MemoryLiteralAnswer(target=null,field='both'){
   return{title:field==='question'?'Tu pregunta de entonces':field==='answer'?'Mi respuesta de entonces':'Recuerdo literal',answer:[when?`Fue ${when}.`:'',...bits].filter(Boolean).join(' '),question:q,answer_raw:a,created_at:trim(target?.turn?.createdAt)};
 }
 
+
+function v79HasLiveOperationalThread(session={}){
+  const t=v73LastOperationalTurn(session),ctx=v73CurrentSummary(session);
+  return !!(t&&(session?.dataset||ctx?.active_dataset||ctx?.last_intent));
+}
+function v79FastLocalPresentation(plan={},execution={},dataset=null,status='OK'){
+  if(trim(status)==='KO')return false;
+  const action=trim(plan?.action),rk=trim(plan?.response_kind),q=plan?.query||{};
+  if(action==='local')return true;
+  if(action!=='query'||!['amount','units','count','who','what','whether','which_event'].includes(rk))return false;
+  const domains=arr(q?.targets).map(t=>trim(t?.domain)).filter(Boolean);
+  if(domains.some(d=>['event_summary','comparison','person','documentation','management','bank','bank_timeline','weather'].includes(d)))return false;
+  if(q?.presentation?.chart===true)return false;
+  return !!dataset;
+}
+
 async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
+  const perfStarted=Date.now(),perf={contextMs:0,compileMs:0,memoryMs:0,executeMs:0,presentMs:0,commitMs:0,fastLocal:false,memorySearch:false};
   const actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{};
   const profile=zuzuLoggedUserProfile({usuarioLogado:actor}),display=profile.identificacion||profile.nombre||'Amigo';
+  const contextT0=Date.now();
   const conversation=await ensureZuzuConversation({conversationId,actor,selectedEventId});
-  const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:true,recentLimit:80});
+  const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:true,recentLimit:24});
+  perf.contextMs=Date.now()-contextT0;
   const entityCandidates=v74EntityCandidatePacket(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session),usePending=v73IsPendingHistoryChoiceReply(userPrompt,pendingHistory);
   const currentConversationRecall=v73IsCurrentConversationRecallPrompt(userPrompt),historyCandidates=usePending?pendingHistory:((isRecallPrompt(userPrompt)&&!currentConversationRecall)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}):[]);
   const policy=v332InteractionPolicy(userPrompt);
@@ -15809,6 +15889,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   {const nav=v78ThreadNavigation(session,v73CurrentSummary(session));zuzuTracePush(flowTrace,'v4_0_exp · Z1 · CONTEXTO DE ENTRADA','INFO',`scope=${JSON.stringify(v73CurrentSummary(session)?.scope||{})} · temas=${arr(nav.topics_recent_first).map(x=>`${x.ref}:${arr(x.domains).join('+')||x.action}`).slice(0,6).join(' | ')||'—'} · eventos=${arr(nav.events_recent_first).map(x=>x.name).join(' → ')||'—'} · resultados=${JSON.stringify(nav.current_result_referents?.ordered_by_role||{}).slice(0,900)}`);}
 
   let compiled;
+  const compileT0=Date.now();
   try{
     if(currentConversationRecall&&!arr(entityCandidates?.flat).length){compiled=v73LocalCompiledConversation('conversation_summary','El usuario pide resumir exclusivamente la conversación actual.',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · TOKEN BUDGET · COMPILACIÓN LOCAL','OK','Resumen general de conversación actual sin entidad explícita: CE evita la primera llamada Gemini y no carga HISTORY_CANDIDATES.');}
     else if(v73IsSimpleAcknowledgement(userPrompt,entityCandidates)){compiled=v73LocalCompiledConversation('general','El usuario acusa recibo o agradece sin pedir datos nuevos.',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · TOKEN BUDGET · COMPILACIÓN LOCAL','OK','Acuse breve: CE evita la primera llamada Gemini; la conversación y CURRENT quedan intactos.');}
@@ -15818,29 +15899,38 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     zuzuTracePush(flowTrace,'v4_0_exp · Ledger · fallo de compilación Zuzu','WARN',`${cleanGeminiError(error)}. El fallo se registra como turno inmutable y no altera el turno anterior.`);
     const answer='Zuzu no llegó a emitir un registro ejecutable en este turno. He conservado intacta la conversación anterior y he guardado el fallo para auditoría.';
     const execution={summary:cleanGeminiError(error),error:cleanGeminiError(error),debug_trace:arr(flowTrace).slice(0,160)};
+    const commitT0=Date.now();
     const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'},execution,datasetId:session?.currentTurn?.datasetId||'',viewId:session?.currentTurn?.viewId||'',parentTurnId:session?.currentTurn?.turnId||'',status:'WARN',title:'Zuzu no pudo interpretar el turno',answer,selectedEventId});
+    perf.commitMs=Date.now()-commitT0;
     const resultContext=v73LightContext(saved.conversation,saved.turn,session?.dataset||null,session?.view||null),usage=summarizeGeminiUsageFromTrace(flowTrace);
-    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · RAW14V · DISCOURSE + MEMORY FOCUS + EVENT COVERAGE · Z1 CONTEXT AUTHORITY',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
   }
 
+  perf.compileMs=Date.now()-compileT0;
   const raw=compiled.raw;let normalizedPlan=v76ApplyFocusBindings(compiled.plan,userPrompt,v73CurrentSummary(session),flowTrace,historyCandidates);
   const coverage=v76EventCoverageProfile(userPrompt,session,normalizedPlan?.query||{});if(coverage&&normalizedPlan?.action==='query'){normalizedPlan={...normalizedPlan,query:{...(normalizedPlan.query||{}),coverage}};zuzuTracePush(flowTrace,'v4_0_exp · EVENT COVERAGE ENGINE','OK',`modo=${coverage.mode} · contexto=${coverage.context_domain||'—'} · facetas=${coverage.facets.join(', ')}. Descripción y DOCxx conservan prioridad narrativa.`);}
   const plan=v73PrepareAnalyticPlan(normalizedPlan,session),model=compiled.model,command=compiled.command,parentTurnId=session?.currentTurn?.turnId||'';
   if(JSON.stringify(plan)!==JSON.stringify(normalizedPlan))zuzuTracePush(flowTrace,'v4_0_exp · Ledger · interpretación física CE','INFO',`CE completa solo detalles físicos de operación; el registro semántico de Zuzu se conserva intacto. EXEC=${JSON.stringify(plan).slice(0,3200)}`);
   let proactiveMemory=null,socialMemoryHints=[];
+  const memoryT0=Date.now(),liveOperationalThread=v79HasLiveOperationalThread(session);
   try{
     const memoryNow=clientLocalDateTime||clientNowIso;
-    if(!isRecallPrompt(userPrompt)&&['query','conversation'].includes(plan.action)){
+    if(!isRecallPrompt(userPrompt)&&!liveOperationalThread&&['query','conversation'].includes(plan.action)){
+      perf.memorySearch=true;
       const hits=await searchZuzuProactiveMemory({actor,prompt:userPrompt,plan:normalizedPlan,conversationId:conversation.conversationId,nowIso:memoryNow,days:3650,limit:3});
       proactiveMemory=arr(hits).find(x=>!v75ProactiveMemoryUsedRecently(session,x?.conversation_id))||null;
       if(proactiveMemory)zuzuTracePush(flowTrace,'v4_0_exp · MEMORIA ASOCIATIVA · SUGERENCIA PROACTIVA','INFO',`fuente=DB · ${proactiveMemory.conversation_id} · similitud=${proactiveMemory?.match?.score||'—'} · edad=${proactiveMemory?.age_label||'—'} · banda=${proactiveMemory?.age_band||'—'} · ${proactiveMemory.recallable_turns} turnos sustanciales.`);
     }
-    if(!proactiveMemory&&['query','conversation'].includes(plan.action)){
+    if(!proactiveMemory&&!liveOperationalThread&&['query','conversation'].includes(plan.action)){
+      perf.memorySearch=true;
       socialMemoryHints=await searchZuzuSocialMemoryHints({actor,prompt:userPrompt,plan:normalizedPlan,conversationId:conversation.conversationId,nowIso:memoryNow,limit:2});
       if(socialMemoryHints.length)zuzuTracePush(flowTrace,'v4_0_exp · MEMORIA SOCIAL · PISTAS','INFO',`${socialMemoryHints.length} pista(s) histórica(s) pertinente(s). Son estilo opcional, nunca fuente factual actual.`);
     }
   }catch(memoryError){zuzuTracePush(flowTrace,'v4_0_exp · MEMORIA EPISÓDICA · no bloqueante','WARN',`La búsqueda asociativa no estuvo disponible (${cleanGeminiError(memoryError)}). El turno actual continúa sin memoria proactiva.`);}
+  perf.memoryMs=Date.now()-memoryT0;
+  if(liveOperationalThread)zuzuTracePush(flowTrace,'v4_0_exp · Z1R · MEMORIA DORMIDA','OK','Hay un hilo operativo vivo: no se consulta memoria proactiva/social en este turno.');
   let title='Zuzu',answer='',tables=[],charts=[],files=[],status='OK',dataset=null,view=null,datasetId='',viewId='',referencedTurnId='',execution={},finalBundle=null,turnWarnings=[],answerPayload={},answerBlueprintUsed=false;
+  const executeT0=Date.now();
   try{
     if(plan._protocol_error){
       status='KO';title='Salida Zuzu no ejecutable';answer='';execution={summary:plan._protocol_error,error:plan._protocol_error,protocol_error:plan._protocol_error};
@@ -15952,19 +16042,22 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(proactiveMemory&&status!=='KO')execution={...(execution||{}),proactive_memory:v75MemoryEpisodeCompact(proactiveMemory,{mode:'proactive',includeAnswers:false})};
   if(socialMemoryHints.length&&status!=='KO')execution={...(execution||{}),social_memory_hints:socialMemoryHints.slice(0,2)};
 
+  perf.executeMs=Date.now()-executeT0;
   let spokenAnswer='',finalPresentation={};
+  const presentT0=Date.now();
 
   // RAW14V · TOKEN BUDGET + FOCO: los acuses simples y el resumen de ESTA conversación ya están
   // resueltos determinísticamente por el Ledger. No tiene sentido pagar otra llamada para que
   // Gemini parafrasee algo que CE conoce exactamente. El resto mantiene ESCAPE LIBRE.
-  if(compiled.local_compile||execution?.local_authoritative_presentation===true){
+  const fastLocal=v79FastLocalPresentation(normalizedPlan,execution,dataset,status);perf.fastLocal=fastLocal;
+  if(compiled.local_compile||execution?.local_authoritative_presentation===true||fastLocal){
     const kind=trim(normalizedPlan?.conversation?.kind),literalLocal=execution?.local_authoritative_presentation===true;
-    if(literalLocal){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};}
-    else if(kind==='conversation_summary'){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};}
-    else{title='Zuzu';answer=`De acuerdo, ${display}. Cuando quieras, seguimos.`;spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};}
-    execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:literalLocal?'local_memory_literal':'local_token_budget'};
-    zuzuTracePush(flowTrace,'v4_0_exp · TOKEN BUDGET · PRESENTACIÓN LOCAL','OK',`${literalLocal?'Recuerdo literal':'Turno '+(kind||'general')} resuelto sin llamada final IA: ${text(answer).length} caracteres.`);
-    zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(answer).length} caracteres · voz=${text(spokenAnswer).length} caracteres · tabla=no · gráfica=no · presentación local autoritativa.`);
+    if(fastLocal){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_fast_fact'};zuzuTracePush(flowTrace,'v4_0_exp · Z1R · CIERRE LOCAL RÁPIDO','OK',`response_kind=${trim(normalizedPlan?.response_kind)||'—'} · ${text(answer).length} caracteres · se evita la segunda llamada IA.`);}
+    else if(literalLocal){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_memory_literal'};}
+    else if(kind==='conversation_summary'){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_token_budget'};}
+    else{title='Zuzu';answer='Vale.';spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_token_budget'};}
+    if(!fastLocal)zuzuTracePush(flowTrace,'v4_0_exp · TOKEN BUDGET · PRESENTACIÓN LOCAL','OK',`${literalLocal?'Recuerdo literal':'Turno '+(kind||'general')} resuelto sin llamada final IA: ${text(answer).length} caracteres.`);
+    zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(answer).length} caracteres · voz=${text(spokenAnswer).length} caracteres · presentación local autoritativa.`);
   }else try{
     const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation,audience:{usuario:profile.identificacion||display,nombre:profile.nombre||display,nivel:profile.nivel},state,selectedEventId,authoritativePayload:answerPayload,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone}});
     title=rawFinal.title||title;answer=rawFinal.written;spokenAnswer=rawFinal.spoken;finalPresentation=rawFinal.presentation||{};
@@ -15977,11 +16070,14 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     zuzuTracePush(flowTrace,'v4_0_exp · ESCAPE LIBRE · fallo redacción final','WARN',cleanGeminiError(finalError));
   }
 
+  perf.presentMs=Date.now()-presentT0;
   if(answerPayload&&Object.keys(answerPayload).length)execution={...(execution||{}),answer_payload:answerPayload};
   if(plan?.answer_blueprint)execution={...(execution||{}),answer_blueprint:plan.answer_blueprint,answer_blueprint_used:!!answerBlueprintUsed};
   execution={...(execution||{}),debug_trace:arr(flowTrace).slice(0,160)};
   const carriesActiveDataset=(['conversation','set_context','clarify'].includes(plan.action)||(plan.action==='reference'&&['recall_episode','resume_episode','recall_turn','reexecute_episode'].includes(trim(plan?.reference?.action))))&&plan?.context?.clear_all!==true;if(carriesActiveDataset&&!datasetId&&!dataset){datasetId=trim(session?.currentTurn?.datasetId);viewId=trim(session?.currentTurn?.viewId);}
+  const commitT0=Date.now();
   const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,execution:{...(execution||{}),interpreted_plan:plan},dataset,view,datasetId,viewId,parentTurnId,referencedTurnId,status,title,answer,selectedEventId});
+  perf.commitMs=Date.now()-commitT0;
   let savedDataset=dataset?{...dataset,datasetId:saved.datasetId}:finalBundle?.dataset||session?.dataset||null,savedView=view?{...view,viewId:saved.viewId,datasetId:saved.datasetId||view.datasetId}:finalBundle?.view||session?.view||null;
   if(saved.datasetId&&!savedDataset){const b=await getZuzuTurnBundle({turnId:saved.turn.turnId,actor});savedDataset=b?.dataset||null;savedView=b?.view||savedView;}
   const resultContext=v73LightContext(saved.conversation,saved.turn,savedDataset,savedView),usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'v4_0_exp · Ledger · COMMIT INMUTABLE','OK',`turn=${saved.turn.turnId} · action=${plan.action} · dataset=${saved.datasetId||'—'} · view=${saved.viewId||'—'} · status=${status}. El turno anterior no se modifica.`);
@@ -15992,7 +16088,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · RAW14V · DISCOURSE + MEMORY FOCUS + EVENT COVERAGE · Z1 CONTEXT AUTHORITY',modelTier:policy.tier,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.

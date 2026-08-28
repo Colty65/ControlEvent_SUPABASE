@@ -34,7 +34,7 @@ t('recuerdo histórico nunca se presenta como dato actual',/No mezcles esas cifr
 t('recall/resume no inventan tabla ni gráfica',/action==='reference'&&\['recall_episode','resume_episode'(?:,'recall_turn','reexecute_episode')?\][\s\S]*table:false,chart:false/.test(ai));
 t('CURRENT conserva dataset al recordar',/recall_episode','resume_episode'[\s\S]*carriesActiveDataset/.test(ai)||/carriesActiveDataset=[^;]*recall_episode[^;]*resume_episode/.test(ai));
 t('traza registra si el turno entra o no en memoria',/MEMORIA EPISÓDICA · ALMACENAMIENTO/.test(ai));
-t('arquitectura memoria episódica/proactiva vigente',/RAW14(?:R · MEMORIA PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|S · MEMORIA FIABLE \+ PROACTIVA HUMANA \+ EPISÓDICA \+ SOCIAL|T · MEMORY CORE DB \+ EXPERIENCIA SEMILLA \+ PROACTIVA HUMANA|U · TOKEN BUDGET \+ CONTEXTO ESTRICTO|V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE)/.test(ai));
+t('arquitectura memoria episódica/proactiva vigente/Z1R',/(?:RAW14Q|RAW14R|RAW14S|RAW14T|RAW14U|RAW14V|Z1R PERFORMANCE · CONTEXT AUTHORITY)/.test(ai));
 
 // Prueba funcional del parser temporal, extrayendo la función pura sin importar Supabase.
 function extractFunction(src,name){const start=src.indexOf(`function ${name}(`)>=0?src.indexOf(`function ${name}(`):src.indexOf(`export function ${name}(`);if(start<0)throw new Error(name);const brace=src.indexOf('{',start);let d=0,q='',esc=false;for(let i=brace;i<src.length;i++){const c=src[i];if(q){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===q)q='';continue;}if(c==='"'||c==="'"||c==='`'){q=c;continue;}if(c==='{')d++;else if(c==='}'&&--d===0)return src.slice(start,i+1).replace(/^export\s+/,'');}throw new Error(name);}

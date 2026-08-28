@@ -2,7 +2,7 @@ const fs=require('fs');
 const ai=fs.readFileSync('services/event-ai.service.js','utf8');
 let ok=0,total=0;function t(name,cond){total++;if(cond){ok++;console.log('OK · '+name);}else{console.error('KO · '+name);process.exitCode=1;}}
 
-t('arquitectura RAW14V',/RAW14V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE/.test(ai));
+t('arquitectura RAW14V/Z1R',/(?:RAW14V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE|Z1R PERFORMANCE · CONTEXT AUTHORITY)/.test(ai));
 t('stores_used existe como dominio',/stores_used/.test(ai)&&/stores_used = tiendas\/proveedores donde EXISTEN compras realizadas/.test(ai));
 t('stores_used usa compras reales',/if\(d==='stores_used'\)return'event_purchase_lines'/.test(ai));
 t('stores_used fuerza compras realizadas',/if\(d==='stores_used'\)\{filters\.purchase_status='realized';filters\.purchase_statuses=\['realized'\]/.test(ai));

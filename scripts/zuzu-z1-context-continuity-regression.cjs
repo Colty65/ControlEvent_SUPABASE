@@ -25,6 +25,6 @@ t('ordinales no se reordenan',/El orden de ordinal_sets es semánticamente signi
 t('siguiente usa orden materializado',/«siguiente» se resuelve por el orden materializado de la vista actual/.test(ai));
 t('traza registra contexto de entrada Z1',/v4_0_exp · Z1 · CONTEXTO DE ENTRADA/.test(ai));
 t('exports estructurales incluyen Z1',/v78TurnSemanticPacket,[\s\S]{0,260}v78ThreadNavigation/.test(ai));
-t('arquitectura visible marca Z1 CONTEXT AUTHORITY',/RAW14V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE · Z1 CONTEXT AUTHORITY/.test(ai));
+t('arquitectura visible marca Z1 CONTEXT AUTHORITY/Z1R',/(?:RAW14V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE · Z1 CONTEXT AUTHORITY|Z1R PERFORMANCE · CONTEXT AUTHORITY)/.test(ai));
 
 console.log(`\nZ1 CONTEXTO/CONTINUIDAD · ${ok}/${total} comprobaciones OK`);if(ok!==total)process.exitCode=1;

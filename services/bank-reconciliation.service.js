@@ -829,14 +829,20 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
           included=true;
         }else if(event.finalized){
           included=eventInclusionExplicit?stateByMovement.get(row.id):incomeMovementIds.has(text(row.id));
-        }else if(displayLinks.length&&num(row.amount)<0){
-          // RAW14W · Un cargo compartido no puede quedar «En saldo» completo en eventos que
-          // no tienen una parte propia. Aunque arrastre un estado antiguo included=true, la
-          // imputación nace exclusivamente de los TKxx del evento actual. Así evitamos volver
-          // a meter el mismo movimiento bancario entero en varios eventos.
-          included=false;
         }else if(eventInclusionExplicit){
+          // BANK4.7 · La decisión MANUAL de este evento manda. Antes, si el mismo cargo ya tenía
+          // TKxx de otro evento, este bloque se evaluaba DESPUÉS del descarte por foreignLinks y
+          // al recargar la pantalla el interruptor volvía solo a «Inactivo». Eso hacía imposible
+          // preparar un movimiento compartido: el usuario lo activaba para este evento y CE lo
+          // desactivaba antes de poder asociar sus TKxx. La fila event-specific es la autoridad
+          // de inclusión para un evento En curso. Si todavía no tiene TKxx propios,
+          // eventAppliedAmount queda a 0 hasta que se vincule la parte del evento, evitando
+          // duplicar el cargo económico mientras se prepara la conciliación compartida.
           included=stateByMovement.get(row.id);
+        }else if(displayLinks.length&&num(row.amount)<0){
+          // Sin decisión específica de ESTE evento, un cargo que ya pertenece a otro evento
+          // nace fuera del saldo local. Puede activarse expresamente si también es compartido.
+          included=false;
         }else{
           included=row.included;
         }

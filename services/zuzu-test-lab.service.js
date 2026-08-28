@@ -146,9 +146,9 @@ function restoredHistoricalCase(raw={},mode=''){
 
 function makeCase({id,group,label,prompt='',expected='',meta={},run}){ return {id,group,label,prompt,expected,meta,run}; }
 function outcome(c,status,actual,extra={}){ return {id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:trim(actual),status,...extra}; }
-const ITV_ESCAPE_FREE=true;
-function observedOutcome(c,result,usage={},extra={}){return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:'OBSERVED',usage,tools:arr(result?.meta?.tools),oracleEnabled:false,observationMode:'ESCAPE_LIBRE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),...ledgerAuditOf(result),...extra};}
-function technicalErrorOutcome(c,message,usage={},extra={}){return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(message),status:'ERROR',usage,oracleEnabled:false,observationMode:'ESCAPE_LIBRE',...extra};}
+const ITV_ESCAPE_FREE=false;
+function observedOutcome(c,result,usage={},extra={}){const verdict=validatePaidCase(c,result);return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:verdict.status,validationReasons:verdict.reasons,usage,performance:result?.meta?.performance||{},tools:arr(result?.meta?.tools),oracleEnabled:true,observationMode:'ORACLE_ACTIVE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),...ledgerAuditOf(result),...extra};}
+function technicalErrorOutcome(c,message,usage={},extra={}){return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(message),status:'KO',validationReasons:['fallo técnico/timeout'],usage,oracleEnabled:true,observationMode:'ORACLE_ACTIVE',...extra};}
 
 // FIX2.10 · ORÁCULO FUERTE -----------------------------------------------------
 // La ITV no debe aprobar una respuesta solo porque conserve la entidad correcta.
@@ -513,10 +513,18 @@ function vItvGenericHealth(result={}){
   if(warnings.length)reasons.push(`warnings CE: ${warnings.join(' | ')}`);
   return{status:reasons.length?'WARN':'OK',reasons};
 }
+function vItvPerformanceHealth(result={}){
+  const p=result?.meta?.performance||{},u=result?.meta?.geminiUsageEstimate||{},ms=num(p?.totalMs),calls=num(u?.calls),tokens=num(u?.totalTokens||u?.totalTokenCount),reasons=[];
+  let status='OK';
+  if(ms>18000){status='KO';reasons.push(`latencia ${Math.round(ms)} ms > 18 s`);}else if(ms>12000){status='WARN';reasons.push(`latencia ${Math.round(ms)} ms > 12 s`);}
+  if(calls>2&&status!=='KO'){status='WARN';reasons.push(`${calls} llamadas IA en un turno`);}
+  if(tokens>18000&&status!=='KO'){status='WARN';reasons.push(`${Math.round(tokens)} tokens en un turno`);}
+  return{status,reasons};
+}
 function validatePaidCase(caseDef,result){
-  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result),ledger=validateLedgerStructural(caseDef,result),health=vItvGenericHealth(result);
-  const reasons=[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons,...ledger.reasons,...health.reasons];
-  let status='OK';if(!base||!oracle.ok||ledger.status==='KO'||health.status==='KO')status='KO';else if(ledger.status==='WARN'||health.status==='WARN')status='WARN';
+  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result),ledger=validateLedgerStructural(caseDef,result),health=vItvGenericHealth(result),perf=vItvPerformanceHealth(result);
+  const reasons=[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons,...ledger.reasons,...health.reasons,...perf.reasons];
+  let status='OK';if(!base||!oracle.ok||ledger.status==='KO'||health.status==='KO'||perf.status==='KO')status='KO';else if(ledger.status==='WARN'||health.status==='WARN'||perf.status==='WARN')status='WARN';
   return{ok:status==='OK',status,reasons};
 }
 
@@ -1028,7 +1036,7 @@ async function batteryBlueprint(state,rawSeed){
 
 export async function previewZuzuBattery({seed}={}){
   const state=await getState(); const b=await batteryBlueprint(state,seed);batteryRuntimeSet(b);
-  return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(100,b.full.length),costEurRange:'según nº de casos',hardCapSuggested:1.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT incorpora Z1 HUMANIDAD/CONTINUIDAD y un recorrido conversacional por todos los eventos reales; conserva pregunta + esperado + respuesta.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco solo se informa como Cuadre Banco cuando existe configuración/evidencia explícita del evento; el histórico general nunca se reconstruye como cuadre. Ningún modo modifica datos de producción.']};
+  return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(100,b.full.length),costEurRange:'según nº de casos',hardCapSuggested:1.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT incorpora Z1 HUMANIDAD/CONTINUIDAD, oráculo factual activo y métricas de latencia/llamadas/tokens por turno.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco solo se informa como Cuadre Banco cuando existe configuración/evidencia explícita del evento; el histórico general nunca se reconstruye como cuadre. Ningún modo modifica datos de producción.']};
 }
 
 function streamWrite(send,type,payload={}){ send({type,at:nowIso(),...payload}); }
@@ -1057,13 +1065,22 @@ async function runTimedAiCase({caseDef,send,parentSignal,index,total,timeoutMs,t
 }
 
 async function runFast({state,cases,send,signal}){
-  const total=cases.length; let ok=0,warn=0,ko=0,done=0; const failures=[];
-  for(const c of cases){
-    if(signal?.aborted)break; const t0=Date.now(); let r;
-    try{ r=await c.run.call(c); }catch(e){r=outcome(c,'KO',e?.message||String(e));}
+  const total=cases.length; let ok=0,warn=0,ko=0,done=0; const failures=[],timeoutMs=Math.max(5000,Math.min(30000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FAST_TIMEOUT_MS)||15000));
+  for(let i=0;i<cases.length;i++){
+    const c=cases[i];if(signal?.aborted)break; const t0=Date.now(); let r,timer=null,heartbeat=null;
+    streamWrite(send,'case_start',{case:{id:c.id,group:c.group,label:c.label,prompt:c.prompt||''},index:i+1,total,timeoutMs});
+    heartbeat=setInterval(()=>streamWrite(send,'heartbeat',{caseId:c.id,index:i+1,total,elapsedMs:Date.now()-t0,timeoutMs}),2500);
+    try{
+      const task=Promise.resolve().then(()=>c.run.call(c)).then(value=>({kind:'value',value}),error=>({kind:'error',error}));
+      const timeout=new Promise(resolve=>{timer=setTimeout(()=>resolve({kind:'timeout'}),timeoutMs);});
+      const got=await Promise.race([task,timeout]);
+      if(got.kind==='timeout')r=outcome(c,'KO',`TIMEOUT FAST: ${Math.round(timeoutMs/1000)} s. Se abandona este caso y la batería continúa.`,{timeout:true});
+      else if(got.kind==='error')r=outcome(c,'KO',got.error?.message||String(got.error));
+      else r=got.value;
+    }finally{if(timer)clearTimeout(timer);if(heartbeat)clearInterval(heartbeat);}
     r.durationMs=Date.now()-t0; done++; if(r.status==='OK')ok++; else if(r.status==='WARN')warn++; else{ko++;failures.push(r);} streamWrite(send,'case',{case:r,progress:{done,total,ok,warn,ko,percent:total?Math.round(done*100/total):100}});
   }
-  return {done,total,ok,warn,ko,failures,costEur:0,calls:0,tokens:0,aborted:!!signal?.aborted};
+  return {done,total,ok,warn,ko,failures,costEur:0,calls:0,tokens:0,aborted:!!signal?.aborted,caseTimeoutMs:timeoutMs};
 }
 
 async function runSmoke({state,cases,send,signal,actor={},maxCostEur=0.25,maxCases=24}){
@@ -1094,7 +1111,7 @@ async function runSmoke({state,cases,send,signal,actor={},maxCostEur=0.25,maxCas
 }
 
 async function runFull({state,turns,send,signal,actor={},maxCostEur=0.50,maxCases=18}){
-  const selected=turns.slice(0,Math.max(1,Math.min(40,Number(maxCases)||18))),total=selected.length;let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0;const failures=[];
+  const selected=turns.slice(0,Math.max(1,Math.min(100,Number(maxCases)||18))),total=selected.length;let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0;const failures=[];
   const timeoutMs=Math.max(45000,Math.min(150000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
   let previousInteractionId='',history=[],activeScenario='',conversationId='';
   for(let i=0;i<selected.length;i++){
@@ -1195,7 +1212,7 @@ export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,ca
   const selected=filterCases(built.cases,caseIds);
   streamWrite(send,'start',{mode:m,seed:built.seed,dataCounts:cached?.counts||batteryDataCounts(state),total:selected.length,source:cached?'batería preparada · tablas reales de ControlEvent':'tablas reales de ControlEvent',maxCostEur:m==='FAST'?0:round(maxCostEur,2)});
   const result=m==='AI-SMOKE'?await runSmoke({state,cases:selected,send,signal,actor,maxCostEur:Math.max(0.02,num(maxCostEur)||0.25),maxCases:maxCases||24}):m==='FULL-CERT'?await runFull({state,turns:selected,send,signal,actor,maxCostEur:Math.max(0.02,num(maxCostEur)||0.50),maxCases:maxCases||18}):await runFast({state,cases:selected,send,signal});
-  streamWrite(send,'summary',{mode:m,...result,finishedAt:nowIso(),certified:m==='FAST'?(result.ko===0&&!result.aborted&&result.done===selected.length&&result.done>0):false,observationMode:m==='FAST'?false:'ESCAPE_LIBRE',oracleEnabled:m==='FAST'?true:false});
+  streamWrite(send,'summary',{mode:m,...result,finishedAt:nowIso(),certified:result.ko===0&&!result.aborted&&result.done===selected.length&&result.done>0,observationMode:m==='FAST'?false:'ORACLE_ACTIVE',oracleEnabled:true});
   return result;
 }
 

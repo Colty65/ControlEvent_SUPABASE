@@ -4,7 +4,7 @@ const voice=fs.readFileSync(path.join(root,'public/app/features/v22-voz3-zuzu.js
 const itv=fs.readFileSync(path.join(root,'services/zuzu-test-lab.service.js'),'utf8');
 const index=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
 let ok=0,ko=0;function t(n,c){if(c){ok++;console.log('OK · '+n)}else{ko++;console.error('KO · '+n)}}
-t('CURRENT carga filas para referentes reales',ai.includes('includeRows:true,recentLimit:80'));
+t('CURRENT carga filas para referentes reales',ai.includes('includeRows:true,recentLimit:24'));
 t('referentes del resultado conservan first_row',ai.includes('current_result_referents:v78CurrentResultReferents')&&ai.includes('first_row:first'));
 t('fila decisiva alimenta discourse focus',ai.includes('resultBundle=null')&&ai.includes("['sort','rank','limit'].includes")&&ai.includes("out.responsible=rr"));
 t('respuesta WHO convierte responsable/donante en sujeto humano',ai.includes("askedPersonRole=rk==='who'")&&ai.includes("if((rr||rd)&&askedPersonRole){out.subject_type='PERSON'"));

@@ -14,11 +14,12 @@ function extract(name){
     if(c==='"'||c==="'"||c==='`'){quote=c;continue;}if(c==='{')depth++;else if(c==='}'&&--depth===0)return src.slice(start,i+1);
   }throw new Error(`Función incompleta ${name}`);
 }
-const names=['vItvLedgerPlan','vItvLedgerDataset','vItvLedgerView','vItvPlanEntityValues','vItvPlanOperations','validateLedgerStructural','vItvGenericHealth','validatePaidCase'];
+const names=['vItvLedgerPlan','vItvLedgerDataset','vItvLedgerView','vItvPlanEntityValues','vItvPlanOperations','validateLedgerStructural','vItvGenericHealth','vItvPerformanceHealth','validatePaidCase'];
 const body=`
 const arr=v=>Array.isArray(v)?v:[];
 const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
+const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
 const norm=v=>trim(v).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\\s+/g,' ').trim();
 const validateOracle=()=>({ok:true,reasons:[]});
 ${names.map(extract).join('\n')}
