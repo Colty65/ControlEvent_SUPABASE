@@ -18,7 +18,7 @@ t('entregada usa estado canónico',ai.includes('Situación entrega')&&ai.include
 t('filtro one_of viaja por operaciones',ai.includes("'one_of'.includes")||ai.includes("'one_of']"));
 t('voz espera con una sola microseñal',voice.includes('entertainmentMaxPerRequest:1')&&voice.includes('entertainmentInitialDelayMs:3300'));
 t('voz deja de comentar compras/banco/donaciones durante espera',!voice.includes('function entertainmentPromptContext')&&!voice.includes('voy recorriendo compras y tickets'));
-t('microseñales son pensamiento breve',voice.includes("'Mmm…'")&&voice.includes("'Calla… que ya lo tengo.'")&&voice.includes('punta de la lengua'));
+t('microseñales son pensamiento breve',voice.includes("'Ummm...................'")&&voice.includes("'Calla............... ya lo tengo....., besitos muá.'")&&voice.includes('punta de la lengua'));
 t('no personaliza relleno con usuario',voice.includes('state.entertainmentPersonalize=false'));
 t('aviso En curso no se fuerza en voz',ai.includes('no lo repite automáticamente en voz'));
 t('ITV reproduce cadena compras→máximo→responsable',itv.includes('Z1 · Compra → máximo → responsable → sus otras cosas'));
@@ -28,5 +28,5 @@ t('FAST escanea físicamente todas las filas operativas',itv.includes('all-recor
 t('FAST recorre todas las tiendas',itv.includes("shuffled(arr(state?.tiendas).filter(s=>trim(s?.id)&&trim(s?.nombre)),seed,'fast-stores')"));
 t('FAST recorre participación de todas las personas',itv.includes("shuffled(people,seed,'fast-participation-people')"));
 t('FULL-CERT admite hasta 100 turnos',itv.includes('maxTurns=100')&&itv.includes('buildFullCertScenarios(state,100,seed)'));
-t('cache bust Z1 humanidad aplicado',index.includes('Z1H-SILENT-THINKING'));
+t('cache bust Z1 humanidad aplicado',index.includes('BANK413-Z1H-VOICE-V47'));
 console.log(`Z1 HUMANIDAD/CONTINUIDAD · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

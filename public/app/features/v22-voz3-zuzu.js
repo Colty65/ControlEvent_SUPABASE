@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-RAW14U-Z1H-SILENT-THINKING-FIX48';
+  var BUILD='v4_0_exp-BANK4_13-Z1H-VOICE-V47';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v46', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v46', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v46', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v46', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v46'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v47', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v47', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v47', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v47', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v47'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -40,12 +40,12 @@
   // Si la respuesta tarda, Zuzu emite COMO MÁXIMO una microseñal de pensamiento, breve y
   // no temática. El mazo evita repeticiones hasta agotarse; no se personaliza con nombres.
   var ENTERTAINMENT_PHRASES=[
-    'Mmm…',
+    'Ummm...................',
     'A ver…',
     'Ufff… espera.',
     'Un segundo…',
     'Mmm… déjame pensar.',
-    'Calla… que ya lo tengo.',
+    'Calla............... ya lo tengo....., besitos muá.',
     'Ufff… lo tengo en la punta de la lengua.',
     'A ver, a ver…',
     'Espera… ya voy.',
@@ -368,7 +368,7 @@
   function contextualEntertainmentPhrase(){
     // No comenta el tema, no anticipa conclusiones y no intenta entretener: solo piensa.
     var idx=nextEntertainmentIndex();
-    if(!Number.isInteger(idx)||idx<0||idx>=ENTERTAINMENT_PHRASES.length)return 'Mmm…';
+    if(!Number.isInteger(idx)||idx<0||idx>=ENTERTAINMENT_PHRASES.length)return 'Ummm...................';
     commitEntertainmentIndex(idx);
     return ENTERTAINMENT_PHRASES[idx];
   }

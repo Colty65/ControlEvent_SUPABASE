@@ -436,6 +436,22 @@ function memoryOrdinalConversationItems(items=[],conversationId='',intent=null){
   });
   return ordered;
 }
+export async function listZuzuMemoryEpisodes({actor={},conversationId='',limit=200}={}){
+  const uid=actorId(actor);if(!uid)return[];
+  const items=await memoryIndexItemsForUser(uid),groups=new Map(),exclude=trim(conversationId);
+  for(const item of arr(items)){
+    const cid=trim(item?.conversationId);if(!cid||cid===exclude)continue;
+    if(!groups.has(cid))groups.set(cid,[]);groups.get(cid).push(item);
+  }
+  const episodes=[];
+  for(const [cid,rows0] of groups){
+    const rows=rows0.slice().sort((a,b)=>Number(a?.seq)-Number(b?.seq)||text(a?.createdAt).localeCompare(text(b?.createdAt))),first=rows[0]||{},last=rows[rows.length-1]||first,sum=episodeSummaryFromItems(rows),start=trim(first?.conversationCreatedAt)||trim(first?.createdAt),updated=trim(first?.conversationUpdatedAt)||trim(last?.createdAt)||start;
+    episodes.push({conversation_id:cid,turn_id:trim(first?.turnId),seq:Number(first?.seq)||0,created_at:trim(first?.createdAt)||start,prompt:trim(first?.userPrompt),title:trim(first?.title),domain:trim(first?.domain),scope:first?.scope||{},focus:first?.focus||{},row_count:Number(first?.rowCount)||0,summary:trim(first?.summary),memory_quality:Math.max(...rows.map(x=>Number(x?.memoryQuality)||0),0),memory_kind:trim(first?.memoryKind),memory_visibility:trim(first?.memoryVisibility)||'private',memory_source:'db',episode_summary:trim(sum.conversation_summary),episode_started_at:start,episode_updated_at:updated,episode_topics:arr(sum.main_topics),score:1,conversation_status:trim(first?.conversationStatus)||'active',same_conversation:false});
+  }
+  episodes.sort((a,b)=>text(b.episode_started_at||b.created_at).localeCompare(text(a.episode_started_at||a.created_at)));
+  return episodes.slice(0,Math.max(1,Math.min(200,Number(limit)||200))).map((x,i)=>({...x,ref:`H${i+1}`}));
+}
+
 export async function searchZuzuHistoryCandidates({actor={},prompt='',conversationId='',limit=8,nowIso=''}={}){
   const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),window=resolveZuzuMemoryTimeWindow(prompt,nowIso),explicit=isRecallPrompt(prompt),unfinishedHint=isUnfinishedRecallPrompt(prompt),ordinalIntent=explicit?memoryConversationOrdinalIntent(prompt):null,n=norm(prompt),broadRecent=/\b(?:ultimamente|recientemente|hace poco|hace unos minutos|hace un rato|hace unas horas)\b/.test(n),topicTerms=tokens(prompt);
   let pool=items.filter(x=>withinMemoryWindow(x,window));

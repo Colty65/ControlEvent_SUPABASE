@@ -9,11 +9,11 @@ function t(name,cond){if(cond){ok++;console.log('OK · '+name)}else{ko++;console
 function phraseCount(){const a=voice.indexOf('var ENTERTAINMENT_PHRASES=['),b=voice.indexOf('\n  ];',a);if(a<0||b<0)return 0;return (voice.slice(a,b).match(/^\s*'(?:[^'\\]|\\.)*',?\s*$/gm)||[]).length;}
 function phraseUnique(){const a=voice.indexOf('var ENTERTAINMENT_PHRASES=['),b=voice.indexOf('\n  ];',a);const p=(voice.slice(a,b).match(/^\s*'(?:[^'\\]|\\.)*',?\s*$/gm)||[]).map(x=>x.trim());return new Set(p).size===p.length;}
 
-t('build RAW14U/Z1H voz',voice.includes('RAW14U-Z1H-SILENT-THINKING'));
-t('caché index espera humana Z1H',index.includes('v22-voz3-zuzu.js?v=20260828-Z1H-SILENT-THINKING'));
+t('build RAW14U/Z1H voz',voice.includes('BANK4_13-Z1H-VOICE-V47'));
+t('caché index espera humana Z1H',index.includes('v22-voz3-zuzu.js?v=20260829-BANK413-Z1H-VOICE-V47'));
 t('microseñales de pensamiento compactas',phraseCount()>=12&&phraseCount()<=20);
 t('microseñales no se repiten en fuente',phraseUnique());
-t('storage v46 fuerza mazo limpio Z1H',voice.includes('entertainment_deck_v46')&&voice.includes('entertainment_used_v46'));
+t('storage v47 fuerza mazo limpio Z1H',voice.includes('entertainment_deck_v47')&&voice.includes('entertainment_used_v47'));
 t('pensamiento audible empieza pasados 3 s',voice.includes('entertainmentInitialDelayMs:3300'));
 t('solo una microseñal por turno',voice.includes('entertainmentIntervalMs:0')&&voice.includes('entertainmentMaxPerRequest:1'));
 t('no hay segunda frase automática',!voice.includes('scheduleEntertainment(state.entertainmentIntervalMs||6000)')&&voice.includes('function entertainmentEnded(){state.entertainmentSpeaking=false'));
