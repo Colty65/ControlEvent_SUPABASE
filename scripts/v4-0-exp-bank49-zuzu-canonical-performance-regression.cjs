@@ -23,6 +23,6 @@ ok(src.includes("if(d==='documentation')")&&src.includes('purchase_tickets_with_
 ok(lab.includes('function pendingPurchaseOracle('),'ITV tiene oráculo específico de compras pendientes');
 ok(lab.includes('withPendingPurchases')&&lab.includes('pendingPurchaseOracle(state,en)'),'batería Z1 de pendientes elige solo eventos con compras pendientes');
 ok(lab.includes("bankMovements:arr(bank?.movements)"),'ITV mantiene movimientos bancarios reales en el snapshot');
-ok(ui.includes("20260828-BANK49-CANONICAL-ID-MULTIENTITY-FASTLOCAL-MEMORY2"),'UI exporta build BANK4_9');
-ok(html.includes('zuzu-test-console-gd.js?v=20260828-BANK49-CANONICAL-ID-MULTIENTITY-FASTLOCAL-MEMORY2'),'index fuerza cache-bust BANK4_9');
+ok(/20260828-BANK4(?:9|10)-/.test(ui),'UI exporta BANK4_9 o sucesora BANK4_10');
+ok(/zuzu-test-console-gd\.js\?v=20260828-BANK4(?:9|10)-/.test(html),'index fuerza cache-bust BANK4_9 o sucesora BANK4_10');
 console.log(`BANK4_9 regression: ${n}/${n} OK`);

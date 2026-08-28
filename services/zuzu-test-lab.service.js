@@ -172,15 +172,15 @@ function lineAmountLocal(row){ return round(num(row?.unidades)*num(row?.precio),
 function mapById(rows=[]){ const m=new Map(); for(const r of arr(rows)){const id=trim(r?.id);if(id)m.set(id,r);} return m; }
 function euro(v){ try{return Z.v26FormatEuro(num(v));}catch(_){return `${round(v,2).toFixed(2).replace('.',',')} €`;} }
 function parseLocalizedDisplayNumber(raw=''){
-  let s=trim(raw).replace(/\s/g,'').replace(/€/g,''); if(!s)return NaN;
+  let s=trim(raw).replace(/\s/g,'').replace(/(?:€|euros?|eur)/gi,''); if(!s)return NaN;
   const comma=s.lastIndexOf(','),dot=s.lastIndexOf('.');
   if(comma>=0&&dot>=0){ if(comma>dot)s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/,/g,''); }
   else if(comma>=0)s=s.replace(/\./g,'').replace(',','.');
-  else if((s.match(/\./g)||[]).length>1)s=s.replace(/\./g,'');
+  else if(dot>=0){const parts=s.split('.');if(parts.length>2)s=parts.join('');else if(parts.length===2&&/^\d{1,3}$/.test(parts[0].replace(/^[-+]/,''))&&/^\d{3}$/.test(parts[1]))s=parts.join('');}
   const n=Number(s); return Number.isFinite(n)?n:NaN;
 }
 function euroValues(value=''){
-  const out=[],re=/-?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,4})?|\d+(?:[.,]\d{1,4})?)\s*(?:€|euros?)/gi;let m;
+  const out=[],re=/-?(?:\d{1,3}(?:[.\s]\d{3})+(?:,\d{1,4})?|\d+(?:[.,]\d{1,4})?)\s*(?:€|euros?|EUR)/gi;let m;
   while((m=re.exec(text(value)))){const n=parseLocalizedDisplayNumber(m[0]);if(Number.isFinite(n))out.push(round(n,2));}
   return out;
 }
@@ -373,9 +373,11 @@ function validateOracle(caseDef,result){
       if(num(ev.productCount||ev.distinctCount)!==num(oracle.productCount))reasons.push(`conteo de productos ${num(ev.productCount||ev.distinctCount)} != ${oracle.productCount}`);
       if(!moneyEq(ev.totalAmount,oracle.total))reasons.push(`total del result-set ${euro(ev.totalAmount)} != ${euro(oracle.total)}`);
     }else{
-      const rows=arr(result?.tables).flatMap(t=>arr(t?.rows)).filter(r=>trim(r?.Producto||r?.label));
-      const labels=new Set(rows.map(r=>norm(r?.Producto||r?.label)).filter(Boolean));
+      const rows=arr(result?.tables).flatMap(t=>arr(t?.rows)).filter(r=>trim(r?.Producto||r?.label)),payload=result?.meta?.ledgerAudit?.execution?.answer_payload||{},payloadItems=arr(payload?.item_values).map(trim).filter(Boolean);
+      const labels=new Set([...rows.map(r=>norm(r?.Producto||r?.label)).filter(Boolean),...payloadItems.map(norm)]);
       if(oracle.productCount>0&&labels.size===0)reasons.push('no entrega un result-set de productos verificable');
+      if(payloadItems.length&&num(payloadItems.length)!==num(oracle.productCount))reasons.push(`conteo del result-set estructurado ${payloadItems.length} != ${oracle.productCount}`);
+      if(payload?.amount_value!=null&&!moneyEq(payload.amount_value,oracle.total))reasons.push(`total del result-set estructurado ${euro(payload.amount_value)} != ${euro(oracle.total)}`);
     }
   }else if(oracle.kind==='purchase-max'||oracle.kind==='purchase-min'){
     const op=oracle.kind==='purchase-max'?'max':'min',row=oracle.row;
@@ -414,13 +416,19 @@ function validateOracle(caseDef,result){
   }else if(oracle.kind==='catalog-count'){
     if(!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`catálogo: no acredita ${oracle.count} registros`);
   }else if(oracle.kind==='bank-summary'){
-    const d=oracle.data,required=trim(d?.lifecycleMessage),normalizedRequired=norm(required);
-    if(required&&!norm(blob).includes(normalizedRequired))reasons.push(`estado de Cuadre Banco no coincide: se exige «${required}»`);
+    const d=oracle.data,required=trim(d?.lifecycleMessage),normalizedRequired=norm(required),promptNorm=norm(c?.prompt),asksLifecycle=/cuadre|concili|justific|estado|como qued|cómo qued/.test(promptNorm),asksCount=/cuantos? movimientos|cuántos movimientos|numero de movimientos|número de movimientos/.test(promptNorm),asksImpact=/impacto|saldo final|neto/.test(promptNorm);
+    // BANK4_10 · el oráculo evalúa lo que se preguntó. Un recuento no obliga a recitar
+    // también el estado del cuadre: eso penalizaba justo la conversación humana que buscamos.
+    if(required&&asksLifecycle&&!norm(blob).includes(normalizedRequired))reasons.push(`estado de Cuadre Banco no coincide: se exige «${required}»`);
     if(d?.hasReconciliation===false){
       const hasBankTable=arr(result?.tables).some(t=>arr(t?.rows).length>0);
-      const hasMoneyOrMovementCount=/\d[\d.,]*\s*€|\b\d+\s+movimientos?\b/i.test(text(result?.answer));
+      const hasMoneyOrMovementCount=/\d[\d.,]*\s*(?:€|EUR)|\b\d+\s+movimientos?\b/i.test(text(result?.answer));
       if(hasBankTable||hasMoneyOrMovementCount)reasons.push('Cuadre inexistente: no puede aportar magnitudes ni tablas del histórico general');
-    }else if(d?.hasData&&d.movements>0&&!new RegExp(`\\b${Number(d.movements)}\\b`).test(blob)&&!hasMoney(blob,d.impact)&&!hasMoney(blob,d.closing))reasons.push('no devuelve ninguna magnitud bancaria canónica almacenada');
+    }else if(d?.hasData){
+      if(asksCount&&d.movements>0&&!new RegExp(`\\b${Number(d.movements)}\\b`).test(blob))reasons.push(`no devuelve el recuento bancario canónico ${Number(d.movements)}`);
+      else if(asksImpact&&!hasMoney(blob,d.impact)&&!hasMoney(blob,d.closing))reasons.push('no devuelve la magnitud bancaria solicitada');
+      else if(!asksCount&&!asksImpact&&d.movements>0&&!new RegExp(`\\b${Number(d.movements)}\\b`).test(blob)&&!hasMoney(blob,d.impact)&&!hasMoney(blob,d.closing))reasons.push('no devuelve ninguna magnitud bancaria canónica almacenada');
+    }
   }else if(oracle.kind==='attendance'){
     const d=oracle.data;if(d&&d.attendees>=0&&!new RegExp(`\\b${Number(d.attendees)}\\b`).test(blob))reasons.push(`asistencia: no acredita ${d.attendees} personas`);
   }else if(oracle.kind==='management'){
