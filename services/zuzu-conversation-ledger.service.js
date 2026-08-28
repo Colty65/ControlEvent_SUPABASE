@@ -218,6 +218,12 @@ function memoryIsTechnicalTurn(turn={}){
   if(['incoherent_input','incoherent_progress','irrelevant_input','system_complaint','clarify'].includes(kind))return true;
   if(note.includes('voice noise')||answer.includes('no pudo interpretar')||answer.includes('no pudo emitir')||answer.includes('fallo tecnico')||answer.includes('no he podido procesar'))return true;
   if(exec?.memory_episode)return true; // recordar un recuerdo no genera otro recuerdo recursivo.
+  // BANK4_14 · también excluimos recuerdos literales que llegan por REFERENCE sin memory_episode.
+  // Así una conversación que recuerda otra no se vuelve a guardar como un nuevo «recuerdo del recuerdo».
+  const refAction=trim(turn?.normalizedPlan?.reference?.action),provenance=trim(exec?.data_provenance);
+  if(action==='reference'&&['recall_turn','recall_episode','resume_episode','restore_snapshot'].includes(refAction))return true;
+  if(/^HISTORICAL_(?:LITERAL|SNAPSHOT|EVIDENCE|TRANSCRIPT|REPLAY)$/i.test(provenance))return true;
+  if(action==='conversation'&&kind==='memory_index')return true;
   return false;
 }
 function memoryLocalHasSubstance(turn={}){

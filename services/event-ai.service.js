@@ -14099,6 +14099,44 @@ function v73CommandTools(){
     },['question'])
   ];
 }
+// BANK4_14 · SEMANTIC CORE. Gemini emite UN solo marco semántico autoritativo.
+// CE conserva el catálogo legado para regresiones/compatibilidad, pero el turno activo ya no
+// elige entre seis tools ni recibe una segunda interpretación semántica después del modelo.
+function v414SemanticCoreTool(){
+  const str={type:'string'},list={type:'array',items:{type:'string'}},bool={type:'boolean'},integer={type:'integer'};
+  const action={type:'string',enum:['query','local','set_context','reference','conversation','clarify']};
+  const peopleMode={type:'string',enum:['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income']};
+  const contextType={type:'string',enum:['event','person','product','store','donor','responsible','ticket']};
+  const referenceAction={type:'string',enum:['restore_snapshot','reexecute_plan','reexecute_episode','recall_turn','recall_episode','resume_episode']};
+  const conversationKind={type:'string',enum:['general','greeting','farewell','feedback','correction','system_complaint','current_context','conversation_summary','incoherent_input','incoherent_progress','irrelevant_input','memory_index']};
+  const memoryOrder={type:'string',enum:['oldest','newest']};
+  return {type:'function',name:'ce_semantic_turn',description:'ÚNICO marco semántico del turno. Gemini decide una sola vez action + argumentos; ControlEvent valida tipos y ejecuta sin reinterpretar el lenguaje.',parameters:{type:'object',required:['action'],properties:{
+    action,
+    // QUERY
+    targets:list,target_metric_roles:list,response_kind:str,
+    scope_kind:str,event:str,events:list,series:str,year:integer,count:integer,order:str,start_date:str,end_date:str,
+    product_text:str,product_match:str,people_mode:peopleMode,people:list,responsibles:list,donors:list,stores:list,tickets:list,purchase_statuses:list,donation_delivery_statuses:list,
+    fields:list,table:bool,summary:bool,chart:bool,chart_type:str,chart_x:str,chart_series:list,operations_json:str,reuse_json:str,supplements_json:str,
+    // LOCAL / estilo opcional
+    lead:str,voice_lead:str,
+    // SET_CONTEXT
+    clear_all:bool,context_type:contextType,values:list,
+    // REFERENCE
+    target_ref:str,reference_action:referenceAction,changes_json:str,
+    // CONVERSATION
+    kind:conversationKind,note:str,memory_order:memoryOrder,
+    // CLARIFY
+    question:str,options:list,candidate_refs:list
+  }}};
+}
+function v414SemanticCallToRaw(call={}){
+  const a=call?.arguments&&typeof call.arguments==='object'?call.arguments:{},action=trim(a?.action);
+  const names={query:'ce_query',local:'ce_local',set_context:'ce_set_context',reference:'ce_reference',conversation:'ce_conversation',clarify:'ce_clarify'};
+  const name=names[action];if(!name)return{action:'conversation',conversation:{kind:'general',note:'Marco semántico sin action ejecutable.'}};
+  const raw=v73CommandCallToRaw({name,arguments:a});
+  if(action==='conversation'&&['oldest','newest'].includes(trim(a?.memory_order))){raw.conversation=raw.conversation||{};raw.conversation.memory_order=trim(a.memory_order);}
+  return raw;
+}
 function v73VoiceGateAssessment(raw={},plan={},voiceConversation=false){
   if(!voiceConversation)return{quality:'text_or_not_voice'};
   const action=trim(plan?.action),kind=trim(plan?.conversation?.kind),note=trim(plan?.conversation?.note);
@@ -14306,7 +14344,7 @@ function v73NormalizePlan(raw={}){
     else if(type==='set_fields'){const fields=arr(x?.fields).map(trim).filter(Boolean).slice(0,24);if(fields.length)ch.fields=fields;}else if(['add_field','remove_field'].includes(type)&&trim(x?.field))ch.field=trim(x.field);changes.push(ch);}
     out.reference={target_ref:trim(r.target_ref),action:['restore_snapshot','reexecute_plan','reexecute_episode','recall_turn','recall_episode','resume_episode'].includes(trim(r.action))?trim(r.action):''};if(changes.length)out.reference.changes=changes;
   }else if(action==='conversation'){
-    const c=raw?.conversation&&typeof raw.conversation==='object'?raw.conversation:{},kind=['general','greeting','farewell','feedback','correction','system_complaint','current_context','conversation_summary','incoherent_input','incoherent_progress','irrelevant_input','memory_index'].includes(trim(c?.kind))?trim(c.kind):'general';out.conversation={kind};if(trim(c?.note))out.conversation.note=trim(c.note).slice(0,420);
+    const c=raw?.conversation&&typeof raw.conversation==='object'?raw.conversation:{},kind=['general','greeting','farewell','feedback','correction','system_complaint','current_context','conversation_summary','incoherent_input','incoherent_progress','irrelevant_input','memory_index'].includes(trim(c?.kind))?trim(c.kind):'general';out.conversation={kind};if(trim(c?.note))out.conversation.note=trim(c.note).slice(0,420);if(kind==='memory_index'&&['oldest','newest'].includes(trim(c?.memory_order)))out.conversation.memory_order=trim(c.memory_order);
   }else if(action==='clarify'){out.clarify={question:trim(raw?.clarify?.question)};const refs=arr(raw?.clarify?.candidate_refs).map(trim).filter(Boolean).slice(0,8);if(refs.length)out.clarify.candidate_refs=refs;const opts=arr(raw?.clarify?.options).map(trim).filter(Boolean).slice(0,8);if(opts.length)out.clarify.options=opts;}
   return out;
 }
@@ -14954,48 +14992,54 @@ function v73IsPendingHistoryChoiceReply(prompt='',choices=[]){
 }
 function v79KernelInstructionCompact(state={},selectedEventId='',display='usuario',timeContext={}){
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'';
-  return `Eres Zuzu, compilador semántico de ControlEvent. Decide el significado del turno y emite EXACTAMENTE UNA tool CE. ControlEvent ejecuta; NO reinterpretará tu decisión.
+  return `Eres Zuzu, el ÚNICO intérprete lingüístico de ControlEvent. CURRENT_USER puede expresarse como una persona normal: con elipsis, pronombres, bromas, tacos, cambios de palabra, correcciones o frases incompletas. Decide su significado UNA SOLA VEZ y emite EXACTAMENTE una ce_semantic_turn. Después de tu salida CE NO reparará, reinterpretará ni adivinará el lenguaje: solo validará tipos, resolverá IDs/campos y ejecutará.
 
-PRINCIPIOS
-- Gemini/Zuzu es la autoridad lingüística. CURRENT_CONTEXT, thread_navigation, CANDIDATES y HISTORY_CANDIDATES son evidencia factual, no decisiones.
-- Conserva el hilo: una continuación elíptica hereda el scope/tema compatible del contexto. El evento de pantalla «${screen}» solo es fallback cuando no existe scope conversacional compatible.
-- Un cambio explícito de foco se hace sin narrarlo: si además hay una pregunta, consulta directamente; si solo cambia el foco, ce_set_context.
-- current_result_referents contiene el orden real del último resultado. Úsalo para «ese», «esa persona», «el primero», «el siguiente», etc. Nunca saltes a asistencia/personas generales si el referente anterior ya identifica producto/responsable/donación.
-- CANDIDATES son Top-K mecánicos. Prefiere coincidencia exacta/tipada; un fuzzy solo ayuda si encaja semánticamente. No conviertas palabras comunes en eventos/productos.
-- Si el usuario corrige una desviación y el contexto permite reparar, ejecuta la consulta correcta; no te limites a pedir perdón.
-- Memoria histórica: usa HISTORY_CANDIDATES solo cuando el usuario pide recordar/retomar o el turno realmente depende de un episodio anterior. No metas recuerdos espontáneos en un hilo operativo vivo.
+SEMANTIC CORE
+- action expresa el acto real: query, local, set_context, reference, conversation o clarify. Todos los demás campos pertenecen a ese mismo marco. No emitas otra tool.
+- CURRENT_CONTEXT es estado conversacional factual: úsalo para resolver «él», «ella», «ahí», «estos», «lo anterior», «dímelo ahora», «¿y en cuál?», etc. No obligues al usuario a repetir un sujeto/scope que ya está vivo y es inequívoco.
+- discourse_focus es el sujeto humano vigente. memory_focus/recalled_episode es el episodio histórico vigente. thread_navigation contiene referentes materiales y su orden. Tú decides cuál encaja; CE no lo hará después.
+- RECENT_DIALOGUE importa: interpreta el turno como continuación de una conversación real, no como una orden aislada.
+- CANDIDATES son solo candidatos mecánicos. Una coincidencia léxica nunca prueba que el usuario se refiera a esa entidad o tipo. El sentido gramatical y conversacional manda.
+- HISTORY_CANDIDATES son punteros históricos, no hechos actuales. Úsalos cuando el sentido del turno sea recordar/retomar/comparar con un episodio.
+- Un texto que sea solo una etiqueta, versión, código de prueba o identificador sin saludo real NO es greeting; trátalo como conversation/general y reconoce el marcador sin inventar intención.
+- Si el usuario critica un fallo SIN pedir una consulta nueva: action=conversation, kind=feedback o correction. No reejecutes datos por reflejo. Si junto a la crítica pide algo concreto, ejecuta esa petición.
+- Si la conversación ya deja claro de qué se hablaba, jamás pidas «recuérdame de qué hablábamos». Conserva el hilo.
+- Si el usuario corrige una desviación y del contexto se deduce inequívocamente la operación correcta, emite esa operación directamente.
+- Si quedan dos interpretaciones materialmente plausibles y cambiarían el resultado, clarify. No aclares por simples variaciones de frase.
 
-DOMINIOS
-- purchases = compras. Pte.Compra/otros gastos = pendiente; TKxx/Gastos corrientes = realizada.
-- donations = donaciones. Situación entrega: Supuesta (no confirmada), Comprometida (prometida pero NO recibida físicamente), Entregada (producto físicamente recibido). Nunca uses compras realizadas/pendientes para responder estados de donación.
-- person = dossier abierto de una persona; people = asistencia/registro de personas dentro de evento.
-- documentation = DOC, justificantes de ingresos y TKxx/fototickets. bank = Cuadre Banco solo si existe evidencia canónica.
-- comparison = comparar eventos. event_summary = resumen/dossier de evento.
-- events = catálogo/estado/fechas. Para cifras, balance, «cómo salió» o economía de un evento usa event_summary; para una matriz económica global usa event_summary con all_events o comparison, nunca el catálogo events como sustituto.
-- En documentation distingue literalmente purchase_tickets, purchase_tickets_with_image y purchase_tickets_without_image; «TKxx» no significa «documentos».
+MARCO ce_semantic_turn
+- query: datos nuevos. targets + scope_kind y los filtros/operations/presentation que procedan.
+- local: transformación sobre CURRENT ya materializado; operations_json.
+- set_context: solo cambia foco, sin consulta.
+- reference: target_ref + reference_action para recuperar/re-ejecutar historia.
+- conversation: kind + note, sin acceso factual nuevo. Para un índice/lista de recuerdos usa kind=memory_index y memory_order=oldest/newest según el sentido pedido.
+- clarify: solo cuando la ambigüedad sea real.
 
-CONSULTAS
-- Toda ce_query lleva scope explícito. named_event requiere event; named_events requiere events; all_events para global; event_series usa series.
-- Si CURRENT_CONTEXT.scope ya fija evento(s) y el usuario no introduce otro, consérvalo. En una continuación sobre un conjunto named_events conserva TODO el conjunto: no lo colapses a un evento.
-- Si la pregunta pide qué evento tiene más/menos de una magnitud dentro de named_events, responde como comparación por Evento: agrupa la métrica por Evento y luego rank/sort; nunca sumes los eventos entre sí ni ordenes líneas individuales para contestar qué EVENTO gana.
-- Si CURRENT_CONTEXT.active_entity_sources.person es explicit_set_context y CURRENT_USER no nombra otra PERSON, esa persona es el sujeto actual y prevalece sobre IDs/personas de turnos más antiguos.
-- Las referencias temporales relativas entre eventos (anterior/siguiente/año posterior) se resuelven contra thread_navigation/ordinal_sets y deben acabar en named_event/named_events canónicos, no en un dominio inventado «all».
-- response_kind: amount, units, count, who, what, whether, which_event, compare, summary, table, context, conversation_summary.
-- Cálculos, orden, ranking y agrupación van en operations_json. CE calcula; no delegues sumas/Top-N a la redacción.
-- Si CURRENT/DATASET ya puede responder mediante filtro/sort/group/proyección, PREFIERE ce_local: reutiliza el dataset y evita otra consulta de negocio. En especial, un superlativo/orden («el mayor», «el siguiente», «el más caro») sobre el resultado vigente debe operar sobre CURRENT y conservar TODOS sus filtros; no vuelvas al conjunto completo del evento.
-- Un resultado filtrado que será base de continuaciones debe conservar su dataset materializado aunque la respuesta oral sea breve. No conviertas una lista de productos en una agrupación por responsable salvo que el usuario haya pedido responsables.
-- En documentation: justificantes de ingreso = income_receipts; TKxx/fototickets = purchase_tickets; un TKxx concreto se consulta como ticket concreto, no como DOCxx.
-- Los importes/precios/saldos/ingresos/gastos/valoraciones/donaciones valoradas son moneda EUR. Recuentos, unidades, asistentes, eventos, documentos, tickets y porcentajes NO son moneda.
-- fields solo cuando el usuario pide columnas concretas; no lo uses para expresar «por responsable/tienda».
-- Si pide varios sujetos del mismo dominio, consérvalos en una sola consulta multi-entidad.
-- Tabla/gráfica es presentación de la MISMA consulta, no otra tool.
+CONTINUIDAD Y MEMORIA
+- «Dímelo ahora / míralo ahora» después de un recuerdo puede significar reexecute_plan si el diálogo lo sostiene: decide tú esa relación, no lo declares incoherente por faltar el sustantivo.
+- Una petición plural de recuerdos/lista/historial es memory_index; no la conviertas en confirmación de un único recuerdo.
+- Para recordar una conversación: reference + recall_episode. Para volver a ejecutar hoy el plan histórico: reexecute_plan. Para retomar el contexto histórico sin actualizar cifras: resume_episode.
+- Los Hn/Pn/Tn/CURRENT son referencias; nunca uses IDs de PERSON/EVENT/STORE/PRODUCT como target_ref histórico.
+
+DOMINIOS Y EJECUCIÓN
+- purchases=compras; donations=donaciones; person=dossier de una persona; people=asistencia/registro; documentation=DOC/justificantes/TKxx; bank=Cuadre Banco; comparison=comparación; event_summary=dossier/resumen de evento; events=catálogo/estado/fechas.
+- Toda query lleva scope explícito. Conserva el scope vigente salvo que CURRENT_USER lo cambie. screen_event «${screen}» es solo fallback ambiental cuando el hilo no aporta ámbito.
+- Para «en qué evento aparece más / cuál tiene más» sobre una persona, consulta person en all_events/named_events y materializa comparación/ranking por Evento. No mandes una gráfica si no aporta nada o no hay dimensiones ejecutables.
+- Para varios sujetos del mismo dominio, una sola query multi-entidad.
+- fields es presentación/proyección, no semántica de agrupación.
+- Cálculos/orden/ranking/agrupación van en operations_json y deben ser físicamente ejecutables.
+- Si CURRENT ya contiene el conjunto exacto y solo hace falta filtrar/ordenar/agrupar, local es preferible.
+- purchases y donations son dominios distintos. En donations: Supuesta/Comprometida no equivalen a recibido; Entregada sí.
+- Importes/saldos/precios/valoraciones son EUR; unidades/recuentos/personas/eventos no.
+
+VOZ
+- INPUT_CHANNEL=voice no cambia la semántica. Solo usa conversation/incoherent_input con note que empiece VOICE_NOISE: cuando el audio sea realmente ininteligible; un cambio brusco de tema sigue siendo válido.
 
 NHC
-No uses listas de frases concretas del usuario para decidir semántica. Resuelve por contexto, entidades, roles, dominio y operaciones. Si quedan dos interpretaciones materialmente plausibles, ce_clarify; si una domina, actúa.
+No memorices listas de frases del usuario ni intentes hacer regex mental. Generaliza por intención, referentes, roles y contexto. Cambiar una palabra manteniendo el significado debe producir el mismo marco semántico.
 
 Usuario actual: ${trim(display)||'usuario'}. Hora: ${trim(timeContext?.local)||trim(timeContext?.iso)||''}.`;
 }
-
 function v73KernelInstruction(state={},selectedEventId='',display='usuario',timeContext={}){
   return v79KernelInstructionCompact(state,selectedEventId,display,timeContext);
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'ninguno',localNow=trim(timeContext?.local)||trim(timeContext?.iso)||new Date().toISOString(),tz=trim(timeContext?.timezone)||'Europe/Madrid';
@@ -15271,31 +15315,29 @@ function v73LocalCompiledConversation(kind='general',note='',model=''){
   const raw={action:'conversation',conversation:{kind,...(trim(note)?{note:trim(note)}:{})}};return{raw,plan:v73NormalizePlan(raw),model:trim(model),command:'ce_conversation',local_compile:true};
 }
 async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext={},voiceConversation=false}){
-  const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'',instruction=v73KernelInstruction(state,selectedEventId,display,timeContext),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates,display,screen,timeContext,voiceConversation),tools=v73CommandTools(),allowed=tools.map(t=>t.name);let model=policy.model,payload;
-  const call=async(stage,m)=>v261CallInteraction({input,previousInteractionId:'',model:m,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1500});
-  try{payload=await call('v4_0_exp · Ledger · Zuzu elige comando CE',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v4_0_exp · Ledger · Lite → Flash','WARN',`Zuzu Lite no emitió un comando CE utilizable (${cleanGeminiError(error)}). Zuzu Flash recibe exactamente la misma petición y catálogo de comandos.`);model=policy.flashModel;payload=await call('v4_0_exp · Ledger · Flash elige comando CE',model);}else{error._ceOrigin='gemini';throw error;}}
-  const parseCommand=(pl)=>{const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Zuzu debe emitir exactamente UN comando CE; emitió ${calls.length}.`);e._ceOrigin='gemini';e._ceCommandCount=calls.length;throw e;}const command=trim(calls[0].name),raw=v73CommandCallToRaw(calls[0]),plan=v73NormalizePlan(raw),protocolError=v73VoiceInputAssessmentViolation(raw,plan,voiceConversation)||v73ProtocolViolation(raw,plan)||v73MemoryReferenceViolation(raw,historyCandidates)||v73MultiPersonCandidateViolation(raw,entityCandidates)||v73RecallFollowupViolation(raw,session,userPrompt,entityCandidates)||v73CrossEventSuperlativeViolation(raw,userPrompt,entityCandidates)||v73RequestedSortViolation(raw,userPrompt)||v73UngroundedEventScopeViolation(raw,session,entityCandidates,state,userPrompt);if(protocolError)plan._protocol_error=protocolError;return{command,raw,plan,protocolError};};
-  const repairCommand=async(reason,stage='v4_0_exp · Ledger · Zuzu recompila comando CE')=>{
-    const repairInput=`${input}\n\nRECHAZO_ESTRUCTURAL_CE:\n${reason}\nReemite EXACTAMENTE UNA tool CE válida. Si INPUT_CHANNEL=voice vuelve a hacer la criba semántica: un cambio intencional de tema/evento y una frase meta comprensible sobre memoria/recuerdos/pruebas son válidos; solo el ruido realmente ininteligible usa ce_conversation/incoherent_input con note empezando por VOICE_NOISE:. Conserva TODAS las partes compatibles de CURRENT_USER y corrige solo la estructura. Si el usuario pidió dos poblaciones del mismo dominio, represéntalas con el modo compuesto de ese dominio (por ejemplo attendance_full). Si pidió datos y una tabla/gráfica, la presentación viaja dentro de la MISMA ce_query. Si pidió varios aspectos de las mismas personas, usa UN target person con people:[...] y una sola ce_query; person NO lleva people_mode. Un dossier multientidad conserva todas sus dimensiones y la gráfica no debe introducir group/rank que oculte compras/donaciones/gestión. Las columnas monetarias canónicas del resumen multientidad incluyen Ingreso imputado persona, Ingresos del registro, Compras bajo responsabilidad y Donaciones vinculadas.`;
-    return v261CallInteraction({input:repairInput,previousInteractionId:'',model,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:2,maxOutputTokens:1500});
+  const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'',instruction=v73KernelInstruction(state,selectedEventId,display,timeContext),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates,display,screen,timeContext,voiceConversation),tools=[v414SemanticCoreTool()],allowed=['ce_semantic_turn'];let model=policy.model,payload;
+  const call=async(stage,m,callInput=input)=>v261CallInteraction({input:callInput,previousInteractionId:'',model:m,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1700});
+  try{payload=await call('v4_0_exp · BANK4_14 · SEMANTIC CORE · Zuzu interpreta',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · Lite → Flash','WARN',`Lite no emitió un marco semántico utilizable (${cleanGeminiError(error)}). Flash recibe exactamente el mismo contexto.`);model=policy.flashModel;payload=await call('v4_0_exp · BANK4_14 · Flash interpreta',model);}else{error._ceOrigin='gemini';throw error;}}
+  const parseCommand=(pl)=>{
+    const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Zuzu debe emitir exactamente UN marco ce_semantic_turn; emitió ${calls.length}.`);e._ceOrigin='gemini';e._ceCommandCount=calls.length;throw e;}
+    const command='ce_semantic_turn',raw=v414SemanticCallToRaw(calls[0]),plan=v73NormalizePlan(raw);
+    // CE valida CONTRATO, no lenguaje. No hay validadores que vuelvan a leer CURRENT_USER para
+    // cambiar scope, sujeto, orden, memoria o intención después de Gemini.
+    const protocolError=v73VoiceInputAssessmentViolation(raw,plan,voiceConversation)||v73ProtocolViolation(raw,plan)||v73MemoryReferenceViolation(raw,historyCandidates);
+    if(protocolError)plan._protocol_error=protocolError;return{command,raw,plan,protocolError};
+  };
+  const repairCommand=async(reason)=>{
+    const repairInput=`${input}\n\nRECHAZO_ESTRUCTURAL_CE:\n${reason}\nLa SEMÁNTICA del turno sigue siendo la que tú decidiste. Reemite EXACTAMENTE UNA ce_semantic_turn corrigiendo SOLO el contrato/tipos/referencia imposible. No cambies sujeto, alcance, intención ni presentación salvo que sean precisamente el campo estructural inválido. CE no reinterpretará nada después.`;
+    return call('v4_0_exp · BANK4_14 · SEMANTIC CORE · recompilación estructural',model,repairInput);
   };
   let parsed;
-  try{parsed=parseCommand(payload);}catch(parseError){
-    if(Number(parseError?._ceCommandCount)!==1){
-      zuzuTracePush(flowTrace,'v4_0_exp · Ledger · RECOMPILACIÓN ZUZU · MÚLTIPLES COMANDOS','WARN',`${cleanGeminiError(parseError)} CE no mezcla ni interpreta las tools: pide a Zuzu que consolide la intención en una sola.`);
-      try{parsed=parseCommand(await repairCommand(cleanGeminiError(parseError),'v4_0_exp · Ledger · Zuzu consolida en UN comando CE'));}catch(repairError){repairError._ceOrigin=repairError._ceOrigin||'gemini';throw repairError;}
-    }else throw parseError;
-  }
-  if(parsed.protocolError){
-    zuzuTracePush(flowTrace,'v4_0_exp · Ledger · RECOMPILACIÓN ZUZU','WARN',`${parsed.protocolError} CE no repara el significado; solicita a Zuzu un único comando válido.`);
-    try{const candidate=parseCommand(await repairCommand(parsed.protocolError));if(!candidate.protocolError)parsed=candidate;else zuzuTracePush(flowTrace,'v4_0_exp · Ledger · RECOMPILACIÓN ZUZU','KO',candidate.protocolError);}catch(repairError){zuzuTracePush(flowTrace,'v4_0_exp · Ledger · RECOMPILACIÓN ZUZU','KO',cleanGeminiError(repairError));}
-  }
+  try{parsed=parseCommand(payload);}catch(parseError){zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · SEMANTIC CORE · RECOMPILACIÓN','WARN',`${cleanGeminiError(parseError)} Se solicita un único marco, sin que CE mezcle ni interprete tools.`);parsed=parseCommand(await repairCommand(cleanGeminiError(parseError)));}
+  if(parsed.protocolError){zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · SEMANTIC CORE · CONTRATO','WARN',`${parsed.protocolError} Se devuelve a Zuzu para corregir solo la estructura.`);try{const candidate=parseCommand(await repairCommand(parsed.protocolError));if(!candidate.protocolError)parsed=candidate;else zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · SEMANTIC CORE · CONTRATO','KO',candidate.protocolError);}catch(repairError){zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · SEMANTIC CORE · CONTRATO','KO',cleanGeminiError(repairError));}}
   const {command,raw,plan,protocolError}=parsed;
-  zuzuTracePush(flowTrace,'v4_0_exp · Ledger · COMANDO ZUZU','INFO',`${command} · ${JSON.stringify(raw).slice(0,5000)}`);
+  zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · MARCO SEMÁNTICO AUTORITATIVO','INFO',`${command}/${trim(plan?.action)||'—'} · ${JSON.stringify(raw).slice(0,5000)}`);
   if(voiceConversation){const qa=v73VoiceGateAssessment(raw,plan,true);zuzuTracePush(flowTrace,'v4_0_exp · Ledger · CALIDAD ENTRADA VOZ',trim(qa?.quality)==='possible_voice_noise'?'WARN':'OK',`${trim(qa?.quality)||'accepted'}${trim(qa?.note)?` · ${trim(qa.note)}`:''}`);}
-  zuzuTracePush(flowTrace,'v4_0_exp · Ledger · REGISTRO NORMALIZADO',protocolError?'WARN':'OK',JSON.stringify(plan).slice(0,5000));
-  if(protocolError)zuzuTracePush(flowTrace,'v4_0_exp · Ledger · CONTRATO ZUZU','KO',`${protocolError} El catálogo de comandos evita mezclar acciones; CE no ejecutará un plan alternativo.`);
-  if(plan.answer_blueprint)zuzuTracePush(flowTrace,'v4_0_exp · Ledger · ANSWER_BLUEPRINT','OK',`Zuzu aporta solo una pista de tono (${Object.keys(plan.answer_blueprint).join(', ')}). La respuesta factual final la redactará Zuzu después de recibir el resultado real de CE; CE no añadirá texto propio.`);
+  zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · REGISTRO SEMÁNTICO',protocolError?'WARN':'OK',JSON.stringify(plan).slice(0,5000));
+  if(protocolError)zuzuTracePush(flowTrace,'v4_0_exp · Ledger · CONTRATO ZUZU','KO',`${protocolError} CE no ejecutará un plan alternativo.`);
   return{raw,plan,model,command};
 }
 
@@ -15391,26 +15433,36 @@ function v73ApplyRequestedChartType(charts=[],intent={}){
 function v73FinalPresentationSchema(){return{type:'object',properties:{title:{type:'string'},written_answer:{type:'string'},spoken_answer:{type:'string'},presentation:{type:'object',properties:{table:{type:'boolean'},chart:{type:'boolean'},chart_type:{type:'string',enum:['bar','line','pie','donut','horizontalBar','none']}},required:['table','chart','chart_type']}},required:['title','written_answer','spoken_answer','presentation']};}
 function v73FinalPresentationTool(){return{type:'function',name:'zuzu_final_presentation',description:'Entrega las dos redacciones finales y la decisión de artefactos.',parameters:v73FinalPresentationSchema()};}
 function v79RawFinalInstructionCompact(){
-  return `Eres Zuzu, fase FINAL de ControlEvent. El plan ya está decidido y CE ya devolvió hechos canónicos. Presenta SOLO esos hechos; no abras otra investigación ni inventes cifras.
+  return `Eres Zuzu en la fase FINAL. CE ya ejecutó el marco semántico y te entrega hechos canónicos. Tu trabajo no es sonar como un informe ni como atención al cliente: es HABLAR con una persona que lleva una conversación contigo.
 
-ESTILO HUMANO
-- Zuzu es masculino. Natural, directo y breve en voz. No narres cambios de foco ni digas «he cambiado el contexto»; simplemente responde en el nuevo foco.
-- Evita prefacios serviciales y repetir el nombre del usuario/evento sin necesidad. spoken_answer puede ser más corto que written_answer salvo que el usuario pida una lista completa.
-- Si no hay dato suficiente, dilo con normalidad; no rellenes con suposiciones.
-- Si CURRENT_USER expresa frustración o critica una respuesta anterior, reconoce el despiste concreto con naturalidad y brevedad. Evita fórmulas de atención al cliente como «mi objetivo es ayudarte», «lamento que tengas esa impresión» o «¿hay algo más en lo que pueda asistirte?». No cierres con una pregunta genérica salvo que necesites una aclaración real.
+VOZ HUMANA
+- Zuzu es masculino. Habla en español natural, cálido, ágil y con personalidad. Frases que una persona diría de verdad; no frases de manual.
+- Lee RECENT_DIALOGUE y conversation_context.current_context antes de redactar. La respuesta debe parecer el siguiente turno de ESA charla, no una respuesta aislada.
+- Adapta el registro al usuario: si habla coloquial, puedes ser coloquial; si bromea, puedes devolver una sonrisa verbal breve; si está molesto, reconoce el fallo sin dramatizar. No imites insultos ni fuerces chistes.
+- Para una respuesta corta, NO pongas encabezados artificiales como «Respuesta a frustración», «Información del evento», «Historial de conversación» salvo que realmente ayuden en pantalla. El title puede ser corto y discreto.
+- Prohibidas las coletillas de call-center: «mi objetivo es ayudarte», «lamento que tengas esa impresión», «¿hay algo más en lo que pueda asistirte?», «no dudes en preguntar», «¿te gustaría conocer...?». Tampoco «Pido disculpas» como fórmula automática. Mejor: «Sí, ahí me despisté», «Tienes razón: seguíamos con Clara», «No, eso no era lo que me pediste».
+- No anuncies procesos («voy a buscar», «he cambiado el foco», «procedo a...»). Hazlo y responde.
+- No pidas al usuario que recuerde el tema si current_context/discourse_focus/recent_turns ya lo contienen. Si sabes que seguíais con Clara, dilo y continúa desde ahí.
+- Si el usuario corrige o se queja y NO pide datos nuevos, responde al fallo concreto en 1–3 frases. No conviertas la queja en una consulta ni cierres con una pregunta genérica.
+- Si el usuario da una etiqueta/versión de prueba, no lo saludes como si hubiera dicho hola: basta una reacción natural y breve al marcador.
+- spoken_answer debe sonar hablado: menos signos, menos listas, menos tecnicismos, respirable. written_answer puede ser algo más completo. Cuando el usuario pide una lista completa, la voz también puede ser larga si hace falta.
 
-AUTORIDAD FACTUAL
-- plan_executed/compiled_action = intención del turno. resultado_ce.authoritative_payload y facts = verdad completa. rows_sample puede estar truncada; no la uses para afirmar que una lista está completa.
-- Totales/recuentos salen de facts/column_stats, no de sumar mentalmente una muestra. Si la VIEW está agrupada, grupos no son registros físicos.
-- purchases y donations son dominios distintos. En donations: Supuesta/Comprometida NO están físicamente recibidas; Entregada SÍ. Nunca traduzcas esos estados a Pte.Compra/TKxx.
-- Para persona individual no atribuyas íntegro un registro compartido si CE distingue importe del registro e imputación personal.
-- Asistencia usa los recuentos/nombres canónicos de facts, no row_count.
-- Memoria: respeta data_provenance. Histórico literal/snapshot no es dato recién consultado; current_reexecution sí lo es. No metas memoria proactiva si no está en resultado_ce.execution.
-- temporal_context manda sobre tiempo verbal. Un evento «En curso» no prueba que ya haya sucedido. mandatory_event_notice se conserva en written_answer; no hace falta repetirlo oralmente.
+FIDELIDAD
+- Solo usa resultado_ce/authoritative_payload/facts/dataset y el contexto conversacional permitido. No inventes cifras ni hechos para sonar humano.
+- rows_sample puede estar truncada. Totales/recuentos salen de facts/column_stats, nunca de una muestra.
+- Si la VIEW está agrupada, grupos no son registros físicos.
+- purchases y donations son dominios distintos. En donaciones, Supuesta/Comprometida no significa recibida; Entregada sí.
+- En personas compartidas no atribuyas todo el importe a una persona si CE da imputación individual.
+- Asistencia usa los recuentos y nombres canónicos de facts.
+- Memoria: HISTORICAL_* es historia; CURRENT_REEXECUTION son datos consultados ahora. No mezcles ambos tiempos.
+- Un evento En curso mantiene el aviso factual escrito; usa tiempos verbales compatibles con temporal_context.
 
-PRESENTACIÓN
-- Si el usuario pidió relato/análisis, prosa cohesionada. Si pidió quién/cuánto/cuál, ve al dato primero.
-- presentation.table/chart solo cuando la petición/plan lo justifica. CE pintará la tabla/gráfica canónica: no copies listas masivas en texto salvo petición explícita.
+FORMA
+- Contesta primero a lo que el usuario realmente quiere saber. Después, solo el detalle que aporte valor.
+- Si pidió tabla/gráfica, presentation debe solicitarla; no recites en prosa 200 filas que CE ya puede mostrar.
+- Si action=conversation kind=feedback/correction, usa recent_turns + current_context para nombrar el despiste cuando sea evidente. Ejemplo de tono, NO plantilla: «Sí, ahí me fui: seguíamos con Clara y te pedí que me recordaras el tema cuando ya lo tenía delante.»
+- Si action=conversation kind=memory_index, acompaña la tabla con una frase humana y corta; no digas que la vas a poner si luego presentation.table=false.
+- Si no hay dato, dilo sin ceremonia: «De Clara no me sale nada en FUNCION 2026.» Si el dato existe, ve directo: «Sí: aparece en...». Evita «No hay información disponible sobre...» salvo que el tono formal sea necesario.
 - Devuelve EXACTAMENTE una zuzu_final_presentation válida con title, written_answer, spoken_answer y presentation.`;
 }
 
@@ -15531,7 +15583,7 @@ function v73EventTemporalContext(state={},dataset=null,selectedEventId='',timeCo
   return{now:{iso:trim(timeContext?.iso),local:trim(timeContext?.local),timezone:trim(timeContext?.timezone)||'Europe/Madrid',local_date:localDate},events};
 }
 function v73EnsureInProgressNotice(final={},notice=null,flowTrace=[]){if(!notice)return final;let written=trim(final?.written),spoken=trim(final?.spoken),changed=false;const has=t=>/\ben\s+curso\b|\bprovisional(?:es)?\b/i.test(t);if(!has(written)){written=`${written}${written?'\n\n':''}${notice.written}`;changed=true;}if(changed)zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · EVENTO EN CURSO','OK','CE conserva el aviso factual en pantalla; no lo repite automáticamente en voz.');return{...final,written,spoken};}
-function v73ConversationMetaContext(session={}){const ds=session?.dataset||null;if(!ds)return{recent_turns:v73RawFinalRecentTurns(session)};const f=ds?.facts||{},keys=['event','events','provider','location','days','people_mode','attendance_semantics','income_semantics','event_count_semantics'],facts={};for(const k of keys)if(f?.[k]!==undefined&&f?.[k]!==null&&f?.[k]!=='')facts[k]=v73CompactFinalValue(f[k]);return{recent_turns:v73RawFinalRecentTurns(session),previous_result:{domain:trim(ds?.domain),scope:v73CompactFinalValue(ds?.scope||{}),source_tool:trim(ds?.provenance?.source_tool),facts}};}
+function v73ConversationMetaContext(session={}){const ds=session?.dataset||null,current_context=v73CompactFinalValue(v73CurrentSummary(session),2),base={recent_turns:v73RawFinalRecentTurns(session),current_context};if(!ds)return base;const f=ds?.facts||{},keys=['event','events','provider','location','days','people_mode','attendance_semantics','income_semantics','event_count_semantics'],facts={};for(const k of keys)if(f?.[k]!==undefined&&f?.[k]!==null&&f?.[k]!=='')facts[k]=v73CompactFinalValue(f[k]);return{...base,previous_result:{domain:trim(ds?.domain),scope:v73CompactFinalValue(ds?.scope||{}),source_tool:trim(ds?.provenance?.source_tool),facts}};}
 function v73WeatherSourceContext(dataset=null){if(!dataset||trim(dataset?.domain)!=='weather')return null;const f=dataset?.facts||{};return{provider:trim(f?.provider)||'Open-Meteo',location:trim(f?.location),days:Number(f?.days)||Number(dataset?.rowCount)||0,source_tool:trim(dataset?.provenance?.source_tool)||'event_weather',semantics:'Previsión meteorológica externa; no es un dato inventado ni un hecho administrativo del estado En curso del evento. Puede actualizarse al cambiar la previsión del proveedor.'};}
 function v73EuroNumber(raw=''){
   let s=trim(raw).replace(/\s/g,'').replace(/€/g,'');if(!s)return null;
@@ -16246,28 +16298,11 @@ function v79HasExplicitOperationalAnchor(plan={},entityCandidates={},session={})
   return false;
 }
 function v79FastLocalPresentation(plan={},execution={},dataset=null,status='OK'){
-  if(trim(status)==='KO')return false;
-  const action=trim(plan?.action),rk=trim(plan?.response_kind),q=plan?.query||{};
-  if(action==='local')return true;
-  const domains=arr(q?.targets).map(t=>trim(t?.domain)).filter(Boolean),one=domains.length===1?domains[0]:'',ops=arr(q?.operations),supported=new Set(['filter','sort','limit','group','set_fields','add_field','add_fields','remove_field','remove_fields','clear_filters']);
-  if(action!=='query'||!dataset||q?.presentation?.chart===true)return false;
-  if(ops.some(op=>!supported.has(trim(op?.type))))return false;
-  if(ops.some(op=>trim(op?.type)==='group'&&!arr(op?.metrics).length&&!trim(op?.metric)&&!trim(op?.aggregation)))return false;
-  if(rk==='compare'&&one!=='comparison')return false;
-  if(['amount','units','count','who','what','whether','which_event','table','compare'].includes(rk)){
-    if(domains.some(d=>['event_summary','person','management','bank_timeline','weather'].includes(d)))return false;
-    // BANK4_10 · SAFE FAST-LOCAL. Una petición que Gemini llamó «table» pero que contiene
-    // orden/ranking/limit no se cierra con el resumen genérico de la tabla cruda. Solo se
-    // permite localmente si la VIEW ya quedó reducida a una única fila autoritativa.
-    if(rk==='table'&&ops.some(op=>['sort','limit','rank'].includes(trim(op?.type)))&&Number(dataset?.rowCount)>1)return false;
-    return true;
-  }
-  // BANK4_9: resúmenes cuyo texto canónico CE ya contiene todas las magnitudes necesarias
-  // no necesitan una segunda llamada para parafrasear. event_summary/person siguen libres
-  // porque una pregunta amplia puede requerir relato/interpretación humana.
-  if((rk==='summary'||!rk)&&['people','bank','documentation'].includes(one))return true;
-  if(rk==='summary'&&['events','purchases','donations','products','stores_used'].includes(one)&&!ops.length)return true;
-  if(rk==='summary'&&one==='event_summary'&&trim(dataset?.scope?.kind)==='all_events')return true;
+  // BANK4_14 · HUMAN RESPONSE. El cierre local rápido ahorraba una llamada, pero también hacía
+  // que muchas respuestas correctas sonaran a plantilla («El importe es...», «Fue...»). Desde
+  // esta versión toda respuesta factual normal pasa por la fase final humana de Zuzu. Solo los
+  // textos que DEBEN ser literales/deterministas (recuerdo literal, índice de memoria, KO seguro,
+  // cambio silencioso de foco) siguen cerrándose localmente por sus ramas específicas.
   return false;
 }
 
@@ -16278,6 +16313,30 @@ async function v79RunWithinBudget(task,budgetMs=700){
   const result=await Promise.race([work,timeout]);if(timer)clearTimeout(timer);return{...result,budgetMs:ms};
 }
 
+// BANK4_14 · Estado físico derivado del MARCO, nunca de volver a leer la frase del usuario.
+function v414NextDiscourseFocus(session={},plan={},execution={},resultBundle=null){
+  const prev=v76DiscourseFocus(session),out={...prev},q=plan?.query||{},scope=q?.scope||execution?.scope||{},domain=trim(v73PrimaryDomain(q)||execution?.domain);
+  if(plan?.action==='set_context'){
+    if(plan?.context?.clear_all===true)return{};
+    const type=trim(plan?.context?.type),values=arr(plan?.context?.values).map(trim).filter(Boolean);if(values.length===1){const value=values[0];if(type==='person'){out.subject_type='PERSON';out.subject=value;delete out.product;delete out.store;}else if(type==='product'){out.subject_type='PRODUCT';out.subject=value;out.product=value;}else if(type==='store'){out.subject_type='STORE';out.subject=value;out.store=value;}else if(type==='event'){out.subject_type='EVENT';out.subject=value;out.event=value;}}
+    return out;
+  }
+  if(plan?.action!=='query'&&plan?.action!=='local'&&plan?.action!=='reference')return out;
+  const one=a=>arr(a).map(trim).filter(Boolean).length===1?arr(a).map(trim).filter(Boolean)[0]:'';
+  const person=trim(q?.person||q?.responsible||q?.donor)||one(q?.people)||one(q?.responsibles)||one(q?.donors)||trim(execution?.focus?.person||execution?.focus?.responsible||execution?.focus?.donor||resultBundle?.dataset?.facts?.person);
+  const product=trim(q?.product?.text||execution?.focus?.product),store=trim(q?.store)||one(q?.stores)||trim(execution?.focus?.store),event=trim(scope?.event||execution?.focus?.event);
+  if(person){out.subject_type='PERSON';out.subject=person;delete out.product;delete out.store;if(domain==='purchases')out.responsible=person;if(domain==='donations')out.donor=person;}
+  else if(product){out.subject_type='PRODUCT';out.subject=product;out.product=product;delete out.store;}
+  else if(store){out.subject_type='STORE';out.subject=store;out.store=store;delete out.product;}
+  else if(event&&['events','event_summary'].includes(domain)){out.subject_type='EVENT';out.subject=event;}
+  if(event)out.event=event;
+  // Un resultado físicamente unitario puede convertirse en referente sin releer CURRENT_USER.
+  const ops=plan?.action==='query'?arr(q?.operations):arr(plan?.local?.operations),decisive=Number(execution?.row_count)===1||ops.some(o=>['sort','rank','limit'].includes(trim(o?.type)));
+  if(decisive&&resultBundle?.dataset){const rows=v73RowsForStored(resultBundle.dataset,resultBundle.view||{}),r=rows[0]||{},val=k=>trim(r?.[k]),rp=val('Producto'),rr=val('Responsable'),rd=val('Donante'),re=val('Evento'),rs=val('Tienda');if(rr||rd){out.subject_type='PERSON';out.subject=rr||rd;}else if(rp){out.subject_type='PRODUCT';out.subject=rp;out.product=rp;}else if(rs){out.subject_type='STORE';out.subject=rs;out.store=rs;}if(rr)out.responsible=rr;if(rd)out.donor=rd;if(re)out.event=re;if(rs)out.store=rs;}
+  return out;
+}
+function v414ShouldClearMemoryFocus(plan={}){return plan?.action==='query'||plan?.action==='set_context';}
+
 async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
   const perfStarted=Date.now(),perf={contextMs:0,compileMs:0,memoryMs:0,executeMs:0,presentMs:0,commitMs:0,fastLocal:false,memorySearch:false};
   const actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{};
@@ -16286,10 +16345,14 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const conversation=await ensureZuzuConversation({conversationId,actor,selectedEventId});
   const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:true,recentLimit:24});
   perf.contextMs=Date.now()-contextT0;
-  const entityCandidates=v74EntityCandidatePacket(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session),usePending=v73IsPendingHistoryChoiceReply(userPrompt,pendingHistory);
-  const currentConversationRecall=v73IsCurrentConversationRecallPrompt(userPrompt),memoryIndexIntent=v413MemoryIndexIntent(userPrompt),historyCandidates=usePending?pendingHistory:(memoryIndexIntent?await listZuzuMemoryEpisodes({actor,conversationId:conversation.conversationId,limit:200}):((isRecallPrompt(userPrompt)&&!currentConversationRecall)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}):[]));
+  const entityCandidates=v74EntityCandidatePacket(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session);
+  // BANK4_14 · La recuperación aporta EVIDENCIA, nunca decide la intención. Se intenta un Top-K
+  // semántico breve para cualquier frase; si tarda, no bloquea. Gemini decide después si aquello
+  // era memoria, una consulta actual o simple conversación.
+  let historyCandidates=arr(pendingHistory).slice(0,8);
+  if(!historyCandidates.length){const memoryProbe=await v79RunWithinBudget(()=>searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}),450);if(memoryProbe.kind==='value')historyCandidates=arr(memoryProbe.value);else if(memoryProbe.kind==='timeout')zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · MEMORY EVIDENCE GATE','INFO','La evidencia histórica superó 450 ms; el turno sigue sin bloquearse.');}
   const policy=v332InteractionPolicy(userPrompt);
-  zuzuTracePush(flowTrace,'v4_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (elección pendiente)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
+  zuzuTracePush(flowTrace,'v4_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (referencias pendientes disponibles)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
   if(historyCandidates.length)zuzuTracePush(flowTrace,'v4_0_exp · MEMORIA EPISÓDICA · FUENTE','INFO',`DB persistente · ${historyCandidates.length} candidato(s) · prioridad natural más joven→más viejo salvo contexto claramente más fuerte.`);
   zuzuTracePush(flowTrace,'v4_0_exp · Ledger · CANDIDATOS TIPADOS RAW14V','INFO',JSON.stringify(entityCandidates).slice(0,2800));
   {const nav=v78ThreadNavigation(session,v73CurrentSummary(session));zuzuTracePush(flowTrace,'v4_0_exp · Z1 · CONTEXTO DE ENTRADA','INFO',`scope=${JSON.stringify(v73CurrentSummary(session)?.scope||{})} · temas=${arr(nav.topics_recent_first).map(x=>`${x.ref}:${arr(x.domains).join('+')||x.action}`).slice(0,6).join(' | ')||'—'} · eventos=${arr(nav.events_recent_first).map(x=>x.name).join(' → ')||'—'} · resultados=${JSON.stringify(nav.current_result_referents?.ordered_by_role||{}).slice(0,900)}`);}
@@ -16297,13 +16360,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   let compiled;
   const compileT0=Date.now();
   try{
-    const ordinalMemoryCandidate=v411MemoryOrdinalCandidate(userPrompt,historyCandidates),activeMemoryFocus=v76MemoryFocus(session),hasTypedEntity=arr(entityCandidates?.flat).some(x=>['exact','strong'].includes(trim(x?.match_type)));
-    if(memoryIndexIntent){compiled=v73LocalCompiledConversation('memory_index',`El usuario pide el índice de recuerdos persistentes en orden ${v413MemoryIndexOrder(userPrompt)}.`,policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_13 · ÍNDICE DE MEMORIA','OK',`${historyCandidates.length} episodio(s) persistentes disponibles para la tabla; se evita convertir una petición plural en confirmación del recuerdo anclado.`);}
-    else if(ordinalMemoryCandidate){compiled=v411LocalCompiledReference(ordinalMemoryCandidate.ref,'recall_episode',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_11 · MEMORIA ORDINAL DIRECTA','OK',`Petición ${v411MemoryOrdinalIntent(userPrompt)?.label||'ordinal'}: ${ordinalMemoryCandidate.ref} → ${trim(ordinalMemoryCandidate.conversation_id)}. CE no deja que la conversación más reciente sustituya a la primera/segunda/última pedida.`);}
-    else if(activeMemoryFocus&&!hasTypedEntity&&v411MemoryFollowupIntent(userPrompt)){compiled=v411LocalCompiledReference('CURRENT','recall_episode',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_11 · FOLLOW-UP DE RECUERDO','OK',`El turno continúa sobre el episodio ${trim(activeMemoryFocus.conversation_id)}; «CURRENT» es el envoltorio de memoria, no la conversación presente.`);}
-    else if(currentConversationRecall&&!arr(entityCandidates?.flat).length){compiled=v73LocalCompiledConversation('conversation_summary','El usuario pide resumir exclusivamente la conversación actual.',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · TOKEN BUDGET · COMPILACIÓN LOCAL','OK','Resumen general de conversación actual sin entidad explícita: CE evita la primera llamada Gemini y no carga HISTORY_CANDIDATES.');}
-    else if(v73IsSimpleAcknowledgement(userPrompt,entityCandidates)){compiled=v73LocalCompiledConversation('general','El usuario acusa recibo o agradece sin pedir datos nuevos.',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · TOKEN BUDGET · COMPILACIÓN LOCAL','OK','Acuse breve: CE evita la primera llamada Gemini; la conversación y CURRENT quedan intactos.');}
-    else compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone},voiceConversation});
+    compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone},voiceConversation});
   }
   catch(error){
     zuzuTracePush(flowTrace,'v4_0_exp · Ledger · fallo de compilación Zuzu','WARN',`${cleanGeminiError(error)}. El fallo se registra como turno inmutable y no altera el turno anterior.`);
@@ -16313,27 +16370,19 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'},execution,datasetId:session?.currentTurn?.datasetId||'',viewId:session?.currentTurn?.viewId||'',parentTurnId:session?.currentTurn?.turnId||'',status:'WARN',title:'Zuzu no pudo interpretar el turno',answer,selectedEventId});
     perf.commitMs=Date.now()-commitT0;
     const resultContext=v73LightContext(saved.conversation,saved.turn,session?.dataset||null,session?.view||null),usage=summarizeGeminiUsageFromTrace(flowTrace);
-    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_13 MEMORY CONTINUITY · FEEDBACK SAFE · Z1 FINAL · ORACLE STRICT · EUR TYPED · SAFE FALLBACK · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_14 SEMANTIC CORE · HUMAN RESPONSE · Z1 FINAL · ORACLE STRICT · EUR TYPED · SAFE FALLBACK · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
   }
 
   perf.compileMs=Date.now()-compileT0;
-  const raw=compiled.raw,currentContext=v73CurrentSummary(session);let normalizedPlan=v76ApplyFocusBindings(compiled.plan,userPrompt,currentContext,flowTrace,historyCandidates);
-  normalizedPlan=v410RepairContextualConversationFollowup(normalizedPlan,currentContext,entityCandidates,flowTrace);
-  normalizedPlan=v413RepairFeedbackOnly(normalizedPlan,userPrompt,flowTrace);
-  normalizedPlan=v79RepairEllipticalScope(normalizedPlan,currentContext,entityCandidates,userPrompt,flowTrace);
-  normalizedPlan=v413RepairSubjectEllipsis(normalizedPlan,currentContext,entityCandidates,userPrompt,flowTrace);
-  normalizedPlan=v411RepairExactEventBroadQuery(normalizedPlan,userPrompt,entityCandidates,flowTrace);
-  normalizedPlan=v411RepairSpecificTicketLiteral(normalizedPlan,userPrompt,flowTrace);
-  normalizedPlan=v79RepairRelativeYearScope(normalizedPlan,currentContext,userPrompt,state,flowTrace);
-  normalizedPlan=v79RepairEventTargetContract(normalizedPlan,currentContext,flowTrace);
-  normalizedPlan=v410RepairExactPersonSelection(normalizedPlan,currentContext,entityCandidates,flowTrace);
-  normalizedPlan=v79RepairExplicitPersonContext(normalizedPlan,currentContext,entityCandidates,flowTrace);
-  normalizedPlan=v410RepairTypedFilterConflicts(normalizedPlan,entityCandidates,flowTrace);
-  normalizedPlan=v411RepairMasterCatalogIntent(normalizedPlan,userPrompt,entityCandidates,flowTrace);
-  normalizedPlan=v411RepairDonationDeliveryContract(normalizedPlan,userPrompt,session,flowTrace);
-  normalizedPlan=v411InheritCurrentSubset(normalizedPlan,session,flowTrace);
-  normalizedPlan=v79RepairComparisonFollowup(normalizedPlan,currentContext,flowTrace);
-  const coverage=v76EventCoverageProfile(userPrompt,session,normalizedPlan?.query||{});if(coverage&&normalizedPlan?.action==='query'){normalizedPlan={...normalizedPlan,query:{...(normalizedPlan.query||{}),coverage}};zuzuTracePush(flowTrace,'v4_0_exp · EVENT COVERAGE ENGINE','OK',`modo=${coverage.mode} · contexto=${coverage.context_domain||'—'} · facetas=${coverage.facets.join(', ')}. Descripción y DOCxx conservan prioridad narrativa.`);}
+  const raw=compiled.raw;let normalizedPlan=compiled.plan;
+  // BANK4_14 · fin del «segundo cerebro» CE: ningún Repair* relee CURRENT_USER. El marco de
+  // Gemini es autoritativo. CE solo puede completar detalles físicos de ejecución después.
+  zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · NO SEMANTIC REPAIR','OK','Marco de Zuzu aceptado sin FocusBindings, SubjectEllipsis, feedback regex, scope heurístico, catálogo por palabras ni reparación comparativa. CE pasa a validación/ejecución física.');
+  if(normalizedPlan?.action==='conversation'&&trim(normalizedPlan?.conversation?.kind)==='memory_index'){
+    historyCandidates=await listZuzuMemoryEpisodes({actor,conversationId:conversation.conversationId,limit:200});
+    zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · ÍNDICE DE MEMORIA','OK',`${historyCandidates.length} episodio(s) persistentes cargados DESPUÉS de que Zuzu decidiera memory_index; la recuperación no decide la semántica.`);
+  }
+  const coverage=null;
   const plan=v73PrepareAnalyticPlan(normalizedPlan,session),model=compiled.model,command=compiled.command,parentTurnId=session?.currentTurn?.turnId||'';
   if(JSON.stringify(plan)!==JSON.stringify(normalizedPlan))zuzuTracePush(flowTrace,'v4_0_exp · Ledger · interpretación física CE','INFO',`CE completa solo detalles físicos de operación; el registro semántico de Zuzu se conserva intacto. EXEC=${JSON.stringify(plan).slice(0,3200)}`);
   let proactiveMemory=null,socialMemoryHints=[];
@@ -16368,7 +16417,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     }else if(plan.action==='conversation'){
       const kind=trim(plan?.conversation?.kind)||'general';
       if(kind==='memory_index'){
-        const order=v413MemoryIndexOrder(userPrompt),rows=v413MemoryIndexRows(historyCandidates,order),oldestFirst=order==='oldest';
+        const order=['oldest','newest'].includes(trim(plan?.conversation?.memory_order))?trim(plan.conversation.memory_order):'newest',rows=v413MemoryIndexRows(historyCandidates,order),oldestFirst=order==='oldest';
         const displayRows=rows.map((r,i)=>({'#':i+1,Fecha:v73SpanishDate(r.Fecha)||r.Fecha,Resumen:r.Recuerdo||'Sin resumen',Temas:r.Temas||'—',Estado:trim(r.Estado)==='unfinished'?'A medias':'Guardado'}));
         title='Recuerdos guardados';
         answer=rows.length?`Tengo ${rows.length} recuerdo${rows.length===1?'':'s'} sustancial${rows.length===1?'':'es'} localizados. Te los pongo ${oldestFirst?'del más antiguo al más moderno':'del más reciente al más antiguo'}.`:'No encuentro recuerdos sustanciales guardados para mostrar.';
@@ -16469,9 +16518,9 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     }
   }catch(error){status='KO';zuzuTracePush(flowTrace,'v4_0_exp · Ledger · ejecución CE','KO',cleanGeminiError(error));answer='ControlEvent no pudo ejecutar este registro. El historial anterior permanece intacto y este fallo queda guardado para auditoría.';execution={summary:cleanGeminiError(error),error:cleanGeminiError(error)};}
   if(status!=='KO'){
-    const nextFocus=v76NextDiscourseFocus(session,entityCandidates,userPrompt,normalizedPlan,execution,{dataset,view});if(nextFocus&&Object.keys(nextFocus).length)execution={...(execution||{}),discourse_focus:nextFocus};
+    const nextFocus=v414NextDiscourseFocus(session,normalizedPlan,execution,{dataset,view});if(nextFocus&&Object.keys(nextFocus).length)execution={...(execution||{}),discourse_focus:nextFocus};
     if(coverage)execution={...(execution||{}),event_coverage:coverage};
-    const shouldClearMemory=v76ShouldClearMemoryFocus(userPrompt,normalizedPlan),oldMemoryFocus=v76MemoryFocus(session),oldMemoryAnchor=v77MemoryAnchor(session),oldMemoryReplay=v77MemoryReplay(session);
+    const shouldClearMemory=v414ShouldClearMemoryFocus(normalizedPlan),oldMemoryFocus=v76MemoryFocus(session),oldMemoryAnchor=v77MemoryAnchor(session),oldMemoryReplay=v77MemoryReplay(session);
     if(oldMemoryFocus&&!execution?.memory_episode&&!shouldClearMemory)execution={...(execution||{}),memory_focus:oldMemoryFocus};
     if(oldMemoryAnchor&&!execution?.memory_anchor&&!shouldClearMemory)execution={...(execution||{}),memory_anchor:oldMemoryAnchor};
     if(oldMemoryReplay&&!execution?.memory_replay&&!shouldClearMemory)execution={...(execution||{}),memory_replay:oldMemoryReplay};
@@ -16492,7 +16541,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     answer=trim(answer)||'No he podido ejecutar esta petición con seguridad. He conservado intacto el hilo anterior.';
     spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};
     execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_execution_error'};
-    zuzuTracePush(flowTrace,'v4_0_exp · BANK4_13 · KO SIN ALUCINACIÓN FINAL','OK',`Ejecución KO: se conserva el mensaje factual/local de CE (${text(answer).length} caracteres) y NO se llama a Gemini para redactar sobre un resultado inexistente.`);
+    zuzuTracePush(flowTrace,'v4_0_exp · BANK4_14 · KO SIN ALUCINACIÓN FINAL','OK',`Ejecución KO: se conserva el mensaje factual/local de CE (${text(answer).length} caracteres) y NO se llama a Gemini para redactar sobre un resultado inexistente.`);
     zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(answer).length} caracteres · voz=${text(spokenAnswer).length} caracteres · error local autoritativo.`);
   }else if(compiled.local_compile||execution?.local_authoritative_presentation===true||fastLocal){
     const kind=trim(normalizedPlan?.conversation?.kind),literalLocal=execution?.local_authoritative_presentation===true;
@@ -16534,7 +16583,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   else if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_13 MEMORY CONTINUITY · FEEDBACK SAFE · Z1 FINAL · ORACLE STRICT · EUR TYPED · SAFE FALLBACK · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_14 SEMANTIC CORE · HUMAN RESPONSE · Z1 FINAL · ORACLE STRICT · EUR TYPED · SAFE FALLBACK · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.

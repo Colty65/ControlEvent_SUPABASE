@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-BANK4_13-Z1H-VOICE-V47';
+  var BUILD='v4_0_exp-BANK4_14-Z1H-VOICE-V47';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
