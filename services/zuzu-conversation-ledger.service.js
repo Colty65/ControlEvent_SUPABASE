@@ -266,7 +266,7 @@ async function persistTurnMemoryProjection(turnId='',memory={}){
 }
 function memoryItemFromTurn(conversation,turn,memory={}){
   const exec=turn.execution||{},m=memory?.summary!==undefined?memory:memoryProjectionForTurn(turn);
-  return{conversationId:trim(conversation?.conversationId||turn.conversationId),conversationStatus:trim(conversation?.status)||'active',turnId:turn.turnId,seq:turn.seq,createdAt:turn.createdAt,userPrompt:turn.userPrompt,title:turn.title,answer:turn.answer,actionType:turn.actionType,domain:trim(exec.domain),scope:exec.scope||{},focus:exec.focus||{},semanticTags:semanticTagsFromTurn(turn),rowCount:Number(exec.row_count)||0,summary:trim(m.summary),memoryQuality:Number(m.quality)||0,memoryKind:trim(m.kind),memoryEntities:arr(m.entities),planSignature:m.planSignature||{},memoryVisibility:trim(m.visibility||turn.memoryVisibility)||'private',experienceSignature:m.experienceSignature||turn.memoryExperienceSignature||{},memorySource:'db'};
+  return{conversationId:trim(conversation?.conversationId||turn.conversationId),conversationCreatedAt:trim(conversation?.createdAt),conversationUpdatedAt:trim(conversation?.updatedAt),conversationStatus:trim(conversation?.status)||'active',turnId:turn.turnId,seq:turn.seq,createdAt:turn.createdAt,userPrompt:turn.userPrompt,title:turn.title,answer:turn.answer,actionType:turn.actionType,domain:trim(exec.domain),scope:exec.scope||{},focus:exec.focus||{},semanticTags:semanticTagsFromTurn(turn),rowCount:Number(exec.row_count)||0,summary:trim(m.summary),memoryQuality:Number(m.quality)||0,memoryKind:trim(m.kind),memoryEntities:arr(m.entities),planSignature:m.planSignature||{},memoryVisibility:trim(m.visibility||turn.memoryVisibility)||'private',experienceSignature:m.experienceSignature||turn.memoryExperienceSignature||{},memorySource:'db'};
 }
 async function updateHistoryIndex(){
   // RAW14T: histórico = tablas persistentes. Deliberadamente NO escribimos índice de recuerdos en ce_meta.
@@ -414,9 +414,39 @@ function compareMemoryCandidates(a={},b={},preferRecent=false){
   const dateDelta=memoryRecentMs(b)-memoryRecentMs(a);if(dateDelta)return dateDelta;
   return sb-sa;
 }
+function memoryConversationOrdinalIntent(prompt=''){
+  const n=norm(prompt);if(!/\b(?:conversacion|charla|hilo|recuerdo|episodio)\b/.test(n))return null;
+  if(/\b(?:penultima|penultimo)\b/.test(n))return{order:'newest',index:2,label:'penúltima'};
+  if(/\b(?:ultima|ultimo|mas reciente|la reciente|el reciente)\b/.test(n))return{order:'newest',index:1,label:'última'};
+  if(/\b(?:mas antigua|mas antiguo|la antigua|el antiguo)\b/.test(n))return{order:'oldest',index:1,label:'más antigua'};
+  const ord=[['primera','primer','primero'],['segunda','segundo'],['tercera','tercer','tercero'],['cuarta','cuarto'],['quinta','quinto'],['sexta','sexto'],['septima','septimo'],['octava','octavo']];
+  for(let i=0;i<ord.length;i++)if(new RegExp(`\\b(?:${ord[i].join('|')})\\b`).test(n))return{order:'oldest',index:i+1,label:ord[i][0]};
+  return null;
+}
+function memoryOrdinalConversationItems(items=[],conversationId='',intent=null){
+  if(!intent)return[];const byConversation=new Map();
+  for(const x of arr(items)){
+    const cid=trim(x?.conversationId);if(!cid||cid===trim(conversationId))continue;
+    const prev=byConversation.get(cid),stamp=trim(x?.conversationCreatedAt)||trim(x?.createdAt);
+    if(!prev||text(stamp).localeCompare(text(trim(prev?.conversationCreatedAt)||trim(prev?.createdAt)))<0)byConversation.set(cid,x);
+  }
+  const ordered=[...byConversation.values()].sort((a,b)=>{
+    const ad=text(trim(a?.conversationCreatedAt)||trim(a?.createdAt)),bd=text(trim(b?.conversationCreatedAt)||trim(b?.createdAt));
+    const cmp=ad.localeCompare(bd);return intent.order==='newest'?-cmp:cmp;
+  });
+  return ordered;
+}
 export async function searchZuzuHistoryCandidates({actor={},prompt='',conversationId='',limit=8,nowIso=''}={}){
-  const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),window=resolveZuzuMemoryTimeWindow(prompt,nowIso),explicit=isRecallPrompt(prompt),unfinishedHint=isUnfinishedRecallPrompt(prompt),n=norm(prompt),broadRecent=/\b(?:ultimamente|recientemente|hace poco|hace unos minutos|hace un rato|hace unas horas)\b/.test(n),topicTerms=tokens(prompt);
+  const uid=actorId(actor);if(!uid)return[];const items=await memoryIndexItemsForUser(uid),window=resolveZuzuMemoryTimeWindow(prompt,nowIso),explicit=isRecallPrompt(prompt),unfinishedHint=isUnfinishedRecallPrompt(prompt),ordinalIntent=explicit?memoryConversationOrdinalIntent(prompt):null,n=norm(prompt),broadRecent=/\b(?:ultimamente|recientemente|hace poco|hace unos minutos|hace un rato|hace unas horas)\b/.test(n),topicTerms=tokens(prompt);
   let pool=items.filter(x=>withinMemoryWindow(x,window));
+  // Una petición ordinal de conversación (primera, segunda, última, penúltima...) no es
+  // una búsqueda temática: ordena episodios sustanciales persistentes por su fecha real.
+  // Así «nuestra primera conversación» no queda secuestrada por los 8 recuerdos más recientes.
+  if(ordinalIntent){
+    const ordered=memoryOrdinalConversationItems(pool,conversationId,ordinalIntent),max=Math.max(Math.max(1,Math.min(12,Number(limit)||8)),Number(ordinalIntent.index)||1),out=[];
+    for(const x of ordered.slice(0,max)){const episode=await memoryEpisodeMeta(x.conversationId);out.push({...x,score:10-(out.length*0.01),episode});}
+    return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,semantic_tags:x.semanticTags||{},row_count:x.rowCount,summary:x.summary,memory_quality:Number(x.memoryQuality)||0,memory_kind:trim(x.memoryKind),memory_visibility:trim(x.memoryVisibility)||'private',memory_source:'db',experience_signature:x.experienceSignature||{},plan_signature:x.planSignature||{},episode_summary:trim(x.episode?.conversation_summary),episode_started_at:trim(x.episode?.started_at),episode_updated_at:trim(x.episode?.updated_at),episode_topics:arr(x.episode?.main_topics),score:Number(x.score.toFixed(3)),ordinal_rank:i+1,ordinal_order:ordinalIntent.order,ordinal_label:ordinalIntent.label,time_window:window?{start:window.start,end:window.end,label:window.label}:null,conversation_status:trim(x.conversationStatus||x.episode?.conversation_status)||'active',unfinished_hint:unfinishedHint,same_conversation:false}));
+  }
   // «La conversación que dejamos a medias» es una pista de estado, no una palabra temática.
   // Si hay episodios unfinished, reducimos la búsqueda a ellos; si no, conservamos el ranking
   // histórico normal para no dejar al usuario sin salida por datos antiguos sin status.

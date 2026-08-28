@@ -13,7 +13,7 @@ t('cambio puro de foco no narra mecanismo',ai.includes("answer='Vale.'")&&ai.inc
 t('prompt prohíbe verbalizar cambio de foco',ai.includes('CAMBIO DE FOCO HUMANO')&&ai.includes('No prepares frases del tipo'));
 t('corrección intenta reparar hilo',ai.includes('REPARACIÓN DEL HILO')&&ai.includes('CORRIGE HACIENDO'));
 t('donaciones mantienen dominio distinto',ai.includes('DONACIONES Y ENTREGA FÍSICA')&&ai.includes('CONSERVA targets:["donations"]'));
-t('no recibido usa Supuesta + Comprometida',ai.includes('values:["Supuesta","Comprometida"]'));
+t('no recibido usa Supuesta + Comprometida',ai.includes("statuses=['Supuesta','Comprometida']")||ai.includes('values:["Supuesta","Comprometida"]'));
 t('entregada usa estado canónico',ai.includes('Situación entrega')&&ai.includes('Entregada'));
 t('filtro one_of viaja por operaciones',ai.includes("'one_of'.includes")||ai.includes("'one_of']"));
 t('voz espera con una sola microseñal',voice.includes('entertainmentMaxPerRequest:1')&&voice.includes('entertainmentInitialDelayMs:3300'));

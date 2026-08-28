@@ -41,7 +41,8 @@
     "test:zuzu-z1-human": "node scripts/zuzu-z1-human-continuity-regression.cjs",
     "test:v4-bank48": "node scripts/v4-0-exp-bank48-zuzu-scope-context-regression.cjs",
     "test:v4-bank49": "node scripts/v4-0-exp-bank49-zuzu-canonical-performance-regression.cjs",
-    "test:v4-bank410": "node scripts/v4-0-exp-bank410-zuzu-z1-closure-money-regression.cjs"
+    "test:v4-bank410": "node scripts/v4-0-exp-bank410-zuzu-z1-closure-money-regression.cjs",
+    "test:v4-bank411": "node scripts/v4-0-exp-bank411-zuzu-z1-final-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

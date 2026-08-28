@@ -58,7 +58,7 @@ ok(F.v79FastLocalPresentation({action:'query',response_kind:'table',query:{targe
 ok(F.v79FastLocalPresentation({action:'query',response_kind:'table',query:{targets:[{domain:'purchases'}],operations:[{type:'sort',field:'Importe'},{type:'limit',limit:1}]}},{},{domain:'purchases',rowCount:1},'OK')===true,'FAST-LOCAL admite ranking ya materializado a una fila');
 ok(lab.includes('asksCount')&&lab.includes('no devuelve el recuento bancario canónico'),'oráculo Banco valida la magnitud realmente preguntada');
 ok(lab.includes('payloadItems')&&lab.includes('result-set estructurado'),'oráculo acepta dataset estructurado aunque la respuesta oral sea breve');
-ok(ui.includes('20260828-BANK410-Z1-CLOSURE-SAFEFASTLOCAL-EUR'),'UI exporta build BANK4_10');
-ok(html.includes('controlevent-build" content="20260828-V4_0_EXP-BANK410-Z1-CLOSURE-SAFEFASTLOCAL-EUR'),'build general BANK4_10 actualizado');
-ok(html.includes('zuzu-test-console-gd.js?v=20260828-BANK410-Z1-CLOSURE-SAFEFASTLOCAL-EUR'),'cache-bust ITV BANK4_10 actualizado');
+ok(/20260828-BANK41(?:0-Z1-CLOSURE-SAFEFASTLOCAL-EUR|1-Z1-FINAL-ORACLE-EUR-FAILSAFE)/.test(ui),'UI exporta BANK4_10 o sucesora BANK4_11');
+ok(/controlevent-build" content="20260828-V4_0_EXP-BANK41(?:0-Z1-CLOSURE-SAFEFASTLOCAL-EUR|1-Z1-FINAL-ORACLE-EUR-FAILSAFE)/.test(html),'build general BANK4_10/BANK4_11 actualizado');
+ok(/zuzu-test-console-gd\.js\?v=20260828-BANK41(?:0-Z1-CLOSURE-SAFEFASTLOCAL-EUR|1-Z1-FINAL-ORACLE-EUR-FAILSAFE)/.test(html),'cache-bust ITV BANK4_10/BANK4_11 actualizado');
 console.log(`BANK4_10 Z1 CLOSURE / EUR: ${n}/${n} OK`);

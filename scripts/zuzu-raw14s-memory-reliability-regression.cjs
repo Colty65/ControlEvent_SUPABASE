@@ -31,12 +31,12 @@ t('prompt prohíbe usar entidad como target_ref',/target_ref NUNCA puede ser el 
 t('prompt distingue revisar CURRENT de recordar pasado',/Vuelve a revisarla[\s\S]*NO abrir memoria histórica/.test(ai));
 t('detalle de esa conversación vuelve al episodio recordado',/dame detalle de esa conversación[\s\S]*reference_action=\"recall_episode\"/.test(ai));
 t('meta-memoria comprensible no es VOICE_NOISE',/META-CONVERSACIÓN[\s\S]*has recuperado de la memoria[\s\S]*NUNCA VOICE_NOISE/.test(ai));
-t('arquitectura RAW14S preservada dentro de RAW14U',/RAW14(?:U · TOKEN BUDGET \+ CONTEXTO ESTRICTO|V · DISCOURSE \+ MEMORY FOCUS \+ EVENT COVERAGE)/.test(ai)&&/CANDIDATOS TIPADOS RAW14[UV]/.test(ai));
+t('arquitectura RAW14S preservada en la tubería Z1 actual',/CANDIDATOS TIPADOS RAW14V/.test(ai)&&/Z1 · CONTEXTO DE ENTRADA/.test(ai)&&/MEMORY_FOCUS conserva el episodio/.test(ai));
 
 function extractFunction(src,name){const start=src.indexOf(`function ${name}(`)>=0?src.indexOf(`function ${name}(`):src.indexOf(`export function ${name}(`);if(start<0)throw new Error(name);const brace=src.indexOf('{',start);let d=0,q='',esc=false;for(let i=brace;i<src.length;i++){const c=src[i];if(q){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===q)q='';continue;}if(c==='"'||c==="'"||c==='`'){q=c;continue;}if(c==='{')d++;else if(c==='}'&&--d===0)return src.slice(start,i+1).replace(/^export\s+/,'');}throw new Error(name);}
 try{
   const consts=ledger.slice(ledger.indexOf('const MEMORY_MONTHS='),ledger.indexOf('function memoryNumber'));
-  const body=`const text=v=>v==null?'':String(v);const trim=v=>text(v).trim();const norm=v=>trim(v).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\\s+/g,' ').trim();${consts}\n${extractFunction(ledger,'memoryNumber')}\n${extractFunction(ledger,'memoryUtc')}\n${extractFunction(ledger,'memoryAddDays')}\n${extractFunction(ledger,'resolveZuzuMemoryTimeWindow')}\n${extractFunction(ledger,'isRecallPrompt')}\nreturn {resolveZuzuMemoryTimeWindow,isRecallPrompt};`;
+  const body=`const text=v=>v==null?'':String(v);const trim=v=>text(v).trim();const norm=v=>trim(v).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\\s+/g,' ').trim();${consts}\n${extractFunction(ledger,'memoryNumber')}\n${extractFunction(ledger,'memoryUtc')}\n${extractFunction(ledger,'memoryAddDays')}\n${extractFunction(ledger,'resolveZuzuMemoryTimeWindow')}\n${extractFunction(ledger,'isUnfinishedRecallPrompt')}\n${extractFunction(ledger,'isRecallPrompt')}\nreturn {resolveZuzuMemoryTimeWindow,isRecallPrompt};`;
   const f=Function(body)();
   const mins=f.resolveZuzuMemoryTimeWindow('Hemos estado hablando hace unos minutos de Esther','2026-08-26T17:00:00Z');
   t('funcional: hace unos minutos = ventana reciente',mins&&mins.label==='hace un rato'&&(mins.endMs-mins.startMs)<=7200000);

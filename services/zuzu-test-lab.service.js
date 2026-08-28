@@ -267,7 +267,7 @@ async function managementOracle(state,event){
   try{const r=await execCanonicalTool(state,{id:'itv_oracle_management',name:'event_management',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,hitos:num(f.hitos_count),lg:num(f.lg_count),completed:num(f.lg_completed),pending:num(f.lg_pending)};}catch(_){return null;}
 }
 async function donationOracle(state,event){
-  try{const r=await execCanonicalTool(state,{id:'itv_oracle_donations',name:'event_donation_lines',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,records:num(f.donation_record_count),donors:num(f.donor_count),products:num(f.product_count),total:round(f.total_value,2),supposed:num(f.supposed_count??f.supuesta_count),committed:num(f.committed_count??f.comprometida_count),delivered:num(f.delivered_count??f.entregada_count),supposedValue:round(f.supposed_value??f.supuesta_value,2),committedValue:round(f.committed_value??f.comprometida_value,2),deliveredValue:round(f.delivered_value??f.entregada_value,2),donorRows:arr(toolTable(r,'donors')?.rows),productRows:arr(toolTable(r,'donor_products')?.rows)};}catch(_){return null;}
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_donations',name:'event_donation_lines',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,records:num(f.donation_record_count),donors:num(f.donor_count),products:num(f.product_count),total:round(f.total_value,2),supposed:num(f.donations_supposed_count??f.supposed_count??f.supuesta_count),committed:num(f.donations_committed_count??f.committed_count??f.comprometida_count),delivered:num(f.donations_delivered_count??f.delivered_count??f.entregada_count),supposedValue:round(f.donations_supposed_value??f.supposed_value??f.supuesta_value,2),committedValue:round(f.donations_committed_value??f.committed_value??f.comprometida_value,2),deliveredValue:round(f.donations_delivered_value??f.delivered_value??f.entregada_value,2),lineRows:arr(toolTable(r,'donation_lines')?.rows),donorRows:arr(toolTable(r,'donors')?.rows),productRows:arr(toolTable(r,'donor_products')?.rows)};}catch(_){return null;}
 }
 function attendanceOracle(eventData,event){return eventData?{event,attendees:num(eventData.attendees)}:null;}
 
@@ -331,6 +331,8 @@ function metricWinner(compare,metric){
 function expectedOracleText(oracle){
   if(!oracle)return'';
   if(oracle.kind==='purchase-set')return `${oracle.event}: ${oracle.productCount} productos · ${euro(oracle.total)}`;
+  if(oracle.kind==='purchase-presence')return `${oracle.event}: compras presentes (${oracle.productCount||0} productos canónicos)`;
+  if(oracle.kind==='event-summary')return `${oracle.event}: resumen canónico disponible`;
   if(oracle.kind==='purchase-max'||oracle.kind==='purchase-min')return `${oracle.row?.label||'—'} · ${euro(oracle.row?.amount||0)}`;
   if(oracle.kind==='purchase-sum')return `${oracle.event}: ${euro(oracle.total)}`;
   if(oracle.kind==='compare-metric'){const w=metricWinner(oracle.compare,oracle.metric);return w?`${w.winner.event} · ${euro(w.winner[oracle.metric])} · diferencia ${euro(w.diff)}`:'';}
@@ -344,6 +346,7 @@ function expectedOracleText(oracle){
   if(oracle.kind==='attendance')return `${oracle.event}: ${oracle.data?.attendees||0} asistentes`;
   if(oracle.kind==='management')return `${oracle.event}: ${oracle.data?.hitos||0} hitos · ${oracle.data?.lg||0} LG · ${oracle.data?.pending||0} pendientes`;
   if(oracle.kind==='donations')return `${oracle.event}: ${oracle.data?.records||0} donaciones · ${oracle.data?.donors||0} donantes · ${euro(oracle.data?.total||0)}`;
+  if(oracle.kind==='donation-status')return `${oracle.event}: ${arr(oracle.statuses).join('+')} · ${oracle.records||0} registros · ${euro(oracle.total||0)}`;
   if(oracle.kind==='documentation-field')return `${oracle.event}: ${oracle.label} = ${oracle.value}`;
   if(oracle.kind==='event-metric')return `${oracle.event}: ${oracle.label} = ${euro(oracle.value)}`;
   if(oracle.kind==='events-overview')return `Panorama: ${oracle.count} eventos`;
@@ -366,7 +369,12 @@ function validateOracle(caseDef,result){
   if(caseDef?.person&&!resultHasPerson(result,caseDef.person))reasons.push(`sujeto distinto de ${caseDef.person}`);
   if(!oracle)return reasons.length?oracleFail(reasons):oraclePass();
 
-  if(oracle.kind==='purchase-set'){
+  if(oracle.kind==='event-summary'){
+    const d=oracle.data||{},answerText=text(result?.answer);
+    if(claimsKnownEventMissing(result,oracle.event)||/\b(?:no\s+(?:se\s+)?(?:han\s+)?encontrad[oa]s?|no\s+hay|sin)\b[^.\n]{0,80}\b(?:datos|detalle|informaci[oó]n)\b/i.test(answerText))reasons.push(`resumen de evento: afirma ausencia de datos canónicos para ${oracle.event}`);
+    const money=[d.income,d.purchases,d.pending,d.donations,d.balance,d.valuation].filter(v=>Number.isFinite(Number(v))&&Math.abs(Number(v))>0.004);
+    if(money.length&&!money.some(v=>hasMoney(blob,v))&&!arr(result?.tables).length&&!resultUsedTool(result,'event_dossier'))reasons.push('resumen de evento: no acredita ninguna magnitud canónica disponible');
+  }else if(oracle.kind==='purchase-set'){
     if(oracle.productCount>0&&claimsNoProducts(result))reasons.push(`afirma que no hay productos, pero CE tiene ${oracle.productCount}`);
     if(ev?.kind==='product_set'){
       if(trim(ev.filterProduct))reasons.push(`aplicó un filtro de producto no pedido: ${ev.filterProduct}`);
@@ -379,6 +387,10 @@ function validateOracle(caseDef,result){
       if(payloadItems.length&&num(payloadItems.length)!==num(oracle.productCount))reasons.push(`conteo del result-set estructurado ${payloadItems.length} != ${oracle.productCount}`);
       if(payload?.amount_value!=null&&!moneyEq(payload.amount_value,oracle.total))reasons.push(`total del result-set estructurado ${euro(payload.amount_value)} != ${euro(oracle.total)}`);
     }
+  }else if(oracle.kind==='purchase-presence'){
+    const pc=num(oracle.productCount),payload=result?.meta?.ledgerAudit?.execution?.answer_payload||{},payloadItems=arr(payload?.item_values).map(trim).filter(Boolean),rows=arr(result?.tables).flatMap(t=>arr(t?.rows));
+    if(pc>0&&claimsNoProducts(result))reasons.push(`compras: afirma ausencia de productos, pero CE tiene ${pc}`);
+    if(pc>0&&payloadItems.length===0&&rows.length===0&&!resultUsedTool(result,'event_purchase_lines'))reasons.push('compras: no materializa el conjunto canónico disponible');
   }else if(oracle.kind==='purchase-max'||oracle.kind==='purchase-min'){
     const op=oracle.kind==='purchase-max'?'max':'min',row=oracle.row;
     if(!row)reasons.push('el oráculo no tiene producto esperado');
@@ -416,7 +428,7 @@ function validateOracle(caseDef,result){
   }else if(oracle.kind==='catalog-count'){
     if(!new RegExp(`\\b${Number(oracle.count)}\\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.count)))reasons.push(`catálogo: no acredita ${oracle.count} registros`);
   }else if(oracle.kind==='bank-summary'){
-    const d=oracle.data,required=trim(d?.lifecycleMessage),normalizedRequired=norm(required),promptNorm=norm(c?.prompt),asksLifecycle=/cuadre|concili|justific|estado|como qued|cómo qued/.test(promptNorm),asksCount=/cuantos? movimientos|cuántos movimientos|numero de movimientos|número de movimientos/.test(promptNorm),asksImpact=/impacto|saldo final|neto/.test(promptNorm);
+    const d=oracle.data,required=trim(d?.lifecycleMessage),normalizedRequired=norm(required),promptNorm=norm(caseDef?.prompt),asksLifecycle=/cuadre|concili|justific|estado|como qued|cómo qued/.test(promptNorm),asksCount=/cuantos? movimientos|cuántos movimientos|numero de movimientos|número de movimientos/.test(promptNorm),asksImpact=/impacto|saldo final|neto/.test(promptNorm);
     // BANK4_10 · el oráculo evalúa lo que se preguntó. Un recuento no obliga a recitar
     // también el estado del cuadre: eso penalizaba justo la conversación humana que buscamos.
     if(required&&asksLifecycle&&!norm(blob).includes(normalizedRequired))reasons.push(`estado de Cuadre Banco no coincide: se exige «${required}»`);
@@ -435,6 +447,16 @@ function validateOracle(caseDef,result){
     const d=oracle.data;if(d&&![d.hitos,d.lg,d.pending,d.completed].some(n=>new RegExp(`\\b${Number(n)}\\b`).test(blob)))reasons.push('gestión: no refleja ningún recuento canónico de Hitos/LG');
   }else if(oracle.kind==='donations'){
     const d=oracle.data;if(d){if(d.records>0&&claimsNoProducts(result))reasons.push('donaciones: afirma ausencia de producto pese a existir registros');if(d.total>0&&!hasMoney(blob,d.total)&&!new RegExp(`\\b${Number(d.records)}\\b`).test(blob))reasons.push(`donaciones: no acredita ${euro(d.total)} ni ${d.records} registros`);}
+  }else if(oracle.kind==='donation-status'){
+    const expectedStatuses=arr(oracle.statuses).map(norm).filter(Boolean),expectedRecords=num(oracle.records),expectedTotal=round(oracle.total,2),plan=vItvLedgerPlan(result),q=plan?.query||{},ops=arr(q?.operations),statusOps=ops.filter(op=>trim(op?.type)==='filter'&&/situacion entrega|donation delivery status|donacion situacion/.test(norm(op?.field))),planStatuses=[...arr(q?.donation_delivery_statuses),...statusOps.flatMap(op=>arr(op?.value).length?arr(op.value):[op?.value])].map(norm).filter(Boolean);
+    if(expectedStatuses.length&&!expectedStatuses.every(st=>planStatuses.includes(st)))reasons.push(`donaciones: no conserva filtro físico ${arr(oracle.statuses).join('/')}`);
+    const payload=result?.meta?.ledgerAudit?.execution?.answer_payload||{},gotCount=payload?.count!=null?num(payload.count):null,gotAmount=payload?.amount_value!=null?round(payload.amount_value,2):null;
+    if(gotCount!=null&&gotCount!==expectedRecords)reasons.push(`donaciones: subconjunto ${gotCount} registros != ${expectedRecords}`);
+    else if(expectedRecords>0&&!new RegExp(`\b${expectedRecords}\b`).test(blob)&&!arr(result?.tables).some(t=>arr(t?.rows).length===expectedRecords))reasons.push(`donaciones: no acredita ${expectedRecords} registros del subconjunto físico`);
+    if(gotAmount!=null&&!moneyEq(gotAmount,expectedTotal))reasons.push(`donaciones: importe del subconjunto ${euro(gotAmount)} != ${euro(expectedTotal)}`);
+    else if(Math.abs(expectedTotal)>0.004&&!hasMoney(blob,expectedTotal)&&gotAmount==null)reasons.push(`donaciones: no acredita ${euro(expectedTotal)} del subconjunto físico`);
+    if(expectedRecords===0&&(/\b[1-9]\d*\s+(?:registros?|donaciones?|productos?)\b/.test(blob)||(gotCount!=null&&gotCount>0)))reasons.push('donaciones: debería devolver subconjunto físico vacío');
+    if(oracle.requireResponsible){const wanted=arr(oracle.responsibles).map(norm).filter(Boolean);if(wanted.length&&!wanted.some(n=>norm(blob).includes(n)))reasons.push('donaciones: no conserva responsables/donantes del subconjunto «esas»');}
   }else if(oracle.kind==='documentation-field'){
     const expected=Number(oracle.value),label=norm(oracle.label);
     const numeric=new RegExp(`\\b${expected}\\b`).test(blob);
@@ -458,6 +480,7 @@ function validateOracle(caseDef,result){
   }else if(oracle.kind==='store-purchases'){
     if(!hasNameInText(blob,oracle.store)&&!arr(result?.tables).length)reasons.push(`tienda no acreditada: ${oracle.store}`);
     if(oracle.total>0&&!hasMoney(blob,oracle.total)&&!arr(result?.tables).length)reasons.push(`compras de tienda: no acredita ${euro(oracle.total)}`);
+    if(num(oracle.records)===0&&/no puedo resolver la persona|persona .* no (?:resuelta|encontrada)|no encuentro (?:a )?la persona/i.test(text(result?.answer)))reasons.push('tienda sin compras: se ha desviado al dominio persona');
   }else if(oracle.kind==='participation-events'){
     const exactCount=new RegExp(`\\b${Number(oracle.eventCount)}\\b`).test(blob)||arr(result?.tables).some(t=>arr(t?.rows).length===Number(oracle.eventCount));
     const expectedNames=arr(oracle?.rows).map(r=>trim(r?.Evento)).filter(Boolean);
@@ -994,12 +1017,16 @@ async function buildFullCertScenarios(state,maxTurns=100,seed=1){
   ];const ticket=trim(pick(d.ticketRows.filter(r=>trim(r?.TKxx)),seed,'full-doc-ticket')?.TKxx);if(ticket)turns.push({prompt:variant(TPL.ticketDetail,seed,'full-doc-ticket-detail',{event:en,ticket}),event:en,oracle:{kind:'ticket-detail',event:en,ticket}});sc.push({name:'Documentos, justificantes y TKxx',turns});}
 
   const donationEvents=events.filter(e=>donationCountForEvent(state,trim(e.id))>0);
-  if(donationEvents.length){const e=pick(donationEvents,seed,'full-donation-event'),en=eventName(e),d=await donationOracle(state,en);if(d)sc.push({name:'Z1 · Donaciones → no recibidas → responsables → entregadas',turns:[
-    {prompt:variant(TPL.donations,seed,'full-donations',{event:en}),event:en,oracle:{kind:'donations',event:en,data:d}},
-    {prompt:variant(TPL.donationMissingPhysical,seed,'full-donations-missing'),event:en,expected:'Debe seguir en DONACIONES y filtrar Situación entrega Supuesta/Comprometida; no convertirlo en compras pendientes.'},
-    {prompt:'¿Quién se encarga de esas?',event:en,expected:'«Esas» conserva el subconjunto de donaciones no entregadas y devuelve sus responsables/donantes según los datos.'},
-    {prompt:variant(TPL.donationDelivered,seed,'full-donations-delivered'),event:en,expected:'Debe seguir en DONACIONES y filtrar Situación entrega=Entregada; no usar compras realizadas.'}
-  ]});}
+  if(donationEvents.length){
+    let chosen=null;
+    for(const e of shuffled(donationEvents,seed,'full-donation-event')){const d=await donationOracle(state,eventName(e));if(!d)continue;if(!chosen)chosen={e,d};if(num(d.supposed)+num(d.committed)>0){chosen={e,d};break;}}
+    if(chosen){const e=chosen.e,en=eventName(e),d=chosen.d,pendingRows=arr(d.lineRows).filter(r=>['supuesta','comprometida'].includes(norm(r?.['Situación entrega']||r?.Situacion||r?.situacion))),pendingResponsibles=[...new Set(pendingRows.flatMap(r=>[trim(r?.Responsable),trim(r?.Donante)]).filter(Boolean))],pendingRecords=num(d.supposed)+num(d.committed),pendingValue=round(num(d.supposedValue)+num(d.committedValue),2);sc.push({name:'Z1 · Donaciones → no recibidas → responsables → entregadas',turns:[
+      {prompt:variant(TPL.donations,seed,'full-donations',{event:en}),event:en,oracle:{kind:'donations',event:en,data:d}},
+      {prompt:variant(TPL.donationMissingPhysical,seed,'full-donations-missing'),event:en,oracle:{kind:'donation-status',event:en,statuses:['Supuesta','Comprometida'],records:pendingRecords,total:pendingValue}},
+      {prompt:'¿Quién se encarga de esas?',event:en,oracle:{kind:'donation-status',event:en,statuses:['Supuesta','Comprometida'],records:pendingRecords,total:pendingValue,requireResponsible:true,responsibles:pendingResponsibles}},
+      {prompt:variant(TPL.donationDelivered,seed,'full-donations-delivered'),event:en,oracle:{kind:'donation-status',event:en,statuses:['Entregada'],records:num(d.delivered),total:round(d.deliveredValue,2)}}
+    ]});}
+  }
 
   const mgEvents=events.filter(e=>arr(state?.hitos).some(h=>eventIdOf(h)===trim(e.id))||arr(state?.lgs).some(l=>eventIdOf(l)===trim(e.id)));
   if(mgEvents.length){const e=pick(mgEvents,seed,'full-management-event'),en=eventName(e),m=await managementOracle(state,en);if(m)sc.push({name:'Hitos y LG',turns:[
@@ -1032,7 +1059,7 @@ async function buildFullCertScenarios(state,maxTurns=100,seed=1){
     const en=eventName(e),eo=await eventOracle(state,en);if(!eo)continue;
     const turns=[{prompt:`Háblame de ${en}.`,event:en,oracle:{kind:'event-summary',event:en,data:eo}}];
     if(donationCountForEvent(state,trim(e.id))>0){const d=await donationOracle(state,en);turns.push({prompt:'¿Y de donaciones?',event:en,oracle:{kind:'donations',event:en,data:d}});}
-    else if(arr(state?.compras).some(r=>eventIdOf(r)===trim(e.id)&&!isDonationTicketLocal(ticketTextLocal(r))))turns.push({prompt:'¿Y de compras?',event:en,expected:`Debe conservar ${en} y consultar compras, sin pedir de nuevo el evento.`});
+    else if(arr(state?.compras).some(r=>eventIdOf(r)===trim(e.id)&&!isDonationTicketLocal(ticketTextLocal(r)))){const po=purchaseOracle(state,en);turns.push({prompt:'¿Y de compras?',event:en,oracle:{kind:'purchase-presence',event:en,productCount:num(po?.productCount),total:round(po?.total,2)}});}
     else turns.push({prompt:'¿Y económicamente cómo quedó?',event:en,oracle:{kind:'event-economy',event:en,data:eo}});
     sc.push({name:`Z1 TODOS · ${en}`,turns});
   }
