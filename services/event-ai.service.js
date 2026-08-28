@@ -14067,7 +14067,7 @@ function v73CommandTools(){
   // ejecutar ninguna llamada ("too many states for serving"). La semántica sigue
   // estando en el prompt y en la validación CE; la capa de function-calling solo
   // expresa un contrato compacto por comando para no agotar el autómata del proveedor.
-  const str={type:'string'},list={type:'array',items:{type:'string'}},bool={type:'boolean'},integer={type:'integer'},peopleMode={type:'string',description:'attendees=TODOS los asistentes; attending_members=SOLO socios asistentes; attending_non_members=SOLO no socios asistentes; attendance_full=asistentes + socios no asistentes en la MISMA petición; non_attending_members=SOLO socios no asistentes; canonical_members=censo canónico; income=ingreso/pago',enum:['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income']},contextType={type:'string',enum:['event','person','product','store','donor','responsible','ticket']};
+  const str={type:'string'},list={type:'array',items:{type:'string'}},bool={type:'boolean'},integer={type:'integer'},peopleMode={type:'string',description:'attendees=TODOS los asistentes; attending_members=SOLO socios asistentes; attending_non_members=SOLO no socios asistentes; attendance_full=asistentes + socios no asistentes en la MISMA petición; non_attending_members=SOLO socios no asistentes; canonical_members=censo canónico; income=ingreso/pago',enum:['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income']},contextType={type:'string',enum:['event','person','product','store','donor','responsible','ticket']},referenceAction={type:'string',description:'Acción CE exacta para una referencia histórica. No inventar alias.',enum:['restore_snapshot','reexecute_plan','reexecute_episode','recall_turn','recall_episode','resume_episode']};
   // RAW14O: no añadimos input_quality/input_note a TODAS las tools. Ese pequeño añadido
   // multiplicaba los estados del schema y Gemini rechazaba el catálogo entero con
   // "too much branching for serving" antes de realizar una sola llamada. La criba de
@@ -14089,7 +14089,7 @@ function v73CommandTools(){
       clear_all:bool,context_type:contextType,values:list,response_kind:str
     },[]),
     make('ce_reference','Restaura o reejecuta un turno anterior.',{
-      target_ref:str,reference_action:str,changes_json:str,response_kind:str,lead:str,voice_lead:str
+      target_ref:str,reference_action:referenceAction,changes_json:str,response_kind:str,lead:str,voice_lead:str
     },['target_ref','reference_action']),
     make('ce_conversation','Conversación o meta-comentario sin consultar datos.',{
       kind:str,note:str
