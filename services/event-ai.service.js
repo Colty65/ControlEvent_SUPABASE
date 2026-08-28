@@ -13163,10 +13163,14 @@ function v74TypedCandidateList(rows=[],limit=3){
     if(kind==='fuzzy'&&mn.replace(/\s+/g,'').length<5)continue;
     if(kind!=='exact'){
       const lexicalHits=mt.filter(t=>ct.includes(t)).length,coverage=ct.length?lexicalHits/ct.length:0,phrase=mt.length>=2;
-      const leading=mt.length===1&&ct[0]===mt[0]&&mt[0].length>=4;
+      // Z1H: una semejanza geométrica sin una sola palabra compartida no es evidencia de entidad.
+      // Evita que lenguaje corriente como una frase de continuidad se convierta en un EVENT/PRODUCT.
+      if(lexicalHits===0)continue;
+      const leading=mt.length===1&&ct[0]===mt[0]&&mt[0].length>=4&&score>=0.985;
       const singleCanonical=ct.length===1&&mt.length===1;
       if(kind==='strong'&&!phrase&&!leading&&!singleCanonical)continue;
       if(kind==='fuzzy'&&!phrase&&!singleCanonical)continue;
+      if(phrase&&coverage<0.20&&score<0.985)continue;
     }
     seen.add(key);out.push({id:trim(x?.id),canonical_name:canonical,matched_text:matched,match_type:kind,score});if(out.length>=limit)break;
   }
@@ -14133,7 +14137,8 @@ function v73NormalizeOperations(raw=[]){
     if(type==='filter'){
       const aliasedValue=x?.value!=null?x.value:x?.filter_value;
       if(aliasedValue!=null&&trim(aliasedValue)!=='')op.value=trim(aliasedValue);
-      if(['eq','neq','gt','gte','lt','lte'].includes(trim(x?.operator)))op.operator=trim(x.operator);
+      if(['eq','neq','gt','gte','lt','lte','one_of'].includes(trim(x?.operator)))op.operator=trim(x.operator);
+      if(trim(x?.operator)==='one_of'){const vals=arr(x?.values).map(trim).filter(Boolean).slice(0,24);if(vals.length)op.values=vals;}
       const aliasedMatch=trim(x?.match_mode||x?.filter_match_mode);
       if(['exact','word','contains','semantic'].includes(aliasedMatch))op.match_mode=aliasedMatch;
       const ps=[...new Set([...arr(x?.purchase_statuses),trim(x?.purchase_status)].map(trim).filter(v=>['realized','pending','all'].includes(v)))];
@@ -14421,7 +14426,7 @@ function v76Candidate(packet={},type=''){
 function v76HasAnaphora(prompt=''){
   return /\b(?:su|sus|él|ella|este|esta|ese|esa|aquel|aquella|dicho|dicha|esa persona|ese hombre|esa mujer|lo mismo|esto|eso)\b/i.test(trim(prompt));
 }
-function v76NextDiscourseFocus(session={},entityCandidates={},userPrompt='',normalizedPlan={},execution={}){
+function v76NextDiscourseFocus(session={},entityCandidates={},userPrompt='',normalizedPlan={},execution={},resultBundle=null){
   const prev=v76DiscourseFocus(session),person=v76Candidate(entityCandidates,'PERSON'),event=v76Candidate(entityCandidates,'EVENT'),product=v76Candidate(entityCandidates,'PRODUCT'),store=v76Candidate(entityCandidates,'STORE'),out={...prev};
   if(person){out.subject_type='PERSON';out.subject=trim(person.canonical_name);delete out.product;delete out.store;}
   else if(product){out.subject_type='PRODUCT';out.subject=trim(product.canonical_name);out.product=trim(product.canonical_name);delete out.store;}
@@ -14430,6 +14435,23 @@ function v76NextDiscourseFocus(session={},entityCandidates={},userPrompt='',norm
   const explicitEvent=trim(event?.canonical_name)||trim(scope?.event);
   if(explicitEvent)out.event=explicitEvent;
   const d=trim(v73PrimaryDomain(normalizedPlan?.query||{})||execution?.domain);
+  // Z1H · Cuando el turno acaba de seleccionar/rankear una fila concreta, esa fila pasa a ser
+  // el referente humano vivo. No lo hacemos en listados generales para no elegir arbitrariamente.
+  const ops=arr(normalizedPlan?.query?.operations),decisive=Number(execution?.row_count)===1||ops.some(o=>['sort','rank','limit'].includes(trim(o?.type)));
+  if(decisive&&resultBundle?.dataset){
+    const rows=v73RowsForStored(resultBundle.dataset,resultBundle.view||{}),r=rows[0]||{};
+    const val=k=>trim(r?.[k]);
+    const rp=val('Producto'),rr=val('Responsable'),rd=val('Donante'),re=val('Evento'),rs=val('Tienda');
+    const rk=trim(normalizedPlan?.response_kind),requestedFields=arr(normalizedPlan?.query?.fields?.values).map(norm),askedPersonRole=rk==='who'||requestedFields.some(f=>['responsable','responsables','donante','donantes','persona','personas'].includes(f));
+    // Si el turno acaba de contestar QUIÉN, el humano resultante pasa a ser el sujeto vivo aunque
+    // la misma fila contenga también el producto. Así «esa persona» en el siguiente turno no vuelve
+    // al producto ni al censo general del evento.
+    if((rr||rd)&&askedPersonRole){out.subject_type='PERSON';out.subject=rr||rd;}
+    else if(rp){out.subject_type='PRODUCT';out.subject=rp;out.product=rp;}
+    else if(rr||rd){out.subject_type='PERSON';out.subject=rr||rd;}
+    else if(rs){out.subject_type='STORE';out.subject=rs;out.store=rs;}
+    if(rr)out.responsible=rr;if(rd)out.donor=rd;if(re)out.event=re;if(rs)out.store=rs;
+  }
   // Una consulta general de un evento sin pronombre es un cambio claro de sujeto: el evento pasa a ser
   // el asunto y no se arrastra una PERSON/PRODUCT/STORE antigua.
   if(!person&&!product&&!store&&!v76HasAnaphora(userPrompt)&&['event_summary','events'].includes(d)&&explicitEvent){
@@ -14624,6 +14646,9 @@ PRIORIDAD
 8. Z1 · CONTINUIDAD: CURRENT_CONTEXT.thread_navigation es un ÍNDICE FACTUAL creado por CE, no una interpretación. topics_recent_first conserva asuntos previos con ref Tn; events_recent_first conserva eventos visitados; ordinal_sets conserva el orden original de conjuntos explícitos; current_result_referents conserva el orden físico del resultado actual. TÚ decides lingüísticamente si «el anterior», «el primero», «el segundo», «lo primero», «de esas», «esa persona», «el siguiente» o cualquier referencia natural apunta a uno de esos elementos. CE no aplica diccionarios de frases ni reinterpreta después tu decisión.
 9. Si el usuario SOLO quiere cambiar de foco a un evento/persona/etc. ya presente en thread_navigation, usa ce_set_context con el valor canónico resuelto. Si quiere VOLVER A VER un resultado anterior, usa ce_reference/restore_snapshot con su Tn. Si además pide datos nuevos, usa ce_query con el scope/entidad resuelto. No preguntes de nuevo qué evento/persona es cuando thread_navigation deja un único referente plausible.
 10. El orden de ordinal_sets es semánticamente significativo y no se debe reordenar. En una comparación con events:[A,B], «primero» puede referirse a A y «segundo» a B si el hilo lo sostiene. En current_result_referents, «siguiente» se resuelve por el orden materializado de la vista actual, no por catálogo ni alfabeto salvo que la vista esté así ordenada.
+11. CAMBIO DE FOCO HUMANO: ce_set_context modifica el estado sin narrarlo. No prepares frases del tipo «he cambiado el foco», «ahora estamos en» o equivalentes; si el usuario solo cambia de asunto, CE responderá con un acuse mínimo y la conversación continúa.
+12. REPARACIÓN DEL HILO: si CURRENT_USER indica que la respuesta anterior se desvió, confundió objetos o perdió el referente y CURRENT_CONTEXT permite reconstruir qué se estaba preguntando, CORRIGE HACIENDO la consulta/operación correcta. No uses ce_conversation únicamente para disculparte cuando existe una reparación factual ejecutable. Conserva el último hilo coherente como autoridad.
+13. REFERENTE DE RESULTADO: current_result_referents.first_row y ordered_by_role pertenecen al resultado materializado, no al catálogo. Si el turno anterior ordenó/rankeó/limitó y ahora se pide una propiedad o «otras cosas» del elemento resultante, conserva esa entidad como sujeto/filtro. No saltes a un listado general del evento.
 
 COMANDOS Y ARGUMENTOS COMPACTOS
 - ce_query: datos nuevos. arguments.targets = array de dominios distintos, mínimo uno. scope_kind es obligatorio. Los demás filtros van en campos planos.
@@ -14720,6 +14745,12 @@ COMPRAS REALIZADAS Y PENDIENTES
 - PENDIENTE/PREVISTA = compra no donada sin ese justificante informado; Pte.Compra/PENDIENTE legacy equivale a pendiente. DONADO TIENDA/SOCIO/OTROS pertenece a donations y NUNCA a purchases.
 - purchase_statuses: ["realized"], ["pending"] o ["all"]. Si el usuario pide pendientes/previstas usa pending; si pide realizadas/ya compradas usa realized.
 - En un evento En curso, una petición genérica de compras significa TODAS las compras no donadas: realizadas + pendientes. Usa all o deja estado sin especificar para que CE aplique ese default. Nunca ocultes pendientes por defecto en un evento En curso.
+
+DONACIONES Y ENTREGA FÍSICA
+- donations es un objeto distinto de purchases. Una línea DONADO TIENDA/SOCIO/OTROS jamás se convierte en compra por una continuación elíptica.
+- La columna canónica «Situación entrega» tiene exactamente tres estados: Supuesta, Comprometida y Entregada. Supuesta = aún no confirmada; Comprometida = prometida pero NO recibida físicamente; Entregada = género físicamente recibido por la Peña.
+- Si el hilo vigente es donations y CURRENT_USER pregunta por disponibilidad física, recepción, entrega o lo que todavía falta recibir, CONSERVA targets:["donations"]. No cambies a products/purchases.
+- Para solo Entregada usa operations_json con filter sobre «Situación entrega» = «Entregada». Para lo todavía NO recibido físicamente usa un único filter operator="one_of" con values:["Supuesta","Comprometida"]. Después puedes proyectar/ordenar lo pedido. purchase_statuses no representa estados de donación.
 
 SCOPE
 Toda ce_query lleva scope_kind explícito. named_event exige event; named_events exige events con al menos un valor; event_series exige series (NUNCA events); all_events para todos. event_summary puede abarcar varios eventos; si se pide comparar 2+ eventos, PREFERIR comparison + named_events. Nunca digas que CE solo procesa un evento si el usuario ha dado varios. NUNCA emitas named_events vacío ni event_series sin series. Si CURRENT_CONTEXT.scope contiene un único evento activo, herédalo como named_event salvo que CURRENT_USER lo cambie. Si CURRENT_CONTEXT.scope contiene VARIOS eventos y CURRENT_USER usa una referencia singular sin identificar cuál, usa ce_clarify: no retrocedas a un evento singular antiguo. Para persona/producto sin evento, normalmente all_events. Fecha/rango explícito => start_date/end_date ISO YYYY-MM-DD y manda sobre las fechas generales del evento.
@@ -15005,6 +15036,7 @@ CONTRATO DE PRESENTACIÓN
 - Si RESULTADO_CE.status es KO/WARN por falta de dataset o scope, describe ese fallo actual; no lo tapes con una respuesta factual anterior.
 - Devuelve SIEMPRE dos redacciones distintas del mismo resultado factual: written_answer para pantalla y spoken_answer para voz.
 - written_answer debe ser una respuesta bien escrita, natural y agradable de leer. Contesta primero a lo preguntado. Usa párrafos claros; si el usuario pide prosa, NO uses listas ni viñetas. Si pide brevedad, sé breve. No vuelques filas masivas dentro del texto.
+- HUMANIDAD DE FOCO: cambiar de evento/persona/tema porque el usuario lo pide es una acción normal de conversación. Hazlo sin explicar el mecanismo ni decir «he cambiado el foco/contexto». Si no hay más contenido que el cambio, un «Vale.» basta.
 - CONTEXTO DE EVENTO OBLIGATORIO: cuando el dominio sea event_summary o CURRENT_USER pida información general/abierta de un evento, no te limites a KPI. Si facts.coverage_narrative_required existe, es una cápsula mínima OBLIGATORIA: integra en prosa al menos una idea concreta de coverage_narrative_required.description y, si documents no está vacío, al menos una referencia concreta a uno de esos DOCxx ANTES o junto al bloque numérico. Si no existe esa cápsula pero facts.event_description/description existe, incluye al menos una idea concreta de esa descripción. Si además existen document_context, purchase_ticket_context, purchase_highlights, income_receipt_context o management_context, incorpora al menos UNA pincelada concreta que ayude a entender qué se organiza, qué documentos lo explican, en qué se está gastando o qué trabajo hay detrás. No hace falta recitarlo todo, pero una respuesta general con solo cifras es incompleta. Los números siguen siendo importantes, pero no deben aplastar el contexto humano.
 - HISTORIA/RELATO/POESÍA/CRÓNICA: RESPETA esa forma creativa si CURRENT_USER la pide. No la conviertas en «resumen ejecutivo» ni en un texto genérico intercambiable. Debe contener varios hechos reconocibles del evento certificados en RESULTADO_CE. Usa especialmente event_description y los textos de Documentos; añade TKxx/justificantes/hitos/compras/gestión cuando estén disponibles. Puedes ser ameno, cachondo, bonito o poético en el lenguaje, pero jamás inventar personas, sucesos, gastos, documentos o cifras. Si RESULTADO_CE no trae hechos suficientes para una creación sobre el evento, dilo en vez de fabricar versos genéricos.
 - PROHIBIDO FABRICAR «importe asociado» u otros totales combinando columnas/targets distintos. Solo menciona un total si RESULTADO_CE lo entrega explícitamente como fact/aggregate/column_stats del mismo significado o como fila agrupada calculada por CE.
@@ -15084,7 +15116,7 @@ function v73EventTemporalContext(state={},dataset=null,selectedEventId='',timeCo
   }
   return{now:{iso:trim(timeContext?.iso),local:trim(timeContext?.local),timezone:trim(timeContext?.timezone)||'Europe/Madrid',local_date:localDate},events};
 }
-function v73EnsureInProgressNotice(final={},notice=null,flowTrace=[]){if(!notice)return final;let written=trim(final?.written),spoken=trim(final?.spoken),changed=false;const has=t=>/\ben\s+curso\b|\bprovisional(?:es)?\b/i.test(t);if(!has(written)){written=`${written}${written?'\n\n':''}${notice.written}`;changed=true;}if(!has(spoken)){spoken=`${spoken}${spoken?' ':''}${notice.spoken}`;changed=true;}if(changed)zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · EVENTO EN CURSO','OK','CE añade el aviso factual obligatorio de provisionalidad del evento En curso.');return{...final,written,spoken};}
+function v73EnsureInProgressNotice(final={},notice=null,flowTrace=[]){if(!notice)return final;let written=trim(final?.written),spoken=trim(final?.spoken),changed=false;const has=t=>/\ben\s+curso\b|\bprovisional(?:es)?\b/i.test(t);if(!has(written)){written=`${written}${written?'\n\n':''}${notice.written}`;changed=true;}if(changed)zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · EVENTO EN CURSO','OK','CE conserva el aviso factual en pantalla; no lo repite automáticamente en voz.');return{...final,written,spoken};}
 function v73ConversationMetaContext(session={}){const ds=session?.dataset||null;if(!ds)return{recent_turns:v73RawFinalRecentTurns(session)};const f=ds?.facts||{},keys=['event','events','provider','location','days','people_mode','attendance_semantics','income_semantics','event_count_semantics'],facts={};for(const k of keys)if(f?.[k]!==undefined&&f?.[k]!==null&&f?.[k]!=='')facts[k]=v73CompactFinalValue(f[k]);return{recent_turns:v73RawFinalRecentTurns(session),previous_result:{domain:trim(ds?.domain),scope:v73CompactFinalValue(ds?.scope||{}),source_tool:trim(ds?.provenance?.source_tool),facts}};}
 function v73WeatherSourceContext(dataset=null){if(!dataset||trim(dataset?.domain)!=='weather')return null;const f=dataset?.facts||{};return{provider:trim(f?.provider)||'Open-Meteo',location:trim(f?.location),days:Number(f?.days)||Number(dataset?.rowCount)||0,source_tool:trim(dataset?.provenance?.source_tool)||'event_weather',semantics:'Previsión meteorológica externa; no es un dato inventado ni un hecho administrativo del estado En curso del evento. Puede actualizarse al cambiar la previsión del proveedor.'};}
 function v73EuroNumber(raw=''){
@@ -15326,7 +15358,7 @@ function v73DatasetCapabilities(domain=''){
 function v73DatasetSchemaColumns(domain=''){
   const d=trim(domain),schemas={
     purchases:['Evento','Producto','Segmento','Destino','Unidades','Precio','Importe','Ticket u otros gastos','Tienda','Responsable'],
-    donations:['Evento','Producto','Segmento','Destino','Unidades','Precio','Valor','Tipo de donación','Donante','Responsable'],
+    donations:['Evento','Producto','Segmento','Destino','Unidades','Precio','Valor','Tipo de donación','Situación entrega','Donante','Responsable'],
     people:['Evento','Grupo','Persona','Personas','Asistente'],
     products:['Evento','Producto','Unidades','Importe','Tiendas','Responsables','Tickets'],
     person:['Evento','Persona','Registrado directamente como','Registro compartido','Eventos vinculados','Ingresos del registro','Ingreso imputado persona','Ingresos pendientes','Compras bajo responsabilidad','Compras realizadas','Compras pendientes','Donaciones vinculadas','Hitos','LG','Responsable','Donante','Producto','Importe'],
@@ -15384,7 +15416,11 @@ function v73ApplyLocalOperations(bundle={},operations=[],flowTrace=[]){
         const wanted=purchaseStatuses.includes('all')?['realized','pending']:purchaseStatuses;
         v.rowFilters=[...arr(v.rowFilters),{field:'Ticket u otros gastos',operator:'purchase_status',values:wanted,stage:'pre_group'}];
       }else{
-        const k=resolve(op.field);if(!k)warn(`Filtro local ignorado: el campo «${trim(op.field)}» no existe en el DATASET.`);else v.rowFilters=[...arr(v.rowFilters),{field:k,value:trim(op.value),operator:trim(op.operator)||'eq',match_mode:trim(op.match_mode)||'exact'}];
+        const k=resolve(op.field);if(!k)warn(`Filtro local ignorado: el campo «${trim(op.field)}» no existe en el DATASET.`);else{
+          const operator=trim(op.operator)||'eq',rf={field:k,operator,match_mode:trim(op.match_mode)||'exact'};
+          if(operator==='one_of')rf.values=arr(op.values).map(trim).filter(Boolean);else rf.value=trim(op.value);
+          v.rowFilters=[...arr(v.rowFilters),rf];
+        }
       }
     }else if(type==='group'){
       const requestedGroup=trim(op.group_field)||trim(op.field)||trim(op.group_role),k=resolve(requestedGroup,op.group_role,'role');if(!k)warn(`Agrupación ignorada: no hay una dimensión ejecutable para «${requestedGroup}».`);else{v.groupBy=[k];v.metrics=arr(op.metrics);if(!v.metrics.length&&trim(op.metric)){const mf=resolve(op.metric,op.metric_role,'metric'),agg=['sum','avg','count','min','max'].includes(trim(op.aggregation))?trim(op.aggregation):'sum';if(agg==='count')v.metrics=['count'];else if(mf)v.metrics=[`${agg}:${mf}`];}if(!v.metrics.length&&['amount','units'].includes(trim(op.metric_role))){const mr=trim(op.metric_role),mf=resolve(mr,mr,'metric');if(mf)v.metrics=[`sum:${mf}`];}if(!v.metrics.length&&trim(op.metric_role)==='count')v.metrics=['count'];const derived=[k];for(const spec of (v.metrics.length?v.metrics:['count'])){const [opRaw,fieldRaw]=trim(spec).split(':',2),mop=norm(opRaw),mf=fieldRaw?resolve(fieldRaw,op.metric_role,'metric'):'';if(mop==='count')derived.push('Nº registros');else if(mop==='sum'&&mf)derived.push(`Suma ${mf}`);else if(mop==='avg'&&mf)derived.push(`Media ${mf}`);else if(mop==='min'&&mf)derived.push(`Mín ${mf}`);else if(mop==='max'&&mf)derived.push(`Máx ${mf}`);else if(mop==='distinct'&&mf)derived.push(`Distintos ${mf}`);}v.visibleFields=[...new Set(derived)];}
@@ -15763,7 +15799,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{};
   const profile=zuzuLoggedUserProfile({usuarioLogado:actor}),display=profile.identificacion||profile.nombre||'Amigo';
   const conversation=await ensureZuzuConversation({conversationId,actor,selectedEventId});
-  const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:false,recentLimit:80});
+  const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:true,recentLimit:80});
   const entityCandidates=v74EntityCandidatePacket(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session),usePending=v73IsPendingHistoryChoiceReply(userPrompt,pendingHistory);
   const currentConversationRecall=v73IsCurrentConversationRecallPrompt(userPrompt),historyCandidates=usePending?pendingHistory:((isRecallPrompt(userPrompt)&&!currentConversationRecall)?await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}):[]);
   const policy=v332InteractionPolicy(userPrompt);
@@ -15817,7 +15853,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     }else if(plan.action==='set_context'){
       const certified=v73CertifyContext(plan.context||{},state,flowTrace),c=certified.context||{};if(certified.error){status='KO';title='Contexto no ejecutable';answer='';execution={summary:certified.error,error:certified.error};}
       else if(c.clear_all===true){title='Contexto reiniciado';answer='Empezamos de cero.';execution={summary:'Foco conversacional reiniciado explícitamente.',focus:{},context:{clear_all:true},row_count:0};}
-      else{const type=trim(c.type),values=arr(c.values).map(trim).filter(Boolean),focus={};if(values.length){if(type==='event')focus.event=values.length===1?values[0]:values;else if(type==='person')focus.person=values.length===1?values[0]:values;else focus[type]=values.length===1?values[0]:values;}title='Contexto actualizado';answer=`Foco actualizado: ${type}=${values.join(', ')}.`;execution={summary:`Cambio de contexto sin consulta: ${type}=${values.join(' / ')}`,focus,context:{type,values},row_count:0};}
+      else{const type=trim(c.type),values=arr(c.values).map(trim).filter(Boolean),focus={};if(values.length){if(type==='event')focus.event=values.length===1?values[0]:values;else if(type==='person')focus.person=values.length===1?values[0]:values;else focus[type]=values.length===1?values[0]:values;}title='Zuzu';answer='Vale.';execution={summary:`Cambio de contexto sin consulta: ${type}=${values.join(' / ')}`,focus,context:{type,values},row_count:0,local_authoritative_presentation:true,silent_context_switch:true};}
     }else if(plan.action==='clarify'){
       const requested=arr(plan.clarify?.candidate_refs),chosen=historyCandidates.filter(c=>!requested.length||requested.includes(c.ref)),base=chosen.length?chosen:historyCandidates,choices=v73CandidateChoices(base);
       title='Necesito una precisión';const entityOptions=arr(plan.clarify?.options).map(trim).filter(Boolean),rendered=entityOptions.length?entityOptions:choices;answer=`${trim(plan.clarify?.question)||'Necesito una precisión.'}${rendered.length?`\n\n${rendered.map((x,i)=>`${i+1}. ${x}`).join('\n')}`:''}`;status='WARN';
@@ -15905,7 +15941,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     }
   }catch(error){status='KO';zuzuTracePush(flowTrace,'v4_0_exp · Ledger · ejecución CE','KO',cleanGeminiError(error));answer='ControlEvent no pudo ejecutar este registro. El historial anterior permanece intacto y este fallo queda guardado para auditoría.';execution={summary:cleanGeminiError(error),error:cleanGeminiError(error)};}
   if(status!=='KO'){
-    const nextFocus=v76NextDiscourseFocus(session,entityCandidates,userPrompt,normalizedPlan,execution);if(nextFocus&&Object.keys(nextFocus).length)execution={...(execution||{}),discourse_focus:nextFocus};
+    const nextFocus=v76NextDiscourseFocus(session,entityCandidates,userPrompt,normalizedPlan,execution,{dataset,view});if(nextFocus&&Object.keys(nextFocus).length)execution={...(execution||{}),discourse_focus:nextFocus};
     if(coverage)execution={...(execution||{}),event_coverage:coverage};
     const shouldClearMemory=v76ShouldClearMemoryFocus(userPrompt,normalizedPlan),oldMemoryFocus=v76MemoryFocus(session),oldMemoryAnchor=v77MemoryAnchor(session),oldMemoryReplay=v77MemoryReplay(session);
     if(oldMemoryFocus&&!execution?.memory_episode&&!shouldClearMemory)execution={...(execution||{}),memory_focus:oldMemoryFocus};

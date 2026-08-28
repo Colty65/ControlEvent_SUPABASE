@@ -242,7 +242,7 @@ async function managementOracle(state,event){
   try{const r=await execCanonicalTool(state,{id:'itv_oracle_management',name:'event_management',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,hitos:num(f.hitos_count),lg:num(f.lg_count),completed:num(f.lg_completed),pending:num(f.lg_pending)};}catch(_){return null;}
 }
 async function donationOracle(state,event){
-  try{const r=await execCanonicalTool(state,{id:'itv_oracle_donations',name:'event_donation_lines',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,records:num(f.donation_record_count),donors:num(f.donor_count),products:num(f.product_count),total:round(f.total_value,2),donorRows:arr(toolTable(r,'donors')?.rows),productRows:arr(toolTable(r,'donor_products')?.rows)};}catch(_){return null;}
+  try{const r=await execCanonicalTool(state,{id:'itv_oracle_donations',name:'event_donation_lines',event,scope:'named_event',detail:'full'},state,'');const f=r?.facts||{};return{event:trim(f.event)||event,records:num(f.donation_record_count),donors:num(f.donor_count),products:num(f.product_count),total:round(f.total_value,2),supposed:num(f.supposed_count??f.supuesta_count),committed:num(f.committed_count??f.comprometida_count),delivered:num(f.delivered_count??f.entregada_count),supposedValue:round(f.supposed_value??f.supuesta_value,2),committedValue:round(f.committed_value??f.comprometida_value,2),deliveredValue:round(f.delivered_value??f.entregada_value,2),donorRows:arr(toolTable(r,'donors')?.rows),productRows:arr(toolTable(r,'donor_products')?.rows)};}catch(_){return null;}
 }
 function attendanceOracle(eventData,event){return eventData?{event,attendees:num(eventData.attendees)}:null;}
 
@@ -545,13 +545,35 @@ async function buildRealFastCases(state,seed){
     const o=await canonicalSociosOracle(state);return outcome(this,o&&o.records>=0&&o.people>=0?'OK':'KO',`registros=${o?.records??'—'}; personas=${o?.people??'—'}`);
   }}));
 
-  for(const store of shuffled(arr(state?.tiendas).filter(s=>trim(s?.id)&&trim(s?.nombre)),seed,'fast-stores').slice(0,Math.min(8,arr(state?.tiendas).length))){
+  // Z1H · Escaneo integral sin IA. No crea miles de tarjetas en la ITV: una sola prueba recorre
+  // físicamente todas las filas operativas cargadas y comprueba enlaces esenciales + semántica
+  // Supuesta/Comprometida/Entregada. Sirve para poder decir «todos los registros» de verdad sin
+  // convertir FULL-CERT en cientos de llamadas pagadas.
+  cases.push(makeCase({id:'all-records-integrity-scan',group:'TODOS LOS REGISTROS',label:'Escaneo integral de filas reales CE',expected:'Todas las filas operativas recorridas sin huérfanos básicos ni estados de donación inválidos',run:async function(){
+    const eventIds=new Set(events.map(e=>trim(e?.id)).filter(Boolean)),productIds=new Set(arr(state?.productos).map(x=>trim(x?.id)).filter(Boolean));
+    const collections={eventos:arr(state?.eventos),personas:arr(state?.personas),tiendas:arr(state?.tiendas),productos:arr(state?.productos),compras:arr(state?.compras),ingresos:arr(state?.colaboradores),documentos:arr(state?.eventDocuments),hitos:arr(state?.hitos),lg:arr(state?.lgs),banco:arr(state?.bankMovements||state?.movimientosBanco||state?.movimientos_banco),fototickets:Object.values(state?.ticketImages||{})};
+    let scanned=0;for(const rows of Object.values(collections))scanned+=rows.length;
+    const issues=[];
+    for(const r of collections.compras){
+      const eid=eventIdOf(r),pid=trim(r?.productoId||r?.producto_id),tt=ticketTextLocal(r),isDon=isDonationTicketLocal(tt),ds=trim(r?.donacionSituacion||r?.donacion_situacion);
+      if(eid&&!eventIds.has(eid))issues.push(`compra ${trim(r?.id)||'?'}: evento huérfano ${eid}`);
+      if(pid&&!productIds.has(pid))issues.push(`compra ${trim(r?.id)||'?'}: producto huérfano ${pid}`);
+      if(isDon&&ds&&!['Supuesta','Comprometida','Entregada'].includes(ds))issues.push(`donación ${trim(r?.id)||'?'}: situación inválida ${ds}`);
+      if(!isDon&&ds)issues.push(`compra ${trim(r?.id)||'?'}: situación de donación impropia ${ds}`);
+      if(issues.length>=12)break;
+    }
+    for(const [name,rows] of [['ingreso',collections.ingresos],['documento',collections.documentos],['hito',collections.hitos],['LG',collections.lg]])for(const r of rows){const eid=eventIdOf(r);if(eid&&!eventIds.has(eid)){issues.push(`${name} ${trim(r?.id)||'?'}: evento huérfano ${eid}`);if(issues.length>=12)break;}}
+    const detail=`filas recorridas=${scanned} · eventos=${collections.eventos.length} · personas=${collections.personas.length} · tiendas=${collections.tiendas.length} · productos=${collections.productos.length} · compras/donaciones=${collections.compras.length} · ingresos=${collections.ingresos.length} · documentos=${collections.documentos.length} · hitos=${collections.hitos.length} · LG=${collections.lg.length} · banco=${collections.banco.length} · fototickets=${collections.fototickets.length}`;
+    return outcome(this,issues.length?'KO':'OK',issues.length?`${detail} · incidencias: ${issues.join(' | ')}`:`${detail} · integridad básica OK`);
+  }}));
+
+  for(const store of shuffled(arr(state?.tiendas).filter(s=>trim(s?.id)&&trim(s?.nombre)),seed,'fast-stores')){
     const name=trim(store?.nombre);cases.push(makeCase({id:`store-purchases-${key(store?.id||name)}`,group:'TIENDAS',label:`Compras históricas de tienda · ${name}`,expected:'Consulta de tienda coherente',run:async function(){
       const o=await storePurchasesOracle(state,name);return outcome(this,o?'OK':'KO',o?`${o.store}: ${o.records} registros · ${euro(o.total)} · ${o.eventCount} eventos`:'No resuelta');
     }}));
   }
 
-  for(const p of shuffled(people,seed,'fast-participation-people').slice(0,Math.min(10,people.length))){
+  for(const p of shuffled(people,seed,'fast-participation-people')){
     const name=personName(p);cases.push(makeCase({id:`participation-events-${key(p?.id||name)}`,group:'PERSONAS',label:`Eventos de participación · ${name}`,expected:'Participación personal coherente',run:async function(){
       const o=await participationOracle(state,name);return outcome(this,o?'OK':'KO',o?`${o.person}: ${o.eventCount} eventos`:'No resuelta');
     }}));
@@ -818,6 +840,10 @@ const TPL={
   ticketsFollow:['¿Y los TKxx?','¿Qué tickets tienen imagen?','Repasa ahora los fototickets.','¿Cuántos tickets están documentados?'],
   bankFollow:['¿Cuántos movimientos hubo?','¿Y el impacto neto?','¿Cómo quedó el saldo final?','¿Están justificados los movimientos?'],
   donationFollow:['¿Cuánto suman las donaciones y cuántos donantes hay?','¿Qué valor total aportaron y cuántos donantes fueron?','¿Cuántos registros de donación constan y por qué valor?','Resúmeme en cifras las donaciones.'],
+  donationMissingPhysical:['¿Cuáles todavía no tenemos físicamente?','¿Qué donaciones faltan por llegar físicamente?','¿Qué de eso aún no está entregado?','De esas donaciones, ¿qué sigue sin estar en el almacén?'],
+  donationDelivered:['¿Y cuáles ya están entregadas?','¿Qué productos donados tenemos ya físicamente?','¿Cuáles constan como Entregada?','Ahora dime las que sí han llegado.'],
+  responsibleFollow:['¿Quién es el responsable?','¿Quién se encarga de eso?','¿Quién lleva esa compra?','¿De quién depende?'],
+  samePersonOtherThings:['¿Y qué otras cosas tiene esa persona?','¿Qué más lleva esa persona?','¿Qué otras compras tiene a su cargo?','¿Y qué más tiene pendiente?'],
   managementFollow:['¿Cuántas tareas LG quedan pendientes?','¿Qué queda pendiente de gestión?','Dime el reparto entre LG terminadas y pendientes.','¿Cuántos hitos y tareas constan?'],
   attendanceFollow:['¿Y cuántas personas fueron en total?','Dame solo el total de asistentes.','¿Cuánta gente consta finalmente?','Resúmeme la asistencia en una cifra.']
 };
@@ -873,7 +899,7 @@ async function buildAiSmokeCases(state,max=40,seed=1){
   return cases.slice(0,max);
 }
 
-async function buildFullCertScenarios(state,maxTurns=36,seed=1){
+async function buildFullCertScenarios(state,maxTurns=100,seed=1){
   const {events,withPurchases,sibling}=chooseEvents(state,seed),{sample:people}=choosePeople(state,seed); const sc=[];
   if(events.length>=2){const a=events[0],b=events.find(x=>trim(x.id)!==trim(a.id));if(b){const an=eventName(a),bn=eventName(b),ao=await eventOracle(state,an),bo=await eventOracle(state,bn);sc.push({name:'Cambio de evento',turns:[
     {prompt:variant(TPL.event,seed,'full-event-a',{event:an}),event:an,oracle:{kind:'event-summary',event:an,data:ao}},
@@ -890,11 +916,11 @@ async function buildFullCertScenarios(state,maxTurns=36,seed=1){
     {prompt:variant(TPL.event,seed,'full-relative-start',{event:eventName(first)}),event:eventName(first),oracle:{kind:'event-summary',event:eventName(first),data:await eventOracle(state,eventName(first))}},
     {prompt:variant(TPL.relativeNext,seed,'full-relative-next',{year:y}),event:eventName(second),oracle:{kind:'event-summary',event:eventName(second),data:await eventOracle(state,eventName(second))}}
   ]});}
-  if(withPurchases[0]){const e=withPurchases[0],en=eventName(e),po=purchaseOracle(state,en);sc.push({name:'Result-set de compras',turns:[
-    {prompt:variant(TPL.listProducts,seed,'full-products',{event:en}),event:en,oracle:{kind:'purchase-set',...(po||{event:en,total:0,productCount:0})}},
+  if(withPurchases[0]){const e=withPurchases[0],en=eventName(e),po=purchaseOracle(state,en);sc.push({name:'Z1 · Compra → máximo → responsable → sus otras cosas',turns:[
+    {prompt:`Dime las compras pendientes de ${en}.`,event:en,oracle:{kind:'purchase-set',...(po||{event:en,total:0,productCount:0})}},
     {prompt:variant(TPL.maxFollow,seed,'full-max'),event:en,oracle:{kind:'purchase-max',event:en,row:po?.max||null}},
-    {prompt:variant(TPL.minFollow,seed,'full-min'),event:en,oracle:{kind:'purchase-min',event:en,row:po?.min||null}},
-    {prompt:variant(TPL.sumFollow,seed,'full-sum'),event:en,oracle:{kind:'purchase-sum',event:en,total:po?.total||0}}
+    {prompt:variant(TPL.responsibleFollow,seed,'full-responsible'),event:en,expected:'Debe conservar como sujeto la fila seleccionada en el turno anterior y responder su responsable, no listar personas del evento.'},
+    {prompt:variant(TPL.samePersonOtherThings,seed,'full-same-person'),event:en,expected:'Debe conservar a esa persona como responsable y consultar sus otras compras; no debe saltar a asistencia/personas generales.'}
   ]});}
   if(people.length>=2){const p1=people[0],p2=people[1],n1=personName(p1),n2=personName(p2),p1o=await personOracle(state,n1),p2o=await personOracle(state,n2);sc.push({name:'Cambio de persona',turns:[
     {prompt:variant(TPL.person,seed,'full-person-1',{person:n1}),person:n1,oracle:{kind:'person-summary',person:n1,data:p1o}},
@@ -919,9 +945,11 @@ async function buildFullCertScenarios(state,maxTurns=36,seed=1){
   ];const ticket=trim(pick(d.ticketRows.filter(r=>trim(r?.TKxx)),seed,'full-doc-ticket')?.TKxx);if(ticket)turns.push({prompt:variant(TPL.ticketDetail,seed,'full-doc-ticket-detail',{event:en,ticket}),event:en,oracle:{kind:'ticket-detail',event:en,ticket}});sc.push({name:'Documentos, justificantes y TKxx',turns});}
 
   const donationEvents=events.filter(e=>donationCountForEvent(state,trim(e.id))>0);
-  if(donationEvents.length){const e=pick(donationEvents,seed,'full-donation-event'),en=eventName(e),d=await donationOracle(state,en);if(d)sc.push({name:'Donaciones del evento',turns:[
+  if(donationEvents.length){const e=pick(donationEvents,seed,'full-donation-event'),en=eventName(e),d=await donationOracle(state,en);if(d)sc.push({name:'Z1 · Donaciones → no recibidas → responsables → entregadas',turns:[
     {prompt:variant(TPL.donations,seed,'full-donations',{event:en}),event:en,oracle:{kind:'donations',event:en,data:d}},
-    {prompt:variant(TPL.donationFollow,seed,'full-donations-follow'),event:en,oracle:{kind:'donations',event:en,data:d}}
+    {prompt:variant(TPL.donationMissingPhysical,seed,'full-donations-missing'),event:en,expected:'Debe seguir en DONACIONES y filtrar Situación entrega Supuesta/Comprometida; no convertirlo en compras pendientes.'},
+    {prompt:'¿Quién se encarga de esas?',event:en,expected:'«Esas» conserva el subconjunto de donaciones no entregadas y devuelve sus responsables/donantes según los datos.'},
+    {prompt:variant(TPL.donationDelivered,seed,'full-donations-delivered'),event:en,expected:'Debe seguir en DONACIONES y filtrar Situación entrega=Entregada; no usar compras realizadas.'}
   ]});}
 
   const mgEvents=events.filter(e=>arr(state?.hitos).some(h=>eventIdOf(h)===trim(e.id))||arr(state?.lgs).some(l=>eventIdOf(l)===trim(e.id)));
@@ -947,6 +975,18 @@ async function buildFullCertScenarios(state,maxTurns=36,seed=1){
 
   const ov=await eventsOverviewOracle(state);if(ov)sc.push({name:'Panorama global',turns:[{prompt:variant(TPL.overview,seed,'full-overview'),oracle:{kind:'events-overview',count:ov.count}}]});
   const fullStore=pick(arr(state?.tiendas).filter(s=>trim(s?.nombre)),seed,'full-store');if(fullStore){const so=await storePurchasesOracle(state,trim(fullStore.nombre));if(so)sc.push({name:'Tienda entre eventos',turns:[{prompt:variant(TPL.storePurchases,seed,'full-store-prompt',{store:so.store}),oracle:{kind:'store-purchases',...so}}]});}
+
+  // Z1H · Cobertura conversacional de TODOS los eventos reales. FAST ya recorre además todas las
+  // personas y valida los catálogos completos; aquí cada evento tiene al menos una continuación
+  // elíptica real para que la ITV detecte saltos de foco sin hacer la batería manualmente.
+  for(const e of events){
+    const en=eventName(e),eo=await eventOracle(state,en);if(!eo)continue;
+    const turns=[{prompt:`Háblame de ${en}.`,event:en,oracle:{kind:'event-summary',event:en,data:eo}}];
+    if(donationCountForEvent(state,trim(e.id))>0){const d=await donationOracle(state,en);turns.push({prompt:'¿Y de donaciones?',event:en,oracle:{kind:'donations',event:en,data:d}});}
+    else if(arr(state?.compras).some(r=>eventIdOf(r)===trim(e.id)&&!isDonationTicketLocal(ticketTextLocal(r))))turns.push({prompt:'¿Y de compras?',event:en,expected:`Debe conservar ${en} y consultar compras, sin pedir de nuevo el evento.`});
+    else turns.push({prompt:'¿Y económicamente cómo quedó?',event:en,oracle:{kind:'event-economy',event:en,data:eo}});
+    sc.push({name:`Z1 TODOS · ${en}`,turns});
+  }
 
   const out=[]; for(const s of sc){for(const t of s.turns){if(out.length>=maxTurns)break;const expected=expectedOracleText(t.oracle)||(t.event?`Evento: ${t.event}`:arr(t.events).length?`Eventos: ${t.events.join(' ↔ ')}`:t.person?`Persona: ${t.person}`:'Regla/invariante satisfecha');out.push({...t,expected,scenario:s.name,id:`full-${out.length+1}-${key(s.name)}-${normalizeSeed(seed).toString(36).slice(-4)}`});} if(out.length>=maxTurns)break;}
   return out;
@@ -977,18 +1017,18 @@ async function buildCasesForMode(state,mode,rawSeed){
   const seed=normalizeSeed(rawSeed),m=trim(mode).toUpperCase();
   if(m==='FAST')return{seed,cases:await buildRealFastCases(state,seed)};
   if(m==='AI-SMOKE')return{seed,cases:await buildAiSmokeCases(state,48,seed)};
-  if(m==='FULL-CERT')return{seed,cases:await buildFullCertScenarios(state,36,seed)};
+  if(m==='FULL-CERT')return{seed,cases:await buildFullCertScenarios(state,100,seed)};
   throw new Error(`Modo ITV no soportado: ${mode}`);
 }
 async function batteryBlueprint(state,rawSeed){
   const seed=normalizeSeed(rawSeed);
-  const fast=await buildRealFastCases(state,seed); const smoke=await buildAiSmokeCases(state,48,seed); const full=await buildFullCertScenarios(state,36,seed);
+  const fast=await buildRealFastCases(state,seed); const smoke=await buildAiSmokeCases(state,48,seed); const full=await buildFullCertScenarios(state,100,seed);
   return {seed,counts:batteryDataCounts(state),fast,smoke,full};
 }
 
 export async function previewZuzuBattery({seed}={}){
   const state=await getState(); const b=await batteryBlueprint(state,seed);batteryRuntimeSet(b);
-  return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(36,b.full.length),costEurRange:'0,12–0,50 €',hardCapSuggested:0.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT recorre conversaciones multiturno con ORÁCULO FUERTE y conserva pregunta + esperado + respuesta.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco solo se informa como Cuadre Banco cuando existe configuración/evidencia explícita del evento; el histórico general nunca se reconstruye como cuadre. Ningún modo modifica datos de producción.']};
+  return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(100,b.full.length),costEurRange:'según nº de casos',hardCapSuggested:1.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT incorpora Z1 HUMANIDAD/CONTINUIDAD y un recorrido conversacional por todos los eventos reales; conserva pregunta + esperado + respuesta.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco solo se informa como Cuadre Banco cuando existe configuración/evidencia explícita del evento; el histórico general nunca se reconstruye como cuadre. Ningún modo modifica datos de producción.']};
 }
 
 function streamWrite(send,type,payload={}){ send({type,at:nowIso(),...payload}); }

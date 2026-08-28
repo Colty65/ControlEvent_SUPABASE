@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · Zuzu Voice · RAW14U · guard local de residuos + barge-in robusto + carrusel 100×2,5 s
+/* ControlEvent v4_0_exp · Zuzu Voice · RAW14U/Z1H · guard local de residuos + barge-in robusto + pensamiento breve de espera
    Objetivo: recuperar la escucha ambiental que sí funcionó y mantener conversación oral humana.
    Flujo deliberadamente simple:
    AMBIENTE -> "Hola Zuzu" -> USUARIO -> ESPERA IA -> ZUZU HABLA -> USUARIO.
@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-RAW14U-VOICE-GUARD-CAROUSEL-FIX47-CONTEXTUAL-ENTERTAINMENT';
+  var BUILD='v4_0_exp-RAW14U-Z1H-SILENT-THINKING-FIX48';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v44', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v44', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v44', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v44', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v45'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v46', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v46', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v46', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v46', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v46'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -32,111 +32,30 @@
     bargeRecognition:null, bargeGeneration:0,
     voices:[],
     recorderStream:null, recorder:null, recorderChunks:[], recordingActive:false, lastRecordingBlob:null, lastRecordingMime:'',
-    entertainmentTimer:null, entertainmentCount:0, entertainmentInitialDelayMs:3000, entertainmentIntervalMs:6000, entertainmentMaxPerRequest:2, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentFinishedAt:0, pendingAnswerTimer:null, lastEntertainmentIndex:-1, entertainmentDeck:[], entertainmentUsed:[], pendingEntertainmentIndex:-1, entertainmentCycle:0, entertainmentLoaded:false, entertainmentRequestCounter:0, entertainmentPersonalize:false,
+    entertainmentTimer:null, entertainmentCount:0, entertainmentInitialDelayMs:3300, entertainmentIntervalMs:0, entertainmentMaxPerRequest:1, entertainmentSpeaking:false, entertainmentUtterance:null, entertainmentFinishedAt:0, pendingAnswerTimer:null, lastEntertainmentIndex:-1, entertainmentDeck:[], entertainmentUsed:[], pendingEntertainmentIndex:-1, entertainmentCycle:0, entertainmentLoaded:false, entertainmentRequestCounter:0, entertainmentPersonalize:false,
     manualDraftOwned:false, manualDraftValue:'', programmaticPromptWrite:0, manualDraftBoundTo:null
   };
 
+  // Z1H · La espera no es una segunda conversación. El humano suele callarse y pensar.
+  // Si la respuesta tarda, Zuzu emite COMO MÁXIMO una microseñal de pensamiento, breve y
+  // no temática. El mazo evita repeticiones hasta agotarse; no se personaliza con nombres.
   var ENTERTAINMENT_PHRASES=[
-    '{usuario}, dame un segundo que estoy haciendo encaje de bolillos.',
-    'Quieto parao, {nombre}, que esto ya viene.',
-    'Estamos en {mes_actual}, {usuario}; no me metas prisa que me despeino.',
-    'Es {diasemana}, {usuario}; día fino para sacar cuentas.',
-    '{nombre}, en {ano_actual} todavía quedan milagros informáticos.',
-    'Voy por ello, {usuario}; no me cambies las cartas ahora.',
-    '{usuario}, esto tiene más vueltas que una persiana.',
-    'Dame aire, {nombre}, que estoy juntando los cabos.',
-    'Un segundo, {usuario}, que aquí hay tomate.',
-    '{usuario}, estoy mirando debajo de las alfombras digitales.',
-    'Ahora mismo, {nombre}; no me hagas correr con los cordones sueltos.',
-    '{usuario}, la cosa pinta bien, pero déjame rematarla.',
-    'Voy fino, {usuario}; hoy es {diasemana} y se nota.',
-    '{nombre}, estoy poniendo cada oveja con su pareja.',
-    '{usuario}, dame dos meneos de rabo y te cuento.',
-    'En {mes_actual} todo parece fácil hasta que preguntas tú, {usuario}.',
-    '{nombre}, me has pillado con las manos en los datos.',
-    'Voy, voy, {usuario}; que la prisa mata al dato.',
-    '{usuario}, estoy sacando punta al lápiz electrónico.',
-    'Un momentín, {nombre}; esto merece mirar dos veces.',
-    '{usuario}, que no cunda el pánico, sigo aquí.',
-    'Con calma, {nombre}; las cuentas tienen memoria.',
-    '{usuario}, estoy peinando la información con raya al medio.',
-    'Espera un pelo, {usuario}; ya asoma la respuesta.',
-    '{nombre}, esto va más derecho que una vela.',
-    '{usuario}, hoy {diasemana} me tienes trabajando de lo lindo.',
-    'Voy a por la buena, {usuario}; las otras eran de calentamiento.',
-    '{nombre}, estoy mirando hasta el último rincón.',
-    '{usuario}, aquí no se escapa ni una miguita de dato.',
-    'Un segundo, que {ano_actual} viene cargadito, {usuario}.',
-    '{usuario}, estoy atando esto con cuerda de esparto.',
-    '{nombre}, no te me aceleres que ya llego.',
-    'Voy sacando la madeja, {usuario}.',
-    '{usuario}, esto está más entretenido que una verbena.',
-    'Dame un suspiro, {nombre}, y te lo pongo bonito.',
-    '{usuario}, a estas horas de {momento_dia} todavía funciono.',
-    '{nombre}, son las {hora_actual}; mira tú qué ganas de preguntar.',
-    '{usuario}, hoy {fecha_hoy} te has levantado preguntón.',
-    'Voy detrás del dato, {usuario}; no puede correr mucho.',
-    '{nombre}, lo tengo casi agarrado por la pechera.',
-    '{usuario}, estoy separando el grano de la paja.',
-    'Un segundo, {nombre}; aquí hay más capas que una cebolla.',
-    '{usuario}, no me distraigas que estoy en la curva buena.',
-    'Ya voy, {usuario}; esto no se arregla a martillazos.',
-    '{nombre}, estoy haciendo arqueología de datos.',
-    '{usuario}, dame un parpadeo largo y te digo.',
-    'Voy con ello, {nombre}; sin trampa ni cartón.',
-    '{usuario}, esto huele a respuesta buena.',
-    'No te vayas, {usuario}; el dato está entrando por la puerta.',
-    '{nombre}, estoy poniendo orden en este gallinero.',
-    '{usuario}, un poco de paciencia, que no soy un microondas.',
-    'En {mes_actual} y todavía me haces sudar, {nombre}.',
-    '{usuario}, le estoy dando una vuelta de llave.',
-    '{nombre}, ahora mismo te saco de dudas.',
-    '{usuario}, estoy comprobando que dos y dos sigan siendo cuatro.',
-    'Un instante, {nombre}; que aquí el detalle manda.',
-    '{usuario}, la respuesta viene andando, no en AVE.',
-    '{nombre}, estoy buscando el dato con linterna.',
-    '{usuario}, no veas cómo está el patio de números.',
-    'Dame un segundo, {usuario}; estoy cuadrando la cuadratura.',
-    '{nombre}, esto ya está cogiendo forma.',
-    '{usuario}, no he desaparecido; estoy debajo del capó.',
-    'Voy al turrón, {nombre}, pero déjame abrir la caja.',
-    '{usuario}, hoy {diasemana} tenemos faena fina.',
-    '{nombre}, estoy sacando brillo a la respuesta.',
-    '{usuario}, que luego dices que te cuento películas.',
-    'Un momento, {usuario}; quiero que salga con fundamento.',
-    '{nombre}, estoy oliendo el dato y no se me escapa.',
-    '{usuario}, a ver quién puede más, tú preguntando o yo buscando.',
-    'Ya casi, {nombre}; no saques todavía la artillería.',
-    '{usuario}, estoy poniendo los números en fila de a uno.',
-    'Un respiro, {nombre}; la criatura está pensando.',
-    '{usuario}, ahora te lo sirvo sin espinas.',
-    '{nombre}, aquí seguimos, pico y pala.',
-    '{usuario}, voy a dejarlo niquelado.',
-    'Es {diasemana}; habrá que hacer algo serio, {usuario}.',
-    '{nombre}, estoy mirando esto con ojo de notario.',
-    '{usuario}, no me vengas luego con que faltaba una coma.',
-    'Un momento, {nombre}; voy por la segunda vuelta.',
-    '{usuario}, estoy metiendo la mano hasta el fondo del cajón.',
-    '{nombre}, déjame que lo mastique antes de hablar.',
-    '{usuario}, esto ya canta por soleares.',
-    'Voy fino filipino, {nombre}.',
-    '{usuario}, la respuesta está calentando motores.',
-    '{nombre}, me faltan dos tornillos y salimos.',
-    '{usuario}, estoy revisando por si hay gato encerrado.',
-    'Un segundo, {nombre}; no quiero venderte humo.',
-    '{usuario}, hoy {fecha_hoy} vienes con hambre de datos.',
-    '{nombre}, me has puesto deberes para {mes_actual}.',
-    '{usuario}, estoy echando cuentas hasta con los dedos.',
-    'Voy, {nombre}; el ordenador también tiene sus lunes aunque sea {diasemana}.',
-    '{usuario}, esto va a quedar más claro que el agua.',
-    '{nombre}, estoy haciendo la última pasada.',
-    '{usuario}, no te me impacientes que ya se ve la meta.',
-    'Un poco más, {nombre}; estoy cerrando el círculo.',
-    '{usuario}, en {ano_actual} seguimos sin fabricar respuestas con churros.',
-    '{nombre}, voy a decirte algo con sustancia, no cualquier cosa.',
-    '{usuario}, la máquina está dándole al coco.',
-    'Ya lo tengo entre ceja y ceja, {nombre}.',
-    '{usuario}, si esto tarda es porque lo estoy mirando de verdad.'
+    'Mmm…',
+    'A ver…',
+    'Ufff… espera.',
+    'Un segundo…',
+    'Mmm… déjame pensar.',
+    'Calla… que ya lo tengo.',
+    'Ufff… lo tengo en la punta de la lengua.',
+    'A ver, a ver…',
+    'Espera… ya voy.',
+    'Mmm… casi.',
+    'Un momentín…',
+    'Calla, calla…',
+    'Déjame un segundo…',
+    'Ufff… a ver.',
+    'Mmm… ya sale.',
+    'Espera un pelo…'
   ];
   function $(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
@@ -446,45 +365,12 @@
     var vars={usuario:voiceAddressName(false),nombre:voiceGreetingName(),mes_actual:months[d.getMonth()],mes:months[d.getMonth()],diasemana:days[d.getDay()],dia_semana:days[d.getDay()],ano_actual:String(d.getFullYear()),'añoactual':String(d.getFullYear()),dia_mes:String(d.getDate()),hora_actual:pad(h)+':'+pad(d.getMinutes()),fecha_hoy:pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(),momento_dia:moment,version:'v4_0_exp'};
     var out=String(raw||'');Object.keys(vars).forEach(function(k){out=out.replace(new RegExp('\\{'+k+'\\}','g'),vars[k]);});return clean(out);
   }
-  function entertainmentPromptContext(prompt){
-    var raw=clean(prompt),n=norm(raw),kind='general',label='',solidary=/\bsolidari/.test(n);
-    var m=raw.match(/\b(?:evento|celebraci[oó]n)\s+[«\"“]?([^?.!,;]{4,78})/i);
-    if(m&&m[1])label=clean(m[1]).replace(/[»\"”]+$/,'').slice(0,78);
-    if(/\b(?:compar|versus|\bvs\b|frente a|diferenc)/.test(n))kind='comparison';
-    else if(/\b(?:banco|bancari|saldo|movimiento|concili|cuadre|reintegro|transferencia)/.test(n))kind='bank';
-    else if(/\b(?:compra|ticket|tk\s*\d|gasto|proveedor|tienda)/.test(n))kind='purchases';
-    else if(/\b(?:donacion|donante|aportacion|regal)/.test(n))kind='donations';
-    else if(/\b(?:ingreso|recaudacion|cuota|abonad|pago socio)/.test(n))kind='income';
-    else if(/\b(?:persona|socio|asistencia|asistente|responsable|quien|quién)/.test(n))kind='people';
-    else if(/\b(?:document|justificante|archivo|pdf)/.test(n))kind='documents';
-    else if(/\b(?:hito|gestion|tarea|pendiente|planificacion|planificación)/.test(n))kind='management';
-    else if(/\b(?:tiempo|meteorolog|temperatura|lluvia|viento|pronostico|pronóstico)/.test(n))kind='weather';
-    else if(/\b(?:evento|celebracion|jornada|fiesta|funcion|función)/.test(n)||label)kind='event';
-    return{raw:raw,n:n,kind:kind,label:label,solidary:solidary};
-  }
-  function nextEntertainmentRequestCounter(){
-    var n=Math.max(0,Number(safeGet(STORAGE.entertainmentRequestCounter,'0'))||0)+1;state.entertainmentRequestCounter=n;safeSet(STORAGE.entertainmentRequestCounter,String(n));return n;
-  }
-  function contextualEntertainmentPhrase(prompt,index){
-    var c=entertainmentPromptContext(prompt),name=state.entertainmentPersonalize&&index===0?voiceGreetingName():'',lead=name?name+', ':'',label=c.label&&index===0?c.label:'';
-    if(index>0){
-      if(c.kind==='comparison')return 'Ya tengo las dos partes enfrentadas; estoy rematando dónde cambia de verdad la película.';
-      if(c.kind==='bank')return 'Ya sigo el hilo del saldo; estoy comprobando los movimientos que pueden cambiar la lectura.';
-      if(c.kind==='event')return 'Ya tengo el hilo del evento; estoy rematando lo que merece la pena contarte y quitando el ruido.';
-      return 'Ya tengo el hilo de tu pregunta; estoy rematando justo lo que puede cambiar la respuesta.';
-    }
-    if(c.kind==='event'&&c.solidary)return lead+(label?'Menudo nombre tiene '+label+'; ':'')+'aquí huele a fiesta y a solidaridad. Estoy mirando qué cuentan de verdad los datos.';
-    if(c.kind==='event')return lead+(label?'Voy con '+label+'; ':'Voy con ese evento; ')+'estoy juntando lo importante para contártelo con hilo.';
-    if(c.kind==='bank')return lead+'estoy siguiendo el rastro de los movimientos y del saldo; aquí conviene no mezclar ni un euro.';
-    if(c.kind==='purchases')return lead+'voy recorriendo compras y tickets; mejor cuadrarlo bien antes de soltar cifras.';
-    if(c.kind==='donations')return lead+'voy con las donaciones; estoy separando quién aportó qué para no mezclar historias.';
-    if(c.kind==='income')return lead+'estoy siguiendo los ingresos y quién los explica; enseguida te cuento lo que importa.';
-    if(c.kind==='people')return lead+'estoy cruzando personas y contexto; así no mezclo quién hizo qué ni en qué evento.';
-    if(c.kind==='documents')return lead+'estoy tirando de los documentos y justificantes que vienen al caso, sin sacar papeles de otra historia.';
-    if(c.kind==='management')return lead+'estoy repasando hitos y pendientes en el orden que toca; ya voy viendo por dónde va el asunto.';
-    if(c.kind==='weather')return lead+'estoy situando fecha y evento para que el tiempo que te cuente sea exactamente el que toca.';
-    if(c.kind==='comparison')return lead+'estoy poniendo las dos cosas lado a lado; así se ve enseguida dónde cambia la película.';
-    return lead+'sigo exactamente con lo que me has preguntado; estoy juntando los datos antes de contártelo.';
+  function contextualEntertainmentPhrase(){
+    // No comenta el tema, no anticipa conclusiones y no intenta entretener: solo piensa.
+    var idx=nextEntertainmentIndex();
+    if(!Number.isInteger(idx)||idx<0||idx>=ENTERTAINMENT_PHRASES.length)return 'Mmm…';
+    commitEntertainmentIndex(idx);
+    return ENTERTAINMENT_PHRASES[idx];
   }
 
   function entertainmentRandomInt(max){
@@ -532,7 +418,7 @@
       state.entertainmentSpeaking=false;state.entertainmentUtterance=null;if(idx>=0&&state.entertainmentUsed.indexOf(idx)<0)requeueEntertainmentIndex(idx);state.pendingEntertainmentIndex=-1;if(was)state.entertainmentFinishedAt=Date.now();persistEntertainmentState();if(was&&supportsSpeech()){try{window.speechSynthesis.cancel();}catch(_){}}}
   }
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Math.max(0,Number(delay)||0));}
-  function entertainmentEnded(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();if(state.conversationMode&&state.requestInFlight&&state.entertainmentCount<state.entertainmentMaxPerRequest)scheduleEntertainment(state.entertainmentIntervalMs||6000);}
+  function entertainmentEnded(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();}
   function speakEntertainmentPhrase(){
     if(!state.conversationMode||!state.requestInFlight||!supportsSpeech()||state.entertainmentSpeaking||state.entertainmentCount>=state.entertainmentMaxPerRequest)return;
     var phrase=renderEntertainmentPhrase(contextualEntertainmentPhrase(state.requestPrompt,state.entertainmentCount));state.entertainmentCount++;setStatus(phrase,'ok');
@@ -542,7 +428,7 @@
       window.speechSynthesis.speak(u);
     }catch(_){entertainmentEnded();}
   }
-  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;state.entertainmentPersonalize=(nextEntertainmentRequestCounter()%4===1);if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(state.entertainmentInitialDelayMs||3000);}
+  function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;state.entertainmentPersonalize=false;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(state.entertainmentInitialDelayMs||3300);}
   function queueAnswerAfterEntertainment(answer,autoRead){clearTimeout(state.pendingAnswerTimer);state.pendingAnswerTimer=null;var hadEntertainment=state.entertainmentSpeaking||!!state.entertainmentUtterance||(state.entertainmentFinishedAt>0&&Date.now()-state.entertainmentFinishedAt<600);function deliver(){if(!state.conversationMode)return;if(state.entertainmentSpeaking){state.pendingAnswerTimer=setTimeout(deliver,60);return;}var wait=hadEntertainment?Math.max(0,500-(Date.now()-(state.entertainmentFinishedAt||0))):0;state.pendingAnswerTimer=setTimeout(function(){state.pendingAnswerTimer=null;if(!state.conversationMode)return;if(autoRead)speakChunks(answer);else startUser();},wait);}deliver();}
 
   function resumeConversationListening(delay){if(!state.conversationMode||state.speaking||state.requestInFlight||state.awaitingResponse)return;setTimeout(function(){if(state.conversationMode&&!state.speaking&&!state.requestInFlight&&!state.awaitingResponse)startUser();},Number(delay)||180);}

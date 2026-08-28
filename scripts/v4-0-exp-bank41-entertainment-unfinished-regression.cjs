@@ -12,10 +12,10 @@ t('línea Movimiento banco eliminada del inspector normal',/const allocation[\s\
 t('cabecera histórica centrada de verdad',/\.ce-bank-history-title\{[\s\S]*position:absolute!important[\s\S]*left:50%!important/.test(css));
 t('título histórico mucho mayor',/\.ce-bank-history-title span\{[\s\S]*font-size:17px!important/.test(css));
 t('cabeceras de columnas históricas mayores',/\.ce-bank-history-head\{[\s\S]*font-size:12px!important/.test(css));
-t('entretenimiento arranca a 3 segundos',voice.includes('entertainmentInitialDelayMs:3000'));
-t('entretenimiento contextual usa prompt',voice.includes('function entertainmentPromptContext')&&voice.includes('contextualEntertainmentPhrase(state.requestPrompt'));
-t('entretenimiento máximo dos frases',voice.includes('entertainmentMaxPerRequest:2')&&voice.includes('state.entertainmentCount>=state.entertainmentMaxPerRequest'));
-t('personalización no se repite en cada pregunta',voice.includes('nextEntertainmentRequestCounter()%4===1'));
+t('microseñal de pensamiento arranca pasados 3 segundos',voice.includes('entertainmentInitialDelayMs:3300'));
+t('la espera deja de comentar el tema de negocio',!voice.includes('function entertainmentPromptContext')&&voice.includes('No comenta el tema'));
+t('máximo una microseñal por respuesta',voice.includes('entertainmentMaxPerRequest:1')&&voice.includes('state.entertainmentCount>=state.entertainmentMaxPerRequest'));
+t('la espera no usa nombres como muletilla',voice.includes('state.entertainmentPersonalize=false')&&!voice.includes('nextEntertainmentRequestCounter()%4===1'));
 t('memoria reconoce pista a medias',ledger.includes('function isUnfinishedRecallPrompt')||ledger.includes('export function isUnfinishedRecallPrompt'));
 t('conversación anterior se clasifica unfinished al abrir una nueva',ledger.includes("conversationClosingSignal(last)?'completed':'unfinished'"));
 t('una conversación recuperada vuelve a active',ledger.includes("setConversationStatus(id,'active')"));
@@ -23,5 +23,5 @@ t('búsqueda con pista unfinished prioriza estado',ledger.includes("trim(x.conve
 t('índice histórico conserva status de conversación',ledger.includes('updated_at,status,memory_summary'));
 t('kernel recibe conversation_status unfinished',ai.includes('conversation_status:trim(x.conversation_status)')&&ai.includes('ESTADO DE CONVERSACIÓN'));
 t('outline verbaliza que quedó a medias',ai.includes('conversación que dejamos a medias'));
-t('cache bust aplicado',index.includes('BANK4-1-LEGIBILIDAD')&&index.includes('RAW14U-CONTEXTUAL-ENTERTAINMENT'));
+t('cache bust aplicado',index.includes('Z1H-SILENT-THINKING'));
 console.log(`PETICIÓN 27/08/2026 · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);
