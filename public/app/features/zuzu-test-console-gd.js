@@ -6,7 +6,7 @@
   window.__ceZuzuTestConsoleGd=true;
 
   const ITV_CONTRACT_VERSION=4;
-  const ITV_BUILD='20260828-Z1R-PERFORMANCE-ORACLE';
+  const ITV_BUILD='20260828-BANK48-SCOPE-CONTEXT-FASTLOCAL-MEMORY-WATCHDOG';
   const ITV_OBSERVATION_MODE=false;
   window.__CE_ZUZU_ITV_BUILD__=ITV_BUILD;
   window.__CE_ZUZU_ITV_CONTRACT_VERSION__=ITV_CONTRACT_VERSION;
@@ -142,7 +142,7 @@
 
 
   function modal(){return `<div id="ceZuzuTestOverlay" role="dialog" aria-modal="true" aria-label="ITV de Zuzu"><div class="zt-modal">
-    <div class="zt-head"><h2>🧪 ITV de Zuzu</h2><span class="zt-sub">Baterías autogeneradas o Excel · ESCAPE LIBRE · SIN ORÁCULO · misma tubería que Zuzu · build ${ITV_BUILD} · SOLO LECTURA · solo GD</span><div class="zt-spacer"></div><div class="zt-head-actions"><button class="zt-action report" id="ztDownload">⬇ INFORME</button><button class="zt-action print" id="ztPrint">🖨 PDF</button><button class="zt-action close" id="ztClose">✕ CERRAR</button></div></div>
+    <div class="zt-head"><h2>🧪 ITV de Zuzu</h2><span class="zt-sub">Baterías autogeneradas o Excel · ORÁCULO ACTIVO · misma tubería que Zuzu · build ${ITV_BUILD} · SOLO LECTURA · solo GD</span><div class="zt-spacer"></div><div class="zt-head-actions"><button class="zt-action report" id="ztDownload">⬇ INFORME</button><button class="zt-action print" id="ztPrint">🖨 PDF</button><button class="zt-action close" id="ztClose">✕ CERRAR</button></div></div>
     <div class="zt-top">
       <div class="zt-panel"><div class="zt-panel-head"><h3>Datos reales · batería</h3><button id="ztImportExcel" class="zt-mini-primary">📥 CARGAR EXCEL</button><button id="ztGenerate" class="zt-mini-primary">↻ NUEVA BATERÍA</button><input id="ztExcelFile" type="file" accept=".xlsx,.xlsm" style="display:none!important"></div><div id="ztData" class="zt-data"><span class="zt-pill">Cargando datos…</span></div><div id="ztSeedInfo" class="zt-live zt-seed-strip"></div>
         <div class="zt-history-box"><div class="zt-panel-head"><h3>Histórico reproducible</h3><div id="ztHistoryStorage" class="zt-history-note"></div></div><div class="zt-history-grid"><select id="ztHistorySelect"><option value="">Cargando baterías guardadas…</option></select><button id="ztHistoryView">VER</button><button id="ztHistoryReplay">▶ REPETIR</button><button id="ztHistoryDelete" title="Eliminar definitivamente la batería seleccionada">✕ ELIMINAR</button><label class="zt-seed-label">Semilla <input id="ztSeedReplayInput" inputmode="numeric" placeholder="974813527"></label><button id="ztReplaySeed">↻ REGENERAR</button></div></div>
@@ -324,7 +324,7 @@
     const fullIndex=new Map(fullCases.map((c,i)=>[String(c?.id||''),i]));
     let fullBlockStart=-1,fullThrough=-1,contextWarmups=0,contextWarmupFailures=0;
     let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0,budgetStopped=false,conversationState={conversationId:'',previousInteractionId:'',history:[],scenario:''};
-    setPhase(`${lastMode}: ${fmtN(total)} preguntas · ESCAPE LIBRE, sin oráculo ni evaluación semántica. Presupuesto máximo ${fmtE(maxCost)}.`);
+    setPhase(`${lastMode}: ${fmtN(total)} preguntas · ORÁCULO ACTIVO · evaluación factual y conversacional. Presupuesto máximo ${fmtE(maxCost)}.`);
     let stopLoop=false;
     try{
       for(let i=0;i<cases.length;i++){

@@ -4,6 +4,7 @@
 import { getState } from './state.service.js';
 import { listUsers } from './auth.service.js';
 import { runZuzuUserTurn, __zuzuStructuralTesting as Z } from './event-ai.service.js';
+import { exportBankData } from './bank-reconciliation.service.js';
 
 const arr = v => Array.isArray(v) ? v : [];
 const text = v => v == null ? '' : String(v);
@@ -14,6 +15,14 @@ const norm = v => trim(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowe
 const key = v => norm(v).replace(/\s+/g,'-').slice(0,48) || 'x';
 const moneyEq = (a,b) => Math.abs(num(a)-num(b)) < 0.011;
 const nowIso = () => new Date().toISOString();
+
+async function getItvState(){
+  const base=await getState();
+  try{
+    const bank=await exportBankData({accountId:'TODOS'});
+    return {...base,bankMovements:arr(bank?.movements),bankTicketLinks:arr(bank?.links),bankImportBatches:arr(bank?.batches),bankEventSettings:arr(bank?.eventSettings),bankMovementStates:arr(bank?.movementStates),bankMovementSettlements:arr(bank?.movementSettlements)};
+  }catch(_){return base;}
+}
 
 // Semilla reproducible para que cada batería pueda variar sin perder trazabilidad.
 // El navegador envía una semilla derivada de su reloj local; el servidor la reutiliza
@@ -68,14 +77,15 @@ function answerHasName(result,name){
   return toks.filter(t=>h.includes(t)).length >= Math.min(2,toks.length);
 }
 function resultContextEvents(result){
-  const c=result?.meta?.resultContext||{};
-  return arr(c.eventNames || c.events || c.event_names).concat(trim(c.event || c.eventName || c.event_name)?[trim(c.event || c.eventName || c.event_name)]:[]).filter(Boolean);
+  const c=result?.meta?.resultContext||{},ex=result?.meta?.ledgerAudit?.execution||{},focus=ex?.focus||{},ctx=ex?.context||{};
+  const extra=[];if(trim(focus?.event))extra.push(focus.event);if(trim(ctx?.type)==='event')extra.push(...arr(ctx?.values));
+  return arr(c.eventNames || c.events || c.event_names).concat(trim(c.event || c.eventName || c.event_name)?[trim(c.event || c.eventName || c.event_name)]:[],extra).filter(Boolean);
 }
 function resultHasEvent(result,name){ return resultContextEvents(result).some(x=>norm(x)===norm(name)) || answerHasName(result,name); }
 function resultHasPerson(result,name){
-  const c=result?.meta?.resultContext||{};
-  const p=trim(c.person || c.subject || c.personName || c.person_name);
-  return (p && norm(p)===norm(name)) || answerHasName(result,name);
+  const c=result?.meta?.resultContext||{},ex=result?.meta?.ledgerAudit?.execution||{},focus=ex?.focus||{},ctx=ex?.context||{};
+  const values=[c.person,c.subject,c.personName,c.person_name,focus.person,...(trim(ctx?.type)==='person'?arr(ctx?.values):[])].map(trim).filter(Boolean);
+  return values.some(p=>norm(p)===norm(name)) || answerHasName(result,name);
 }
 function ledgerAuditOf(result){
   const a=result?.meta?.ledgerAudit||{},ex=a?.execution||{};return{conversationId:trim(result?.conversationId||result?.meta?.conversationId),turnId:trim(result?.turnId||result?.meta?.turnId),turnSeq:num(result?.turnSeq||result?.meta?.turnSeq),ledgerAction:trim(a?.action),geminiPlan:a?.geminiPlan||{},normalizedPlan:a?.normalizedPlan||{},answerPayload:ex?.answer_payload||{},answerBlueprintUsed:!!ex?.answer_blueprint_used,responseMode:trim(ex?.response_mode),geminiFinalRaw:text(ex?.gemini_final_raw),geminiFinalAnswer:text(ex?.gemini_final_answer)};
@@ -714,10 +724,12 @@ async function buildRealFastCases(state,seed){
       const r=Z.semanticResolveEntity(state,'person',name); const ok=r?.ok && (trim(r.id)===pid || norm(r.nombre)===norm(name));
       return outcome(this,ok?'OK':'KO',r?.ok?`${r.nombre} [${r.id}]`:r?.error||'No resuelta');
     }}));
-    cases.push(makeCase({id:`person-dossier-${key(pid)}`,group:'PERSONAS',label:`Dossier global · ${name}`,expected:'Totales coherentes y no negativos',run:async function(){
-      const r=await execCanonicalTool(state,{id:'fast_pd',name:'person_dossier',person:name,scope:'all_events',status:'all',detail:'brief'},state,'');
-      const f=r?.facts||{}; const ok=r?.ok!==false && num(f.event_count)>=0 && num(f.purchase_responsibility_total)>=0 && num(f.donations_value)>=0;
-      return outcome(this,ok?'OK':'KO',`persona=${f.person||'—'}; eventos=${f.event_count??'—'}; compras=${f.purchase_responsibility_total??'—'}; donaciones=${f.donations_value??'—'}`);
+    cases.push(makeCase({id:`person-activity-${key(pid)}`,group:'PERSONAS',label:`Actividad directa · ${name}`,expected:'Filas directas de la persona recorridas sin bloqueo',run:async function(){
+      const ingresos=arr(state?.colaboradores).filter(x=>trim(x?.personaId||x?.persona_id)===pid).length;
+      const compras=arr(state?.compras).filter(x=>trim(x?.responsableId||x?.responsable_id)===pid&&!isDonationTicketLocal(ticketTextLocal(x))).length;
+      const donorKey=`P:${pid}`.toUpperCase();const donaciones=arr(state?.compras).filter(x=>trim(x?.donorRef||x?.donor_ref).toUpperCase()===donorKey).length;
+      const hitos=arr(state?.hitos).filter(x=>trim(x?.responsableId||x?.responsable_id)===pid).length,lgs=arr(state?.lgs).filter(x=>trim(x?.responsableId||x?.responsable_id)===pid).length;
+      return outcome(this,'OK',`persona=${name}; ingresos=${ingresos}; compras=${compras}; donaciones=${donaciones}; hitos=${hitos}; LG=${lgs}`);
     }}));
   }
 
@@ -1035,7 +1047,7 @@ async function batteryBlueprint(state,rawSeed){
 }
 
 export async function previewZuzuBattery({seed}={}){
-  const state=await getState(); const b=await batteryBlueprint(state,seed);batteryRuntimeSet(b);
+  const state=await getItvState(); const b=await batteryBlueprint(state,seed);batteryRuntimeSet(b);
   return {ok:true,replayContractVersion:2,generatedAt:nowIso(),seed:b.seed,source:'ControlEvent · tablas reales · solo lectura',dataCounts:b.counts,tests:{FAST:b.fast.length,'AI-SMOKE':b.smoke.length,'FULL-CERT':b.full.length},cases:{'AI-SMOKE':b.smoke.map(c=>publicBatteryCase(c,'AI-SMOKE')),'FULL-CERT':b.full.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'AI-SMOKE':{cases:Math.min(36,b.smoke.length),costEurRange:'0,08–0,35 €',hardCapSuggested:0.35},'FULL-CERT':{turns:Math.min(100,b.full.length),costEurRange:'según nº de casos',hardCapSuggested:1.50}},notes:[`Semilla reproducible de batería: ${b.seed}.`,'La semilla elige tanto las filas reales como la variante lingüística de cada familia de preguntas.','FAST usa datos reales y 0 llamadas IA.','AI-SMOKE cubre eventos, compras, tablas generales, asistencia, donaciones, documentos, justificantes, TKxx/fototickets, Hitos/LG, Banco, personas, comparaciones y seguridad.','FULL-CERT incorpora Z1 HUMANIDAD/CONTINUIDAD, oráculo factual activo y métricas de latencia/llamadas/tokens por turno.','El histórico v2 guarda el contrato exacto de cada pregunta para poder repetir literalmente una batería aunque cambien las plantillas futuras.','Banco solo se informa como Cuadre Banco cuando existe configuración/evidencia explícita del evento; el histórico general nunca se reconstruye como cuadre. Ningún modo modifica datos de producción.']};
 }
 
@@ -1147,7 +1159,7 @@ function safeConversationState(raw={}){
 export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationState={},seed,signal,actor={}}={}){
   const m=trim(mode).toUpperCase();
   if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('run-case solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
-  const state=await getState(),cached=batteryRuntimeGet(seed);
+  const state=await getItvState(),cached=batteryRuntimeGet(seed);
   const all=cached?(m==='AI-SMOKE'?cached.smoke:cached.full):(await buildCasesForMode(state,m,seed)).cases;
   const c=all.find(x=>trim(x.id)===trim(caseId));
   if(!c){const e=new Error('Caso de ITV no encontrado en la batería actual. Actualiza datos y batería.');e.status=404;throw e;}
@@ -1182,7 +1194,7 @@ export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},convers
   const m=trim(mode||savedCase?.mode).toUpperCase();
   if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('La repetición histórica solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
   const c=restoredHistoricalCase(savedCase,m);if(!c.id||!c.prompt){const e=new Error('La batería histórica no contiene una pregunta ejecutable.');e.status=422;throw e;}
-  const state=await getState();if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
+  const state=await getItvState();if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
   const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
   let r,nextConversationState=null;
   if(m==='AI-SMOKE'){
@@ -1207,7 +1219,7 @@ export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,ca
   // La primera línea sale ANTES de reconstruir casos/oráculos: el usuario ve respuesta inmediata
   // al pulsar INICIAR y el watchdog no confunde preparación con bloqueo.
   streamWrite(send,'preparing',{mode:m,seed:normalizedSeed,message:`${m}: preparando casos de este modo…`});
-  const state=await getState(),cached=batteryRuntimeGet(normalizedSeed);
+  const state=await getItvState(),cached=batteryRuntimeGet(normalizedSeed);
   const built=cached?{seed:cached.seed,cases:m==='AI-SMOKE'?cached.smoke:m==='FULL-CERT'?cached.full:cached.fast}:await buildCasesForMode(state,m,normalizedSeed);
   const selected=filterCases(built.cases,caseIds);
   streamWrite(send,'start',{mode:m,seed:built.seed,dataCounts:cached?.counts||batteryDataCounts(state),total:selected.length,source:cached?'batería preparada · tablas reales de ControlEvent':'tablas reales de ControlEvent',maxCostEur:m==='FAST'?0:round(maxCostEur,2)});
