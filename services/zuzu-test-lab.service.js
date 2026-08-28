@@ -224,6 +224,21 @@ function purchaseOracle(state,event){
   const byAmountAsc=rows.slice().sort((a,b)=>num(a.amount)-num(b.amount)||a.label.localeCompare(b.label,'es',{sensitivity:'base'}));
   return{event:rr.nombre,eventId:rr.id,total:round(total,2),totalUnits:round(totalUnits,3),records,productCount:rows.length,rows,max:byAmountDesc[0]||null,min:byAmountAsc[0]||null};
 }
+function pendingPurchaseOracle(state,event){
+  const rr=Z.semanticResolveEntity(state,'event',event); if(!rr?.ok)return null;
+  const products=mapById(state?.productos),groups=new Map(); let total=0,records=0,totalUnits=0;
+  for(const row of arr(state?.compras)){
+    if(eventIdOf(row)!==trim(rr.id))continue; const tt=ticketTextLocal(row);
+    if(isDonationTicketLocal(tt)||!isPendingTicketLocal(tt))continue;
+    const pid=trim(row?.productoId||row?.producto_id),prod=products.get(pid)||{},label=trim(prod?.nombre)||pid||'Sin producto',amount=lineAmountLocal(row),units=round(row?.unidades,3);
+    total+=amount; totalUnits+=units; records++;
+    const k=norm(label),g=groups.get(k)||{label,amount:0,units:0,records:0};g.amount+=amount;g.units+=units;g.records++;groups.set(k,g);
+  }
+  const rows=[...groups.values()].map(x=>({...x,amount:round(x.amount,2),units:round(x.units,3)}));
+  const byAmountDesc=rows.slice().sort((a,b)=>num(b.amount)-num(a.amount)||a.label.localeCompare(b.label,'es',{sensitivity:'base'}));
+  const byAmountAsc=rows.slice().sort((a,b)=>num(a.amount)-num(b.amount)||a.label.localeCompare(b.label,'es',{sensitivity:'base'}));
+  return{event:rr.nombre,eventId:rr.id,total:round(total,2),totalUnits:round(totalUnits,3),records,productCount:rows.length,rows,max:byAmountDesc[0]||null,min:byAmountAsc[0]||null,status:'pending'};
+}
 async function eventOracle(state,event){
   try{const r=await execCanonicalTool(state,{id:'itv_oracle_event',name:'event_dossier',event,scope:'named_event',detail:'brief'},state,'');return{event:trim(r?.facts?.event)||event,income:round(r?.facts?.income_total,2),purchases:round(r?.facts?.purchases_realized,2),pending:round(r?.facts?.purchases_pending,2),donations:round(r?.facts?.donations_value,2),balance:round(r?.facts?.operating_balance,2),valuation:round(r?.facts?.event_valuation,2),attendees:round(r?.facts?.attendees_canonical,3),status:trim(r?.facts?.status)};}catch(_){return null;}
 }
@@ -742,8 +757,14 @@ async function buildRealFastCases(state,seed){
 
 function chooseEvents(state,seed){
   const events=arr(state?.eventos).filter(e=>trim(e?.id)&&eventName(e));
-  const purchaseCounts=new Map(); for(const r of arr(state?.compras)){const id=eventIdOf(r);if(id)purchaseCounts.set(id,(purchaseCounts.get(id)||0)+1);}
+  const purchaseCounts=new Map(),pendingPurchaseCounts=new Map();
+  for(const r of arr(state?.compras)){
+    const id=eventIdOf(r);if(!id)continue;const tt=ticketTextLocal(r);
+    if(!isDonationTicketLocal(tt))purchaseCounts.set(id,(purchaseCounts.get(id)||0)+1);
+    if(!isDonationTicketLocal(tt)&&isPendingTicketLocal(tt))pendingPurchaseCounts.set(id,(pendingPurchaseCounts.get(id)||0)+1);
+  }
   const withPurchases=events.filter(e=>purchaseCounts.get(trim(e.id))>0);
+  const withPendingPurchases=events.filter(e=>pendingPurchaseCounts.get(trim(e.id))>0);
   const families=new Map(); for(const e of events){const stem=familyStem(eventName(e)),y=yearOf(eventName(e));if(stem&&y){if(!families.has(stem))families.set(stem,[]);families.get(stem).push(e);}}
   const familyLists=[...families.values()].filter(v=>v.length>=2);
   let sibling=[];
@@ -753,7 +774,7 @@ function chooseEvents(state,seed){
     const pos=Math.min(sorted.length-2,pickIndex(Math.max(1,sorted.length-1),seed,'family-pair'));
     sibling=sorted.slice(pos,pos+2);
   }
-  return {events:shuffled(events,seed,'events'),withPurchases:shuffled(withPurchases,seed,'purchases-events'),sibling};
+  return {events:shuffled(events,seed,'events'),withPurchases:shuffled(withPurchases,seed,'purchases-events'),withPendingPurchases:shuffled(withPendingPurchases,seed,'pending-purchases-events'),sibling};
 }
 function choosePeople(state,seed){
   const people=arr(state?.personas).filter(p=>trim(p?.id)&&personName(p)&&!/^z[_ -]?dev/i.test(personName(p)));
@@ -920,7 +941,7 @@ async function buildAiSmokeCases(state,max=40,seed=1){
 }
 
 async function buildFullCertScenarios(state,maxTurns=100,seed=1){
-  const {events,withPurchases,sibling}=chooseEvents(state,seed),{sample:people}=choosePeople(state,seed); const sc=[];
+  const {events,withPurchases,withPendingPurchases,sibling}=chooseEvents(state,seed),{sample:people}=choosePeople(state,seed); const sc=[];
   if(events.length>=2){const a=events[0],b=events.find(x=>trim(x.id)!==trim(a.id));if(b){const an=eventName(a),bn=eventName(b),ao=await eventOracle(state,an),bo=await eventOracle(state,bn);sc.push({name:'Cambio de evento',turns:[
     {prompt:variant(TPL.event,seed,'full-event-a',{event:an}),event:an,oracle:{kind:'event-summary',event:an,data:ao}},
     {prompt:variant(TPL.economyFollow,seed,'full-economy-a'),event:an,oracle:{kind:'event-economy',event:an,data:ao}},
@@ -936,8 +957,8 @@ async function buildFullCertScenarios(state,maxTurns=100,seed=1){
     {prompt:variant(TPL.event,seed,'full-relative-start',{event:eventName(first)}),event:eventName(first),oracle:{kind:'event-summary',event:eventName(first),data:await eventOracle(state,eventName(first))}},
     {prompt:variant(TPL.relativeNext,seed,'full-relative-next',{year:y}),event:eventName(second),oracle:{kind:'event-summary',event:eventName(second),data:await eventOracle(state,eventName(second))}}
   ]});}
-  if(withPurchases[0]){const e=withPurchases[0],en=eventName(e),po=purchaseOracle(state,en);sc.push({name:'Z1 · Compra → máximo → responsable → sus otras cosas',turns:[
-    {prompt:`Dime las compras pendientes de ${en}.`,event:en,oracle:{kind:'purchase-set',...(po||{event:en,total:0,productCount:0})}},
+  if(withPendingPurchases[0]){const e=withPendingPurchases[0],en=eventName(e),po=pendingPurchaseOracle(state,en);sc.push({name:'Z1 · Compra → máximo → responsable → sus otras cosas',turns:[
+    {prompt:`Dime las compras pendientes de ${en}.`,event:en,oracle:{kind:'purchase-set',...(po||{event:en,total:0,productCount:0,status:'pending'})}},
     {prompt:variant(TPL.maxFollow,seed,'full-max'),event:en,oracle:{kind:'purchase-max',event:en,row:po?.max||null}},
     {prompt:variant(TPL.responsibleFollow,seed,'full-responsible'),event:en,expected:'Debe conservar como sujeto la fila seleccionada en el turno anterior y responder su responsable, no listar personas del evento.'},
     {prompt:variant(TPL.samePersonOtherThings,seed,'full-same-person'),event:en,expected:'Debe conservar a esa persona como responsable y consultar sus otras compras; no debe saltar a asistencia/personas generales.'}

@@ -13394,9 +13394,11 @@ function v70CanonicalAnswer(frame={},result={},ws=null,scopeInfo={}){
   if(d==='products'){const data=arr(ws?.row_cache?.rows),distinct=new Set(data.map(r=>norm(r?.Producto)).filter(Boolean)).size,multi=data.some(r=>Object.prototype.hasOwnProperty.call(r,'Evento'))&&scopeInfo?.eventNames?.length>1;return multi?`He preparado ${distinct} ${distinct===1?'producto distinto':'productos distintos'} en ${rows} ${rows===1?'fila Evento+Producto':'filas Evento+Producto'}${label?` de ${label}`:''}${total!=null&&Number.isFinite(Number(total))?`, con un importe total de ${v26FormatEuro(total)}`:''}. La tabla inferior contiene la relación completa.`:`He preparado ${rows} ${rows===1?'producto':'productos'}${label?` de ${label}`:''}${total!=null&&Number.isFinite(Number(total))?`, con un importe total de ${v26FormatEuro(total)}`:''}. La tabla inferior contiene la relación completa.`;}
   if(d==='purchases')return`He preparado ${rows} ${rows===1?'registro de compra':'registros de compra'}${label?` de ${label}`:''}${total!=null&&Number.isFinite(Number(total))?`, por ${v26FormatEuro(total)}`:''}. La tabla inferior contiene el detalle.`;
   if(d==='donations')return`He preparado ${rows} ${rows===1?'fila de donación':'filas de donación'}${label?` de ${label}`:''}${total!=null&&Number.isFinite(Number(total))?`, con un valor total de ${v26FormatEuro(total)}`:''}. La tabla inferior contiene la relación.`;
-  if(d==='events')return`He preparado ${rows} ${rows===1?'evento':'eventos'}. La tabla inferior contiene la relación solicitada.`;
-  if(d==='people'){const f=result?.facts||{};return`He preparado la información de personas${trim(f.event)?` de ${trim(f.event)}`:''}${f.attendees_canonical!=null?`. Hay ${v26FormatPlainNumber(f.attendees_canonical,0)} asistentes canónicos`:''}. La tabla inferior contiene la relación.`;}
-  if(d==='event_summary'){const f=result?.facts||{};return`${trim(f.event)||'El evento'} está ${trim(f.status)||'sin estado indicado'}${trim(f.start)?`, del ${trim(f.start)} al ${trim(f.end)}`:''}. Registra ${v26FormatEuro(f.income_total||0)} de ingresos, ${v26FormatEuro(f.purchases_realized||0)} de compras realizadas${num(f.purchases_pending)?`, ${v26FormatEuro(f.purchases_pending)} pendientes`:''} y ${v26FormatPlainNumber(f.attendees_canonical||0,0)} asistentes canónicos.`;}
+  if(d==='events'){const f=result?.facts||{};return`Hay ${Number(f.event_count??rows)||rows} eventos registrados${f.en_curso_count!=null?`: ${Number(f.en_curso_count)||0} En curso y ${Number(f.finalizados_count)||0} Finalizados`:''}.`;}
+  if(d==='people'){const f=result?.facts||{},att=Number(f.attendees_canonical??f.total_attendees_people);return`He preparado la información de personas${trim(f.event)?` de ${trim(f.event)}`:''}${Number.isFinite(att)?`. Hay ${v26FormatPlainNumber(att,0)} asistentes canónicos`:''}. La tabla inferior contiene la relación.`;}
+  if(d==='bank'){const f=result?.facts||{},life=trim(f.lifecycle_message)||trim(f.reconciliation_status)||'Cuadre bancario';if(f.has_bank_reconciliation===false)return`${life}${trim(f.event)?` · ${trim(f.event)}`:''}.`;return`${life}${trim(f.event)?` · ${trim(f.event)}`:''}: ${Number(f.included_movement_count)||0} movimientos incluidos, ${Number(f.justified_movement_count)||0} justificados y ${Number(f.unlinked_movement_count)||0} sin justificar. Abonos ${v26FormatEuro(f.included_income_total||0)}; cargos ${v26FormatEuro(f.included_charge_total||0)}; impacto ${v26FormatEuro(f.bank_impact||0)}.`;}
+  if(d==='documentation'){const f=result?.facts||{};return`En ${trim(f.event)||'el evento'} constan ${Number(f.income_records)||0} ingresos (${Number(f.income_with_receipt)||0} con justificante), ${Number(f.purchase_tickets)||0} TKxx (${Number(f.purchase_tickets_with_image)||0} con imagen y ${Number(f.purchase_tickets_without_image)||0} sin imagen) y ${Number(f.documents)||0} documentos (${Number(f.documents_with_attachment)||0} con adjunto). Faltan ${Number(f.missing_evidence_count)||0} evidencias.`;}
+  if(d==='event_summary'){const f=result?.facts||{};if(trim(result?.name)==='events_overview'||trim(scopeInfo?.kind)==='all_events')return`El panorama canónico contiene ${Number(f.event_count)||rows} eventos. La tabla compara ingresos, compras realizadas y pendientes, donaciones, saldo, valoración y asistencia.`;return`${trim(f.event)||'El evento'} está ${trim(f.status)||'sin estado indicado'}${trim(f.start)?`, del ${trim(f.start)} al ${trim(f.end)}`:''}. Registra ${v26FormatEuro(f.income_total||0)} de ingresos, ${v26FormatEuro(f.purchases_realized||0)} de compras realizadas${num(f.purchases_pending)?`, ${v26FormatEuro(f.purchases_pending)} pendientes`:''} y ${v26FormatPlainNumber(f.attendees_canonical||0,0)} asistentes canónicos.`;}
   if(d==='person'){const f=result?.facts||{};return`He preparado el dossier de ${trim(f.person)||trim(frame?.filters?.person)||'la persona indicada'}: ${Number(f.event_count)||0} eventos vinculados, ${v26FormatEuro(f.purchase_responsibility_total||0)} en compras bajo responsabilidad y ${v26FormatEuro(f.donations_value||0)} en donaciones vinculadas.`;}
   if(d==='comparison'){const f=result?.facts||{};return`He comparado ${Number(f.event_count)||rows} eventos con las métricas canónicas disponibles. La tabla inferior muestra la comparación.`;}
   if(d==='stores_used')return`He preparado ${rows} tiendas con compras realizadas${label?` de ${label}`:''}${total!=null&&Number.isFinite(Number(total))?`, por ${v26FormatEuro(total)}`:''}. La tabla inferior muestra solo tiendas realmente utilizadas, no el catálogo general.`;if(d.startsWith('catalog_')||d==='stores')return`He preparado ${rows} registros del catálogo solicitado. La tabla inferior contiene la relación.`;
@@ -14112,14 +14114,17 @@ function v73CommandCallToRaw(call={}){
   return{action:'conversation',conversation:{kind:'general'}};
 }
 function v73NormalizeScope(raw={}){
-  // BANK4_8 · ADAPTADOR DE CONTRATO, no semántica. Interactions puede devolver
-  // abreviaturas estructurales aunque la instrucción pida el nombre canónico. Aquí solo
-  // convertimos FORMAS equivalentes; la elección lingüística sigue siendo de Gemini.
-  const rawKind=trim(raw?.kind).toLowerCase();
+  // BANK4_9 · ADAPTADOR ESTRUCTURAL. Gemini decide el ámbito; CE solo impide que una
+  // forma contradictoria destruya entidades explícitas del propio plan. Si llegan nombres
+  // concretos junto a all_events, los nombres son información más específica del mismo
+  // bloque y por tanto prevalecen sobre el comodín global.
+  const rawKind=trim(raw?.kind).toLowerCase(),event=trim(raw?.event),events=arr(raw?.events).map(trim).filter(Boolean).slice(0,40);
   const alias={event:'named_event',events:'named_events',global:'all_events','global=':'all_events',person:'all_events',store:'all_events',conversation:'inherit',all:'all_events'};
-  const candidate=alias[rawKind]||rawKind;
+  let candidate=alias[rawKind]||rawKind;
+  if(candidate==='all_events'&&events.length)candidate=events.length===1?'named_event':'named_events';
+  else if(candidate==='all_events'&&event)candidate='named_event';
   const kind=['screen_event','named_event','named_events','event_series','all_events','year','latest_events','inherit'].includes(candidate)?candidate:'';
-  const out={kind},event=trim(raw?.event),events=arr(raw?.events).map(trim).filter(Boolean).slice(0,40);
+  const out={kind};
   // Adaptación física del contrato, no interpretación lingüística: named_event acepta
   // event o una lista events de un solo elemento; named_events acepta events o event.
   // El nombre emitido por Zuzu se conserva literalmente, sin resolverlo ni sustituirlo aquí.
@@ -14220,13 +14225,17 @@ function v73NormalizeAnswerBlueprint(raw={},responseKind=''){
   return Object.keys(out).length?out:undefined;
 }
 function v73NormalizePlan(raw={}){
-  const action=['query','local','set_context','reference','conversation','clarify'].includes(trim(raw?.action))?trim(raw.action):'conversation',out={action};const ia=raw?.input_assessment&&typeof raw.input_assessment==='object'?raw.input_assessment:null,iq=trim(ia?.quality);if(['coherent','intentional_topic_shift','possible_voice_noise'].includes(iq))out.input_assessment={quality:iq,...(trim(ia?.note)?{note:trim(ia.note).slice(0,280)}:{})};const rk=trim(raw?.response_kind);if(['amount','units','count','who','what','whether','which_event','compare','summary','table','context','conversation_summary'].includes(rk))out.response_kind=rk;
+  const action=['query','local','set_context','reference','conversation','clarify'].includes(trim(raw?.action))?trim(raw.action):'conversation',out={action};const ia=raw?.input_assessment&&typeof raw.input_assessment==='object'?raw.input_assessment:null,iq=trim(ia?.quality);if(['coherent','intentional_topic_shift','possible_voice_noise'].includes(iq))out.input_assessment={quality:iq,...(trim(ia?.note)?{note:trim(ia.note).slice(0,280)}:{})};const rk=trim(raw?.response_kind),metricAlias=['income','purchases','donations','balance','valuation','attendance'].includes(rk)?rk:'';if(['amount','units','count','who','what','whether','which_event','compare','summary','table','context','conversation_summary'].includes(rk))out.response_kind=rk;else if(metricAlias)out.response_kind='amount';
   const blueprint=v73NormalizeAnswerBlueprint(raw?.answer_blueprint,out.response_kind||rk);if(blueprint)out.answer_blueprint=blueprint;
   if(action==='query'){
     const q=raw?.query&&typeof raw.query==='object'?raw.query:{},p=q.product&&typeof q.product==='object'?q.product:null,f=q.fields&&typeof q.fields==='object'?q.fields:null,pres=q.presentation&&typeof q.presentation==='object'?q.presentation:null;
     out.query={};const targets=v73NormalizeTargets(q);if(targets.length)out.query.targets=targets;
+    if(metricAlias)out.query.comparison_metric=metricAlias;
     if(q.scope)out.query.scope=v73NormalizeScope(q.scope);
-    const peopleMode=trim(q?.people_mode);if(['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income'].includes(peopleMode))out.query.people_mode=peopleMode;
+    const peopleMode=trim(q?.people_mode),primaryDomain=trim(targets?.[0]?.domain);
+    // BANK4_9 · people_mode pertenece al dominio people. Si Gemini lo añade además a
+    // person, es redundancia de esquema: el dossier person ya contiene ingresos y actividad.
+    if(primaryDomain!=='person'&&['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income'].includes(peopleMode))out.query.people_mode=peopleMode;
     if(p&&trim(p.text))out.query.product={text:trim(p.text),match:['exact','family','semantic'].includes(trim(p.match))?trim(p.match):'semantic'};
     const products=arr(q?.products).map(x=>typeof x==='string'?{text:trim(x),match:'semantic'}:{text:trim(x?.text),match:['exact','family','semantic'].includes(trim(x?.match))?trim(x.match):'semantic'}).filter(x=>x.text).slice(0,24);if(products.length)out.query.products=products;
     for(const k of ['person','responsible','donor','store','ticket','purchase_status'])if(trim(q?.[k]))out.query[k]=trim(q[k]);
@@ -14259,7 +14268,8 @@ function v73ProtocolViolation(raw={},plan={}){
   if(action==='query'){if(!raw?.query||typeof raw.query!=='object')return'QUERY sin bloque query.';const rawTargets=arr(raw.query.targets).map(x=>trim(x?.domain)).filter(Boolean),legacy=trim(raw.query.domain);if(!rawTargets.length&&!legacy)return'QUERY sin targets.';if(legacy&&rawTargets.length)return'QUERY no debe mezclar el formato antiguo domain con targets.';if(!raw.query.scope||typeof raw.query.scope!=='object'||!trim(raw.query.scope.kind))return'QUERY sin scope explícito.';const sk=trim(raw.query.scope.kind),se=trim(raw.query.scope.event),ses=arr(raw.query.scope.events).map(trim).filter(Boolean);if(sk==='event_series'&&(!trim(raw.query.scope.series)||ses.length||se))return'QUERY con scope event_series debe usar series y no event/events; CE no convierte una lista de eventos en nombre de serie.';if((sk==='named_event'&&!se&&!ses.length)||(sk==='named_events'&&!ses.length&&!se)||(sk==='year'&&!Number.isFinite(Number(raw.query.scope.year)))||(sk==='latest_events'&&!(Number(raw.query.scope.count)>0)))return`QUERY con scope ${sk||'—'} incompleto.`;
     const rk=trim(raw?.response_kind),multiLists=['people','responsibles','donors','stores'].filter(k=>arr(raw.query?.[k]).map(trim).filter(Boolean).length>1),multiProducts=arr(raw.query?.products).filter(Boolean).length>1,ops=arr(raw.query?.operations),hasAggregate=ops.some(op=>['group','compare'].includes(trim(op?.type))&&(['sum','avg','count','min','max'].includes(trim(op?.aggregation))||trim(op?.metric)||trim(op?.metric_role)));
     if(rawTargets.includes('people')&&!['attendance_full','attendees','attending_members','attending_non_members','non_attending_members','canonical_members','income'].includes(trim(raw.query?.people_mode)))return'QUERY people sin people_mode válido. Usa attendance_full, attendees, attending_members, attending_non_members, non_attending_members, canonical_members o income.';
-    if(rawTargets.includes('person')&&trim(raw.query?.people_mode))return'QUERY person no admite people_mode: person ya materializa el dossier transversal completo de cada identidad. Conserva people:[...] y elimina people_mode.';
+    // BANK4_9: people_mode extra en person se tolera como ruido de contrato y se elimina
+    // en v73NormalizePlan. No altera el significado ni bloquea un follow-up correcto.
     const multiPersonDossier=rawTargets.length===1&&rawTargets[0]==='person'&&arr(raw.query?.people).map(trim).filter(Boolean).length>1;
     if(multiPersonDossier&&!['amount','units','count','compare'].includes(rk)&&ops.some(op=>['group','rank','compare'].includes(trim(op?.type))))return'QUERY person multientidad de tipo dossier/resumen no debe colapsarse con group/rank/compare. Conserva las columnas canónicas del dossier y, si se pidió gráfica, añade solo chart sobre Persona y métricas existentes.';
     if(['amount','units','count','compare'].includes(rk)&&(multiLists.length||multiProducts)&&!hasAggregate)return`QUERY de magnitud sobre varias entidades (${[...multiLists,...(multiProducts?['products']:[])].join(', ')}) sin agregación explícita group/compare. Zuzu debe decidir el agrupamiento; CE no permitirá que la redacción final calcule desde filas crudas.`;
@@ -14496,10 +14506,69 @@ function v79RepairQueryScopeFromContext(query={},currentContext={},flowTrace=[])
   }else q.scope=scope;
   return q;
 }
+function v79RecoverCanonicalId(rows=[],value=''){
+  const raw=trim(value);if(!/^id[-_]/i.test(raw)||raw.length<12)return null;
+  const exact=arr(rows).find(r=>trim(r?.id)===raw);if(exact)return exact;
+  // Gemini a veces copia un ID canónico y repite/añade un sufijo. No hacemos fuzzy sobre
+  // IDs: solo aceptamos relación de prefijo literal y únicamente si produce UN candidato.
+  const candidates=arr(rows).filter(r=>{const id=trim(r?.id);return id.length>=12&&(raw.startsWith(id)||id.startsWith(raw));});
+  return candidates.length===1?candidates[0]:null;
+}
+// legacy-regression-marker: resolution:'canonical_id' · v79DirectTypedEntity
 function v79DirectTypedEntity(state={},type='',value=''){
   const raw=trim(value),semanticType=['donor','responsible'].includes(trim(type))?'person':trim(type);if(!raw)return null;
-  const rows=semanticCatalogRows(state,semanticType);const direct=rows.find(r=>trim(r?.id)===raw);
-  return direct?{ok:true,id:trim(direct.id),nombre:trim(direct.nombre),score:1,type:semanticType,resolution:'canonical_id'}:null;
+  const rows=semanticCatalogRows(state,semanticType),direct=v79RecoverCanonicalId(rows,raw);
+  return direct?{ok:true,id:trim(direct.id),nombre:trim(direct.nombre),score:1,type:semanticType,resolution:trim(direct.id)===raw?'canonical_id':'canonical_id_prefix_recovery'}:null;
+}
+
+function v79RepairEllipticalScope(plan={},currentContext={},entityCandidates={},userPrompt='',flowTrace=[]){
+  const out=JSON.parse(JSON.stringify(plan||{}));if(trim(out?.action)!=='query')return out;
+  const q=out.query||{},scope=v73NormalizeScope(q.scope||{}),ctx=v73NormalizeScope(currentContext?.scope||{});
+  if(scope.kind!=='all_events'||!['named_event','named_events'].includes(ctx.kind))return out;
+  const explicitEvent=arr(entityCandidates?.typed?.EVENT).some(x=>['exact','strong'].includes(trim(x?.match_type)));if(explicitEvent)return out;
+  const p=trim(userPrompt),continuation=v76HasAnaphora(p)||/^\s*[¿?¡!]*\s*(?:y|también|además|entonces)\b/i.test(p);
+  const explicitGlobal=/\b(?:todos?|todas?|global|general|conjunto\s+completo|cat[aá]logo\s+completo)\b/i.test(p);
+  if(!continuation||explicitGlobal)return out;
+  q.scope=ctx;out.query=q;zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · SCOPE ELÍPTICO','OK',`Continuación sin EVENT nueva: all_events contradictorio → ${JSON.stringify(ctx)} desde el hilo activo.`);return out;
+}
+
+function v79RepairEventTargetContract(plan={},currentContext={},flowTrace=[]){
+  const out=JSON.parse(JSON.stringify(plan||{}));if(trim(out?.action)!=='query')return out;
+  const q=out.query||{},targets=arr(q.targets),scope=v73NormalizeScope(q.scope||{});if(targets.length!==1||trim(targets[0]?.domain)!=='events')return out;
+  if(scope.kind==='named_event'){targets[0].domain='event_summary';zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · CONTRATO EVENTO','OK','events + named_event → event_summary: el dossier es la fuente canónica superset para un evento concreto.');}
+  else if(scope.kind==='named_events'){targets[0].domain='comparison';if(trim(q.comparison_metric)||['amount','which_event'].includes(trim(out.response_kind))||!trim(out.response_kind))out.response_kind='compare';zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · CONTRATO MULTIEVENTO','OK',`${arr(scope.events).length} eventos explícitos → comparison; no se colapsan a catálogo ni se agregan entre sí.`);}
+  else if(scope.kind==='all_events'&&trim(out.response_kind)==='summary'){targets[0].domain='event_summary';zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · PANORAMA GLOBAL','OK','events + all_events + summary → event_summary global/overview canónico.');}
+  q.targets=targets;out.query=q;return out;
+}
+function v79RepairRelativeYearScope(plan={},currentContext={},userPrompt='',state={},flowTrace=[]){
+  const out=JSON.parse(JSON.stringify(plan||{}));if(trim(out?.action)!=='query')return out;
+  const ctx=v73NormalizeScope(currentContext?.scope||{});if(ctx.kind!=='named_event'||!trim(ctx.event))return out;
+  const prior=trim(ctx.event),priorYear=v325YearInText(prior),targetYear=v325RelativeYearRequested(userPrompt,priorYear);if(!priorYear||!targetYear||targetYear===priorYear)return out;
+  const cue=/\b(?:ano|año)\s+(?:anterior|siguiente|posterior)\b|\bdel\s+(?:ano|año)\s+(?:anterior|siguiente|posterior)\b/i.test(norm(userPrompt));if(!cue)return out;
+  const priorCore=v314EventCoreTokens(prior);if(!priorCore.length)return out;const candidates=[];
+  for(const e of arr(state?.eventos)){const name=trim(e?.titulo);if(!name||v325YearInText(name)!==targetYear)continue;const core=v314EventCoreTokens(name);if(!core.length)continue;const shared=priorCore.filter(t=>core.some(c=>semanticTokenNear(t,c)>=0.9)).length,precision=shared/Math.max(1,core.length),recall=shared/Math.max(1,priorCore.length),score=(precision+recall)/2;if(score>=0.55)candidates.push({name,score});}
+  candidates.sort((a,b)=>b.score-a.score||a.name.localeCompare(b.name,'es'));if(!candidates.length||(candidates.length>1&&candidates[0].score-candidates[1].score<0.08))return out;
+  const q=out.query||{};q.scope={kind:'named_event',event:candidates[0].name};const d=trim(v73PrimaryDomain(q));if(!d||d==='all')q.targets=[{domain:'event_summary'}];out.query=q;zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · REFERENCIA TEMPORAL','OK',`${priorYear} → ${targetYear}: «${prior}» se resuelve de forma unívoca a «${candidates[0].name}».`);return out;
+}
+function v79RepairExplicitPersonContext(plan={},currentContext={},entityCandidates={},flowTrace=[]){
+  const out=JSON.parse(JSON.stringify(plan||{}));if(trim(out?.action)!=='query')return out;
+  const source=trim(currentContext?.active_entity_sources?.person),active=trim(currentContext?.active_entities?.person);if(source!=='explicit_set_context'||!active)return out;
+  const explicit=arr(entityCandidates?.typed?.PERSON).some(x=>['exact','strong'].includes(trim(x?.match_type)));if(explicit)return out;
+  const q=out.query||{},d=trim(v73PrimaryDomain(q));
+  if(d==='person'){q.person='';q.people=[active];}
+  else if(d==='purchases'){q.person='';q.people=[];q.responsible=active;q.responsibles=[];}
+  else if(d==='donations'){q.person='';q.people=[];q.donor=active;q.donors=[];}
+  else return out;
+  out.query=q;zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · PERSONA ACTIVA','OK',`Follow-up sin PERSON nueva: se conserva la persona fijada explícitamente «${active}» y se descartan referencias antiguas incompatibles.`);return out;
+}
+function v79RepairComparisonFollowup(plan={},currentContext={},flowTrace=[]){
+  const out=JSON.parse(JSON.stringify(plan||{}));if(trim(out?.action)!=='query')return out;const q=out.query||{},scope=v73NormalizeScope(q.scope||{}),d=trim(v73PrimaryDomain(q));
+  const inComparison=arr(currentContext?.last_intent?.domains).includes('comparison')||arr(currentContext?.thread_navigation?.topics_recent_first).slice(0,2).some(x=>arr(x?.domains).includes('comparison'));
+  if(!inComparison||scope.kind!=='named_events'||arr(scope.events).length<2||!['purchases','donations'].includes(d))return out;
+  const sort=arr(q.operations).find(op=>trim(op?.type)==='sort'&&['amount','importe','valor','coste','costo'].includes(norm(op?.field||op?.metric_role)));
+  if(!sort||!['amount','', 'compare'].includes(trim(out.response_kind)))return out;
+  q.targets=[{domain:'comparison'}];q.comparison_metric=d==='purchases'?'purchases':'donations';q.operations=[];out.response_kind='compare';out.query=q;
+  zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · COMPARACIÓN PERSISTENTE','OK',`Follow-up de ${d} sobre ${arr(scope.events).length} eventos del hilo: se usa comparison canónica por Evento en vez de sumar/ordenar líneas individuales.`);return out;
 }
 
 function v76ApplyFocusBindings(plan={},userPrompt='',currentContext={},flowTrace=[],historyCandidates=[]){
@@ -14687,10 +14756,15 @@ DOMINIOS
 - person = dossier abierto de una persona; people = asistencia/registro de personas dentro de evento.
 - documentation = DOC, justificantes de ingresos y TKxx/fototickets. bank = Cuadre Banco solo si existe evidencia canónica.
 - comparison = comparar eventos. event_summary = resumen/dossier de evento.
+- events = catálogo/estado/fechas. Para cifras, balance, «cómo salió» o economía de un evento usa event_summary; para una matriz económica global usa event_summary con all_events o comparison, nunca el catálogo events como sustituto.
+- En documentation distingue literalmente purchase_tickets, purchase_tickets_with_image y purchase_tickets_without_image; «TKxx» no significa «documentos».
 
 CONSULTAS
 - Toda ce_query lleva scope explícito. named_event requiere event; named_events requiere events; all_events para global; event_series usa series.
-- Si CURRENT_CONTEXT.scope ya fija evento(s) y el usuario no introduce otro, consérvalo.
+- Si CURRENT_CONTEXT.scope ya fija evento(s) y el usuario no introduce otro, consérvalo. En una continuación sobre un conjunto named_events conserva TODO el conjunto: no lo colapses a un evento.
+- Si la pregunta pide qué evento tiene más/menos de una magnitud dentro de named_events, responde como comparación por Evento: agrupa la métrica por Evento y luego rank/sort; nunca sumes los eventos entre sí ni ordenes líneas individuales para contestar qué EVENTO gana.
+- Si CURRENT_CONTEXT.active_entity_sources.person es explicit_set_context y CURRENT_USER no nombra otra PERSON, esa persona es el sujeto actual y prevalece sobre IDs/personas de turnos más antiguos.
+- Las referencias temporales relativas entre eventos (anterior/siguiente/año posterior) se resuelven contra thread_navigation/ordinal_sets y deben acabar en named_event/named_events canónicos, no en un dominio inventado «all».
 - response_kind: amount, units, count, who, what, whether, which_event, compare, summary, table, context, conversation_summary.
 - Cálculos, orden, ranking y agrupación van en operations_json. CE calcula; no delegues sumas/Top-N a la redacción.
 - Si CURRENT/DATASET ya puede responder mediante filtro/sort/group/proyección, PREFIERE ce_local: reutiliza el dataset y evita otra consulta de negocio.
@@ -15346,7 +15420,7 @@ function v73CanonicalEventName(state={},value=''){
   // Un ID canónico ya certificado por SCC/ledger NO vuelve a pasar por resolución lingüística.
   // Esto evita convertir ids persistidos en nombres ambiguos o imposibles de recertificar.
   const raw=trim(value);if(!raw)return{ok:false,ambiguous:false,value:'',candidates:[]};
-  const direct=arr(state?.eventos).find(e=>trim(e?.id)===raw);if(direct)return{ok:true,name:trim(direct?.titulo)||raw,id:raw,score:1,resolution:'canonical_id'};
+  const direct=v79RecoverCanonicalId(arr(state?.eventos),raw);if(direct)return{ok:true,name:trim(direct?.titulo)||trim(direct?.id)||raw,id:trim(direct?.id),score:1,resolution:trim(direct?.id)===raw?'canonical_id':'canonical_id_prefix_recovery'};
   const rr=semanticResolveEntity(state,'event',raw);if(rr.ok)return{ok:true,name:rr.nombre,id:rr.id,score:rr.score,resolution:'scc'};
   return{ok:false,ambiguous:!!rr.ambiguous,value:raw,candidates:arr(rr.candidates).map(x=>trim(x.nombre)).filter(Boolean)};
 }
@@ -15374,7 +15448,8 @@ function v73CertifyContext(context={},state={},flowTrace=[]){
   const semanticType=['person','donor','responsible'].includes(type)?'person':type,canonical=[];
   for(const raw of values){let r;if(semanticType==='event')r=v73CanonicalEventName(state,raw);else r=v79DirectTypedEntity(state,semanticType,raw)||(semanticType==='person'?v26ResolvePersonFamily(state,raw):semanticResolveEntity(state,semanticType,raw));
     if(r?.ambiguous)return{context:c,error:`${type} «${raw}» es ambiguo dentro del tipo ${semanticType}: ${arr(r?.candidates).map(x=>trim(x?.nombre||x)).filter(Boolean).join(' / ')}.`};
-    const name=trim(r?.name||r?.nombre);canonical.push(name||raw);if(name&&norm(name)!==norm(raw))zuzuTracePush(flowTrace,'v4_0_exp · Ledger · CONTEXTO TIPADO','OK',`${type}: «${raw}» → «${name}».`);
+    const name=trim(r?.name||r?.nombre);if(!r?.ok||!name)return{context:c,error:`No puedo certificar ${type} «${raw}»; no guardo IDs o nombres no canónicos en el contexto.`};
+    canonical.push(name);if(norm(name)!==norm(raw))zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · CONTEXTO TIPADO','OK',`${type}: «${raw}» → «${name}»${r?.resolution==='canonical_id_prefix_recovery'?' (ID estructural recuperado)':''}.`);
   }
   return{context:{type,values:[...new Set(canonical)]},error:''};
 }
@@ -15623,11 +15698,11 @@ async function v73CanonicalPeopleResult(query={},state={},selectedEventId='',flo
   const full=[...attendees,...absents];
   const rows=mode==='attendees'?attendees:mode==='attending_members'?memberAttendees:mode==='attending_non_members'?nonmemberAttendees:mode==='non_attending_members'?absents:full;
   const summary=[{Evento:event,'Socios del censo':Number(att?.sociosCensoPersonas)||0,'Socios asistentes':Number(att?.sociosAsistentesPersonas)||0,'No socios asistentes':Number(att?.noSociosAsistentesPersonas)||0,'Total asistentes':Number(att?.totalAsistentesPersonas)||0,'Socios no asistentes':Number(att?.sociosNoAsistentesPersonas)||0}];
-  const result={id:`att_${v61Hash(`${eid}|${mode}`)}`,name:'event_people',ok:true,title:`Asistencia canónica · ${event}`,facts:{event,people_mode:mode,canonical_members_people:Number(att?.sociosCensoPersonas)||0,member_attendees_people:Number(att?.sociosAsistentesPersonas)||0,nonmember_attendees_people:Number(att?.noSociosAsistentesPersonas)||0,total_attendees_people:Number(att?.totalAsistentesPersonas)||0,nonattending_members_people:Number(att?.sociosNoAsistentesPersonas)||0,member_attendee_names:memberAttendees.map(r=>trim(r.Persona)).filter(Boolean),nonmember_attendee_names:nonmemberAttendees.map(r=>trim(r.Persona)).filter(Boolean),nonattending_member_names:absents.map(r=>trim(r.Persona)).filter(Boolean),attendee_list_count:attendees.length,nonattendee_list_count:absents.length,attendance_criterion:trim(att?.criterio),attendance_semantics:isEventInProgressValue(eventRow?.situacion||eventRow?.Estado)?'Los totales son PERSONAS físicas. Como el evento sigue En curso, asistente/no asistente describe el estado registrado o previsto, NO prueba que la asistencia ya haya ocurrido. Redactar en presente de estado o futuro, nunca como hecho pasado cerrado. Las parejas se desglosan por Personas.':'Los totales son PERSONAS físicas. Las filas administrativas/parejas no se cuentan como una persona por fila; el campo Personas y la asistencia canónica mandan.'},tables:[v26Table('attendance_summary',`Resumen canónico de asistencia · ${event}`,summary),v26Table('attendance',mode==='attendees'?`Asistentes · ${event}`:mode==='attending_members'?`Socios asistentes · ${event}`:mode==='attending_non_members'?`No socios asistentes · ${event}`:mode==='non_attending_members'?`Socios no asistentes · ${event}`:`Asistentes y socios no asistentes · ${event}`,rows,{Evento:v26TextSchema('Evento'),Grupo:v26TextSchema('SOCIO asistente / NO SOCIO asistente / SOCIO no asistente'),Persona:v26TextSchema('Persona física cuando la pareja registrada puede desglosarse de forma segura'),Personas:v26CountSchema('personas','Personas físicas representadas por la fila'),'Registro canónico':v26TextSchema('Registro de origen; puede ser pareja')})]};
+  const result={id:`att_${v61Hash(`${eid}|${mode}`)}`,name:'event_people',ok:true,title:`Asistencia canónica · ${event}`,facts:{event,people_mode:mode,canonical_members_people:Number(att?.sociosCensoPersonas)||0,member_attendees_people:Number(att?.sociosAsistentesPersonas)||0,nonmember_attendees_people:Number(att?.noSociosAsistentesPersonas)||0,total_attendees_people:Number(att?.totalAsistentesPersonas)||0,attendees_canonical:Number(att?.totalAsistentesPersonas)||0,nonattending_members_people:Number(att?.sociosNoAsistentesPersonas)||0,member_attendee_names:memberAttendees.map(r=>trim(r.Persona)).filter(Boolean),nonmember_attendee_names:nonmemberAttendees.map(r=>trim(r.Persona)).filter(Boolean),nonattending_member_names:absents.map(r=>trim(r.Persona)).filter(Boolean),attendee_list_count:attendees.length,nonattendee_list_count:absents.length,attendance_criterion:trim(att?.criterio),attendance_semantics:isEventInProgressValue(eventRow?.situacion||eventRow?.Estado)?'Los totales son PERSONAS físicas. Como el evento sigue En curso, asistente/no asistente describe el estado registrado o previsto, NO prueba que la asistencia ya haya ocurrido. Redactar en presente de estado o futuro, nunca como hecho pasado cerrado. Las parejas se desglosan por Personas.':'Los totales son PERSONAS físicas. Las filas administrativas/parejas no se cuentan como una persona por fila; el campo Personas y la asistencia canónica mandan.'},tables:[v26Table('attendance_summary',`Resumen canónico de asistencia · ${event}`,summary),v26Table('attendance',mode==='attendees'?`Asistentes · ${event}`:mode==='attending_members'?`Socios asistentes · ${event}`:mode==='attending_non_members'?`No socios asistentes · ${event}`:mode==='non_attending_members'?`Socios no asistentes · ${event}`:`Asistentes y socios no asistentes · ${event}`,rows,{Evento:v26TextSchema('Evento'),Grupo:v26TextSchema('SOCIO asistente / NO SOCIO asistente / SOCIO no asistente'),Persona:v26TextSchema('Persona física cuando la pareja registrada puede desglosarse de forma segura'),Personas:v26CountSchema('personas','Personas físicas representadas por la fila'),'Registro canónico':v26TextSchema('Registro de origen; puede ser pareja')})]};
   zuzuTracePush(flowTrace,'v4_0_exp · Ledger · ASISTENCIA CANÓNICA','OK',`${event}: ${result.facts.total_attendees_people} asistentes físicos (${result.facts.member_attendees_people} socios + ${result.facts.nonmember_attendees_people} no socios); ${result.facts.nonattending_members_people} socios no asistentes. people_mode=${mode}.`);
   return{result,scopeInfo,productNames:[],extras:[]};
 }
-async function v73ExecuteResolvedQuery(frame={},query={},state={},selectedEventId='',flowTrace=[]){const canonicalPeople=trim(frame?.domain)==='people'?await v73CanonicalPeopleResult(query,state,selectedEventId,flowTrace):null;if(canonicalPeople){for(const sup of arr(query?.supplements)){const x=await v73ExecuteSupplement(sup,state,selectedEventId,flowTrace);if(x)canonicalPeople.extras.push(x);}return canonicalPeople;}const multi=trim(frame?.domain)==='person'?await v73ExecuteMultiPersonDossier(frame,query,state,selectedEventId,flowTrace):null;if(multi){for(const sup of arr(query?.supplements)){const x=await v73ExecuteSupplement(sup,state,selectedEventId,flowTrace);if(x)multi.extras.push(x);}return multi;}let base;const cmp=arr(query?.operations).find(op=>trim(op?.type)==='compare'),role=trim(cmp?.group_role)||v73RoleFromLabel(cmp?.group_field,'comparison'),resolvedScope=v70ResolveScope(frame,{},state,selectedEventId);if(trim(frame?.domain)==='event_summary'&&resolvedScope.eventNames.length>1){const result=await v261ExecuteAgentTool({id:`es_${v61Hash(String(Date.now()))}`,name:'compare_events',arguments:{events:resolvedScope.eventNames}},state,selectedEventId,flowTrace);if(!result||result.ok===false)throw new Error(trim(result?.error)||'No se pudo materializar el resumen de varios eventos.');zuzuTracePush(flowTrace,'v4_0_exp · Ledger · EVENT_SUMMARY MULTIEVENTO','OK',`${resolvedScope.eventNames.length} eventos materializados mediante KPI canónicos: ${resolvedScope.eventNames.join(' / ')}.`);base={result:{...result,name:'compare_events'},scopeInfo:resolvedScope,productNames:[],extras:[]};}else if(trim(frame?.domain)==='comparison'&&role==='person'){const values=[...new Set(arr(cmp?.values).map(trim).filter(Boolean))];if(values.length<2)throw new Error('La comparación de personas necesita al menos dos valores.');const scopeInfo=v70ResolveScope(frame,{},state,selectedEventId),rows=[];for(const person of values){const d=await v26ToolPersonDossier({id:`c_${v61Hash(person)}`,name:'person_dossier',person,scope:scopeInfo.eventNames.length===1?'named_event':'all_events',event:scopeInfo.eventNames[0],status:'all',detail:'brief'},state,selectedEventId),f=d?.facts||{};rows.push({Persona:trim(f.person)||person,'Aportación vinculada':v26Money(num(f.income_linked_total)+num(f.donations_value)),'Ingresos vinculados':v26Money(f.income_linked_total),'Compras bajo responsabilidad':v26Money(f.purchase_responsibility_total),'Donaciones vinculadas':v26Money(f.donations_value),'Eventos vinculados':Number(f.event_count)||0});}const result={id:'cmp_people',name:'compare_people',ok:true,title:'Comparativa de personas',facts:{person_count:rows.length},tables:[v26Table('comparison','Comparativa de personas',rows)]};base={result,scopeInfo,productNames:[],extras:[]};}else if(trim(frame?.domain)==='weather'&&v70ResolveScope(frame,{},state,selectedEventId).eventNames.length>1){const x=await v73ExecuteSupplement({domain:'weather',scope:query.scope},state,selectedEventId,flowTrace);base={result:x.result,scopeInfo:x.scopeInfo,productNames:[],extras:[]};}else base={...(await v70ExecuteCanonicalSource(frame,{},state,selectedEventId,flowTrace)),extras:[]};for(const sup of arr(query?.supplements)){const x=await v73ExecuteSupplement(sup,state,selectedEventId,flowTrace);if(x)base.extras.push(x);}return base;}
+async function v73ExecuteResolvedQuery(frame={},query={},state={},selectedEventId='',flowTrace=[]){const canonicalPeople=trim(frame?.domain)==='people'?await v73CanonicalPeopleResult(query,state,selectedEventId,flowTrace):null;if(canonicalPeople){for(const sup of arr(query?.supplements)){const x=await v73ExecuteSupplement(sup,state,selectedEventId,flowTrace);if(x)canonicalPeople.extras.push(x);}return canonicalPeople;}const multi=trim(frame?.domain)==='person'?await v73ExecuteMultiPersonDossier(frame,query,state,selectedEventId,flowTrace):null;if(multi){for(const sup of arr(query?.supplements)){const x=await v73ExecuteSupplement(sup,state,selectedEventId,flowTrace);if(x)multi.extras.push(x);}return multi;}let base;const cmp=arr(query?.operations).find(op=>trim(op?.type)==='compare'),role=trim(cmp?.group_role)||v73RoleFromLabel(cmp?.group_field,'comparison'),resolvedScope=v70ResolveScope(frame,{},state,selectedEventId);if(trim(frame?.domain)==='event_summary'&&trim(resolvedScope.kind)==='all_events'){const result=await v261ExecuteAgentTool({id:`eo_${v61Hash(String(Date.now()))}`,name:'events_overview',arguments:{}},state,selectedEventId,flowTrace);if(!result||result.ok===false)throw new Error(trim(result?.error)||'No se pudo materializar el panorama global de eventos.');zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · EVENT_SUMMARY GLOBAL','OK',`${Number(result?.facts?.event_count)||resolvedScope.eventNames.length} eventos materializados mediante events_overview.`);base={result:{...result,name:'events_overview'},scopeInfo:resolvedScope,productNames:[],extras:[]};}else if(trim(frame?.domain)==='event_summary'&&resolvedScope.eventNames.length>1){const result=await v261ExecuteAgentTool({id:`es_${v61Hash(String(Date.now()))}`,name:'compare_events',arguments:{events:resolvedScope.eventNames}},state,selectedEventId,flowTrace);if(!result||result.ok===false)throw new Error(trim(result?.error)||'No se pudo materializar el resumen de varios eventos.');zuzuTracePush(flowTrace,'v4_0_exp · Ledger · EVENT_SUMMARY MULTIEVENTO','OK',`${resolvedScope.eventNames.length} eventos materializados mediante KPI canónicos: ${resolvedScope.eventNames.join(' / ')}.`);base={result:{...result,name:'compare_events'},scopeInfo:resolvedScope,productNames:[],extras:[]};}else if(trim(frame?.domain)==='comparison'&&role==='person'){const values=[...new Set(arr(cmp?.values).map(trim).filter(Boolean))];if(values.length<2)throw new Error('La comparación de personas necesita al menos dos valores.');const scopeInfo=v70ResolveScope(frame,{},state,selectedEventId),rows=[];for(const person of values){const d=await v26ToolPersonDossier({id:`c_${v61Hash(person)}`,name:'person_dossier',person,scope:scopeInfo.eventNames.length===1?'named_event':'all_events',event:scopeInfo.eventNames[0],status:'all',detail:'brief'},state,selectedEventId),f=d?.facts||{};rows.push({Persona:trim(f.person)||person,'Aportación vinculada':v26Money(num(f.income_linked_total)+num(f.donations_value)),'Ingresos vinculados':v26Money(f.income_linked_total),'Compras bajo responsabilidad':v26Money(f.purchase_responsibility_total),'Donaciones vinculadas':v26Money(f.donations_value),'Eventos vinculados':Number(f.event_count)||0});}const result={id:'cmp_people',name:'compare_people',ok:true,title:'Comparativa de personas',facts:{person_count:rows.length},tables:[v26Table('comparison','Comparativa de personas',rows)]};base={result,scopeInfo,productNames:[],extras:[]};}else if(trim(frame?.domain)==='weather'&&v70ResolveScope(frame,{},state,selectedEventId).eventNames.length>1){const x=await v73ExecuteSupplement({domain:'weather',scope:query.scope},state,selectedEventId,flowTrace);base={result:x.result,scopeInfo:x.scopeInfo,productNames:[],extras:[]};}else base={...(await v70ExecuteCanonicalSource(frame,{},state,selectedEventId,flowTrace)),extras:[]};for(const sup of arr(query?.supplements)){const x=await v73ExecuteSupplement(sup,state,selectedEventId,flowTrace);if(x)base.extras.push(x);}return base;}
 
 async function v73ExecuteCompositePlan(query={},state={},selectedEventId='',flowTrace=[]){
   const targets=arr(query?.targets).filter(t=>trim(t?.domain));if(targets.length<2)throw new Error('La consulta compuesta necesita al menos dos targets.');
@@ -15757,6 +15832,16 @@ function v73PlanMetricRole(plan={}){
   const q=plan?.query||{},roles=[];for(const t of arr(q?.targets))if(['amount','units','count'].includes(trim(t?.metric_role)))roles.push(trim(t.metric_role));for(const op of [...arr(q?.operations),...arr(plan?.local?.operations)])if(['amount','units','count'].includes(trim(op?.metric_role)))roles.push(trim(op.metric_role));
   const rk=trim(plan?.response_kind);if(['amount','units','count'].includes(rk))roles.unshift(rk);const unique=[...new Set(roles)];return unique.length===1?unique[0]:'';
 }
+function v79CanonicalPeopleCount(dataset=null){
+  if(trim(dataset?.domain)!=='people')return null;const f=dataset?.facts||{},mode=trim(f?.people_mode||dataset?.provenance?.source_args?.frame?.filters?.people_mode);
+  const pick=v=>Number.isFinite(Number(v))?Number(v):null;
+  if(mode==='attending_members')return pick(f.member_attendees_people);
+  if(mode==='attending_non_members')return pick(f.nonmember_attendees_people);
+  if(mode==='non_attending_members')return pick(f.nonattending_members_people);
+  if(mode==='canonical_members')return pick(f.people_count??f.canonical_members_people);
+  if(['attendees','attendance_full',''].includes(mode))return pick(f.attendees_canonical??f.total_attendees_people);
+  return pick(f.attendees_canonical??f.total_attendees_people);
+}
 function v73MetricTotal(role='',ws=null,dataset=null){
   const mr=trim(role),rows=arr(ws?.row_cache?.rows).length?arr(ws.row_cache.rows):arr(dataset?.rows);
   if(mr==='amount')return v73FirstNumericTotal(ws,dataset);
@@ -15766,6 +15851,7 @@ function v73MetricTotal(role='',ws=null,dataset=null){
     const cap=v73FieldFromCapability(dataset||{},'units','metric','units');if(cap){const vals=rows.map(r=>v40MaybeNumber(r?.[cap])).filter(v=>v!=null);if(vals.length)return vals.reduce((a,b)=>a+b,0);}return null;
   }
   if(mr==='count'){
+    const peopleCount=v79CanonicalPeopleCount(dataset);if(peopleCount!=null)return peopleCount;
     const countKey=v70FieldKey(rows,'Nº registros');if(countKey){const vals=rows.map(r=>v40MaybeNumber(r?.[countKey])).filter(v=>v!=null);if(vals.length)return vals.reduce((a,b)=>a+b,0);}return Number(ws?.row_count??dataset?.rowCount??rows.length)||0;
   }
   return null;
@@ -15775,9 +15861,15 @@ function v73ScopeText(scope={}){
   const k=trim(scope?.kind);if(k==='all_events')return'todos los eventos';if(k==='named_event'&&trim(scope?.event))return trim(scope.event);if(k==='named_events'&&arr(scope?.events).length)return arr(scope.events).map(trim).filter(Boolean).join(', ');if(k==='year'&&scope?.year!=null)return`el año ${scope.year}`;if(k==='latest_events'&&scope?.count)return`los ${scope.count} eventos indicados`;if(k==='screen_event')return'el evento actual';return'';
 }
 function v73JoinHuman(values=[]){const v=arr(values).map(trim).filter(Boolean);if(!v.length)return'';if(v.length===1)return v[0];if(v.length===2)return`${v[0]} y ${v[1]}`;return`${v.slice(0,-1).join(', ')} y ${v[v.length-1]}`;}
+function v79ComparisonMetricKey(plan={},rows=[]){
+  const q=plan?.query||{},hint=norm(q?.comparison_metric),aliases={income:['Ingresos','Ingreso'],purchases:['Compras realizadas','Compras','Gastos'],donations:['Donaciones valoradas','Donaciones'],balance:['Saldo operativo','Saldo'],valuation:['Valoración del evento','Valoracion del evento','Valoración'],attendance:['Asistentes canónicos','Asistentes']};
+  const candidates=aliases[hint]||[];for(const c of candidates){const k=v70FieldKey(rows,c);if(k)return k;}
+  const op=arr(q?.operations).find(x=>trim(x?.field)||trim(x?.metric_role)),raw=trim(op?.field||op?.metric_role);if(raw){const k=v70FieldKey(rows,raw);if(k)return k;}
+  return'';
+}
 function v73BuildAnswerPayload(kind='',canonical='',ws=null,dataset=null,view=null,plan={}){
   const k=trim(kind)||'auto',rows=arr(ws?.row_cache?.rows),frame=dataset?.provenance?.source_args?.frame||{},filters=frame?.filters||{},scope=dataset?.scope||frame?.scope||plan?.query?.scope||{},focus=plan?.query||{},requestedMetric=v73PlanMetricRole(plan);
-  const person=trim(focus.person||focus.responsible||focus.donor||filters.person||filters.responsible||filters.donor),product=trim(focus.product?.text||filters.product_text),event=trim(scope?.event),count=Number(ws?.row_count)||0,totalAmount=v73MetricTotal('amount',ws,dataset),totalUnits=v73MetricTotal('units',ws,dataset),requestedValue=requestedMetric?v73MetricTotal(requestedMetric,ws,dataset):null,who=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Nombre','Socio']),what=v73UniqueValues(rows,['Producto','Concepto','Descripción']),events=v73UniqueValues(rows,['Evento']);
+  const person=trim(focus.person||focus.responsible||focus.donor||filters.person||filters.responsible||filters.donor),product=trim(focus.product?.text||filters.product_text),event=trim(scope?.event),peopleCount=v79CanonicalPeopleCount(dataset),count=peopleCount!=null?peopleCount:(Number(ws?.row_count)||0),totalAmount=v73MetricTotal('amount',ws,dataset),totalUnits=v73MetricTotal('units',ws,dataset),requestedValue=requestedMetric?v73MetricTotal(requestedMetric,ws,dataset):null,who=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Nombre','Socio']),what=v73UniqueValues(rows,['Producto','Concepto','Descripción']),events=v73UniqueValues(rows,['Evento']);
   const payload={kind:k,count,person,product,event,scope_text:v73ScopeText(scope),subject:person||product||event,summary:trim(canonical),detail:trim(canonical),empty:count===0,...(requestedMetric?{requested_metric_role:requestedMetric}:{}),...(requestedValue!=null?{requested_metric_value:requestedValue}:{})};
   if(totalAmount!=null){payload.amount_value=v26Money(totalAmount);payload.amount=v26FormatEuro(v26Money(totalAmount));}
   if(totalUnits!=null){payload.units_value=round(totalUnits,4);payload.units=`${v26FormatPlainNumber(totalUnits,4)} unidades`;}
@@ -15792,7 +15884,7 @@ function v73BuildAnswerPayload(kind='',canonical='',ws=null,dataset=null,view=nu
     payload.value=value;payload.matched_count=matchedCount;
   }
   if(k==='compare'){
-    const labels=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Evento','Producto','Tienda']),numericKey=rows.length?Object.keys(rows[0]||{}).find(key=>key!==labels.field&&rows.some(r=>v40MaybeNumber(r?.[key])!=null)):'';
+    const labels=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Evento','Producto','Tienda']),hintKey=v79ComparisonMetricKey(plan,rows),numericKey=hintKey||(rows.length?Object.keys(rows[0]||{}).find(key=>key!==labels.field&&rows.some(r=>v40MaybeNumber(r?.[key])!=null)):'');
     if(labels.field&&numericKey){const ranked=rows.map(r=>({label:trim(r?.[labels.field]),value:v40MaybeNumber(r?.[numericKey])})).filter(x=>x.label&&x.value!=null).sort((a,b)=>b.value-a.value);if(ranked.length){payload.metric=numericKey;payload.winner=ranked[0].label;payload.winner_value=v26FormatPlainNumber(ranked[0].value,2);if(ranked.length>1){payload.runner_up=ranked[1].label;payload.runner_up_value=v26FormatPlainNumber(ranked[1].value,2);payload.difference=v26FormatPlainNumber(ranked[0].value-ranked[1].value,2);}}}
   }
   Object.keys(payload).forEach(key=>{if(payload[key]===''||payload[key]===undefined||payload[key]===null)delete payload[key];});return payload;
@@ -15826,7 +15918,7 @@ function v73AnswerForKind(kind='',canonical='',ws=null,dataset=null,view=null,pl
     return yes?`Sí. ${canonical}`:`No. ${canonical}`;
   }
   if(k==='which_event'){const u=v73UniqueValues(rows,['Evento']);if(u.values.length)return u.values.length===1?`Fue en ${u.values[0]}.`:`Aparece en ${u.values.join(', ')}.`;return canonical;}
-  if(k==='compare'){const labels=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Evento','Producto','Tienda']);const numericKey=rows.length?Object.keys(rows[0]||{}).find(key=>key!==labels.field&&rows.some(r=>v40MaybeNumber(r?.[key])!=null)):'';if(labels.values.length>=2&&numericKey){const ranked=rows.map(r=>({label:trim(r?.[labels.field]),value:v40MaybeNumber(r?.[numericKey])})).filter(x=>x.label&&x.value!=null).sort((a,b)=>b.value-a.value);if(ranked.length>=2)return`${ranked.map(x=>`${x.label}: ${v26FormatPlainNumber(x.value,2)}`).join('; ')}. ${ranked[0].label} queda por encima en ${numericKey}.`;}return canonical;}
+  if(k==='compare'){const labels=v73UniqueValues(rows,['Responsable','Donante','Persona','Asistente','Evento','Producto','Tienda']);const numericKey=v79ComparisonMetricKey(plan,rows)||(rows.length?Object.keys(rows[0]||{}).find(key=>key!==labels.field&&rows.some(r=>v40MaybeNumber(r?.[key])!=null)):'');if(labels.values.length>=2&&numericKey){const ranked=rows.map(r=>({label:trim(r?.[labels.field]),value:v40MaybeNumber(r?.[numericKey])})).filter(x=>x.label&&x.value!=null).sort((a,b)=>b.value-a.value);if(ranked.length>=2){const diff=ranked[0].value-ranked[1].value;return`${ranked[0].label}: ${v26FormatPlainNumber(ranked[0].value,2)}; ${ranked[1].label}: ${v26FormatPlainNumber(ranked[1].value,2)}. ${ranked[0].label} queda por encima en ${numericKey} por ${v26FormatPlainNumber(diff,2)}.`;}}return canonical;}
   return canonical;
 }
 function v73HumanTheme(turn={}){
@@ -15894,19 +15986,36 @@ function v76MemoryLiteralAnswer(target=null,field='both'){
 }
 
 
+// legacy-regression-marker: BANK4_8 · MEMORY GATE
 function v79HasLiveOperationalThread(session={}){
   const t=v73LastOperationalTurn(session),ctx=v73CurrentSummary(session);
   return !!(t&&(session?.dataset||ctx?.active_dataset||ctx?.last_intent));
+}
+function v79HasExplicitOperationalAnchor(plan={},entityCandidates={},session={}){
+  const q=plan?.query||{},s=v73NormalizeScope(q?.scope||{}),ctx=v73CurrentSummary(session);
+  if(['named_event','named_events','year','latest_events','all_events'].includes(trim(s.kind)))return true;
+  if([trim(q.person),trim(q.responsible),trim(q.donor),trim(q.store),trim(q.product?.text),...arr(q.people),...arr(q.responsibles),...arr(q.donors),...arr(q.stores)].map(trim).some(Boolean))return true;
+  if(arr(entityCandidates?.flat).some(x=>['EVENT','PERSON','STORE','PRODUCT'].includes(trim(x?.type))&&['exact','strong'].includes(trim(x?.match_type))))return true;
+  if(['named_event','named_events'].includes(trim(ctx?.scope?.kind))||Object.keys(ctx?.active_entities||{}).length)return true;
+  return false;
 }
 function v79FastLocalPresentation(plan={},execution={},dataset=null,status='OK'){
   if(trim(status)==='KO')return false;
   const action=trim(plan?.action),rk=trim(plan?.response_kind),q=plan?.query||{};
   if(action==='local')return true;
-  if(action!=='query'||!['amount','units','count','who','what','whether','which_event','table'].includes(rk))return false;
-  const domains=arr(q?.targets).map(t=>trim(t?.domain)).filter(Boolean);
-  if(domains.some(d=>['event_summary','comparison','person','documentation','management','bank','bank_timeline','weather'].includes(d)))return false;
-  if(q?.presentation?.chart===true)return false;
-  return !!dataset;
+  const domains=arr(q?.targets).map(t=>trim(t?.domain)).filter(Boolean),one=domains.length===1?domains[0]:'';
+  if(action!=='query'||!dataset||q?.presentation?.chart===true)return false;
+  if(['amount','units','count','who','what','whether','which_event','table','compare'].includes(rk)){
+    if(domains.some(d=>['event_summary','person','management','bank_timeline','weather'].includes(d)))return false;
+    return true;
+  }
+  // BANK4_9: resúmenes cuyo texto canónico CE ya contiene todas las magnitudes necesarias
+  // no necesitan una segunda llamada para parafrasear. event_summary/person siguen libres
+  // porque una pregunta amplia puede requerir relato/interpretación humana.
+  if((rk==='summary'||!rk)&&['people','bank','documentation'].includes(one))return true;
+  if(rk==='summary'&&['events','purchases','donations','products','stores_used'].includes(one))return true;
+  if(rk==='summary'&&one==='event_summary'&&trim(dataset?.scope?.kind)==='all_events')return true;
+  return false;
 }
 
 async function v79RunWithinBudget(task,budgetMs=700){
@@ -15947,19 +16056,24 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'},execution,datasetId:session?.currentTurn?.datasetId||'',viewId:session?.currentTurn?.viewId||'',parentTurnId:session?.currentTurn?.turnId||'',status:'WARN',title:'Zuzu no pudo interpretar el turno',answer,selectedEventId});
     perf.commitMs=Date.now()-commitT0;
     const resultContext=v73LightContext(saved.conversation,saved.turn,session?.dataset||null,session?.view||null),usage=summarizeGeminiUsageFromTrace(flowTrace);
-    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_8 SCOPE/CONTEXT · FAST-LOCAL · MEMORY GATE',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_9 CANONICAL IDS · MULTIENTITY · FAST-LOCAL · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
   }
 
   perf.compileMs=Date.now()-compileT0;
-  const raw=compiled.raw;let normalizedPlan=v76ApplyFocusBindings(compiled.plan,userPrompt,v73CurrentSummary(session),flowTrace,historyCandidates);
+  const raw=compiled.raw,currentContext=v73CurrentSummary(session);let normalizedPlan=v76ApplyFocusBindings(compiled.plan,userPrompt,currentContext,flowTrace,historyCandidates);
+  normalizedPlan=v79RepairEllipticalScope(normalizedPlan,currentContext,entityCandidates,userPrompt,flowTrace);
+  normalizedPlan=v79RepairRelativeYearScope(normalizedPlan,currentContext,userPrompt,state,flowTrace);
+  normalizedPlan=v79RepairEventTargetContract(normalizedPlan,currentContext,flowTrace);
+  normalizedPlan=v79RepairExplicitPersonContext(normalizedPlan,currentContext,entityCandidates,flowTrace);
+  normalizedPlan=v79RepairComparisonFollowup(normalizedPlan,currentContext,flowTrace);
   const coverage=v76EventCoverageProfile(userPrompt,session,normalizedPlan?.query||{});if(coverage&&normalizedPlan?.action==='query'){normalizedPlan={...normalizedPlan,query:{...(normalizedPlan.query||{}),coverage}};zuzuTracePush(flowTrace,'v4_0_exp · EVENT COVERAGE ENGINE','OK',`modo=${coverage.mode} · contexto=${coverage.context_domain||'—'} · facetas=${coverage.facets.join(', ')}. Descripción y DOCxx conservan prioridad narrativa.`);}
   const plan=v73PrepareAnalyticPlan(normalizedPlan,session),model=compiled.model,command=compiled.command,parentTurnId=session?.currentTurn?.turnId||'';
   if(JSON.stringify(plan)!==JSON.stringify(normalizedPlan))zuzuTracePush(flowTrace,'v4_0_exp · Ledger · interpretación física CE','INFO',`CE completa solo detalles físicos de operación; el registro semántico de Zuzu se conserva intacto. EXEC=${JSON.stringify(plan).slice(0,3200)}`);
   let proactiveMemory=null,socialMemoryHints=[];
-  const memoryT0=Date.now(),liveOperationalThread=v79HasLiveOperationalThread(session);
+  const memoryT0=Date.now(),liveOperationalThread=v79HasLiveOperationalThread(session),explicitOperationalAnchor=v79HasExplicitOperationalAnchor(normalizedPlan,entityCandidates,session);
   try{
     const memoryNow=clientLocalDateTime||clientNowIso;
-    if(!isRecallPrompt(userPrompt)&&!liveOperationalThread&&['query','conversation'].includes(plan.action)){
+    if(!isRecallPrompt(userPrompt)&&!liveOperationalThread&&!explicitOperationalAnchor&&['query','conversation'].includes(plan.action)){
       perf.memorySearch=true;
       const budget=Number(process.env.CONTROLEVENT_ZUZU_MEMORY_BUDGET_MS)||700;
       const gated=await v79RunWithinBudget(async()=>{
@@ -15969,7 +16083,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
         const social=await searchZuzuSocialMemoryHints({actor,prompt:userPrompt,plan:normalizedPlan,conversationId:conversation.conversationId,nowIso:memoryNow,limit:2});
         return{proactive:null,social};
       },budget);
-      if(gated.kind==='timeout')zuzuTracePush(flowTrace,'v4_0_exp · BANK4_8 · MEMORY GATE','INFO',`La memoria proactiva superó ${gated.budgetMs} ms y no bloquea la respuesta actual.`);
+      if(gated.kind==='timeout')zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · MEMORY GATE','INFO',`La memoria proactiva superó ${gated.budgetMs} ms y no bloquea la respuesta actual.`);
       else if(gated.kind==='error')throw gated.error;
       else{proactiveMemory=gated.value?.proactive||null;socialMemoryHints=arr(gated.value?.social);}
       if(proactiveMemory)zuzuTracePush(flowTrace,'v4_0_exp · MEMORIA ASOCIATIVA · SUGERENCIA PROACTIVA','INFO',`fuente=DB · ${proactiveMemory.conversation_id} · similitud=${proactiveMemory?.match?.score||'—'} · edad=${proactiveMemory?.age_label||'—'} · banda=${proactiveMemory?.age_band||'—'} · ${proactiveMemory.recallable_turns} turnos sustanciales.`);
@@ -15977,7 +16091,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     }
   }catch(memoryError){zuzuTracePush(flowTrace,'v4_0_exp · MEMORIA EPISÓDICA · no bloqueante','WARN',`La búsqueda asociativa no estuvo disponible (${cleanGeminiError(memoryError)}). El turno actual continúa sin memoria proactiva.`);}
   perf.memoryMs=Date.now()-memoryT0;
-  if(liveOperationalThread)zuzuTracePush(flowTrace,'v4_0_exp · Z1R · MEMORIA DORMIDA','OK','Hay un hilo operativo vivo: no se consulta memoria proactiva/social en este turno.');
+  if(liveOperationalThread||explicitOperationalAnchor)zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · MEMORIA DORMIDA','OK',liveOperationalThread?'Hay un hilo operativo vivo: no se consulta memoria proactiva/social en este turno.':'La consulta ya trae un ancla operativa explícita/canónica: la memoria histórica no añade valor a este turno.');
   let title='Zuzu',answer='',tables=[],charts=[],files=[],status='OK',dataset=null,view=null,datasetId='',viewId='',referencedTurnId='',execution={},finalBundle=null,turnWarnings=[],answerPayload={},answerBlueprintUsed=false;
   const executeT0=Date.now();
   try{
@@ -16101,7 +16215,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const fastLocal=v79FastLocalPresentation(normalizedPlan,execution,dataset,status);perf.fastLocal=fastLocal;
   if(compiled.local_compile||execution?.local_authoritative_presentation===true||fastLocal){
     const kind=trim(normalizedPlan?.conversation?.kind),literalLocal=execution?.local_authoritative_presentation===true;
-    if(fastLocal){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_fast_fact'};zuzuTracePush(flowTrace,'v4_0_exp · BANK4_8 · CIERRE LOCAL RÁPIDO','OK',`response_kind=${trim(normalizedPlan?.response_kind)||'—'} · ${text(answer).length} caracteres · se evita la segunda llamada IA.`);}
+    if(fastLocal){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_fast_fact'};zuzuTracePush(flowTrace,'v4_0_exp · BANK4_9 · CIERRE LOCAL RÁPIDO','OK',`response_kind=${trim(normalizedPlan?.response_kind)||'—'} · ${text(answer).length} caracteres · se evita la segunda llamada IA.`);}
     else if(literalLocal){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_memory_literal'};}
     else if(kind==='conversation_summary'){spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_token_budget'};}
     else{title='Zuzu';answer='Vale.';spokenAnswer=answer;finalPresentation={table:false,chart:false,chart_type:''};execution={...(execution||{}),gemini_presentation:finalPresentation,response_mode:'local_token_budget'};}
@@ -16137,7 +16251,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_8 SCOPE/CONTEXT · FAST-LOCAL · MEMORY GATE',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_9 CANONICAL IDS · MULTIENTITY · FAST-LOCAL · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.
@@ -21697,7 +21811,16 @@ export const __zuzuStructuralTesting = Object.freeze({
   v73NormalizePlan,
   v73NormalizeOperations,
   v79RepairQueryScopeFromContext,
+  v79RepairEllipticalScope,
+  v79RepairEventTargetContract,
+  v79RepairRelativeYearScope,
+  v79RepairExplicitPersonContext,
+  v79RepairComparisonFollowup,
+  v79RecoverCanonicalId,
   v79DirectTypedEntity,
+  v79ComparisonMetricKey,
+  v79CanonicalPeopleCount,
+  v79HasExplicitOperationalAnchor,
   v79FastLocalPresentation,
   v73NormalizeAnswerBlueprint,
   v73PrepareAnalyticPlan,

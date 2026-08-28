@@ -39,7 +39,8 @@
     "test:v4-bank44": "node scripts/v4-0-exp-bank44-donaciones-backup-infoevento-regression.cjs",
     "test:zuzu-z1": "node scripts/zuzu-z1-context-continuity-regression.cjs",
     "test:zuzu-z1-human": "node scripts/zuzu-z1-human-continuity-regression.cjs",
-    "test:v4-bank48": "node scripts/v4-0-exp-bank48-zuzu-scope-context-regression.cjs"
+    "test:v4-bank48": "node scripts/v4-0-exp-bank48-zuzu-scope-context-regression.cjs",
+    "test:v4-bank49": "node scripts/v4-0-exp-bank49-zuzu-canonical-performance-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
