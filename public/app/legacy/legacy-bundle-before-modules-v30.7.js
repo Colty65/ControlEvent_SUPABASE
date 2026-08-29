@@ -416,6 +416,11 @@ function mergeLoadedState(parsed, defaults){
     eventos: (parsed.eventos || defaults.eventos).map(e => ({
       id: e.id || uid(),
       titulo: e.titulo || '',
+      // BANK4_25: conservar el dato persistente de ce_eventos.nombre_hablado
+      // al hidratar estado/localStorage. BANK4_23 ya lo leía de Supabase, pero
+      // mergeLoadedState lo descartaba y Mantenimiento mostraba el input vacío
+      // tras refrescar/recargar aunque la BBDD siguiera correcta.
+      nombreHablado: e.nombreHablado || e.nombre_hablado || e.tituloVoz || e.titulo_voz || '',
       precio: Number(e.precio || 0),
       fechaIni: e.fechaIni || '',
       fechaFin: e.fechaFin || '',
