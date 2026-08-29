@@ -1,0 +1,22 @@
+const fs=require('fs');
+const path=require('path');
+const root=path.resolve(__dirname,'..');
+const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const voice=fs.readFileSync(path.join(root,'public/app/features/v22-voz3-zuzu.js'),'utf8');
+const idx=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+const human=fs.readFileSync(path.join(root,'services/zuzu-human-language.service.js'),'utf8');
+let ok=0,ko=0;function t(name,cond){if(cond){ok++;console.log('OK',name)}else{ko++;console.error('KO',name)}}
+t('domain helper exists',svc.includes('function v424CanonicalDomain'));
+t('event singular -> events',svc.includes("event:'events'"));
+t('product singular -> products',svc.includes("product:'products'"));
+t('compact payload targets canonicalized',svc.includes("payload.targets=payload.targets.map(v424CanonicalDomain)"));
+t('normalize targets canonicalized',svc.includes('const domain=v424CanonicalDomain(t?.domain)'));
+t('TTS prefers spoken server answer',voice.includes("TTS usa spoken_answer certificado del servidor"));
+t('numeric EUR safety fallback remains',voice.includes('spoken_answer añade un importe numérico no acreditado'));
+t('old screen-only TTS disabled',!voice.includes('TTS usa answer de pantalla como fuente semántica única'));
+t('mic fallback on audio-capture',voice.includes("code==='network'||code==='audio-capture'"));
+t('mic fallback after repeated no-speech',voice.includes('state.webSpeechNoSpeechCount>=2'));
+t('voice build V54',voice.includes('BANK4_24-Z1H-VOICE-V54'));
+t('cache bust V54',idx.includes('BANK424-Z1H-VOICE-V54'));
+t('human profile BANK4_24',human.includes("version:'BANK4_24'"));
+console.log(`TOTAL ${ok} OK / ${ko} KO`);process.exit(ko?1:0);

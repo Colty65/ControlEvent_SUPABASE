@@ -8,7 +8,7 @@ function containsPhrase(haystack='',needle=''){ const h=normPhrase(haystack),n=n
 function arr(v){ return Array.isArray(v)?v:[]; }
 function esc(v){ return text(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 
-let profile={version:'BANK4_21',event_series:[],person_aliases:[],spoken_replacements:[]};
+let profile={version:'BANK4_24',event_series:[],person_aliases:[],spoken_replacements:[]};
 try{ profile=JSON.parse(fs.readFileSync(new URL('../config/zuzu-human-language.json',import.meta.url),'utf8')); }catch(_){ }
 
 const MONTHS='ENE|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|OCT|NOV|DIC|DEC';
@@ -141,4 +141,4 @@ export function familiarPersonAliasCandidates(state={},prompt=''){
   for(const alias of unique){if(!containsPhrase(prompt,alias))continue;const r=resolveFamiliarPersonAlias(state,alias);const candidates=r.ok?[r]:r.ambiguous?arr(r.candidates):[];for(const c of candidates){const key=`${c.id}|${normPhrase(alias)}`;if(seen.has(key))continue;seen.add(key);out.push({id:c.id,name:c.nombre,score:r.ok?1:0.99,matched:alias,match_kind:r.ok?'exact_social_alias':'ambiguous_social_alias',resolution:c.resolution||'db_person_alias'});}}
   return out;
 }
-export function humanLanguageProfile(){return JSON.parse(JSON.stringify({...profile,version:'BANK4_23'}));}
+export function humanLanguageProfile(){return JSON.parse(JSON.stringify({...profile,version:'BANK4_24'}));}
