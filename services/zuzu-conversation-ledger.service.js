@@ -310,7 +310,16 @@ async function updateConversationMemoryProjection({conversation,turn,actor,memor
 
 const STOP=new Set('ahora antes despues luego este esta esto esa ese esos esas aquel aquella aquellos aquellas te acuerdas recuerdas recordar hablamos conversacion conversaciones sobre cosa cosas algo aquello volver vuelve dame dime lo la los las un una unos unas de del al en y o que me nos se si por para con ya fue era es son estuvimos estaba estaban hoy ayer anteayer ultimamente recientemente poco minutos minuto horas hora rato semana semanas mes meses ano anos dia dias manana tarde noche'.split(' '));
 function tokens(v=''){return norm(v).split(' ').filter(x=>x.length>2&&!STOP.has(x)).map(x=>x.length>5&&x.endsWith('es')?x.slice(0,-2):x.length>4&&x.endsWith('s')?x.slice(0,-1):x); }
-function tokenHitScore(q,source,weight=1){const set=new Set(tokens(source));let n=0;for(const t of q)if(set.has(t))n+=(t.length>=6?2:1)*weight;return n;}
+function tokenHitScore(q,source,weight=1){
+  const src=tokens(source),set=new Set(src);let n=0;
+  for(const t of q){
+    if(set.has(t)){n+=(t.length>=6?2:1)*weight;continue;}
+    // Voz, diminutivos y pequeñas deformaciones: una raíz larga compartida aporta evidencia
+    // débil, nunca equivalente a una coincidencia exacta. Evita hard-code de nombres.
+    if(t.length>=6&&src.some(s=>s.length>=6&&t.slice(0,5)===s.slice(0,5)))n+=0.65*weight;
+  }
+  return n;
+}
 function historyScore(prompt='',item={}){
   const q=tokens(prompt);if(!q.length)return 0;
   const direct=tokenHitScore(q,item.userPrompt||'',5);

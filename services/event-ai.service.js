@@ -14341,7 +14341,10 @@ function v73NormalizePlan(raw={}){
     const r=raw?.reference&&typeof raw.reference==='object'?raw.reference:{},changes=[];
     for(const x of arr(r.changes).slice(0,10)){const type=trim(x?.type);if(!type)continue;const ch={type};if(type==='replace_scope'&&x?.scope)ch.scope=v73NormalizeScope(x.scope);
     else if(type==='set_fields'){const fields=arr(x?.fields).map(trim).filter(Boolean).slice(0,24);if(fields.length)ch.fields=fields;}else if(['add_field','remove_field'].includes(type)&&trim(x?.field))ch.field=trim(x.field);changes.push(ch);}
-    out.reference={target_ref:trim(r.target_ref),action:['restore_snapshot','reexecute_plan','reexecute_episode','recall_turn','recall_episode','resume_episode'].includes(trim(r.action))?trim(r.action):''};if(changes.length)out.reference.changes=changes;
+    const rawTarget=r?.target_ref;let targetRef='';
+    if(typeof rawTarget==='string'||typeof rawTarget==='number')targetRef=trim(rawTarget);
+    else if(rawTarget&&typeof rawTarget==='object')targetRef=trim(rawTarget.target_ref||rawTarget.ref||rawTarget.turn_id||rawTarget.turnId||rawTarget.id||rawTarget.pointer);
+    out.reference={target_ref:targetRef,action:['restore_snapshot','reexecute_plan','reexecute_episode','recall_turn','recall_episode','resume_episode'].includes(trim(r.action))?trim(r.action):''};if(changes.length)out.reference.changes=changes;
   }else if(action==='conversation'){
     const c=raw?.conversation&&typeof raw.conversation==='object'?raw.conversation:{},kind=['general','greeting','farewell','feedback','correction','system_complaint','current_context','conversation_summary','incoherent_input','incoherent_progress','irrelevant_input','memory_index'].includes(trim(c?.kind))?trim(c.kind):'general';out.conversation={kind};if(trim(c?.note))out.conversation.note=trim(c.note).slice(0,420);if(kind==='memory_index'&&['oldest','newest'].includes(trim(c?.memory_order)))out.conversation.memory_order=trim(c.memory_order);
   }else if(action==='clarify'){out.clarify={question:trim(raw?.clarify?.question)||'¿Me lo puedes concretar un poco?'};const refs=arr(raw?.clarify?.candidate_refs).map(trim).filter(Boolean).slice(0,8);if(refs.length)out.clarify.candidate_refs=refs;const opts=arr(raw?.clarify?.options).map(trim).filter(Boolean).slice(0,8);if(opts.length)out.clarify.options=opts;}
@@ -15021,6 +15024,8 @@ MARCO ce_semantic_turn
 CONTINUIDAD Y MEMORIA
 - «Dímelo ahora / míralo ahora» después de un recuerdo puede significar reexecute_plan si el diálogo lo sostiene: decide tú esa relación, no lo declares incoherente por faltar el sustantivo.
 - Una petición plural de recuerdos/lista/historial es memory_index; no la conviertas en confirmación de un único recuerdo.
+- Una petición abierta sobre QUÉ RECUERDAS de conversaciones anteriores, sin señalar un episodio concreto, también es memory_index: no la clasifiques como incoherent_input solo porque el usuario no dé una fecha o tema.
+- Para reference.target_ref usa EXCLUSIVAMENTE CURRENT, Tn, Hn, Pn o un turn_id ZC_... ya visible en el contexto. Nunca envíes objetos/selectores ordinales dentro de target_ref; si el usuario pide primera/última conversación, elige el Hn ordinal que CE ya ha preparado.
 - Para recordar una conversación: reference + recall_episode. Para volver a ejecutar hoy el plan histórico: reexecute_plan. Para retomar el contexto histórico sin actualizar cifras: resume_episode.
 - Los Hn/Pn/Tn/CURRENT son referencias; nunca uses IDs de PERSON/EVENT/STORE/PRODUCT como target_ref histórico.
 
@@ -15575,8 +15580,16 @@ function v416RepairCanonicalEventYears(value='',state={}){
   }
   return out;
 }
+function v421ScreenUnitGuard(value=''){
+  let out=text(value);
+  const countNouns='(?:cuotas?|registros?|eventos?|personas?|socios?|asistentes?|unidades?|uds\\.?|tickets?|TK|hitos?|tareas?|LG|documentos?|movimientos?)';
+  const re=new RegExp('(-?\\d{1,3}(?:\\.\\d{3})*(?:,\\d+)?|-?\\d+(?:[.,]\\d+)?)\\s*€\\s+(?='+countNouns+'\\b)','gi');
+  out=out.replace(re,'$1 ');
+  out=out.replace(/(\\d+)\\s*(?:,00\\s*)?€\\s*ºs\\b/gi,'$1ºs');
+  return out;
+}
 function v416VoiceUnitOracle(written='',spoken='',state={}){
-  const repairedWritten=v416RepairCanonicalEventYears(written,state),repairedSpoken=v416RepairCanonicalEventYears(spoken,state);
+  const repairedWritten=v421ScreenUnitGuard(v416RepairCanonicalEventYears(written,state)),repairedSpoken=v421ScreenUnitGuard(v416RepairCanonicalEventYears(spoken,state));
   const allowed=v416ExplicitMoneyValues(repairedWritten),claims=v416SpokenEuroClaims(repairedSpoken),allowedBag=new Map();
   for(const n of allowed)allowedBag.set(n,(allowedBag.get(n)||0)+1);
   const unsupported=[];
@@ -15793,7 +15806,7 @@ function v419ResolveFamiliarPerson(state={},value=''){
 }
 function v73CertifyTypedEntities(query={},state={},flowTrace=[]){
   const q=query,warnings=[];
-  const resolveOne=(type,value,label)=>{const raw=trim(value);if(!raw)return{ok:true,value:''};const familiar=type==='person'?v419ResolveFamiliarPerson(state,raw):null,direct=familiar?.ok?familiar:v79DirectTypedEntity(state,type,raw),r=direct||(type==='person'?v26ResolvePersonFamily(state,raw):semanticResolveEntity(state,type,raw));if(!r.ok)return{ok:false,error:r.ambiguous?`${label} «${raw}» es ambiguo: ${arr(r.candidates).map(x=>trim(x?.nombre)).filter(Boolean).join(' / ')}.`:`No puedo resolver ${label.toLowerCase()} «${raw}» con suficiente seguridad.`};if(norm(r.nombre)!==norm(raw)){zuzuTracePush(flowTrace,'v4_0_exp · Ledger · ENTIDAD TIPADA','OK',`${label}: «${raw}» → «${r.nombre}» (${r.resolution==='canonical_id'?'ID canónico':r.score>=0.995?'exacta':'variante/fuzzy'}).`);}return{ok:true,value:r.nombre};};
+  const resolveOne=(type,value,label)=>{const raw=trim(value);if(!raw)return{ok:true,value:''};const familiar=type==='person'?v419ResolveFamiliarPerson(state,raw):null;if(familiar?.ambiguous)return{ok:false,error:`${label} «${raw}» es ambiguo: ${arr(familiar.candidates).map(x=>trim(x?.nombre)).filter(Boolean).join(' / ')}.`};const direct=familiar?.ok?familiar:v79DirectTypedEntity(state,type,raw),r=direct||(type==='person'?v26ResolvePersonFamily(state,raw):semanticResolveEntity(state,type,raw));if(!r.ok)return{ok:false,error:r.ambiguous?`${label} «${raw}» es ambiguo: ${arr(r.candidates).map(x=>trim(x?.nombre)).filter(Boolean).join(' / ')}.`:`No puedo resolver ${label.toLowerCase()} «${raw}» con suficiente seguridad.`};if(norm(r.nombre)!==norm(raw)){zuzuTracePush(flowTrace,'v4_0_exp · Ledger · ENTIDAD TIPADA','OK',`${label}: «${raw}» → «${r.nombre}» (${r.resolution==='canonical_id'?'ID canónico':r.score>=0.995?'exacta':'variante/fuzzy'}).`);}return{ok:true,value:r.nombre};};
   const singles=[['person','person','Persona'],['responsible','person','Responsable'],['donor','person','Donante'],['store','store','Tienda']];
   for(const [field,type,label] of singles){if(!trim(q?.[field]))continue;const r=resolveOne(type,q[field],label);if(!r.ok)return{query:q,warnings,error:r.error};q[field]=r.value;}
   const plurals=[['people','person','Persona'],['responsibles','person','Responsable'],['donors','person','Donante'],['stores','store','Tienda']];
@@ -16411,7 +16424,18 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   // semántico breve para cualquier frase; si tarda, no bloquea. Gemini decide después si aquello
   // era memoria, una consulta actual o simple conversación.
   let historyCandidates=arr(pendingHistory).slice(0,8);
-  if(!historyCandidates.length){const memoryProbe=await v79RunWithinBudget(()=>searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}),1200);if(memoryProbe.kind==='value')historyCandidates=arr(memoryProbe.value);else if(memoryProbe.kind==='timeout')zuzuTracePush(flowTrace,'v4_0_exp · BANK4_15 · MEMORY EVIDENCE GATE','INFO','La evidencia histórica superó 1200 ms; el turno sigue sin bloquearse.');}
+  if(!historyCandidates.length){
+    if(isRecallPrompt(userPrompt)){
+      const memoryT0=Date.now();
+      historyCandidates=arr(await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:12,nowIso:clientLocalDateTime||clientNowIso}));
+      perf.memoryMs+=Date.now()-memoryT0;perf.memorySearch=true;
+      zuzuTracePush(flowTrace,'v4_0_exp · BANK4_21 · MEMORIA EXPLÍCITA AUTORITATIVA','OK',`Petición explícita de recuerdo: CE espera la evidencia persistente antes de compilar (${historyCandidates.length} candidato(s)). No se permite que un timeout convierta memoria existente en «no recuerdo».`);
+    }else{
+      const memoryProbe=await v79RunWithinBudget(()=>searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}),1200);
+      if(memoryProbe.kind==='value')historyCandidates=arr(memoryProbe.value);
+      else if(memoryProbe.kind==='timeout')zuzuTracePush(flowTrace,'v4_0_exp · BANK4_15 · MEMORY EVIDENCE GATE','INFO','La evidencia histórica superó 1200 ms; el turno sigue sin bloquearse.');
+    }
+  }
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v4_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (referencias pendientes disponibles)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
   if(historyCandidates.length)zuzuTracePush(flowTrace,'v4_0_exp · MEMORIA EPISÓDICA · FUENTE','INFO',`DB persistente · ${historyCandidates.length} candidato(s) · prioridad natural más joven→más viejo salvo contexto claramente más fuerte.`);
