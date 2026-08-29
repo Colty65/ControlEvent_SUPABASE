@@ -292,7 +292,7 @@
     const id = btn.dataset.id; const p = byId('personas', id); if(!p) return block(ev, 'No se encuentra la persona.');
     const nombre = norm(getVal('edit-persona-nombre', id)); if(!nombre) return block(ev, 'El nombre no puede estar vacío.');
     const scroll = captureScroll(); stop(ev);
-    p.nombre = nombre; p.rango = getVal('edit-persona-rango', id) || p.rango;
+    p.nombre = nombre; p.nombreAmigo = norm(getVal('edit-persona-nombreamigo', id)) || ''; p.aliases = String(getVal('edit-persona-aliases', id)||'').split(/[;,\n]+/).map(v=>v.trim()).filter(Boolean); p.rango = getVal('edit-persona-rango', id) || p.rango;
     finishModify('save-persona', id, scroll);
     return false;
   }

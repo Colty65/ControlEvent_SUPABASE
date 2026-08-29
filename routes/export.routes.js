@@ -519,6 +519,7 @@ function scopedBackupState(fullState, scope){
   });
   const productIds = new Set(compras.map(c => String(c.productoId || '')).filter(Boolean));
   const personas = all ? [...dataRows(fullState,'personas')] : dataRows(fullState,'personas').filter(p => personIds.has(String(p.id)));
+  const personAliases = dataRows(fullState,'personAliases').filter(a => all || personIds.has(String(a.personaId || a.persona_id || '')));
   const tiendas = all ? [...dataRows(fullState,'tiendas')] : dataRows(fullState,'tiendas').filter(t => storeIds.has(String(t.id)));
   const productos = all ? [...dataRows(fullState,'productos')] : dataRows(fullState,'productos').filter(p => productIds.has(String(p.id)));
   const eventDocuments = dataRows(fullState,'eventDocuments').filter(doc => all || eventIds.has(String(doc.eventId)));
@@ -527,12 +528,13 @@ function scopedBackupState(fullState, scope){
   const liveIndex = buildLiveImageIndex(fullState, eventIds);
   Object.entries(fullState.ticketImages || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
   Object.entries(fullState.ticketImageRefs || {}).forEach(([key, value]) => addCanonicalTicketImage(ticketImages, key, value, liveIndex, eventIds));
-  return {eventos, personas, tiendas, productos, colaboradores, compras, eventDocuments, eventPersonSnapshots, ticketImages};
+  return {eventos, personas, personAliases, tiendas, productos, colaboradores, compras, eventDocuments, eventPersonSnapshots, ticketImages};
 }
 function countsFor(state){
   return {
     eventos: arr(state,'eventos').length,
     personas: arr(state,'personas').length,
+    personAliases: arr(state,'personAliases').length,
     tiendas: arr(state,'tiendas').length,
     productos: arr(state,'productos').length,
     colaboradores: arr(state,'colaboradores').length,
@@ -673,6 +675,7 @@ async function buildBackupWorkbook(fullState, scope){
     ['FECHA_DESCARGA', `${now.yyyy}${now.mm}${now.dd}-${now.hh}_${now.mi}_${now.ss}`],
     ['REGISTROS_EVENTOS', scopedCounts.eventos],
     ['REGISTROS_PERSONAS', scopedCounts.personas],
+    ['REGISTROS_PERSONAS_ALIAS', scopedCounts.personAliases || 0],
     ['REGISTROS_TIENDAS', scopedCounts.tiendas],
     ['REGISTROS_PRODUCTOS', scopedCounts.productos],
     ['REGISTROS_INGRESOS', scopedCounts.colaboradores],
@@ -690,7 +693,8 @@ async function buildBackupWorkbook(fullState, scope){
     ['NOTA', 'Exportación generada en servidor con clonado plano y tickets divididos para evitar RangeError.']
   ]);
   addRows('EVENTOS', ['EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
-  addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.rango || 'SOCIO']));
+  addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_NOMBRE_AMIGO','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.nombreAmigo || p.nombre_amigo || '', p.rango || 'SOCIO']));
+  addRows('PERSONAS_ALIAS', ['PERSONA_ID','ALIAS','PRIORIDAD','ES_PREFERIDO','ACTIVO'], (scoped.personAliases || []).map(a => [a.personaId || a.persona_id || '', a.alias || '', Number(a.prioridad ?? 50), (a.preferido === true || a.es_preferido === true) ? 'SI' : 'NO', a.activo === false ? 'NO' : 'SI']));
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));
   const wsProductos = addRows('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));
   try{ wsProductos.getColumn(6).numFmt = '#,##0.00 [$€-C0A]'; }catch(_){ }
@@ -837,6 +841,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
     const err=new Error('El BACKUP total no contiene una tabla ACCESOS válida con al menos un usuario GD. Restauración cancelada.');err.status=400;throw err;
   }
   if(all){
+    await deleteRowsByPk('ce_persona_aliases','persona_id');
     await deleteRowsByPk('ce_bank_income_links','id');
     await deleteRowsByPk('ce_bank_movement_settlements','movement_id');
     await deleteRowsByPk('ce_bank_ticket_links','id');
@@ -865,6 +870,7 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
     counts.ticketImageRows=await upsertChunks('ce_ticket_images',tables.ticketImageRows,'image_key');
     await deleteRowsNotInPk('ce_ticket_images','image_key',(Array.isArray(tables.ticketImageRows)?tables.ticketImageRows:[]).map(row=>row.image_key));
   }
+  counts.personAliases=await upsertChunks('ce_persona_aliases',tables.personAliases,'persona_id,alias');
   counts.bankImportBatches=await upsertChunks('ce_bank_import_batches',tables.bankImportBatches,'id');
   counts.bankMovements=await upsertChunks('ce_bank_movements',tables.bankMovements,'id');
   counts.bankEventSettings=await upsertChunks('ce_bank_event_settings',tables.bankEventSettings,'event_id');

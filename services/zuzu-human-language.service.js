@@ -8,7 +8,7 @@ function containsPhrase(haystack='',needle=''){ const h=normPhrase(haystack),n=n
 function arr(v){ return Array.isArray(v)?v:[]; }
 function esc(v){ return text(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 
-let profile={version:'BANK4_19',event_series:[],person_aliases:[],spoken_replacements:[]};
+let profile={version:'BANK4_20',event_series:[],person_aliases:[],spoken_replacements:[]};
 try{ profile=JSON.parse(fs.readFileSync(new URL('../config/zuzu-human-language.json',import.meta.url),'utf8')); }catch(_){ }
 
 const MONTHS='ENE|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|OCT|NOV|DIC|DEC';
@@ -62,7 +62,29 @@ export function humanizeEventName(name='',opts={}){
   out=out.replace(/\b([IVXLCDM]{2,})\b/g,(m,r)=>{const n=romanToInt(r);return n?String(n):m;});
   return out.replace(/\s+/g,' ').trim();
 }
-function personRows(state={}){return arr(state?.personas).map(x=>({id:trim(x?.id),name:trim(x?.nombre)})).filter(x=>x.id&&x.name);}
+function personRows(state={}){return arr(state?.personas).map(x=>({id:trim(x?.id),name:trim(x?.nombre),friend:trim(x?.nombreAmigo||x?.nombre_amigo),aliases:arr(x?.aliases).map(trim).filter(Boolean)})).filter(x=>x.id&&x.name);}
+function dbAliasRows(state={}){return arr(state?.personAliases||state?.person_aliases).map(x=>({personaId:trim(x?.personaId||x?.persona_id),alias:trim(x?.alias),prioridad:Number(x?.prioridad??50),preferido:x?.preferido===true||x?.es_preferido===true,activo:x?.activo!==false})).filter(x=>x.personaId&&x.alias&&x.activo);}
+function socialRowsForPerson(state={},row={}){
+  const out=[],seen=new Set(),key=v=>normPhrase(v);
+  function add(alias,prioridad=50,preferido=false){alias=trim(alias);const k=key(alias);if(!alias||!k||k===key(row?.name)||seen.has(k))return;seen.add(k);out.push({alias,prioridad:Number(prioridad)||50,preferido:!!preferido});}
+  if(row?.friend)add(row.friend,10,true);
+  for(const a of dbAliasRows(state).filter(x=>x.personaId===row.id))add(a.alias,a.prioridad,a.preferido);
+  for(const a of arr(row?.aliases))add(a,50,false);
+  return out.sort((a,b)=>(a.preferido===b.preferido?0:(a.preferido?-1:1))||a.prioridad-b.prioridad);
+}
+function chooseDbSocialName(state={},row={},seed=''){
+  const variants=socialRowsForPerson(state,row);if(!variants.length)return'';const h=hash32(`${seed}|${row.id}|${row.name}`);
+  // Humanización frecuente, no obligatoria: a veces entre amigos también usamos el nombre de siempre.
+  if((h%100)>=78)return'';
+  const weighted=variants.map(v=>({ ...v, weight:v.preferido?9:Math.max(1,7-Math.floor(Math.max(0,v.prioridad)/20)) }));
+  const total=weighted.reduce((n,v)=>n+v.weight,0);let pick=Math.floor(h/100)%Math.max(1,total);
+  for(const v of weighted){if(pick<v.weight)return v.alias;pick-=v.weight;}return weighted[0]?.alias||'';
+}
+function dbAliasMatches(state={},value=''){const n=normPhrase(value);if(!n)return[];const rows=personRows(state),byId=new Map(rows.map(r=>[r.id,r])),out=[];
+  for(const row of rows){if(normPhrase(row.friend)===n)out.push({id:row.id,nombre:row.name,alias:trim(value),score:1,resolution:'db_friend_name'});}
+  for(const a of dbAliasRows(state)){if(normPhrase(a.alias)!==n)continue;const row=byId.get(a.personaId);if(row&&!out.some(x=>x.id===row.id))out.push({id:row.id,nombre:row.name,alias:a.alias,score:1,resolution:'db_person_alias'});}
+  return out;
+}
 function canonicalEntryMatchesName(entry={},name=''){
   const n=normPhrase(name);return arr(entry?.canonical).some(c=>{const q=normPhrase(c);return q&&(n===q||(` ${n} `).includes(` ${q} `));});
 }
@@ -75,12 +97,16 @@ function replaceWholeName(value='',needle='',replacement=''){
 export function humanizePersonNames(value='',state={},opts={}){
   let out=text(value);const changes=[],seed=trim(opts?.seed)||'zuzu';
   const rows=personRows(state).sort((a,b)=>b.name.length-a.name.length);
-  for(const row of rows){if(/\s+y\s+/i.test(row.name))continue;const entry=arr(profile?.person_aliases).find(e=>canonicalEntryMatchesName(e,row.name));if(!entry)continue;const alias=chooseAlias(entry,seed,row.name);if(!alias)continue;const before=out;out=replaceWholeName(out,row.name,alias);if(out!==before)changes.push(`${row.name}→${alias}`);}
-  // También permite nombres abreviados presentes literalmente en la redacción (p. ej. «Cordo») aunque el catálogo tenga una entidad compuesta.
-  for(const entry of arr(profile?.person_aliases)){
-    for(const c of arr(entry?.canonical).sort((a,b)=>text(b).length-text(a).length)){
-      const alias=chooseAlias(entry,seed,c);if(!alias)continue;const before=out;out=replaceWholeName(out,c,alias);if(out!==before)changes.push(`${c}→${alias}`);
-    }
+  for(const row of rows){
+    if(/\s+y\s+/i.test(row.name))continue;
+    let alias=chooseDbSocialName(state,row,seed);
+    if(!alias){const entry=arr(profile?.person_aliases).find(e=>canonicalEntryMatchesName(e,row.name));if(entry)alias=chooseAlias(entry,seed,row.name);}
+    if(!alias)continue;const before=out;out=replaceWholeName(out,row.name,alias);if(out!==before)changes.push(`${row.name}→${alias}`);
+  }
+  // Compatibilidad temporal con nombres abreviados presentes literalmente en la redacción.
+  // BANK4_20 da prioridad a BBDD; este bloque solo cubre instalaciones que aún no ejecutaron el SQL.
+  if(!dbAliasRows(state).length&&!rows.some(r=>r.friend)){
+    for(const entry of arr(profile?.person_aliases)){for(const c of arr(entry?.canonical).sort((a,b)=>text(b).length-text(a).length)){const alias=chooseAlias(entry,seed,c);if(!alias)continue;const before=out;out=replaceWholeName(out,c,alias);if(out!==before)changes.push(`${c}→${alias}`);}}
   }
   return{text:out,changes:[...new Set(changes)]};
 }
@@ -92,35 +118,27 @@ export function humanizeSpokenEntities(value='',state={},opts={}){
   return{text:out,eventChanges:[...new Set(eventChanges)],personChanges:people.changes,formChanges:staticForms.changes,changed:eventChanges.length>0||people.changes.length>0||staticForms.changes.length>0,profileVersion:trim(profile?.version)||'unknown'};
 }
 
-export function familiarAliasCanonicalCandidates(value=''){
-  const n=normPhrase(value);if(!n)return[];
-  const out=[];for(const entry of arr(profile?.person_aliases)){
-    if(!arr(entry?.aliases).some(a=>normPhrase(aliasText(a))===n))continue;
-    for(const c of arr(entry?.canonical).map(aliasText).filter(Boolean))if(!out.some(x=>normPhrase(x)===normPhrase(c)))out.push(c);
-  }
-  return out;
+export function familiarAliasCanonicalCandidates(value='',state={}){
+  const direct=dbAliasMatches(state,value);if(direct.length)return direct.map(x=>x.nombre);
+  const n=normPhrase(value);if(!n)return[];const out=[];for(const entry of arr(profile?.person_aliases)){if(!arr(entry?.aliases).some(a=>normPhrase(aliasText(a))===n))continue;for(const c of arr(entry?.canonical).map(aliasText).filter(Boolean))if(!out.some(x=>normPhrase(x)===normPhrase(c)))out.push(c);}return out;
 }
 export function resolveFamiliarPersonAlias(state={},value=''){
-  const raw=trim(value),n=normPhrase(raw);if(!raw)return{ok:false,ambiguous:false,value:raw,candidates:[]};
-  const entries=arr(profile?.person_aliases).filter(e=>arr(e?.aliases).some(a=>normPhrase(aliasText(a))===n));if(!entries.length)return{ok:false,ambiguous:false,value:raw,candidates:[]};
-  const rows=personRows(state),matches=[];
-  for(const entry of entries){
-    for(const row of rows){
-      if(!canonicalEntryMatchesName(entry,row.name))continue;
-      if(!matches.some(x=>x.id===row.id))matches.push({id:row.id,nombre:row.name,score:1,resolution:'familiar_alias',alias:raw});
-    }
-  }
+  const raw=trim(value);if(!raw)return{ok:false,ambiguous:false,value:raw,candidates:[]};
+  const dbMatches=dbAliasMatches(state,raw);
+  if(dbMatches.length===1)return{ok:true,...dbMatches[0],type:'person',candidates:dbMatches};
+  if(dbMatches.length>1)return{ok:false,ambiguous:true,value:raw,type:'person',candidates:dbMatches,canonical_candidates:dbMatches.map(x=>x.nombre)};
+  const n=normPhrase(raw),entries=arr(profile?.person_aliases).filter(e=>arr(e?.aliases).some(a=>normPhrase(aliasText(a))===n));if(!entries.length)return{ok:false,ambiguous:false,value:raw,candidates:[]};
+  const rows=personRows(state),matches=[];for(const entry of entries){for(const row of rows){if(!canonicalEntryMatchesName(entry,row.name))continue;if(!matches.some(x=>x.id===row.id))matches.push({id:row.id,nombre:row.name,score:1,resolution:'legacy_familiar_alias',alias:raw});}}
   if(matches.length===1)return{ok:true,...matches[0],type:'person',candidates:matches};
-  return{ok:false,ambiguous:matches.length>1,value:raw,type:'person',candidates:matches,canonical_candidates:familiarAliasCanonicalCandidates(raw)};
+  return{ok:false,ambiguous:matches.length>1,value:raw,type:'person',candidates:matches,canonical_candidates:familiarAliasCanonicalCandidates(raw,state)};
 }
 export function familiarPersonAliasCandidates(state={},prompt=''){
-  const out=[],seen=new Set();
-  for(const entry of arr(profile?.person_aliases))for(const alias of arr(entry?.aliases).map(aliasText).filter(Boolean)){
-    if(!containsPhrase(prompt,alias))continue;
-    const r=resolveFamiliarPersonAlias(state,alias);
-    const candidates=r.ok?[r]:r.ambiguous?arr(r.candidates):[];
-    for(const c of candidates){const key=`${c.id}|${normPhrase(alias)}`;if(seen.has(key))continue;seen.add(key);out.push({id:c.id,name:c.nombre,score:r.ok?1:0.99,matched:alias,match_kind:r.ok?'exact':'ambiguous_alias',resolution:r.ok?'familiar_alias':'familiar_alias_ambiguous'});}
-  }
+  const out=[],seen=new Set(),aliases=[];
+  for(const row of personRows(state)){if(row.friend)aliases.push(row.friend);}
+  for(const a of dbAliasRows(state))aliases.push(a.alias);
+  if(!aliases.length)for(const entry of arr(profile?.person_aliases))for(const alias of arr(entry?.aliases).map(aliasText).filter(Boolean))aliases.push(alias);
+  const unique=[...new Map(aliases.filter(Boolean).map(a=>[normPhrase(a),a])).values()].sort((a,b)=>b.length-a.length);
+  for(const alias of unique){if(!containsPhrase(prompt,alias))continue;const r=resolveFamiliarPersonAlias(state,alias);const candidates=r.ok?[r]:r.ambiguous?arr(r.candidates):[];for(const c of candidates){const key=`${c.id}|${normPhrase(alias)}`;if(seen.has(key))continue;seen.add(key);out.push({id:c.id,name:c.nombre,score:r.ok?1:0.99,matched:alias,match_kind:r.ok?'exact_social_alias':'ambiguous_social_alias',resolution:c.resolution||'db_person_alias'});}}
   return out;
 }
-export function humanLanguageProfile(){return JSON.parse(JSON.stringify(profile));}
+export function humanLanguageProfile(){return JSON.parse(JSON.stringify({...profile,version:'BANK4_20'}));}

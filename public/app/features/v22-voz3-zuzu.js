@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-BANK4_19-Z1H-VOICE-V52';
+  var BUILD='v4_0_exp-BANK4_20-Z1H-VOICE-V53';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v49', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v49', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v49', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v49', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v49'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v50', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v50', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v50', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v50', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v50'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -43,26 +43,26 @@
   // La pantalla puede conservar puntos largos; TTS recibe palabras pronunciables y pausas
   // explícitas. Así «ummmmm» suena como una vacilación y no como «eme, eme, eme».
   var ENTERTAINMENT_PHRASES=[
-    {display:'Ummmmm................... espera, que lo tengo casi.',speech:[['ummmmm',620],['espera, que lo tengo casi.',0]]},
-    {display:'Ufff............... a ver, que estoy tirando del hilo.',speech:[['ufff',520],['a ver, que estoy tirando del hilo.',0]]},
-    {display:'Aaaah............... espera un segundo, que esto me suena.',speech:[['aaah',560],['espera un segundo, que esto me suena.',0]]},
-    {display:'Ummmmm............... calla, que creo que ya sé por dónde va.',speech:[['ummmmm',620],['calla, que creo que ya sé por dónde va.',0]]},
-    {display:'Ufff............... lo tengo en la punta de la lengua... dame un segundo.',speech:[['ufff',520],['lo tengo en la punta de la lengua.',420],['dame un segundo.',0]]},
-    {display:'A ver, a ver............... no te me vayas, que ya sale.',speech:[['a ver, a ver',520],['no te me vayas, que ya sale.',0]]},
-    {display:'Ummmmm............... un momentín, que estoy juntando las piezas.',speech:[['ummmmm',620],['un momentín, que estoy juntando las piezas.',0]]},
-    {display:'Aaaah............... espera, espera... que me viene.',speech:[['aaah',520],['espera, espera.',360],['que me viene.',0]]},
-    {display:'Ufff............... calla, calla... que casi lo tengo.',speech:[['ufff',520],['calla, calla.',360],['que casi lo tengo.',0]]},
-    {display:'Ummmmm............... déjame rebuscar un poquito, que está aquí.',speech:[['ummmmm',620],['déjame rebuscar un poquito, que está aquí.',0]]},
-    {display:'A ver............... espera, que no quiero soltarte una burrada.',speech:[['a ver',500],['espera, que no quiero soltarte una burrada.',0]]},
-    {display:'Ufff............... un segundo, que estoy encajando esto.',speech:[['ufff',520],['un segundo, que estoy encajando esto.',0]]},
-    {display:'Ummmmm............... ya, ya... creo que lo tengo.',speech:[['ummmmm',620],['ya, ya.',340],['creo que lo tengo.',0]]},
-    {display:'Calla............... ya lo tengo....., besitos muá.',speech:[['calla',620],['ya lo tengo',480],['besitos muá',0]]},
-    {display:'Aaaah............... vale, vale... ya sé por dónde tirar.',speech:[['aaah',520],['vale, vale.',340],['ya sé por dónde tirar.',0]]},
-    {display:'Ufff............... dame un pelín, que estoy llegando.',speech:[['ufff',520],['dame un pelín, que estoy llegando.',0]]},
-    {display:'Ummmmm............... espera... esto está aquí, casi.',speech:[['ummmmm',620],['espera.',360],['esto está aquí, casi.',0]]},
-    {display:'A ver, a ver............... sí, sí... ya viene.',speech:[['a ver, a ver',500],['sí, sí.',340],['ya viene.',0]]},
-    {display:'Ufff............... espera, que me estoy acordando ahora.',speech:[['ufff',520],['espera, que me estoy acordando ahora.',0]]},
-    {display:'Ummmmm............... no me sale todavía... un segundito.',speech:[['ummmmm',620],['no me sale todavía.',380],['un segundito.',0]]}
+    {display:'Ummmmm................... espera un poco, que estoy intentando acordarme bien.',speech:[['uuuummmmmmmmmm',720,0.42],['espera un poco, que estoy intentando acordarme bien.',0,0.90]]},
+    {display:'Ufffff............... a ver, que estoy tirando del hilo y no quiero saltarme nada.',speech:[['ufffffff',650,0.55],['a ver, que estoy tirando del hilo y no quiero saltarme nada.',0,0.90]]},
+    {display:'Aaaah............... espera, espera, que esto me suena mucho.',speech:[['aaaaah',620,0.58],['espera, espera.',380,0.88],['que esto me suena mucho.',0,0.90]]},
+    {display:'Ummmmm............... calla, que creo que ya sé por dónde va esto.',speech:[['uuuummmmmmmmmm',720,0.42],['calla, que creo que ya sé por dónde va esto.',0,0.90]]},
+    {display:'Ufffff............... lo tengo en la punta de la lengua... dame un segundo.',speech:[['ufffffff',650,0.55],['lo tengo en la punta de la lengua.',460,0.88],['dame un segundo.',0,0.90]]},
+    {display:'Ehhhh............... a ver, déjame ordenar esto un momento.',speech:[['eeehhhhh',620,0.55],['a ver, déjame ordenar esto un momento.',0,0.90]]},
+    {display:'Ummmmm............... un momentín, que estoy juntando las piezas.',speech:[['uuuummmmmmmmmm',720,0.42],['un momentín, que estoy juntando las piezas.',0,0.90]]},
+    {display:'Aaaah............... calla, calla... que me está viniendo ahora.',speech:[['aaaaah',620,0.58],['calla, calla.',400,0.88],['que me está viniendo ahora.',0,0.90]]},
+    {display:'Ufffff............... espera, que casi lo tengo encajado.',speech:[['ufffffff',650,0.55],['espera, que casi lo tengo encajado.',0,0.90]]},
+    {display:'Ummmmm............... déjame rebuscar un poquito, que está por aquí.',speech:[['uuuummmmmmmmmm',720,0.42],['déjame rebuscar un poquito, que está por aquí.',0,0.90]]},
+    {display:'A ver, a ver............... espera, que no quiero soltarte una burrada.',speech:[['a ver, a ver',520,0.86],['espera, que no quiero soltarte una burrada.',0,0.90]]},
+    {display:'Ufffff............... dame un instante, que estoy comprobando una cosa.',speech:[['ufffffff',650,0.55],['dame un instante, que estoy comprobando una cosa.',0,0.90]]},
+    {display:'Ummmmm............... sí, sí... espera, que creo que ya lo tengo.',speech:[['uuuummmmmmmmmm',720,0.42],['sí, sí.',360,0.86],['espera, que creo que ya lo tengo.',0,0.90]]},
+    {display:'Calla............... ya lo tengo....., besitos muá.',speech:[['calla',620,0.84],['ya lo tengo',520,0.86],['besitos muá',0,0.84]]},
+    {display:'Aaaah............... vale, espera, que ya sé por dónde tirar.',speech:[['aaaaah',620,0.58],['vale, espera, que ya sé por dónde tirar.',0,0.90]]},
+    {display:'Ufffff............... dame un pelín, que estoy llegando.',speech:[['ufffffff',650,0.55],['dame un pelín, que estoy llegando.',0,0.90]]},
+    {display:'Ummmmm............... espera un momento, que esto está aquí, casi lo veo.',speech:[['uuuummmmmmmmmm',720,0.42],['espera un momento, que esto está aquí, casi lo veo.',0,0.90]]},
+    {display:'Ehhhh............... sí, sí... un segundo, que ya viene.',speech:[['eeehhhhh',620,0.55],['sí, sí.',360,0.86],['un segundo, que ya viene.',0,0.90]]},
+    {display:'Ufffff............... espera, que me estoy acordando ahora mismo.',speech:[['ufffffff',650,0.55],['espera, que me estoy acordando ahora mismo.',0,0.90]]},
+    {display:'Ummmmm............... no me sale todavía... déjame pensar un poquito más.',speech:[['uuuummmmmmmmmm',720,0.42],['no me sale todavía.',420,0.88],['déjame pensar un poquito más.',0,0.90]]}
   ];
   function $(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
@@ -375,12 +375,12 @@
     var vars={usuario:voiceAddressName(false),nombre:voiceGreetingName(),mes_actual:months[d.getMonth()],mes:months[d.getMonth()],diasemana:days[d.getDay()],dia_semana:days[d.getDay()],ano_actual:String(d.getFullYear()),'añoactual':String(d.getFullYear()),dia_mes:String(d.getDate()),hora_actual:pad(h)+':'+pad(d.getMinutes()),fecha_hoy:pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(),momento_dia:moment,version:'v4_0_exp'};
     function inject(v){var out=String(v||'');Object.keys(vars).forEach(function(k){out=out.replace(new RegExp('\\{'+k+'\\}','g'),vars[k]);});return clean(out);}
     var speech=Array.isArray(item.speech)?item.speech:[];
-    return{display:inject(item.display),speech:speech.map(function(part){if(Array.isArray(part))return{text:inject(part[0]),pauseMs:Math.max(0,Number(part[1])||0)};return{text:inject(part&&part.text),pauseMs:Math.max(0,Number(part&&part.pauseMs)||0)};}).filter(function(x){return !!x.text;})};
+    return{display:inject(item.display),speech:speech.map(function(part){if(Array.isArray(part))return{text:inject(part[0]),pauseMs:Math.max(0,Number(part[1])||0),rate:Number(part[2])||0,pitch:Number(part[3])||0};return{text:inject(part&&part.text),pauseMs:Math.max(0,Number(part&&part.pauseMs)||0),rate:Number(part&&part.rate)||0,pitch:Number(part&&part.pitch)||0};}).filter(function(x){return !!x.text;})};
   }
   function contextualEntertainmentPhrase(){
     // No comenta el tema ni anticipa conclusiones: solo una señal humana de pensamiento.
     var idx=nextEntertainmentIndex();
-    if(!Number.isInteger(idx)||idx<0||idx>=ENTERTAINMENT_PHRASES.length)return{display:'Ummmmm................... espera, que lo tengo casi.',speech:[['ummmmm',620],['espera, que lo tengo casi.',0]]};
+    if(!Number.isInteger(idx)||idx<0||idx>=ENTERTAINMENT_PHRASES.length)return{display:'Ummmmm................... espera un poco, que estoy intentando acordarme bien.',speech:[['uuuummmmmmmmmm',720,0.42],['espera un poco, que estoy intentando acordarme bien.',0,0.90]]};
     commitEntertainmentIndex(idx);
     return ENTERTAINMENT_PHRASES[idx];
   }
@@ -432,7 +432,7 @@
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Math.max(0,Number(delay)||0));}
   function entertainmentEnded(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();}
   function entertainmentSpeechParts(item){
-    if(item&&Array.isArray(item.speech)&&item.speech.length)return item.speech.map(function(x){return{text:clean(x.text),pauseMs:Math.max(0,Number(x.pauseMs)||0)};}).filter(function(x){return !!x.text;});
+    if(item&&Array.isArray(item.speech)&&item.speech.length)return item.speech.map(function(x){return{text:clean(x.text),pauseMs:Math.max(0,Number(x.pauseMs)||0),rate:Number(x.rate)||0,pitch:Number(x.pitch)||0};}).filter(function(x){return !!x.text;});
     var p=String(item&&item.display||item||'').trim();if(!p)return[];
     return p.replace(/…+/g,'...').split(/(?:\.{3,}|[;]+)/).map(function(x){return{text:clean(x).replace(/^[,.:!?\s]+|[,.:!?\s]+$/g,''),pauseMs:300};}).filter(function(x){return !!x.text;});
   }
@@ -444,7 +444,7 @@
     function next(){
       if(!state.entertainmentSpeaking)return;
       if(pos>=parts.length){entertainmentEnded();return;}
-      try{var part=parts[pos++],u=new SpeechSynthesisUtterance(part.text);u.lang='es-ES';u.rate=Math.min(0.98,speechRate());u.pitch=0.82;u.volume=1;if(v)u.voice=v;state.entertainmentUtterance=u;
+      try{var part=parts[pos++],u=new SpeechSynthesisUtterance(part.text);u.lang='es-ES';u.rate=part.rate>0?Math.max(0.35,Math.min(1.05,part.rate)):Math.min(0.94,speechRate());u.pitch=part.pitch>0?part.pitch:0.82;u.volume=1;if(v)u.voice=v;state.entertainmentUtterance=u;
         u.onend=function(){state.entertainmentUtterance=null;setTimeout(next,Math.max(40,Number(part.pauseMs)||0));};
         u.onerror=function(){state.entertainmentUtterance=null;setTimeout(next,80);};
         window.speechSynthesis.speak(u);

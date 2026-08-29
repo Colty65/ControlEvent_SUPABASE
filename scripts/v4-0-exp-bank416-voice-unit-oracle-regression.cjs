@@ -8,8 +8,8 @@ check('prompt prohíbe monetizar años',()=>assert(src.includes('No conviertas 2
 check('oráculo de unidades está en salida final',()=>assert(src.includes('BANK4_16 · ORÁCULO DE UNIDADES DE VOZ')));
 check('se conserva spoken raw para auditoría',()=>assert(src.includes('gemini_spoken_answer_raw:rawFinal.spoken')));
 check('TTS usa pantalla como fuente semántica única',()=>assert(voice.includes('TTS usa answer de pantalla como fuente semántica única')));
-check('build de voz BANK4_16',()=>assert(voice.includes("BANK4_16-Z1H-VOICE-V48")||voice.includes("BANK4_17-Z1H-VOICE-V49")||voice.includes("BANK4_18-Z1H-VOICE-V51")||voice.includes("BANK4_19-Z1H-VOICE-V52")));
-check('cache bust BANK416',()=>assert(index.includes('BANK416-Z1H-VOICE-V48')||index.includes('BANK417-Z1H-VOICE-V49')||(index.includes('BANK418-Z1H-VOICE-V51')||index.includes('BANK419-Z1H-VOICE-V52'))));
+check('build de voz BANK4_16',()=>assert(voice.includes("BANK4_16-Z1H-VOICE-V48")||voice.includes("BANK4_17-Z1H-VOICE-V49")||voice.includes("BANK4_18-Z1H-VOICE-V51")||voice.includes("BANK4_19-Z1H-VOICE-V52")||voice.includes("BANK4_20-Z1H-VOICE-V53")));
+check('cache bust BANK416',()=>assert(index.includes('BANK416-Z1H-VOICE-V48')||index.includes('BANK417-Z1H-VOICE-V49')||(index.includes('BANK418-Z1H-VOICE-V51')||index.includes('BANK419-Z1H-VOICE-V52')||index.includes('BANK420-Z1H-VOICE-V53'))));
 const a=src.indexOf('function v416ParseEuroNumber'),b=src.indexOf('function v73RawFinalParse');assert(a>0&&b>a);
 const code=src.slice(a,b)+'\nthis.guard=v416VoiceUnitOracle;';
 const ctx={trim:v=>String(v??'').trim(),text:v=>String(v??''),arr:v=>Array.isArray(v)?v:[],console};vm.createContext(ctx);vm.runInContext(code,ctx);

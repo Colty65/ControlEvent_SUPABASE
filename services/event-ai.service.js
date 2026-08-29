@@ -15781,7 +15781,7 @@ function v73ExpandEventSeries(state={},series=''){
 function v419ResolveFamiliarPerson(state={},value=''){
   const raw=trim(value);if(!raw)return{ok:false,ambiguous:false,value:raw,candidates:[]};
   const directAlias=resolveFamiliarPersonAlias(state,raw);if(directAlias?.ok||directAlias?.ambiguous)return directAlias;
-  const hints=familiarAliasCanonicalCandidates(raw);if(!hints.length)return directAlias||{ok:false,ambiguous:false,value:raw,candidates:[]};
+  const hints=familiarAliasCanonicalCandidates(raw,state);if(!hints.length)return directAlias||{ok:false,ambiguous:false,value:raw,candidates:[]};
   const matches=[];
   for(const hint of hints){
     const r=v79DirectTypedEntity(state,'person',hint)||v26ResolvePersonFamily(state,hint)||semanticResolveEntity(state,'person',hint);

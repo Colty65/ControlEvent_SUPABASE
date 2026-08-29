@@ -46,7 +46,8 @@
     "test:v4-bank412": "node scripts/v4-0-exp-bank412-memory-reference-contract-regression.cjs",
     "test:v4-bank413": "node scripts/v4-0-exp-bank413-memory-continuity-feedback-voice-regression.cjs",
     "test:v4-bank414": "node scripts/v4-0-exp-bank414-semantic-core-human-response-regression.cjs",
-    "test:v4-bank417": "node scripts/v4-0-exp-bank417-human-speech-regression.cjs"
+    "test:v4-bank417": "node scripts/v4-0-exp-bank417-human-speech-regression.cjs",
+    "test:v4-bank420": "node scripts/v4-0-exp-bank420-personas-sociales-entertainment-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

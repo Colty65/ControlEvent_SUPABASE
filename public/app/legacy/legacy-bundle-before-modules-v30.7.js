@@ -254,6 +254,7 @@ async function importInitialWorkbook(){
         id,
         eventId: eventMap[eventCode],
         nombre,
+        nombreAmigo: String(pick(row, ['PERSONA_NOMBRE_AMIGO','NOMBRE_AMIGO'], '')).trim(),
         rango: String(pick(row, ['PERSONA_RANGO','RANGO'], 'SOCIO')).trim().toUpperCase() === 'DONANTE' ? 'DONANTE' : 'SOCIO'
       });
     });
@@ -408,7 +409,9 @@ function mergeLoadedState(parsed, defaults){
     personas: (parsed.personas || defaults.personas).map(p => ({
       id: p.id || uid(),
       nombre: p.nombre || '',
-      rango: p.rango || 'SOCIO'
+      rango: p.rango || 'SOCIO',
+      nombreAmigo: p.nombreAmigo || p.nombre_amigo || '',
+      aliases: Array.isArray(p.aliases) ? p.aliases.slice() : []
     })),
     eventos: (parsed.eventos || defaults.eventos).map(e => ({
       id: e.id || uid(),
@@ -2106,8 +2109,8 @@ async function exportSeedWorkbook(){
     state.eventos.map(e => [eventCode[e.id], e.titulo || '', Number(e.precio || 0), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || ''])
   );
   makeSheet('PERSONAS',
-    ['PERSONA_CODIGO','PERSONA_NOMBRE','PERSONA_RANGO'],
-    state.personas.map(p => [personCode[p.id], p.nombre || '', p.rango || 'SOCIO'])
+    ['PERSONA_CODIGO','PERSONA_NOMBRE','PERSONA_NOMBRE_AMIGO','PERSONA_RANGO'],
+    state.personas.map(p => [personCode[p.id], p.nombre || '', p.nombreAmigo || '', p.rango || 'SOCIO'])
   );
   makeSheet('TIENDAS',
     ['TIENDA_CODIGO','TIENDA_NOMBRE'],
@@ -2893,6 +2896,8 @@ function donorOptions(){
       row.innerHTML = `
         <div class="rowline persona">
           <div class="field"><label>Nombre</label><input value="${escapeHtml(p.nombre)}" data-action="edit-persona-nombre" data-id="${p.id}" /></div>
+          <div class="field"><label>Nombre amigo</label><input value="${escapeHtml(p.nombreAmigo||'')}" data-action="edit-persona-nombreamigo" data-id="${p.id}" /></div>
+          <div class="field"><label>Otros nombres / motes</label><input value="${escapeHtml((p.aliases||[]).join(', '))}" data-action="edit-persona-aliases" data-id="${p.id}" /></div>
           <div class="field"><label>Rango</label><select data-action="edit-persona-rango" data-id="${p.id}">${PERSONA_RANGOS.map(v => `<option value="${v}" ${v===p.rango?'selected':''}>${v}</option>`).join('')}</select></div>
           <button type="button" class="modify small" data-action="save-persona" data-id="${p.id}">Modificar</button>
           <button type="button" class="danger small" data-action="delete-persona" data-id="${p.id}">Eliminar</button>
@@ -2992,9 +2997,11 @@ function donorOptions(){
   addPersona = function(){
     const nombre = (opt('newPersonaNombre').value || '').trim();
     const rango = opt('newPersonaRango').value;
+    const nombreAmigo = (opt('newPersonaNombreAmigo')?.value || '').trim();
+    const aliases = (opt('newPersonaAliases')?.value || '').split(/[;,\n]+/).map(v=>v.trim()).filter(Boolean);
     if(!nombre) return;
-    state.personas.push({id:uid(), nombre, rango});
-    opt('newPersonaNombre').value = '';
+    state.personas.push({id:uid(), nombre, rango, nombreAmigo, aliases});
+    opt('newPersonaNombre').value = ''; if(opt('newPersonaNombreAmigo')) opt('newPersonaNombreAmigo').value=''; if(opt('newPersonaAliases')) opt('newPersonaAliases').value='';
     render();
   };
 
@@ -3532,7 +3539,7 @@ function donorOptions(){
       case 'toggleComprasEvent': showComprasEvent = !showComprasEvent; renderTabVisibility(); break;
       case 'save-persona': {
         const id = btn.dataset.id, p = personaById(id);
-        if(p){ p.nombre = currentValuesByAction('edit-persona-nombre', id).trim(); p.rango = currentValuesByAction('edit-persona-rango', id); render(); }
+        if(p){ p.nombre = currentValuesByAction('edit-persona-nombre', id).trim(); p.nombreAmigo = currentValuesByAction('edit-persona-nombreamigo', id).trim(); p.aliases = currentValuesByAction('edit-persona-aliases', id).split(/[;,\n]+/).map(v=>v.trim()).filter(Boolean); p.rango = currentValuesByAction('edit-persona-rango', id); render(); }
         break;
       }
       case 'delete-persona':
