@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-BANK4_18-Z1H-VOICE-V51';
+  var BUILD='v4_0_exp-BANK4_19-Z1H-VOICE-V52';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v48', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v48', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v48', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v48', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v48'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v49', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v49', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v49', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v49', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v49'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -39,23 +39,30 @@
   // Z1H · La espera no es una segunda conversación. El humano suele callarse y pensar.
   // Si la respuesta tarda, Zuzu emite COMO MÁXIMO una microseñal de pensamiento, breve y
   // no temática. El mazo evita repeticiones hasta agotarse; no se personaliza con nombres.
+  // BANK4_19 · Frases de pensamiento: display y audio están separados.
+  // La pantalla puede conservar puntos largos; TTS recibe palabras pronunciables y pausas
+  // explícitas. Así «ummmmm» suena como una vacilación y no como «eme, eme, eme».
   var ENTERTAINMENT_PHRASES=[
-    'Ummm...................',
-    'A ver…',
-    'Ufff… espera.',
-    'Un segundo…',
-    'Mmm… déjame pensar.',
-    'Calla............... ya lo tengo....., besitos muá.',
-    'Ufff… lo tengo en la punta de la lengua.',
-    'A ver, a ver…',
-    'Espera… ya voy.',
-    'Mmm… casi.',
-    'Un momentín…',
-    'Calla, calla…',
-    'Déjame un segundo…',
-    'Ufff… a ver.',
-    'Mmm… ya sale.',
-    'Espera un pelo…'
+    {display:'Ummmmm................... espera, que lo tengo casi.',speech:[['ummmmm',620],['espera, que lo tengo casi.',0]]},
+    {display:'Ufff............... a ver, que estoy tirando del hilo.',speech:[['ufff',520],['a ver, que estoy tirando del hilo.',0]]},
+    {display:'Aaaah............... espera un segundo, que esto me suena.',speech:[['aaah',560],['espera un segundo, que esto me suena.',0]]},
+    {display:'Ummmmm............... calla, que creo que ya sé por dónde va.',speech:[['ummmmm',620],['calla, que creo que ya sé por dónde va.',0]]},
+    {display:'Ufff............... lo tengo en la punta de la lengua... dame un segundo.',speech:[['ufff',520],['lo tengo en la punta de la lengua.',420],['dame un segundo.',0]]},
+    {display:'A ver, a ver............... no te me vayas, que ya sale.',speech:[['a ver, a ver',520],['no te me vayas, que ya sale.',0]]},
+    {display:'Ummmmm............... un momentín, que estoy juntando las piezas.',speech:[['ummmmm',620],['un momentín, que estoy juntando las piezas.',0]]},
+    {display:'Aaaah............... espera, espera... que me viene.',speech:[['aaah',520],['espera, espera.',360],['que me viene.',0]]},
+    {display:'Ufff............... calla, calla... que casi lo tengo.',speech:[['ufff',520],['calla, calla.',360],['que casi lo tengo.',0]]},
+    {display:'Ummmmm............... déjame rebuscar un poquito, que está aquí.',speech:[['ummmmm',620],['déjame rebuscar un poquito, que está aquí.',0]]},
+    {display:'A ver............... espera, que no quiero soltarte una burrada.',speech:[['a ver',500],['espera, que no quiero soltarte una burrada.',0]]},
+    {display:'Ufff............... un segundo, que estoy encajando esto.',speech:[['ufff',520],['un segundo, que estoy encajando esto.',0]]},
+    {display:'Ummmmm............... ya, ya... creo que lo tengo.',speech:[['ummmmm',620],['ya, ya.',340],['creo que lo tengo.',0]]},
+    {display:'Calla............... ya lo tengo....., besitos muá.',speech:[['calla',620],['ya lo tengo',480],['besitos muá',0]]},
+    {display:'Aaaah............... vale, vale... ya sé por dónde tirar.',speech:[['aaah',520],['vale, vale.',340],['ya sé por dónde tirar.',0]]},
+    {display:'Ufff............... dame un pelín, que estoy llegando.',speech:[['ufff',520],['dame un pelín, que estoy llegando.',0]]},
+    {display:'Ummmmm............... espera... esto está aquí, casi.',speech:[['ummmmm',620],['espera.',360],['esto está aquí, casi.',0]]},
+    {display:'A ver, a ver............... sí, sí... ya viene.',speech:[['a ver, a ver',500],['sí, sí.',340],['ya viene.',0]]},
+    {display:'Ufff............... espera, que me estoy acordando ahora.',speech:[['ufff',520],['espera, que me estoy acordando ahora.',0]]},
+    {display:'Ummmmm............... no me sale todavía... un segundito.',speech:[['ummmmm',620],['no me sale todavía.',380],['un segundito.',0]]}
   ];
   function $(id){return document.getElementById(id);}
   function q(sel,root){return (root||document).querySelector(sel);}
@@ -363,14 +370,17 @@
   function previewVoice(){if(!supportsSpeech())return;try{window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance('Esta es la voz de Zuzu. Estoy listo. Vamos al lío.');u.lang='es-ES';u.rate=speechRate();u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;window.speechSynthesis.speak(u);}catch(_){} }
 
   function renderEntertainmentPhrase(raw){
+    var item=(raw&&typeof raw==='object')?raw:{display:String(raw||''),speech:[[String(raw||''),0]]};
     var d=new Date(),months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'],days=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],h=d.getHours(),moment=h<7?'madrugada':h<13?'mañana':h<15?'mediodía':h<20?'tarde':'noche',pad=function(n){return String(n).padStart(2,'0');};
     var vars={usuario:voiceAddressName(false),nombre:voiceGreetingName(),mes_actual:months[d.getMonth()],mes:months[d.getMonth()],diasemana:days[d.getDay()],dia_semana:days[d.getDay()],ano_actual:String(d.getFullYear()),'añoactual':String(d.getFullYear()),dia_mes:String(d.getDate()),hora_actual:pad(h)+':'+pad(d.getMinutes()),fecha_hoy:pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(),momento_dia:moment,version:'v4_0_exp'};
-    var out=String(raw||'');Object.keys(vars).forEach(function(k){out=out.replace(new RegExp('\\{'+k+'\\}','g'),vars[k]);});return clean(out);
+    function inject(v){var out=String(v||'');Object.keys(vars).forEach(function(k){out=out.replace(new RegExp('\\{'+k+'\\}','g'),vars[k]);});return clean(out);}
+    var speech=Array.isArray(item.speech)?item.speech:[];
+    return{display:inject(item.display),speech:speech.map(function(part){if(Array.isArray(part))return{text:inject(part[0]),pauseMs:Math.max(0,Number(part[1])||0)};return{text:inject(part&&part.text),pauseMs:Math.max(0,Number(part&&part.pauseMs)||0)};}).filter(function(x){return !!x.text;})};
   }
   function contextualEntertainmentPhrase(){
-    // No comenta el tema, no anticipa conclusiones y no intenta entretener: solo piensa.
+    // No comenta el tema ni anticipa conclusiones: solo una señal humana de pensamiento.
     var idx=nextEntertainmentIndex();
-    if(!Number.isInteger(idx)||idx<0||idx>=ENTERTAINMENT_PHRASES.length)return 'Ummm...................';
+    if(!Number.isInteger(idx)||idx<0||idx>=ENTERTAINMENT_PHRASES.length)return{display:'Ummmmm................... espera, que lo tengo casi.',speech:[['ummmmm',620],['espera, que lo tengo casi.',0]]};
     commitEntertainmentIndex(idx);
     return ENTERTAINMENT_PHRASES[idx];
   }
@@ -421,28 +431,28 @@
   }
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Math.max(0,Number(delay)||0));}
   function entertainmentEnded(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();}
-  function entertainmentSpeechParts(phrase){
-    var p=String(phrase||'').trim();if(!p)return[];
-    // Los puntos largos son pausas visuales, no contenido. Separar por cláusulas evita que
-    // algunos SpeechSynthesis corten la frase en el primer bloque de puntuación repetida.
-    return p.replace(/…+/g,'...').split(/(?:\.{3,}|[;]+)/).map(function(x){return clean(x).replace(/^[,.:!?\s]+|[,.:!?\s]+$/g,'');}).filter(Boolean);
+  function entertainmentSpeechParts(item){
+    if(item&&Array.isArray(item.speech)&&item.speech.length)return item.speech.map(function(x){return{text:clean(x.text),pauseMs:Math.max(0,Number(x.pauseMs)||0)};}).filter(function(x){return !!x.text;});
+    var p=String(item&&item.display||item||'').trim();if(!p)return[];
+    return p.replace(/…+/g,'...').split(/(?:\.{3,}|[;]+)/).map(function(x){return{text:clean(x).replace(/^[,.:!?\s]+|[,.:!?\s]+$/g,''),pauseMs:300};}).filter(function(x){return !!x.text;});
   }
   function speakEntertainmentPhrase(){
     if(!state.conversationMode||!state.requestInFlight||!supportsSpeech()||state.entertainmentSpeaking||state.entertainmentCount>=state.entertainmentMaxPerRequest)return;
-    var phrase=renderEntertainmentPhrase(contextualEntertainmentPhrase(state.requestPrompt,state.entertainmentCount)),parts=entertainmentSpeechParts(phrase);state.entertainmentCount++;setStatus(phrase,'ok');
+    var item=renderEntertainmentPhrase(contextualEntertainmentPhrase(state.requestPrompt,state.entertainmentCount)),phrase=item.display,parts=entertainmentSpeechParts(item);state.entertainmentCount++;setStatus(phrase,'ok');
     if(!parts.length){entertainmentEnded();return;}
     state.entertainmentSpeaking=true;var pos=0,v=chooseVoice();
     function next(){
       if(!state.entertainmentSpeaking)return;
       if(pos>=parts.length){entertainmentEnded();return;}
-      try{var u=new SpeechSynthesisUtterance(parts[pos++]);u.lang='es-ES';u.rate=Math.min(1.02,speechRate()+0.04);u.pitch=0.82;u.volume=1;if(v)u.voice=v;state.entertainmentUtterance=u;
-        u.onend=function(){state.entertainmentUtterance=null;setTimeout(next,parts.length>1?170:30);};
+      try{var part=parts[pos++],u=new SpeechSynthesisUtterance(part.text);u.lang='es-ES';u.rate=Math.min(0.98,speechRate());u.pitch=0.82;u.volume=1;if(v)u.voice=v;state.entertainmentUtterance=u;
+        u.onend=function(){state.entertainmentUtterance=null;setTimeout(next,Math.max(40,Number(part.pauseMs)||0));};
         u.onerror=function(){state.entertainmentUtterance=null;setTimeout(next,80);};
         window.speechSynthesis.speak(u);
       }catch(_){setTimeout(next,80);}
     }
     next();
   }
+
   function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;state.entertainmentPersonalize=false;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(state.entertainmentInitialDelayMs||3300);}
   function queueAnswerAfterEntertainment(answer,autoRead){clearTimeout(state.pendingAnswerTimer);state.pendingAnswerTimer=null;var hadEntertainment=state.entertainmentSpeaking||!!state.entertainmentUtterance||(state.entertainmentFinishedAt>0&&Date.now()-state.entertainmentFinishedAt<600);function deliver(){if(!state.conversationMode)return;if(state.entertainmentSpeaking){state.pendingAnswerTimer=setTimeout(deliver,60);return;}var wait=hadEntertainment?Math.max(0,500-(Date.now()-(state.entertainmentFinishedAt||0))):0;state.pendingAnswerTimer=setTimeout(function(){state.pendingAnswerTimer=null;if(!state.conversationMode)return;if(autoRead)speakChunks(answer);else startUser();},wait);}deliver();}
 

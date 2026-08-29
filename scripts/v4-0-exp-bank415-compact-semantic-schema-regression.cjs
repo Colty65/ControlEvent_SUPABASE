@@ -23,7 +23,7 @@ t('prompt mantiene NHC semántico',ai.includes('Cambiar una palabra manteniendo 
 t('CE no vuelve a usar reparadores lingüísticos antiguos',!run.includes('v76ApplyFocusBindings(compiled.plan')&&!run.includes('v413RepairSubjectEllipsis(normalizedPlan')&&!run.includes('v413RepairFeedbackOnly(normalizedPlan'));
 t('memoria recibe más margen sin ser autoridad semántica',run.includes('MEMORY EVIDENCE GATE')&&run.includes('}),1200)')&&run.includes('searchZuzuHistoryCandidates'));
 t('respuesta humana sigue prohibiendo call-center',final.includes('Prohibidas las coletillas de call-center')&&final.includes('No pidas al usuario que recuerde el tema'));
-t('entretenimiento Ummm se conserva',voice.includes("'Ummm...................'")&&voice.includes("return 'Ummm...................';"));
+t('entretenimiento Ummm se conserva',(voice.includes("Ummmmm...................")&&voice.includes("'ummmmm'")));
 t('entretenimiento Calla/besitos se conserva',voice.includes("'Calla............... ya lo tengo....., besitos muá.'"));
 t('recuerdos de recuerdos siguen excluidos',ledger.includes("['recall_turn','recall_episode','resume_episode','restore_snapshot'].includes(refAction)"));
 t('fallo de ejecución no pasa a redacción alucinada',run.includes('KO SIN ALUCINACIÓN FINAL'));

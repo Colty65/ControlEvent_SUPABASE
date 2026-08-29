@@ -3,10 +3,12 @@ import fs from 'node:fs';
 function text(v){ return v == null ? '' : String(v); }
 function trim(v){ return text(v).trim(); }
 function norm(v){ const s=text(v); return (s.normalize?s.normalize('NFD').replace(/[\u0300-\u036f]/g,''):s).toLowerCase().trim(); }
+function normPhrase(v){ return norm(v).replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/g,' ').trim(); }
+function containsPhrase(haystack='',needle=''){ const h=normPhrase(haystack),n=normPhrase(needle); return !!(h&&n&&(` ${h} `).includes(` ${n} `)); }
 function arr(v){ return Array.isArray(v)?v:[]; }
 function esc(v){ return text(v).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
 
-let profile={version:'BANK4_18',event_series:[],person_aliases:[],spoken_replacements:[]};
+let profile={version:'BANK4_19',event_series:[],person_aliases:[],spoken_replacements:[]};
 try{ profile=JSON.parse(fs.readFileSync(new URL('../config/zuzu-human-language.json',import.meta.url),'utf8')); }catch(_){ }
 
 const MONTHS='ENE|JAN|FEB|MAR|ABR|APR|MAY|JUN|JUL|AGO|AUG|SEP|OCT|NOV|DIC|DEC';
@@ -62,7 +64,7 @@ export function humanizeEventName(name='',opts={}){
 }
 function personRows(state={}){return arr(state?.personas).map(x=>({id:trim(x?.id),name:trim(x?.nombre)})).filter(x=>x.id&&x.name);}
 function canonicalEntryMatchesName(entry={},name=''){
-  const n=norm(name);return arr(entry?.canonical).some(c=>{const q=norm(c);return q&&(n===q||n.startsWith(`${q} `)||n.endsWith(` ${q}`)||n.includes(` ${q} `));});
+  const n=normPhrase(name);return arr(entry?.canonical).some(c=>{const q=normPhrase(c);return q&&(n===q||(` ${n} `).includes(` ${q} `));});
 }
 function chooseAlias(entry={},seed='',canonical=''){
   const aliases=arr(entry?.aliases).map(aliasText).filter(Boolean);if(!aliases.length)return'';const pct=Math.max(0,Math.min(100,Number(entry?.use_percent)||0)),h=hash32(`${seed}|${canonical}`);if((h%100)>=pct)return'';const total=aliases.reduce((n,a)=>n+aliasWeight(entry,a),0),pick=(Math.floor(h/100)%Math.max(1,total));let acc=0;for(const a of aliases){acc+=aliasWeight(entry,a);if(pick<acc)return a;}return aliases[0]||'';
@@ -90,21 +92,34 @@ export function humanizeSpokenEntities(value='',state={},opts={}){
   return{text:out,eventChanges:[...new Set(eventChanges)],personChanges:people.changes,formChanges:staticForms.changes,changed:eventChanges.length>0||people.changes.length>0||staticForms.changes.length>0,profileVersion:trim(profile?.version)||'unknown'};
 }
 
+export function familiarAliasCanonicalCandidates(value=''){
+  const n=normPhrase(value);if(!n)return[];
+  const out=[];for(const entry of arr(profile?.person_aliases)){
+    if(!arr(entry?.aliases).some(a=>normPhrase(aliasText(a))===n))continue;
+    for(const c of arr(entry?.canonical).map(aliasText).filter(Boolean))if(!out.some(x=>normPhrase(x)===normPhrase(c)))out.push(c);
+  }
+  return out;
+}
 export function resolveFamiliarPersonAlias(state={},value=''){
-  const raw=trim(value),n=norm(raw);if(!raw)return{ok:false,ambiguous:false,value:raw,candidates:[]};
-  const entries=arr(profile?.person_aliases).filter(e=>arr(e?.aliases).some(a=>norm(aliasText(a))===n));if(!entries.length)return{ok:false,ambiguous:false,value:raw,candidates:[]};
+  const raw=trim(value),n=normPhrase(raw);if(!raw)return{ok:false,ambiguous:false,value:raw,candidates:[]};
+  const entries=arr(profile?.person_aliases).filter(e=>arr(e?.aliases).some(a=>normPhrase(aliasText(a))===n));if(!entries.length)return{ok:false,ambiguous:false,value:raw,candidates:[]};
   const rows=personRows(state),matches=[];
-  for(const entry of entries)for(const row of rows)if(canonicalEntryMatchesName(entry,row.name)&&!matches.some(x=>x.id===row.id))matches.push({id:row.id,nombre:row.name,score:1,resolution:'familiar_alias',alias:raw});
+  for(const entry of entries){
+    for(const row of rows){
+      if(!canonicalEntryMatchesName(entry,row.name))continue;
+      if(!matches.some(x=>x.id===row.id))matches.push({id:row.id,nombre:row.name,score:1,resolution:'familiar_alias',alias:raw});
+    }
+  }
   if(matches.length===1)return{ok:true,...matches[0],type:'person',candidates:matches};
-  return{ok:false,ambiguous:matches.length>1,value:raw,type:'person',candidates:matches};
+  return{ok:false,ambiguous:matches.length>1,value:raw,type:'person',candidates:matches,canonical_candidates:familiarAliasCanonicalCandidates(raw)};
 }
 export function familiarPersonAliasCandidates(state={},prompt=''){
-  const p=text(prompt),out=[],seen=new Set();
+  const out=[],seen=new Set();
   for(const entry of arr(profile?.person_aliases))for(const alias of arr(entry?.aliases).map(aliasText).filter(Boolean)){
-    const re=new RegExp(`(^|[^\p{L}\p{N}])${esc(alias)}(?=$|[^\p{L}\p{N}])`,'iu');if(!re.test(p))continue;
+    if(!containsPhrase(prompt,alias))continue;
     const r=resolveFamiliarPersonAlias(state,alias);
     const candidates=r.ok?[r]:r.ambiguous?arr(r.candidates):[];
-    for(const c of candidates){const key=`${c.id}|${norm(alias)}`;if(seen.has(key))continue;seen.add(key);out.push({id:c.id,name:c.nombre,score:r.ok?1:0.99,matched:alias,match_kind:r.ok?'exact':'ambiguous_alias',resolution:r.ok?'familiar_alias':'familiar_alias_ambiguous'});}
+    for(const c of candidates){const key=`${c.id}|${normPhrase(alias)}`;if(seen.has(key))continue;seen.add(key);out.push({id:c.id,name:c.nombre,score:r.ok?1:0.99,matched:alias,match_kind:r.ok?'exact':'ambiguous_alias',resolution:r.ok?'familiar_alias':'familiar_alias_ambiguous'});}
   }
   return out;
 }

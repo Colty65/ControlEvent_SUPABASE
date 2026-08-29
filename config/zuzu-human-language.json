@@ -1,5 +1,5 @@
 {
-  "version": "BANK4_18",
+  "version": "BANK4_19",
   "event_series": [
     {
       "prefix": "SySA",
@@ -269,6 +269,16 @@
         "La Celes": 9,
         "Celeste": 1
       }
+    },
+    {
+      "canonical": [
+        "Miguel Ángel",
+        "Miguel Angel"
+      ],
+      "aliases": [
+        "Veinticinco"
+      ],
+      "use_percent": 55
     }
   ],
   "spoken_replacements": [
