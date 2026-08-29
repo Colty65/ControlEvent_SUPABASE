@@ -28,5 +28,5 @@ t('FAST escanea físicamente todas las filas operativas',itv.includes('all-recor
 t('FAST recorre todas las tiendas',itv.includes("shuffled(arr(state?.tiendas).filter(s=>trim(s?.id)&&trim(s?.nombre)),seed,'fast-stores')"));
 t('FAST recorre participación de todas las personas',itv.includes("shuffled(people,seed,'fast-participation-people')"));
 t('FULL-CERT admite hasta 100 turnos',itv.includes('maxTurns=100')&&itv.includes('buildFullCertScenarios(state,100,seed)'));
-t('cache bust Z1 humanidad aplicado',index.includes('BANK415-Z1H-VOICE-V47'));
+t('cache bust Z1 humanidad aplicado',index.includes('BANK415-Z1H-VOICE-V47')||index.includes('BANK417-Z1H-VOICE-V49')||index.includes('BANK418-Z1H-VOICE-V51'));
 console.log(`Z1 HUMANIDAD/CONTINUIDAD · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

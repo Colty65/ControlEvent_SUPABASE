@@ -1,0 +1,21 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const src=fs.readFileSync(new URL('../services/event-ai.service.js',`file://${__filename}`).pathname,'utf8');
+const voice=fs.readFileSync(new URL('../public/app/features/v22-voz3-zuzu.js',`file://${__filename}`).pathname,'utf8');
+const index=fs.readFileSync(new URL('../public/index.html',`file://${__filename}`).pathname,'utf8');
+let ok=0;function check(name,fn){try{fn();console.log('OK · '+name);ok++;}catch(e){console.error('KO · '+name+' · '+e.message);process.exitCode=1;}}
+check('prompt compacto distingue cifras y euros',()=>assert(src.includes('Una cifra NO es dinero por ser una cifra')));
+check('prompt prohíbe monetizar años',()=>assert(src.includes('No conviertas 2026 en «dos mil veintiséis euros»')));
+check('oráculo de unidades está en salida final',()=>assert(src.includes('BANK4_16 · ORÁCULO DE UNIDADES DE VOZ')));
+check('se conserva spoken raw para auditoría',()=>assert(src.includes('gemini_spoken_answer_raw:rawFinal.spoken')));
+check('TTS usa pantalla como fuente semántica única',()=>assert(voice.includes('TTS usa answer de pantalla como fuente semántica única')));
+check('build de voz BANK4_16',()=>assert(voice.includes("BANK4_16-Z1H-VOICE-V48")||voice.includes("BANK4_17-Z1H-VOICE-V49")||voice.includes("BANK4_18-Z1H-VOICE-V51")));
+check('cache bust BANK416',()=>assert(index.includes('BANK416-Z1H-VOICE-V48')||index.includes('BANK417-Z1H-VOICE-V49')||index.includes('BANK418-Z1H-VOICE-V51')));
+const a=src.indexOf('function v416ParseEuroNumber'),b=src.indexOf('function v73RawFinalParse');assert(a>0&&b>a);
+const code=src.slice(a,b)+'\nthis.guard=v416VoiceUnitOracle;';
+const ctx={trim:v=>String(v??'').trim(),text:v=>String(v??''),arr:v=>Array.isArray(v)?v:[],console};vm.createContext(ctx);vm.runInContext(code,ctx);
+const state={eventos:[{titulo:'FUNCION 2026'},{titulo:'Cuotas y gastos corrientes 2026'}]};
+check('año convertido a euro se restaura en nombre canónico',()=>{const r=ctx.guard('Hay 2 eventos: FUNCION 2026.','Hay 2 euros: FUNCION 2.026,00 €.',state);assert.strictEqual(r.spoken,'Hay 2 eventos: FUNCION 2026.');assert(r.guarded);});
+check('importe real en euros se conserva',()=>{const r=ctx.guard('Pocholo tiene 15,00 € en FUNCION 2026.','Pocholo tiene 15 euros en FUNCION 2026.',state);assert(!r.reason.includes('monetizó cifras'));});
+check('euro extra con dinero real fuerza voz segura',()=>{const r=ctx.guard('Hay 2 eventos y 15,00 € de ingreso.','Hay 2 euros y 15 euros de ingreso.',state);assert.strictEqual(r.spoken,'Hay 2 eventos y 15,00 € de ingreso.');});
+console.log(`BANK4_16 VOICE UNIT ORACLE: ${ok}/10 OK`);
+if(process.exitCode)process.exit(process.exitCode);

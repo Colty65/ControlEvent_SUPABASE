@@ -9,7 +9,7 @@ function arr(v){ return Array.isArray(v)?v:[]; }
 
 const PEOPLE = [
   {
-    id:'colty', name:'Colty', aliases:['Jesús','Jesus','Colty'], age:61,
+    id:'colty', name:'Colty', aliases:['Jesús','Jesus','Jesús Álvarez Seguido','Jesus Alvarez Seguido','Colty'], age:61,
     relations:['marido de Esther','primo hermano de Carmelo y Javier','padre de dos hijas y un hijo con Esther'],
     roles:['creador de ControlEvent','CEO actual de la Peña El Arrastre'],
     background:['40 años en informática: programador, analista orgánico, analista funcional, jefe de proyectos y PMO'],
@@ -17,7 +17,7 @@ const PEOPLE = [
     humor:['su nombre de pila es Jesús']
   },
   {
-    id:'esther', name:'Esther', aliases:['Esther'], age:57,
+    id:'esther', name:'Esther', aliases:['Esther','La Estercita'], age:57,
     relations:['esposa de Colty','hermana de Juan Carlos García','madre de dos hijas y un hijo con Colty'],
     roles:[], background:['usuaria final de Facebook, Instagram y TikTok; no es tecnológica'],
     traits:['muy abierta con la gente'], humor:['bromea con que ControlEvent no se acaba nunca']
@@ -42,7 +42,7 @@ const PEOPLE = [
     traits:['prudente y poco concluyente al decidir','buen abuelo'], humor:['nombre de guerra: Car','suele decir: Bueno, ya si eso lo vemos']
   },
   {
-    id:'lucia', name:'Lucía', aliases:['Lucía','Lucia'], age:60,
+    id:'lucia', name:'Lucía', aliases:['Lucía','Lucia','La Luci'], age:60,
     relations:['esposa de Carmelo','madre de un hijo de otro matrimonio y de una hija con Carmelo','abuela de tres nietas y un nieto'],
     background:['procedente de un pueblo de Guadalajara'], traits:['muy familiar','superabuela']
   },
@@ -67,7 +67,7 @@ const PEOPLE = [
     sensitive:[{kind:'personality',fact:'puede reaccionar con fuerza en discusiones',use:'solo para adaptar el tono, nunca para ridiculizarla ni divulgarlo sin motivo'}]
   },
   {
-    id:'gonzalo', name:'Gonzalo', aliases:['Gonzalo'], age:46,
+    id:'gonzalo', name:'Gonzalo', aliases:['Gonzalo','Gonzalito'], age:46,
     relations:['pareja de María José Fuentes'], background:['tratante de cerdos'], traits:['buena gente','de los más jóvenes de la Peña']
   },
   {
@@ -87,23 +87,26 @@ const PEOPLE = [
   },
   { id:'julian', name:'Julian', aliases:['Julian','Julián'], age:67, relations:['marido de Pilar'], background:['jubilado del sector seguros'], traits:[] },
   { id:'pilar', name:'Pilar', aliases:['Pilar'], age:67, relations:['esposa de Julian'], background:['jubilada del sector eléctrico'], traits:[] },
-  { id:'curvas', name:'Curvas', aliases:['Curvas','Paco Curvas','Francisco García Donaire','Francisco Garcia Donaire'], relations:['marido de Angeles','primo hermano de Cito','suegro de Ernesto'], background:['en el Banco figura como Francisco García Donaire; en la Peña es Paco Curvas'], traits:[] },
+  { id:'curvas', name:'Curvas', aliases:['Curvas','Paco','Paco Curvas','Francisco García Donaire','Francisco Garcia Donaire'], relations:['marido de Angeles','primo hermano de Cito','suegro de Ernesto'], background:['en el Banco figura como Francisco García Donaire; en la Peña es Paco Curvas'], traits:[] },
   { id:'angeles', name:'Angeles', aliases:['Angeles','Ángeles'], age:66, relations:['esposa de Curvas','suegra de Ernesto'], background:['jubilada'], traits:[] },
   { id:'emiliano', name:'Emiliano', aliases:['Emiliano'], age:61, relations:['marido de Nines'], background:['pintor de brocha gorda','muy aficionado a la caza'], traits:[] },
   { id:'nines', name:'Nines', aliases:['Nines'], age:61, relations:['esposa de Emiliano'], traits:['muy buena persona'] },
-  { id:'pocholo', name:'Pocholo', aliases:['Pocholo','Manuel Barrios Arrondo'], age:51, relations:['marido de Celes'], roles:['principal donante habitual de la Peña'], background:['apodo por su parecido con Pocholo Martínez-Bordiú'], traits:['muy generoso'], humor:['lo suyo es tuyo'] },
-  { id:'celes', name:'Celes', aliases:['Celes'], age:49, relations:['esposa de Pocholo'], traits:['le gusta ver el frigorífico lleno de cerveza'], humor:['sonríe cuando el frigorífico está bien abastecido'] },
+  { id:'pocholo', name:'Pocholo', aliases:['Pocholo','Manolo','Manuel Barrios Arrondo'], age:51, relations:['marido de Celes'], roles:['principal donante habitual de la Peña'], background:['apodo por su parecido con Pocholo Martínez-Bordiú'], traits:['muy generoso'], humor:['lo suyo es tuyo'] },
+  { id:'celes', name:'Celes', aliases:['Celes','La Celes','Celeste'], age:49, relations:['esposa de Pocholo'], traits:['le gusta ver el frigorífico lleno de cerveza'], humor:['sonríe cuando el frigorífico está bien abastecido'] },
   { id:'javier', name:'Javier', aliases:['Javier','Porreta'], age:59, relations:['primo hermano de Colty y Carmelo'], background:['empleado del Ayuntamiento','está poniendo olivas de regadío'], traits:['siempre dispuesto a ayudar'], humor:['acepta que se dirijan a él como Porreta'] },
   { id:'vicente', name:'Vicente', aliases:['Vicente'], background:['persona de gran corpulencia y fuerza'], traits:['afectuoso con sus amigos','constante con el plan de alimentación y deporte'], sensitive:[{kind:'health',fact:'ha perdido alrededor de 45 kg con alimentación y deporte',use:'solo si se pregunta por su evolución personal o hábitos; no usar en informes generales'}] },
-  { id:'jose-manuel', name:'Jose Manuel', aliases:['Jose Manuel','José Manuel'], age:61, background:['procedente de Vicálvaro','llegó al pueblo con Ernesto'], traits:[] },
+  { id:'jose-manuel', name:'Jose Manuel', aliases:['Jose Manuel','José Manuel','el primo'], age:61, background:['procedente de Vicálvaro','llegó al pueblo con Ernesto'], traits:[] },
   { id:'ernesto', name:'Ernesto', aliases:['Ernesto'], relations:['yerno de Curvas y Angeles'], background:['muy aficionado al ciclismo'], traits:['gran apetito cuando llega a la Peña'], humor:['cuando llega conviene tener comida preparada'] },
   { id:'miguel-angel', name:'Miguel Angel', aliases:['Miguel Angel','Miguel Ángel','Veinticinco'], background:['apodo Veinticinco porque eligió el número 25 en clase'], traits:['muy observador','lo graba y recuerda casi todo'], humor:['parece una cámara de 360 grados'] },
   { id:'pana', name:'Pana', aliases:['Pana','Miguel Angel Villamuelas Pelaez','Miguel Ángel Villamuelas Peláez'], age:61, relations:['marido de Tita'], roles:['trabaja con Tita en MP Printing Area'], traits:['muy cumplido','a veces puñetero'] },
   { id:'tita', name:'Tita', aliases:['Tita','Paula Alvarez','Paula Álvarez'], age:61, relations:['esposa de Pana'], roles:['trabaja con Pana en MP Printing Area'], traits:['muy dicharachera','le encantan las bromas'] },
   { id:'angel-tellez', name:'Angel Téllez', aliases:['Angel Téllez','Ángel Téllez','Angel Tellez'], age:65, relations:['marido de Isabel'], background:['cristalero desde muy joven'], traits:['muy despistado'], humor:['Isabel dice que es Diesel porque tarda en arrancar'] },
   { id:'isabel', name:'Isabel', aliases:['Isabel'], relations:['esposa de Angel Téllez'], background:['muy vinculada a Mora'], traits:['ahora está más tranquila tras la retirada taurina de su hijo'] },
-  { id:'varito', name:'Varito', aliases:['Varito','varito','Eduardo Donaire Gutierrez','Eduardo Donaire Gutiérrez'], age:64, relations:['marido de Juli','hermano de Cito'], roles:['celador'], traits:['muy limpio y ordenado','le gusta guardar sobras en tuppers'], humor:['lleva tuppers al trabajo para dar envidia'] },
-  { id:'juli', name:'Juli', aliases:['Juli'], age:60, relations:['esposa de Varito'], background:['trabajó en el sector de los colirios'], traits:['muy comilona y disfrutona','le gustan los bares'] }
+  { id:'varito', name:'Varito', aliases:['Varito','varito','Eduardo','Eduardo Donaire Gutierrez','Eduardo Donaire Gutiérrez'], age:64, relations:['marido de Juli','hermano de Cito'], roles:['celador'], traits:['muy limpio y ordenado','le gusta guardar sobras en tuppers'], humor:['lleva tuppers al trabajo para dar envidia'] },
+  { id:'juli', name:'Juli', aliases:['Juli','Julita'], age:60, relations:['esposa de Varito'], background:['trabajó en el sector de los colirios'], traits:['muy comilona y disfrutona','le gustan los bares'] },
+  { id:'rafa', name:'Rafa', aliases:['Rafa','Rafita','Pipitilla'], traits:[] },
+  { id:'victor-cuervo', name:'Víctor Cuervo', aliases:['Víctor Cuervo','Victor Cuervo','Cuervito'], traits:[] },
+  { id:'placidin', name:'Placidín', aliases:['Placidín','Placido','Plácido','Placi','el gordo'], traits:[] }
 ];
 
 const ALIAS_INDEX = (()=>{

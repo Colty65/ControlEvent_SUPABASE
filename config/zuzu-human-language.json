@@ -1,0 +1,309 @@
+{
+  "version": "BANK4_18",
+  "event_series": [
+    {
+      "prefix": "SySA",
+      "spoken": "Santiago y Santa Ana",
+      "relative_year": true
+    }
+  ],
+  "person_aliases": [
+    {
+      "canonical": [
+        "Carmelo"
+      ],
+      "aliases": [
+        "Car",
+        "Carmelera"
+      ],
+      "use_percent": 52
+    },
+    {
+      "canonical": [
+        "Pablo"
+      ],
+      "aliases": [
+        "Pablito"
+      ],
+      "use_percent": 55
+    },
+    {
+      "canonical": [
+        "Vicente",
+        "Vivente"
+      ],
+      "aliases": [
+        "Vicentito"
+      ],
+      "use_percent": 55
+    },
+    {
+      "canonical": [
+        "Javier"
+      ],
+      "aliases": [
+        "Porreta"
+      ],
+      "use_percent": 72
+    },
+    {
+      "canonical": [
+        "Juan Carlos García",
+        "Juan Carlos Garcia"
+      ],
+      "aliases": [
+        "García"
+      ],
+      "use_percent": 72
+    },
+    {
+      "canonical": [
+        "Tita"
+      ],
+      "aliases": [
+        "Paulita"
+      ],
+      "use_percent": 62
+    },
+    {
+      "canonical": [
+        "Gema"
+      ],
+      "aliases": [
+        "Gemita"
+      ],
+      "use_percent": 58
+    },
+    {
+      "canonical": [
+        "Cordo"
+      ],
+      "aliases": [
+        "Paco"
+      ],
+      "use_percent": 38
+    },
+    {
+      "canonical": [
+        "Sierra"
+      ],
+      "aliases": [
+        "Sierri"
+      ],
+      "use_percent": 48
+    },
+    {
+      "canonical": [
+        "María José Fuentes",
+        "Maria Jose Fuentes"
+      ],
+      "aliases": [
+        "la Membrillera"
+      ],
+      "use_percent": 72
+    },
+    {
+      "canonical": [
+        "Ángeles",
+        "Angeles"
+      ],
+      "aliases": [
+        "la rubia"
+      ],
+      "use_percent": 60
+    },
+    {
+      "canonical": [
+        "Nines"
+      ],
+      "aliases": [
+        "Angelines"
+      ],
+      "use_percent": 60
+    },
+    {
+      "canonical": [
+        "Lucía",
+        "Lucia"
+      ],
+      "aliases": [
+        "La Luci"
+      ],
+      "use_percent": 58
+    },
+    {
+      "canonical": [
+        "Esther"
+      ],
+      "aliases": [
+        "La Estercita"
+      ],
+      "use_percent": 52
+    },
+    {
+      "canonical": [
+        "Curvas",
+        "Paco Curvas",
+        "Francisco García Donaire",
+        "Francisco Garcia Donaire"
+      ],
+      "aliases": [
+        "Paco"
+      ],
+      "use_percent": 45
+    },
+    {
+      "canonical": [
+        "Gonzalo"
+      ],
+      "aliases": [
+        "Gonzalito"
+      ],
+      "use_percent": 58
+    },
+    {
+      "canonical": [
+        "Jose Manuel",
+        "José Manuel"
+      ],
+      "aliases": [
+        "el primo"
+      ],
+      "use_percent": 55
+    },
+    {
+      "canonical": [
+        "Pocholo",
+        "Manuel Barrios Arrondo"
+      ],
+      "aliases": [
+        "Manolo"
+      ],
+      "use_percent": 42
+    },
+    {
+      "canonical": [
+        "Varito",
+        "Eduardo Donaire Gutierrez",
+        "Eduardo Donaire Gutiérrez"
+      ],
+      "aliases": [
+        "Eduardo"
+      ],
+      "use_percent": 45
+    },
+    {
+      "canonical": [
+        "Juli"
+      ],
+      "aliases": [
+        "Julita"
+      ],
+      "use_percent": 58
+    },
+    {
+      "canonical": [
+        "Colty",
+        "Jesús Álvarez Seguido",
+        "Jesus Alvarez Seguido"
+      ],
+      "aliases": [
+        "Colty"
+      ],
+      "use_percent": 92
+    },
+    {
+      "canonical": [
+        "Rafa",
+        "Rafita"
+      ],
+      "aliases": [
+        "Rafa",
+        "Pipitilla"
+      ],
+      "use_percent": 65,
+      "alias_weights": {
+        "Rafa": 6,
+        "Pipitilla": 4
+      }
+    },
+    {
+      "canonical": [
+        "Víctor Cuervo",
+        "Victor Cuervo"
+      ],
+      "aliases": [
+        "Cuervito"
+      ],
+      "use_percent": 58
+    },
+    {
+      "canonical": [
+        "Placidín",
+        "Placido",
+        "Plácido",
+        "Placido Jimenez",
+        "Plácido Jiménez"
+      ],
+      "aliases": [
+        "Placi",
+        "el gordo"
+      ],
+      "use_percent": 62,
+      "alias_weights": {
+        "Placi": 7,
+        "el gordo": 3
+      }
+    },
+    {
+      "canonical": [
+        "Celes",
+        "Celeste"
+      ],
+      "aliases": [
+        "La Celes",
+        "Celeste"
+      ],
+      "use_percent": 58,
+      "alias_weights": {
+        "La Celes": 9,
+        "Celeste": 1
+      }
+    }
+  ],
+  "spoken_replacements": [
+    {
+      "canonical": [
+        "Hdad. Stmo. Cristo de la Angustias",
+        "Hdad. Stmo. Cristo de las Angustias"
+      ],
+      "spoken": "Hermandad Santísimo Cristo de las Angustias"
+    },
+    {
+      "canonical": [
+        "Hdad.",
+        "Hdad"
+      ],
+      "spoken": "Hermandad"
+    },
+    {
+      "canonical": [
+        "Stmo.",
+        "Stmo"
+      ],
+      "spoken": "Santísimo"
+    },
+    {
+      "canonical": [
+        "VdB"
+      ],
+      "spoken": "Villanueva de Bogas"
+    },
+    {
+      "canonical": [
+        "FdO"
+      ],
+      "spoken": "Fiesta del Olivo"
+    }
+  ]
+}

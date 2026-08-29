@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-BANK4_15-Z1H-VOICE-V47';
+  var BUILD='v4_0_exp-BANK4_18-Z1H-VOICE-V51';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v47', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v47', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v47', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v47', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v47'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v48', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v48', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v48', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v48', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v48'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -353,6 +353,8 @@
   function parseSpokenEuroNumber(raw){var t=clean(raw).replace(/\s/g,'');if(!t)return NaN;var sign=t.charAt(0)==='-'?-1:1;if(sign<0)t=t.slice(1);if(t.indexOf(',')>=0){t=t.replace(/\./g,'').replace(',','.');}else if((t.match(/\./g)||[]).length>1||/^\d{1,3}(?:\.\d{3})+$/.test(t)){t=t.replace(/\./g,'');}var n=Number(t);return Number.isFinite(n)?sign*n:NaN;}
   function spokenEuroInteger(n){n=Math.trunc(Number(n)||0);var neg=n<0,a=Math.abs(n),words=spokenNumberEs(a);if(a===1)words='un';return (neg?'menos ':'')+words+' euro'+(a===1?'':'s');}
   function humanizeSpokenMoney(v){return String(v==null?'':v).replace(/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|euros?\b)/gi,function(_,numtxt){var n=parseSpokenEuroNumber(numtxt);return Number.isFinite(n)?spokenEuroInteger(n):_;});}
+  function voiceExplicitMoneyValues(v){var out=[],re=/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|EUR\b|euros?\b)/gi,m;while((m=re.exec(String(v==null?'':v)))){var n=parseSpokenEuroNumber(m[1]);if(Number.isFinite(n))out.push(Math.trunc(n));}return out;}
+  function safeVoiceAgainstScreen(screen,spoken){var w=String(screen==null?'':screen),s=String(spoken==null?'':spoken);if(w){if(s&&s!==w){try{console.info('[CE VOZ BANK4_16] TTS usa answer de pantalla como fuente semántica única; spoken_answer queda solo para auditoría.');}catch(_){}}return w;}return s;}
   function prepareSpeechText(v){var text=String(v==null?'':v).replace(/[*_`#>|]/g,' ');text=humanizeSpokenMoney(text);text=humanizeSpokenListRhythm(text);text=humanizeSpokenLabels(text);return stripReservedFromSpeech(clean(text));}
   function chunkSpeech(v){var text=prepareSpeechText(v);if(!text)return[];var sentences=text.split(/(?<=[.!?;:])\s+/),out=[],cur='';sentences.forEach(function(s){if((cur+' '+s).trim().length<=170)cur=clean(cur+' '+s);else{if(cur)out.push(cur);cur=s;}});if(cur)out.push(cur);return out.length?out:[text];}
   function stopSpeaking(interrupted){state.speechGeneration++;state.localControlGeneration++;state.localControlSpeaking=false;state.speaking=false;state.currentUtterance=null;state.speechChunks=[];state.speechIndex=0;stopBarge();try{window.speechSynthesis.pause();window.speechSynthesis.cancel();}catch(_){}updateBadge();if(!interrupted&&state.conversationMode&&!state.requestInFlight&&!state.awaitingResponse)setTimeout(startUser,180);}
@@ -419,14 +421,27 @@
   }
   function scheduleEntertainment(delay){clearTimeout(state.entertainmentTimer);state.entertainmentTimer=setTimeout(function(){if(!state.conversationMode||!state.requestInFlight)return;speakEntertainmentPhrase();},Math.max(0,Number(delay)||0));}
   function entertainmentEnded(){state.entertainmentSpeaking=false;state.entertainmentUtterance=null;state.entertainmentFinishedAt=Date.now();}
+  function entertainmentSpeechParts(phrase){
+    var p=String(phrase||'').trim();if(!p)return[];
+    // Los puntos largos son pausas visuales, no contenido. Separar por cláusulas evita que
+    // algunos SpeechSynthesis corten la frase en el primer bloque de puntuación repetida.
+    return p.replace(/…+/g,'...').split(/(?:\.{3,}|[;]+)/).map(function(x){return clean(x).replace(/^[,.:!?\s]+|[,.:!?\s]+$/g,'');}).filter(Boolean);
+  }
   function speakEntertainmentPhrase(){
     if(!state.conversationMode||!state.requestInFlight||!supportsSpeech()||state.entertainmentSpeaking||state.entertainmentCount>=state.entertainmentMaxPerRequest)return;
-    var phrase=renderEntertainmentPhrase(contextualEntertainmentPhrase(state.requestPrompt,state.entertainmentCount));state.entertainmentCount++;setStatus(phrase,'ok');
-    try{var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=Math.min(1.06,speechRate()+0.08);u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;state.entertainmentSpeaking=true;state.entertainmentUtterance=u;
-      u.onend=function(){entertainmentEnded();};
-      u.onerror=function(){entertainmentEnded();};
-      window.speechSynthesis.speak(u);
-    }catch(_){entertainmentEnded();}
+    var phrase=renderEntertainmentPhrase(contextualEntertainmentPhrase(state.requestPrompt,state.entertainmentCount)),parts=entertainmentSpeechParts(phrase);state.entertainmentCount++;setStatus(phrase,'ok');
+    if(!parts.length){entertainmentEnded();return;}
+    state.entertainmentSpeaking=true;var pos=0,v=chooseVoice();
+    function next(){
+      if(!state.entertainmentSpeaking)return;
+      if(pos>=parts.length){entertainmentEnded();return;}
+      try{var u=new SpeechSynthesisUtterance(parts[pos++]);u.lang='es-ES';u.rate=Math.min(1.02,speechRate()+0.04);u.pitch=0.82;u.volume=1;if(v)u.voice=v;state.entertainmentUtterance=u;
+        u.onend=function(){state.entertainmentUtterance=null;setTimeout(next,parts.length>1?170:30);};
+        u.onerror=function(){state.entertainmentUtterance=null;setTimeout(next,80);};
+        window.speechSynthesis.speak(u);
+      }catch(_){setTimeout(next,80);}
+    }
+    next();
   }
   function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;state.entertainmentPersonalize=false;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(state.entertainmentInitialDelayMs||3300);}
   function queueAnswerAfterEntertainment(answer,autoRead){clearTimeout(state.pendingAnswerTimer);state.pendingAnswerTimer=null;var hadEntertainment=state.entertainmentSpeaking||!!state.entertainmentUtterance||(state.entertainmentFinishedAt>0&&Date.now()-state.entertainmentFinishedAt<600);function deliver(){if(!state.conversationMode)return;if(state.entertainmentSpeaking){state.pendingAnswerTimer=setTimeout(deliver,60);return;}var wait=hadEntertainment?Math.max(0,500-(Date.now()-(state.entertainmentFinishedAt||0))):0;state.pendingAnswerTimer=setTimeout(function(){state.pendingAnswerTimer=null;if(!state.conversationMode)return;if(autoRead)speakChunks(answer);else startUser();},wait);}deliver();}
@@ -472,7 +487,7 @@
 
   document.addEventListener('ce:zuzu-request-started',function(ev){if(state.manualDraftOwned)releaseManualDraft(true);if(!state.conversationMode)return;clearReplyWindow();pauseCloudListening();state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=clean(ev&&ev.detail&&ev.detail.prompt||state.requestPrompt);stopRecognition();clearTurnTimer();setVoicePhase('PROCESSING','petición CE iniciada');setStatus('Consultando ControlEvent…','ok');startEntertainment();});
   document.addEventListener('ce:zuzu-request-error',function(){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(true);setVoicePhase('RECOVERY','error de petición CE');setStatus('No se pudo completar. Te escucho.','err');setTimeout(startUser,180);});
-  document.addEventListener('ce:zuzu-response-rendered',function(ev){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(false);var raw=clean(ev&&ev.detail&&(ev.detail.spokenAnswer||ev.detail.answer));var answer=stripVoiceAnswerLead(raw);window.__ceZuzuLastSpokenAnswer=answer||raw;var auto=$('ceVoz3AutoRead'),autoRead=!auto||auto.checked!==false;if(!answer){queueAnswerAfterEntertainment('',false);return;}queueAnswerAfterEntertainment(answer,autoRead);});
+  document.addEventListener('ce:zuzu-response-rendered',function(ev){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(false);var screen=clean(ev&&ev.detail&&ev.detail.answer),spoken=clean(ev&&ev.detail&&ev.detail.spokenAnswer),raw=clean(safeVoiceAgainstScreen(screen,spoken||screen));var answer=stripVoiceAnswerLead(raw);window.__ceZuzuLastSpokenAnswer=answer||raw;var auto=$('ceVoz3AutoRead'),autoRead=!auto||auto.checked!==false;if(!answer){queueAnswerAfterEntertainment('',false);return;}queueAnswerAfterEntertainment(answer,autoRead);});
   window.addEventListener('controlevent:zuzu-opened',function(){state.overlayMissingSince=0;setTimeout(function(){injectPanel();installManualDraftGuard();},30);});
   window.addEventListener('controlevent:zuzu-closed',function(ev){forceReturnToAmbient(!!(ev&&ev.detail&&ev.detail.fromGesture),'evento controlevent:zuzu-closed');});
   document.addEventListener('click',function(ev){var t=ev.target;if(t&&t.closest&&t.closest('#ceAiDownloadResult')&&state.conversationMode)stopEntertainment(true);},true);

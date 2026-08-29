@@ -9,6 +9,7 @@ import { buildRelevantPeopleContext } from './zuzu-people-context.service.js';
 import { listAllHitosState } from './hitos.service.js';
 import { exportBankData } from './bank-reconciliation.service.js';
 import { ensureZuzuConversation, getZuzuConversationSession, getZuzuTurnBundle, appendZuzuTurn, searchZuzuHistoryCandidates, listZuzuMemoryEpisodes, searchZuzuProactiveMemory, searchZuzuSocialMemoryHints, readZuzuMemoryEpisode, isRecallPrompt, newDatasetId, newViewId, turnIdFor } from './zuzu-conversation-ledger.service.js';
+import { humanizeSpokenEntities, resolveFamiliarPersonAlias, familiarPersonAliasCandidates } from './zuzu-human-language.service.js';
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -13203,8 +13204,9 @@ function v74TypedCandidateEvidence(list=[]){
   return{exact_mentions:exact,strong_mentions:strong,fuzzy_mentions:fuzzy,best_score:rows.reduce((m,x)=>Math.max(m,Number(x?.score)||0),0),candidate_count:rows.length};
 }
 function v74EntityCandidatePacket(state={},prompt=''){
+  const aliasPeople=familiarPersonAliasCandidates(state,prompt),personCandidates=[...aliasPeople,...v70CandidateRows(state,'person',prompt,12)].filter((x,i,a)=>a.findIndex(y=>trim(y?.id)===trim(x?.id)&&norm(y?.matched)===norm(x?.matched))===i);
   const typed={
-    PERSON:v74TypedCandidateList(v70CandidateRows(state,'person',prompt,12),3),
+    PERSON:v74TypedCandidateList(personCandidates,3),
     EVENT:v74TypedCandidateList(v70CandidateRows(state,'event',prompt,12),3),
     STORE:v74TypedCandidateList(v70CandidateRows(state,'store',prompt,10),3),
     PRODUCT:v74TypedCandidateList(v70CandidateRows(state,'product',prompt,16),3)
@@ -15448,6 +15450,12 @@ VOZ HUMANA
 - Si el usuario da una etiqueta/versión de prueba, no lo saludes como si hubiera dicho hola: basta una reacción natural y breve al marcador.
 - spoken_answer debe sonar hablado: menos signos, menos listas, menos tecnicismos, respirable. written_answer puede ser algo más completo. Cuando el usuario pide una lista completa, la voz también puede ser larga si hace falta.
 
+CIFRAS Y UNIDADES
+- Una cifra NO es dinero por ser una cifra. Solo es monetaria cuando RESULTADO_CE/facts/dataset la identifica como importe, precio, ingreso, gasto, compra/donación valorada, saldo, coste, total monetario o metric_role=amount.
+- Años, fechas, recuentos, personas, eventos, unidades físicas, números de cuota, tickets, porcentajes y fragmentos numéricos de nombres canónicos NO son euros. Copia los nombres de entidades tal como vienen; por ejemplo, el año dentro de un nombre de evento sigue siendo un año.
+- En spoken_answer está PROHIBIDO añadir «euro/euros» a una cifra si la misma magnitud no es monetaria en los hechos canónicos. No conviertas 2026 en «dos mil veintiséis euros», ni 2 eventos en «dos euros».
+- Cuando sí sea dinero, written_answer conserva el importe exacto con € y spoken_answer puede decir el importe de forma natural en euros.
+
 FIDELIDAD
 - Solo usa resultado_ce/authoritative_payload/facts/dataset y el contexto conversacional permitido. No inventes cifras ni hechos para sonar humano.
 - rows_sample puede estar truncada. Totales/recuentos salen de facts/column_stats, nunca de una muestra.
@@ -15537,6 +15545,45 @@ function v73RawFinalExecution(execution={}){
   }
   if(arr(e?.social_memory_hints).length)out.social_memory_hints=arr(e.social_memory_hints).slice(0,2).map(h=>({conversation_id:trim(h?.conversation_id),created_at:trim(h?.created_at),title:trim(h?.title).slice(0,120),summary:trim(h?.summary).slice(0,420),entities:arr(h?.entities).slice(0,6)}));
   return out;
+}
+function v416ParseEuroNumber(raw){
+  let t=trim(raw).replace(/\s/g,'');if(!t)return NaN;let sign=t.startsWith('-')?-1:1;if(sign<0)t=t.slice(1);
+  if(t.includes(','))t=t.replace(/\./g,'').replace(',','.');else if((t.match(/\./g)||[]).length>1||/^\d{1,3}(?:\.\d{3})+$/.test(t))t=t.replace(/\./g,'');
+  const n=Number(t);return Number.isFinite(n)?sign*n:NaN;
+}
+function v416ExplicitMoneyValues(value=''){
+  const out=[],re=/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|EUR\b|euros?\b)/gi;let m;
+  while((m=re.exec(text(value)))){const n=v416ParseEuroNumber(m[1]);if(Number.isFinite(n))out.push(Math.trunc(n));}
+  return out;
+}
+function v416SpokenEuroClaims(value=''){
+  const out=[],re=/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|EUR\b|euros?\b)/gi;let m;
+  while((m=re.exec(text(value)))){const n=v416ParseEuroNumber(m[1]);if(Number.isFinite(n))out.push({raw:m[0],value:Math.trunc(n)});}
+  return out;
+}
+function v416RepairCanonicalEventYears(value='',state={}){
+  let out=text(value);const names=arr(state?.eventos).map(e=>trim(e?.titulo||e?.nombre)).filter(Boolean);
+  for(const name of names){
+    const years=[...name.matchAll(/\b(?:19|20)\d{2}\b/g)].map(m=>m[0]);if(!years.length)continue;
+    let pattern=name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    for(const year of years){
+      const y=Number(year),th=Math.floor(y/1000),rest=String(y%1000).padStart(3,'0');
+      const variants=`(?:${year}|${th}[.\\s]?${rest}(?:,00)?(?:\\s*(?:€|EUR|euros?))?)`;
+      pattern=pattern.replace(new RegExp(year,'g'),variants);
+    }
+    try{out=out.replace(new RegExp(pattern,'gi'),name);}catch(_){}
+  }
+  return out;
+}
+function v416VoiceUnitOracle(written='',spoken='',state={}){
+  const repairedWritten=v416RepairCanonicalEventYears(written,state),repairedSpoken=v416RepairCanonicalEventYears(spoken,state);
+  const allowed=v416ExplicitMoneyValues(repairedWritten),claims=v416SpokenEuroClaims(repairedSpoken),allowedBag=new Map();
+  for(const n of allowed)allowedBag.set(n,(allowedBag.get(n)||0)+1);
+  const unsupported=[];
+  for(const c of claims){const left=allowedBag.get(c.value)||0;if(left>0)allowedBag.set(c.value,left-1);else unsupported.push(c);}
+  const euroWords=(repairedSpoken.match(/\beuros?\b|€/gi)||[]).length,writtenMoneyMarkers=(repairedWritten.match(/(?:€|\bEUR\b|\beuros?\b)/gi)||[]).length;
+  const suspicious=unsupported.length>0||euroWords>writtenMoneyMarkers;
+  return{written:repairedWritten,spoken:suspicious?repairedWritten:repairedSpoken,guarded:suspicious||repairedWritten!==written||repairedSpoken!==spoken,reason:suspicious?`voz monetizó cifras no monetarias: ${unsupported.map(x=>x.raw).slice(0,6).join(' / ')||`${euroWords} marcas de euro frente a ${writtenMoneyMarkers} monetarias en pantalla`}`:(repairedWritten!==written||repairedSpoken!==spoken?'se restauraron años dentro de nombres canónicos':'')};
 }
 function v73RawFinalParse(payload){const calls=v261FunctionCalls(payload).filter(c=>trim(c?.name)==='zuzu_final_presentation'),tool=calls.length?calls[calls.length-1]?.arguments:null,envelope=v261OutputText(payload),body=text(envelope).trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();let parsed=tool&&typeof tool==='object'?tool:{};if(!Object.keys(parsed).length&&body){try{parsed=parsePlanJsonLenientHf37(body).parsed||{};}catch(_){}}if(!trim(parsed?.written_answer)&&body){const wm=body.match(/(?:^|\n)\s*written_answer\s*:\s*([\s\S]*?)(?=\n\s*spoken_answer\s*:|$)/i),sm=body.match(/(?:^|\n)\s*spoken_answer\s*:\s*([\s\S]*?)$/i);if(wm)parsed.written_answer=trim(wm[1]);if(sm)parsed.spoken_answer=trim(sm[1]);}const written=typeof parsed?.written_answer==='string'?parsed.written_answer:(typeof parsed?.answer==='string'?parsed.answer:''),spoken=typeof parsed?.spoken_answer==='string'?parsed.spoken_answer:written,pp=parsed?.presentation||{},ct=['bar','line','pie','donut','horizontalBar'].includes(trim(pp.chart_type))?trim(pp.chart_type):'';return{title:trim(parsed?.title)||'Zuzu',written:trim(written)||body,spoken:trim(spoken)||trim(written)||body,presentation:{table:pp.table===true,chart:pp.chart===true,chart_type:pp.chart===true?(ct||'bar'):''},envelope:tool?JSON.stringify(tool):envelope};}
 function v73SpokenCoverageNeedsRepair(final={},plan={}){
@@ -15733,7 +15780,7 @@ function v73ExpandEventSeries(state={},series=''){
 }
 function v73CertifyTypedEntities(query={},state={},flowTrace=[]){
   const q=query,warnings=[];
-  const resolveOne=(type,value,label)=>{const raw=trim(value);if(!raw)return{ok:true,value:''};const direct=v79DirectTypedEntity(state,type,raw),r=direct||(type==='person'?v26ResolvePersonFamily(state,raw):semanticResolveEntity(state,type,raw));if(!r.ok)return{ok:false,error:r.ambiguous?`${label} «${raw}» es ambiguo: ${arr(r.candidates).map(x=>trim(x?.nombre)).filter(Boolean).join(' / ')}.`:`No puedo resolver ${label.toLowerCase()} «${raw}» con suficiente seguridad.`};if(norm(r.nombre)!==norm(raw)){zuzuTracePush(flowTrace,'v4_0_exp · Ledger · ENTIDAD TIPADA','OK',`${label}: «${raw}» → «${r.nombre}» (${r.resolution==='canonical_id'?'ID canónico':r.score>=0.995?'exacta':'variante/fuzzy'}).`);}return{ok:true,value:r.nombre};};
+  const resolveOne=(type,value,label)=>{const raw=trim(value);if(!raw)return{ok:true,value:''};const familiar=type==='person'?resolveFamiliarPersonAlias(state,raw):null,direct=familiar?.ok?familiar:v79DirectTypedEntity(state,type,raw),r=direct||(type==='person'?v26ResolvePersonFamily(state,raw):semanticResolveEntity(state,type,raw));if(!r.ok)return{ok:false,error:r.ambiguous?`${label} «${raw}» es ambiguo: ${arr(r.candidates).map(x=>trim(x?.nombre)).filter(Boolean).join(' / ')}.`:`No puedo resolver ${label.toLowerCase()} «${raw}» con suficiente seguridad.`};if(norm(r.nombre)!==norm(raw)){zuzuTracePush(flowTrace,'v4_0_exp · Ledger · ENTIDAD TIPADA','OK',`${label}: «${raw}» → «${r.nombre}» (${r.resolution==='canonical_id'?'ID canónico':r.score>=0.995?'exacta':'variante/fuzzy'}).`);}return{ok:true,value:r.nombre};};
   const singles=[['person','person','Persona'],['responsible','person','Responsable'],['donor','person','Donante'],['store','store','Tienda']];
   for(const [field,type,label] of singles){if(!trim(q?.[field]))continue;const r=resolveOne(type,q[field],label);if(!r.ok)return{query:q,warnings,error:r.error};q[field]=r.value;}
   const plurals=[['people','person','Persona'],['responsibles','person','Responsable'],['donors','person','Donante'],['stores','store','Tienda']];
@@ -15745,7 +15792,7 @@ function v73CertifyTypedEntities(query={},state={},flowTrace=[]){
 function v73CertifyContext(context={},state={},flowTrace=[]){
   const c=JSON.parse(JSON.stringify(context||{}));if(c.clear_all===true)return{context:{clear_all:true},error:''};const type=trim(c.type),values=arr(c.values).map(trim).filter(Boolean);if(!type||!values.length)return{context:c,error:''};
   const semanticType=['person','donor','responsible'].includes(type)?'person':type,canonical=[];
-  for(const raw of values){let r;if(semanticType==='event')r=v73CanonicalEventName(state,raw);else r=v79DirectTypedEntity(state,semanticType,raw)||(semanticType==='person'?v26ResolvePersonFamily(state,raw):semanticResolveEntity(state,semanticType,raw));
+  for(const raw of values){let r;if(semanticType==='event')r=v73CanonicalEventName(state,raw);else{const familiar=semanticType==='person'?resolveFamiliarPersonAlias(state,raw):null;r=(familiar?.ok?familiar:null)||v79DirectTypedEntity(state,semanticType,raw)||(semanticType==='person'?v26ResolvePersonFamily(state,raw):semanticResolveEntity(state,semanticType,raw));}
     if(r?.ambiguous)return{context:c,error:`${type} «${raw}» es ambiguo dentro del tipo ${semanticType}: ${arr(r?.candidates).map(x=>trim(x?.nombre||x)).filter(Boolean).join(' / ')}.`};
     const name=trim(r?.name||r?.nombre);if(!r?.ok||!name)return{context:c,error:`No puedo certificar ${type} «${raw}»; no guardo IDs o nombres no canónicos en el contexto.`};
     canonical.push(name);if(norm(name)!==norm(raw))zuzuTracePush(flowTrace,'v4_0_exp · BANK4_10 · CONTEXTO TIPADO','OK',`${type}: «${raw}» → «${name}»${r?.resolution==='canonical_id_prefix_recovery'?' (ID estructural recuperado)':''}.`);
@@ -16554,9 +16601,11 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(answer).length} caracteres · voz=${text(spokenAnswer).length} caracteres · presentación local autoritativa.`);
   }else try{
     const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation,audience:{usuario:profile.identificacion||display,nombre:profile.nombre||display,nivel:profile.nivel},state,selectedEventId,authoritativePayload:answerPayload,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone}});
-    title=rawFinal.title||title;answer=rawFinal.written;spokenAnswer=rawFinal.spoken;finalPresentation=rawFinal.presentation||{};
-    execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:rawFinal.written,gemini_spoken_answer:rawFinal.spoken,gemini_presentation:finalPresentation,response_mode:'gemini_dual_presentation'};
-    zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(rawFinal.written).length} caracteres · voz=${text(rawFinal.spoken).length} caracteres · tabla=${finalPresentation.table?'sí':'no'} · gráfica=${finalPresentation.chart?'sí':'no'}. CE no reescribe ninguna de las dos redacciones.`);
+    title=rawFinal.title||title;const unitGuard=v416VoiceUnitOracle(rawFinal.written,rawFinal.spoken,state),humanSpeech=humanizeSpokenEntities(unitGuard.spoken,state,{currentDate:clientLocalDateTime||clientNowIso,seed:`${conversation.conversationId}|${arr(session?.recentTurns).length+1}`});answer=unitGuard.written;spokenAnswer=humanSpeech.text;finalPresentation=rawFinal.presentation||{};
+    execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:answer,gemini_spoken_answer:spokenAnswer,gemini_spoken_answer_raw:rawFinal.spoken,gemini_presentation:finalPresentation,response_mode:humanSpeech.changed?'gemini_dual_presentation_human_speech_lexicon':unitGuard.guarded?'gemini_dual_presentation_voice_unit_guard':'gemini_dual_presentation'};
+    if(unitGuard.guarded)zuzuTracePush(flowTrace,'v4_0_exp · BANK4_16 · ORÁCULO DE UNIDADES DE VOZ','WARN',`${unitGuard.reason}. La voz usa una redacción segura derivada de la pantalla cuando detecta euros añadidos a cifras no monetarias.`);
+    if(humanSpeech.changed)zuzuTracePush(flowTrace,'v4_0_exp · BANK4_18 · LENGUAJE ORAL HUMANO','OK',`Perfil=${humanSpeech.profileVersion} · eventos=${humanSpeech.eventChanges.slice(0,6).join(' / ')||'—'} · personas=${humanSpeech.personChanges.slice(0,8).join(' / ')||'—'} · formas=${humanSpeech.formChanges?.slice(0,6).join(' / ')||'—'}. La pantalla conserva nombres canónicos; solo la voz usa forma social/humana.`);
+    zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(answer).length} caracteres · voz=${text(spokenAnswer).length} caracteres · tabla=${finalPresentation.table?'sí':'no'} · gráfica=${finalPresentation.chart?'sí':'no'}. La pantalla conserva nombres canónicos y la voz pasa oráculo de unidades + humanización social.`);
   }catch(finalError){
     status=status==='KO'?'KO':'WARN';
     const err=cleanGeminiError(finalError),fallback=v26FormatNarrativeMoney(trim(answer)||trim(answerPayload?.detail)||trim(answerPayload?.summary),[]);
