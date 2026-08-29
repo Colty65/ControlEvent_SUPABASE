@@ -14340,13 +14340,13 @@ function v73NormalizePlan(raw={}){
   }else if(action==='reference'){
     const r=raw?.reference&&typeof raw.reference==='object'?raw.reference:{},changes=[];
     for(const x of arr(r.changes).slice(0,10)){const type=trim(x?.type);if(!type)continue;const ch={type};if(type==='replace_scope'&&x?.scope)ch.scope=v73NormalizeScope(x.scope);
-    else if(type==='set_fields'){const fields=arr(x?.fields).map(trim).filter(Boolean).slice(0,24);if(fields.length)ch.fields=fields;}else if(['add_field','remove_field'].includes(type)&&trim(x?.field))ch.field=trim(x.field);changes.push(ch);}
+    else if(type==='set_fields'){const fields=arr(x?.fields).map(trim).filter(Boolean).slice(0,24);if(fields.length)ch.fields=fields;}else if(['add_field','remove_field'].includes(type)&&trim(x?.field))ch.field=trim(x.field);else if(type==='memory_literal'&&['question','answer','both'].includes(trim(x?.field)))ch.field=trim(x.field);changes.push(ch);}
     const rawTarget=r?.target_ref;let targetRef='';
     if(typeof rawTarget==='string'||typeof rawTarget==='number')targetRef=trim(rawTarget);
     else if(rawTarget&&typeof rawTarget==='object')targetRef=trim(rawTarget.target_ref||rawTarget.ref||rawTarget.turn_id||rawTarget.turnId||rawTarget.id||rawTarget.pointer);
-    out.reference={target_ref:targetRef,action:['restore_snapshot','reexecute_plan','reexecute_episode','recall_turn','recall_episode','resume_episode'].includes(trim(r.action))?trim(r.action):''};if(changes.length)out.reference.changes=changes;
+    const ra=trim(r.action),raAliases={recalled_episode:'recall_episode',remember_episode:'recall_episode',remembered_episode:'recall_episode',recall:'recall_episode',recalled_turn:'recall_turn',remember_turn:'recall_turn',resume:'resume_episode',reexecute:'reexecute_plan'};const canonicalAction=raAliases[ra]||ra;out.reference={target_ref:targetRef,action:['restore_snapshot','reexecute_plan','reexecute_episode','recall_turn','recall_episode','resume_episode'].includes(canonicalAction)?canonicalAction:''};if(changes.length)out.reference.changes=changes;if(r?.full_transcript===true)out.reference.full_transcript=true;
   }else if(action==='conversation'){
-    const c=raw?.conversation&&typeof raw.conversation==='object'?raw.conversation:{},kind=['general','greeting','farewell','feedback','correction','system_complaint','current_context','conversation_summary','incoherent_input','incoherent_progress','irrelevant_input','memory_index'].includes(trim(c?.kind))?trim(c.kind):'general';out.conversation={kind};if(trim(c?.note))out.conversation.note=trim(c.note).slice(0,420);if(kind==='memory_index'&&['oldest','newest'].includes(trim(c?.memory_order)))out.conversation.memory_order=trim(c.memory_order);
+    const c=raw?.conversation&&typeof raw.conversation==='object'?raw.conversation:{},kind=['general','greeting','farewell','feedback','correction','system_complaint','current_context','conversation_summary','incoherent_input','incoherent_progress','irrelevant_input','memory_index'].includes(trim(c?.kind))?trim(c.kind):'general';out.conversation={kind};if(trim(c?.note))out.conversation.note=trim(c.note).slice(0,420);if(kind==='memory_index'&&['oldest','newest'].includes(trim(c?.memory_order)))out.conversation.memory_order=trim(c.memory_order);if(kind==='memory_index'&&['overview','list'].includes(trim(c?.memory_mode)))out.conversation.memory_mode=trim(c.memory_mode);
   }else if(action==='clarify'){out.clarify={question:trim(raw?.clarify?.question)||'¿Me lo puedes concretar un poco?'};const refs=arr(raw?.clarify?.candidate_refs).map(trim).filter(Boolean).slice(0,8);if(refs.length)out.clarify.candidate_refs=refs;const opts=arr(raw?.clarify?.options).map(trim).filter(Boolean).slice(0,8);if(opts.length)out.clarify.options=opts;}
   return out;
 }
@@ -15314,6 +15314,58 @@ function v411MemoryOrdinalCandidate(prompt='',historyCandidates=[]){
 function v411LocalCompiledReference(targetRef='',action='recall_episode',model=''){
   const raw={action:'reference',reference:{target_ref:trim(targetRef),action:trim(action)||'recall_episode'}};return{raw,plan:v73NormalizePlan(raw),model:trim(model),command:'ce_reference',local_memory_compile:true};
 }
+function v422MemoryContextIsAlive(session={}){
+  if(v76MemoryFocus(session)||v77MemoryAnchor(session))return true;
+  return arr(session?.recentTurns).slice(-4).some(t=>trim(t?.normalizedPlan?.conversation?.kind)==='memory_index'||t?.execution?.memory_index===true);
+}
+function v422MemoryOverviewIntent(prompt=''){
+  const p=norm(prompt);if(!p)return false;
+  if(/\b(?:tabla|lista|listado|orden|cronolog|primera|segunda|tercera|ultima|penultima)\b/.test(p))return false;
+  return /\b(?:que|qué)\s+(?:recuerdas|recuerda|tienes\s+guardado).{0,80}(?:hablado|conversado|charlado|conmigo|nosotros)|\bdime\s+(?:que|qué)\s+recuerdas\b|\bde\s+que\s+(?:hemos|habiamos|habíamos)\s+hablado\b/.test(p);
+}
+function v422MemoryIndexListIntent(prompt=''){
+  const p=norm(prompt),memory=/\b(?:recuerdos?|conversaciones?|charlas?|episodios?|historial)\b/.test(p),list=/\b(?:tabla|lista|listado|todos?|todas?|orden|cronolog|antigu|modern|reciente|historial)\b/.test(p);
+  return memory&&list&&!v411MemoryOrdinalIntent(prompt);
+}
+function v422OrdinalFromMemoryContext(prompt='',session={}){
+  let intent=v411MemoryOrdinalIntent(prompt);if(intent)return intent;if(!v422MemoryContextIsAlive(session))return null;
+  const p=norm(prompt).replace(/[!?.,;:]+/g,' ').replace(/\s+/g,' ').trim();
+  const m=p.match(/^(?:vuelve|volvamos|regresa|regresemos|vete|vamos)\s+(?:a\s+)?(?:la\s+|al\s+)?(primera|primer|primero|segunda|segundo|tercera|tercero|cuarta|cuarto|quinta|quinto|sexta|sexto|septima|septimo|ultima|ultimo|penultima|penultimo)$/);
+  if(!m)return null;const w=m[1];if(/^penult/.test(w))return{order:'newest',index:2,label:'penúltima'};if(/^ultim/.test(w))return{order:'newest',index:1,label:'última'};
+  const order=['primer','segund','tercer','cuart','quint','sext','septim'];const i=order.findIndex(x=>w.startsWith(x));return i>=0?{order:'oldest',index:i+1,label:w}:null;
+}
+function v422PickMemoryOrdinal(episodes=[],intent=null){
+  if(!intent)return null;const rows=arr(episodes).slice().sort((a,b)=>{const ad=text(a?.episode_started_at||a?.created_at),bd=text(b?.episode_started_at||b?.created_at),cmp=ad.localeCompare(bd);return intent.order==='newest'?-cmp:cmp;});return rows[Math.max(0,(Number(intent.index)||1)-1)]||null;
+}
+function v422MemoryFollowupAction(prompt='',session={}){
+  const focus=v76MemoryFocus(session),anchor=v77MemoryAnchor(session),turnId=trim(anchor?.turn_id||focus?.matched_turn_id);if(!turnId)return null;
+  const literal=v76MemoryLiteralIntent(prompt);if(literal)return{target_ref:turnId,action:'recall_turn',changes:[{type:'memory_literal',field:literal}],reason:`literal_${literal}`};
+  if(v77MemoryFullIntent(prompt)||v411MemoryExpandedDetailIntent(prompt))return{target_ref:turnId,action:'recall_episode',full_transcript:true,reason:'full_episode'};
+  const p=norm(prompt).replace(/[!?.,;:]+/g,' ').replace(/\s+/g,' ').trim();
+  if(/^(?:si\s*)?(?:recuerdamelo|recuérdamelo|recuerdame\s+eso|recuérdame\s+eso|esa\s+conversacion|esa\s+charla|de\s+que\s+hablamos|que\s+hablamos|cuentame\s+esa|cuentamela|cuéntamela)$/.test(p)||v411MemoryFollowupIntent(prompt))return{target_ref:turnId,action:'recall_episode',reason:'memory_followup'};
+  return null;
+}
+function v422LocalCompiledMemoryReference(spec={},model=''){
+  const ref={target_ref:trim(spec?.target_ref),action:trim(spec?.action)||'recall_episode'};if(arr(spec?.changes).length)ref.changes=spec.changes;if(spec?.full_transcript===true)ref.full_transcript=true;
+  const raw={action:'reference',reference:ref};return{raw,plan:v73NormalizePlan(raw),model:trim(model),command:'ce_reference',local_memory_compile:true};
+}
+function v422LocalCompiledMemoryIndex(order='newest',mode='list',model=''){
+  const raw={action:'conversation',conversation:{kind:'memory_index',memory_order:['oldest','newest'].includes(order)?order:'newest',memory_mode:mode==='overview'?'overview':'list'}};
+  return{raw,plan:v73NormalizePlan(raw),model:trim(model),command:'ce_conversation',local_memory_compile:true};
+}
+function v422MemoryDominantCandidate(candidates=[]){
+  const c=arr(candidates);if(!c.length)return null;if(c.length===1)return c[0];const a=Number(c[0]?.score)||0,b=Number(c[1]?.score)||0;return (a>=1.2&&(a-b>=0.35||a>=2.5))?c[0]:null;
+}
+function v422MemoryOverviewText(rows=[]){
+  if(!rows.length)return'Ahora mismo no encuentro recuerdos sustanciales guardados de conversaciones anteriores.';
+  const topics=new Map();for(const r of rows){for(const t of text(r?.Temas).split('·').map(trim).filter(Boolean)){const k=norm(t);if(!k)continue;const cur=topics.get(k)||{label:t,n:0};cur.n++;topics.set(k,cur);}}
+  const top=[...topics.values()].sort((a,b)=>b.n-a.n).slice(0,6).map(x=>x.label),samples=rows.slice(0,4).map(r=>trim(r?.Recuerdo)).filter(Boolean).map(x=>x.replace(/\s+/g,' ').slice(0,180));
+  let out=`Sí, tengo bastante memoria guardada: ${rows.length} conversaciones sustanciales.`;if(top.length)out+=` Los temas que más se repiten son ${top.join(', ')}.`;if(samples.length)out+=` Entre las más recientes recuerdo ${samples.join(' / ')}.`;out+=' Si quieres, me dices una persona, un tema o una fecha aproximada y voy directamente a esa conversación.';return out;
+}
+function v422MemoryListText(rows=[],order='newest'){
+  if(!rows.length)return'No encuentro recuerdos sustanciales guardados para mostrar.';const preview=rows.slice(0,6).map((r,i)=>`${i+1}. ${v73SpanishDate(r.Fecha)||r.Fecha}: ${trim(r.Recuerdo).replace(/\s+/g,' ').slice(0,150)}`).join('\n');
+  return `Tengo ${rows.length} recuerdos sustanciales. Los estoy ordenando ${order==='oldest'?'del más antiguo al más moderno':'del más reciente al más antiguo'}.\n\n${preview}${rows.length>6?'\n\nTe dejo la tabla completa debajo.':''}`;
+}
 function v73IsSimpleAcknowledgement(prompt='',entityCandidates={}){
   if(arr(entityCandidates?.flat).some(x=>['exact','strong'].includes(trim(x?.match_type))))return false;const p=norm(prompt).replace(/[!?.,;:]+/g,' ').replace(/\s+/g,' ').trim();if(!p||p.length>90)return false;
   if(/\b(?:evento|compra|donacion|ingreso|persona|tienda|saldo|tabla|grafica|memoria|recuerdo|quien|cuanto|dime|muestra|consulta|revisa)\b/.test(p))return false;
@@ -15324,7 +15376,7 @@ function v73LocalCompiledConversation(kind='general',note='',model=''){
 }
 async function v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext={},voiceConversation=false}){
   const screen=trim(v26EventById(state,selectedEventId)?.titulo)||'',instruction=v73KernelInstruction(state,selectedEventId,display,timeContext),input=v73KernelInput(userPrompt,session,entityCandidates,historyCandidates,display,screen,timeContext,voiceConversation),tools=[v415SemanticCoreTool()],allowed=['ce_semantic_turn'];let model=policy.model,payload;
-  const call=async(stage,m,callInput=input)=>v261CallInteraction({input:callInput,previousInteractionId:'',model:m,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:1,maxOutputTokens:1700});
+  const call=async(stage,m,callInput=input)=>v261CallInteraction({input:callInput,previousInteractionId:'',model:m,systemInstruction:instruction,tools,flowTrace,stage,toolChoice:{allowed_tools:{mode:'any',tools:allowed}},externalSignal,maxCalls:2,maxOutputTokens:1700});
   try{payload=await call('v4_0_exp · BANK4_15 · SEMANTIC CORE · Zuzu interpreta',model);}catch(error){if(policy.tier==='lite'&&policy.flashModel&&policy.flashModel!==model&&v332CanEscalateLiteFailure(error)){zuzuTracePush(flowTrace,'v4_0_exp · BANK4_15 · Lite → Flash','WARN',`Lite no emitió un marco semántico utilizable (${cleanGeminiError(error)}). Flash recibe exactamente el mismo contexto.`);model=policy.flashModel;payload=await call('v4_0_exp · BANK4_15 · Flash interpreta',model);}else{error._ceOrigin='gemini';throw error;}}
   const parseCommand=(pl)=>{
     const calls=v261FunctionCalls(pl).filter(c=>allowed.includes(trim(c?.name)));if(calls.length!==1){const e=new Error(`Zuzu debe emitir exactamente UN marco ce_semantic_turn; emitió ${calls.length}.`);e._ceOrigin='gemini';e._ceCommandCount=calls.length;throw e;}
@@ -16419,22 +16471,23 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const conversation=await ensureZuzuConversation({conversationId,actor,selectedEventId});
   const session=await getZuzuConversationSession({conversationId:conversation.conversationId,actor,includeRows:true,recentLimit:24});
   perf.contextMs=Date.now()-contextT0;
-  const entityCandidates=v74EntityCandidatePacket(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session);
-  // BANK4_15 · La recuperación aporta EVIDENCIA, nunca decide la intención. Se intenta un Top-K
-  // semántico breve para cualquier frase; si tarda, no bloquea. Gemini decide después si aquello
-  // era memoria, una consulta actual o simple conversación.
-  let historyCandidates=arr(pendingHistory).slice(0,8);
-  if(!historyCandidates.length){
-    if(isRecallPrompt(userPrompt)){
-      const memoryT0=Date.now();
-      historyCandidates=arr(await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:12,nowIso:clientLocalDateTime||clientNowIso}));
-      perf.memoryMs+=Date.now()-memoryT0;perf.memorySearch=true;
-      zuzuTracePush(flowTrace,'v4_0_exp · BANK4_21 · MEMORIA EXPLÍCITA AUTORITATIVA','OK',`Petición explícita de recuerdo: CE espera la evidencia persistente antes de compilar (${historyCandidates.length} candidato(s)). No se permite que un timeout convierta memoria existente en «no recuerdo».`);
-    }else{
-      const memoryProbe=await v79RunWithinBudget(()=>searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}),1200);
-      if(memoryProbe.kind==='value')historyCandidates=arr(memoryProbe.value);
-      else if(memoryProbe.kind==='timeout')zuzuTracePush(flowTrace,'v4_0_exp · BANK4_15 · MEMORY EVIDENCE GATE','INFO','La evidencia histórica superó 1200 ms; el turno sigue sin bloquearse.');
-    }
+  const entityCandidates=v74EntityCandidatePacket(state,userPrompt),pendingHistory=v73PendingHistoryChoices(session),activeMemoryFocus=v76MemoryFocus(session),activeMemoryAnchor=v77MemoryAnchor(session),memoryContextAlive=v422MemoryContextIsAlive(session),memoryOverviewIntent=v422MemoryOverviewIntent(userPrompt),memoryListIntent=v422MemoryIndexListIntent(userPrompt),memoryOrdinalIntent=v422OrdinalFromMemoryContext(userPrompt,session),memoryFollowup=v422MemoryFollowupAction(userPrompt,session);
+  // BANK4_22 · La memoria deja de depender del compilador para su navegación básica. Buscar,
+  // seleccionar ordinales, repetir el episodio activo y pedir la respuesta literal son operaciones
+  // sobre punteros persistentes, no una nueva interpretación del negocio. Gemini sigue siendo el
+  // intérprete de cualquier turno que no encaje inequívocamente en este pequeño estado de memoria.
+  let historyCandidates=arr(pendingHistory).slice(0,8),allMemoryEpisodes=[];
+  const explicitMemorySearch=isRecallPrompt(userPrompt)||memoryOverviewIntent||memoryListIntent||!!memoryOrdinalIntent;
+  if(memoryOverviewIntent||memoryListIntent||memoryOrdinalIntent){
+    const memoryT0=Date.now();allMemoryEpisodes=arr(await listZuzuMemoryEpisodes({actor,conversationId:conversation.conversationId,limit:200}));perf.memoryMs+=Date.now()-memoryT0;perf.memorySearch=true;
+    if(memoryOverviewIntent||memoryListIntent)historyCandidates=allMemoryEpisodes;
+  }
+  if(!historyCandidates.length&&!memoryFollowup&&!memoryOrdinalIntent&&explicitMemorySearch){
+    const memoryT0=Date.now();historyCandidates=arr(await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:12,nowIso:clientLocalDateTime||clientNowIso}));perf.memoryMs+=Date.now()-memoryT0;perf.memorySearch=true;
+    zuzuTracePush(flowTrace,'v4_0_exp · BANK4_22 · MEMORIA EXPLÍCITA ESTABLE','OK',`Petición de memoria: CE espera la fuente persistente antes de compilar (${historyCandidates.length} candidato(s)).`);
+  }else if(!historyCandidates.length&&!explicitMemorySearch&&!memoryFollowup){
+    const memoryProbe=await v79RunWithinBudget(()=>searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}),1200);
+    if(memoryProbe.kind==='value')historyCandidates=arr(memoryProbe.value);else if(memoryProbe.kind==='timeout')zuzuTracePush(flowTrace,'v4_0_exp · BANK4_15 · MEMORY EVIDENCE GATE','INFO','La evidencia histórica superó 1200 ms; el turno sigue sin bloquearse.');
   }
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v4_0_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (referencias pendientes disponibles)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
@@ -16445,7 +16498,14 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   let compiled;
   const compileT0=Date.now();
   try{
-    compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone},voiceConversation});
+    const currentConversationRecall=v73IsCurrentConversationRecallPrompt(userPrompt),hasTypedEntity=arr(entityCandidates?.flat).some(x=>['exact','strong'].includes(trim(x?.match_type)));
+    if(currentConversationRecall&&!hasTypedEntity){compiled=v73LocalCompiledConversation('conversation_summary','El usuario pide resumir exclusivamente la conversación actual.',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_22 · MEMORIA ACTUAL','OK','Resumen de la conversación actual; no abre memoria histórica.');}
+    else if(memoryOrdinalIntent){const ep=v422PickMemoryOrdinal(allMemoryEpisodes.length?allMemoryEpisodes:historyCandidates,memoryOrdinalIntent);if(ep){compiled=v422LocalCompiledMemoryReference({target_ref:trim(ep.turn_id),action:'recall_episode'},policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_22 · MEMORIA ORDINAL','OK',`${memoryOrdinalIntent.label}: ${trim(ep.turn_id)} · ${trim(ep.conversation_id)}.`);}else compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone},voiceConversation});}
+    else if(memoryOverviewIntent){compiled=v422LocalCompiledMemoryIndex('newest','overview',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_22 · PANORÁMICA DE MEMORIA','OK',`${historyCandidates.length} episodio(s) persistentes para responder qué recuerda Zuzu.`);}
+    else if(memoryListIntent){compiled=v422LocalCompiledMemoryIndex(v413MemoryIndexOrder(userPrompt),'list',policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_22 · LISTA DE MEMORIA','OK',`${historyCandidates.length} episodio(s) persistentes para la lista/tabla.`);}
+    else if(memoryFollowup){compiled=v422LocalCompiledMemoryReference(memoryFollowup,policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_22 · FOLLOW-UP DE MEMORIA','OK',`${memoryFollowup.reason} → ${memoryFollowup.action} ${memoryFollowup.target_ref}.`);}
+    else if(explicitMemorySearch){const chosen=v422MemoryDominantCandidate(historyCandidates);if(chosen){compiled=v422LocalCompiledMemoryReference({target_ref:trim(chosen.turn_id),action:'recall_episode'},policy.model);zuzuTracePush(flowTrace,'v4_0_exp · BANK4_22 · RECUERDO DOMINANTE','OK',`${trim(chosen.turn_id)} · score=${Number(chosen.score)||0} · ${trim(chosen.conversation_id)}.`);}else compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone},voiceConversation});}
+    else compiled=await v73CompileTurn({userPrompt,state,selectedEventId,session,entityCandidates,historyCandidates,display,policy,flowTrace,externalSignal,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone},voiceConversation});
   }
   catch(error){
     zuzuTracePush(flowTrace,'v4_0_exp · Ledger · fallo de compilación Zuzu','WARN',`${cleanGeminiError(error)}. El fallo se registra como turno inmutable y no altera el turno anterior.`);
@@ -16455,7 +16515,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     const saved=await appendZuzuTurn({conversation,actor,userPrompt,actionType:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'},execution,datasetId:session?.currentTurn?.datasetId||'',viewId:session?.currentTurn?.viewId||'',parentTurnId:session?.currentTurn?.turnId||'',status:'WARN',title:'Zuzu no pudo interpretar el turno',answer,selectedEventId});
     perf.commitMs=Date.now()-commitT0;
     const resultContext=v73LightContext(saved.conversation,saved.turn,session?.dataset||null,session?.view||null),usage=summarizeGeminiUsageFromTrace(flowTrace);
-    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_15 SEMANTIC CORE · BANK4_19 SOCIAL ALIASES · HUMAN RESPONSE · Z1 FINAL · ORACLE STRICT · EUR TYPED · SAFE FALLBACK · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+    return{ok:true,rejected:false,title:'Zuzu no pudo interpretar el turno',answer,warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'gemini-zuzu-ledger-compile-error',model:policy.model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_15 SEMANTIC CORE · BANK4_22 MEMORY STATE MACHINE · BANK4_19 SOCIAL ALIASES · HUMAN RESPONSE · Z1 FINAL · ORACLE STRICT · EUR TYPED · SAFE FALLBACK · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resultContext,ledgerAudit:{action:'compile_error',geminiPlan:{},normalizedPlan:{action:'compile_error'}},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
   }
 
   perf.compileMs=Date.now()-compileT0;
@@ -16502,12 +16562,12 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     }else if(plan.action==='conversation'){
       const kind=trim(plan?.conversation?.kind)||'general';
       if(kind==='memory_index'){
-        const order=['oldest','newest'].includes(trim(plan?.conversation?.memory_order))?trim(plan.conversation.memory_order):'newest',rows=v413MemoryIndexRows(historyCandidates,order),oldestFirst=order==='oldest';
+        const order=['oldest','newest'].includes(trim(plan?.conversation?.memory_order))?trim(plan.conversation.memory_order):'newest',mode=trim(plan?.conversation?.memory_mode)==='overview'?'overview':'list',rows=v413MemoryIndexRows(historyCandidates,order);
         const displayRows=rows.map((r,i)=>({'#':i+1,Fecha:v73SpanishDate(r.Fecha)||r.Fecha,Resumen:r.Recuerdo||'Sin resumen',Temas:r.Temas||'—',Estado:trim(r.Estado)==='unfinished'?'A medias':'Guardado'}));
-        title='Recuerdos guardados';
-        answer=rows.length?`Tengo ${rows.length} recuerdo${rows.length===1?'':'s'} sustancial${rows.length===1?'':'es'} localizados. Te los pongo ${oldestFirst?'del más antiguo al más moderno':'del más reciente al más antiguo'}.`:'No encuentro recuerdos sustanciales guardados para mostrar.';
-        tables=rows.length?[v26Table('memory_index','Índice de recuerdos',displayRows,{Fecha:v26TextSchema('Fecha de inicio del episodio recordado'),Resumen:v26TextSchema('Resumen sustancial persistido'),Temas:v26TextSchema('Temas principales del episodio'),Estado:v26StatusSchema('Guardado o conversación a medias')})]:[];
-        execution={summary:`Índice local de memoria: ${rows.length} episodio(s), orden=${order}.`,memory_index:true,memory_index_count:rows.length,memory_index_order:order,local_authoritative_presentation:true,current_context:v73CurrentSummary(session)};
+        title=mode==='overview'?'Lo que recuerdo':'Recuerdos guardados';
+        answer=mode==='overview'?v422MemoryOverviewText(rows):v422MemoryListText(rows,order);
+        tables=mode==='list'&&rows.length?[v26Table('memory_index','Índice de recuerdos',displayRows,{Fecha:v26TextSchema('Fecha de inicio del episodio recordado'),Resumen:v26TextSchema('Resumen sustancial persistido'),Temas:v26TextSchema('Temas principales del episodio'),Estado:v26StatusSchema('Guardado o conversación a medias')})]:[];
+        execution={summary:`Memoria local: ${rows.length} episodio(s), orden=${order}, modo=${mode}.`,memory_index:true,memory_index_count:rows.length,memory_index_order:order,memory_index_mode:mode,local_authoritative_presentation:true,current_context:v73CurrentSummary(session)};
       }
       else if(kind==='conversation_summary'){const summary=v73ConversationSummary(session);title='Resumen de la conversación';answer=summary;execution={summary,current_context:v73CurrentSummary(session),turn_count:arr(session?.recentTurns).length};}
       else if(kind==='current_context'){const ctx=v73CurrentSummary(session),ds=ctx?.active_dataset,entities=ctx?.active_entities||{},bits=[];if(Object.keys(entities).length)bits.push(`foco ${JSON.stringify(entities)}`);if(ds)bits.push(`DATASET ${ds.domain} con ${ds.row_count} filas; visibles=${arr(ds.visible_fields).join(', ')||'—'}; disponibles=${arr(ds.available_fields).join(', ')||'—'}`);const summary=bits.length?bits.join(' · '):'No hay un dataset activo ni un foco de negocio establecido.';title='Contexto actual';answer=summary;execution={summary,current_context:ctx};}
@@ -16670,7 +16730,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   else if(artifactIntent.table&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}};visibleTables=v73TableFromBundle(pseudo);for(const t of arr(tables))if(!visibleTables.some(x=>trim(x?.title)===trim(t?.title)))visibleTables.push(t);}
   if(artifactIntent.chart&&savedDataset){const pseudo={conversation:saved.conversation,turn:saved.turn,dataset:savedDataset,view:savedView||{}},ws=v73WorkingFromBundle(pseudo),weatherSupplement=arr(normalizedPlan?.query?.supplements).some(x=>trim(x?.domain)==='weather'),weatherCharts=weatherSupplement?arr(charts).filter(ch=>/meteorolog|temperatur|tiempo/i.test(trim(ch?.title))):[],requested=v73RequestedChartFromBundle(pseudo,flowTrace),baseCharts=weatherSupplement?weatherCharts:(requested.length?requested:(trim(savedDataset?.domain)==='weather'?v73WeatherChartFromDataset(savedDataset,savedView||{}):(ws?v72ChartFromWorking(ws,flowTrace):[])));visibleCharts=v73ApplyRequestedChartType(baseCharts,artifactIntent);if(!requested.length&&!weatherCharts.length){const sig=ch=>JSON.stringify([trim(ch?.type),arr(ch?.labels),arr(ch?.series).map(x=>[trim(x?.name),arr(x?.values)]),arr(ch?.values)]),seen=new Set(visibleCharts.map(sig));for(const ch of arr(charts)){const a=v73ApplyRequestedChartType([ch],artifactIntent)[0],k=a?sig(a):'';if(a&&!seen.has(k)){seen.add(k);visibleCharts.push(a);}}}}
   zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · ARTEFACTOS','OK',`Zuzu decide presentación: tabla=${artifactIntent.table?'sí':'no'} (${visibleTables.length}), gráfica=${artifactIntent.chart?'sí':'no'} (${visibleCharts.length}).`);
-  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_15 SEMANTIC CORE · BANK4_19 SOCIAL ALIASES · HUMAN RESPONSE · Z1 FINAL · ORACLE STRICT · EUR TYPED · SAFE FALLBACK · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
+  return{ok:true,rejected:false,title,answer,spokenAnswer,warnings:[],charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-ledger-dual-presentation',model,interactionId:'',conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Zuzu Ledger Inmutable v1 · Z1R PERFORMANCE · CONTEXT AUTHORITY · BANK4_15 SEMANTIC CORE · BANK4_22 MEMORY STATE MACHINE · BANK4_19 SOCIAL ALIASES · HUMAN RESPONSE · Z1 FINAL · ORACLE STRICT · EUR TYPED · SAFE FALLBACK · MEMORY GATE 2',modelTier:policy.tier,performance:{...perf,totalMs:Date.now()-perfStarted},conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,resetInteractionId:true,pendingAction:execution.pending_candidates?{topic:'history_reference',question:title,choices:execution.pending_candidates}:null,resultContext,spokenAnswer,presentation:artifactIntent,ledgerAudit:{command,action:normalizedPlan.action,geminiPlan:raw,normalizedPlan:normalizedPlan,interpretedPlan:plan,execution:physical,artifactIntent},tools:[command,trim(savedDataset?.provenance?.source_tool)].filter(Boolean),geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,160)},debugTrace:arr(flowTrace).slice(0,160),showDebugTrace:true};
 }
 
 // Entrada ÚNICA del turno Zuzu para ventana, voz e ITV. No hay una tubería semántica especial de pruebas.

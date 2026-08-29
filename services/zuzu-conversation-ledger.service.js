@@ -375,6 +375,8 @@ export function isRecallPrompt(prompt=''){
   const p=trim(prompt),n=norm(p);
   if(isUnfinishedRecallPrompt(p))return true;
   if(/\b(?:te\s+acuerdas|recuerdas|recu[eé]rdame|recu[eé]rdanos|recuerda|acu[eé]rdate|recordamos|recordad[oa]|recuerdos?|conversaci[oó]n\s+(?:pasada|anterior)|(?:aquella|esa)\s+(?:tabla|conversaci[oó]n)|aquel\s+(?:tema|d[ií]a)|lo\s+que\s+vimos|lo\s+de\s+(?:antes|otro\s+d[ií]a)|(?:retoma|retomemos)\b|(?:vuelve|volvamos|volver)\s+(?:a\s+)?(?:lo\s+de|aquel(?:la)?\s+(?:tema|conversaci[oó]n)|esa\s+conversaci[oó]n))\b/i.test(p))return true;
+  if(/\b(?:creo\s+que\s+)?(?:estuvimos|hemos\s+estado|hemos|habiamos|habíamos)\s+(?:hablando|conversando|charlando|viendo|mirando)\s+(?:de|sobre)\b/.test(n))return true;
+  if(/\b(?:que|qué)\s+recuerdas.{0,80}(?:hablado|conversado|charlado|conmigo)|\bdime\s+(?:que|qué)\s+recuerdas\b/.test(n))return true;
   // «vuelve a revisarla» NO es memoria: es una orden de revisar CURRENT. Para abrir memoria
   // exigimos una referencia humana al pasado, al hablar previo o una ventana temporal.
   return /\b(?:hablamos|hemos\s+(?:hablado|estado\s+hablando)|estuvimos\s+(?:hablando|viendo|mirando)|te\s+pregunte|me\s+dijiste|me\s+contestaste|que\s+vimos)\b/.test(n)&&/\b(?:ayer|anteayer|hoy|semana|mes|ano|dia|manana|tarde|noche|hace|pasad[oa]|ultimamente|recientemente|minutos?|horas?|rato)\b/.test(n);
