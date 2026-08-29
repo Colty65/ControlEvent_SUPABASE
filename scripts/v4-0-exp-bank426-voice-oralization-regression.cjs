@@ -1,0 +1,30 @@
+const fs=require('fs'),vm=require('vm'),path=require('path');
+const root=path.join(__dirname,'..');
+let ok=0,ko=0;function t(name,cond,detail=''){if(cond){ok++;console.log('OK ',name);}else{ko++;console.error('KO ',name,detail);}}
+const voice=fs.readFileSync(path.join(root,'public/app/features/v22-voz3-zuzu.js'),'utf8');
+const a=voice.indexOf('  function spokenNumberEs'),b=voice.indexOf('  function stopSpeaking',a);
+const ctx={console,clean:v=>String(v==null?'':v).replace(/\s+/g,' ').trim(),stripReservedFromSpeech:v=>String(v)};vm.createContext(ctx);vm.runInContext(voice.slice(a,b),ctx);
+const weather=ctx.prepareSpeechText('Hoy 26 °C, humedad 55% y viento 18 km/h; presión 1015 hPa.');
+t('temperatura se dice grados',/veintiséis grados/.test(weather),weather);
+t('humedad se dice por ciento',/cincuenta y cinco por ciento/.test(weather),weather);
+t('viento km/h humanizado',/dieciocho kilómetros por hora/.test(weather),weather);
+t('presión hPa humanizada',/mil quince hectopascales/.test(weather),weather);
+t('ordinal 4ºs no se convierte en grados',ctx.prepareSpeechText('MUNDIAL 4ºs Final').includes('cuartos de final'));
+t('euros conservan céntimos',/quinientos noventa y ocho euros con cuarenta y cuatro céntimos/.test(ctx.prepareSpeechText('598,44 €')));
+const seg=ctx.speechProsodySegments('Uno, dos: tres; cuatro. Cinco?');
+t('prosodia pausa en coma',seg.some(x=>x.pauseAfter===135),JSON.stringify(seg));
+t('prosodia pausa media en dos puntos/punto y coma',seg.filter(x=>x.pauseAfter===230).length>=2,JSON.stringify(seg));
+t('prosodia pausa de frase',seg.some(x=>x.pauseAfter===330),JSON.stringify(seg));
+t('hora 18:30 no se parte por los dos puntos',ctx.speechProsodySegments('A las 18:30 empieza.')[0]?.text.includes('18:30'));
+
+const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const c=svc.indexOf("function v421ScreenUnitGuard"),d=svc.indexOf('function v73RawFinalParse',c);
+const sc={console,text:v=>String(v==null?'':v),trim:v=>String(v==null?'':v).trim(),arr:v=>Array.isArray(v)?v:[]};
+sc.v416RepairCanonicalEventYears=v=>v;sc.v416ParseEuroNumber=raw=>{let s=String(raw).replace(/\s/g,'');if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');return Number(s)};sc.v416ExplicitMoneyValues=v=>[];sc.v416SpokenEuroClaims=v=>[];vm.createContext(sc);vm.runInContext(svc.slice(c,d),sc);
+const ds={columnTypes:{'Número de cuota registrado':'count','Registros compra asignados':'count','TK distintos':'count','Ingresos vinculados':'money'}};
+const repaired=sc.v426TypedScreenUnitGuard('Número de cuota registrado 2,00 €, Ingresos vinculados 360,00 €, Registros compra asignados 1,00 €, TK distintos 1,00 €',ds);
+t('schema count elimina euro de cuota',/Número de cuota registrado 2(?:\D|$)/.test(repaired)&&!/Número de cuota registrado 2[^,]*€/.test(repaired),repaired);
+t('schema count elimina euro de registros',/Registros compra asignados 1(?:\D|$)/.test(repaired)&&!/Registros compra asignados 1[^,]*€/.test(repaired),repaired);
+t('schema count elimina euro de TK',/TK distintos 1(?:\D|$)/.test(repaired)&&!/TK distintos 1[^,]*€/.test(repaired),repaired);
+t('schema money conserva euro',/Ingresos vinculados 360,00 €/.test(repaired),repaired);
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exit(ko?1:0);

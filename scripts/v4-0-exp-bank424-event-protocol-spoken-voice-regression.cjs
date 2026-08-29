@@ -16,7 +16,7 @@ t('numeric EUR safety fallback remains',voice.includes('spoken_answer añade un 
 t('old screen-only TTS disabled',!voice.includes('TTS usa answer de pantalla como fuente semántica única'));
 t('mic fallback on audio-capture',voice.includes("code==='network'||code==='audio-capture'"));
 t('mic fallback after repeated no-speech',voice.includes('state.webSpeechNoSpeechCount>=2'));
-t('voice build V54',voice.includes('BANK4_24-Z1H-VOICE-V54'));
-t('cache bust V54',idx.includes('BANK424-Z1H-VOICE-V54'));
+t('voice build V54+',/BANK4_(?:24|26)-Z1H-VOICE-V(?:54|55)/.test(voice));
+t('cache bust V54+',/BANK42(?:4|6)-Z1H-VOICE-V(?:54|55)/.test(idx));
 t('human profile BANK4_24',human.includes("version:'BANK4_24'"));
 console.log(`TOTAL ${ok} OK / ${ko} KO`);process.exit(ko?1:0);

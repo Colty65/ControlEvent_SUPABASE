@@ -15649,15 +15649,31 @@ function v421ScreenUnitGuard(value=''){
   out=out.replace(/(\\d+)\\s*(?:,00\\s*)?€\\s*ºs\\b/gi,'$1ºs');
   return out;
 }
-function v416VoiceUnitOracle(written='',spoken='',state={}){
-  const repairedWritten=v421ScreenUnitGuard(v416RepairCanonicalEventYears(written,state)),repairedSpoken=v421ScreenUnitGuard(v416RepairCanonicalEventYears(spoken,state));
+function v426EscapeRegExp(value=''){return text(value).replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&');}
+function v426TypedScreenUnitGuard(value='',dataset=null){
+  let out=v421ScreenUnitGuard(value),types=dataset?.columnTypes&&typeof dataset.columnTypes==='object'?dataset.columnTypes:{};
+  const nonMoney=Object.entries(types).filter(([,kind])=>['count','quantity','number','percent','date'].includes(trim(kind))).map(([field,kind])=>({field:trim(field),kind:trim(kind)})).filter(x=>x.field).sort((a,b)=>b.field.length-a.field.length);
+  const num='(-?\\d{1,3}(?:\\.\\d{3})*(?:,\\d+)?|-?\\d+(?:[.,]\\d+)?)';
+  const plain=(raw,kind)=>{const n=v416ParseEuroNumber(raw);if(kind==='count'&&Number.isFinite(n)&&Math.abs(n-Math.round(n))<0.000001)return String(Math.round(n));return trim(raw);};
+  for(const item of nonMoney){
+    const field=item.field,kind=item.kind,f=v426EscapeRegExp(field);
+    try{
+      // La unidad tipada manda tanto si Gemini escribe «1,00 € registros» como «Registros 1,00 €».
+      out=out.replace(new RegExp('('+f+'\\s*[:=-]?\\s*)'+num+'\\s*(?:€|EUR\\b|euros?\\b)','gi'),(_,lead,n)=>lead+plain(n,kind));
+      out=out.replace(new RegExp(num+'\\s*(?:€|EUR\\b|euros?\\b)(\\s+(?:de\\s+)?'+f+'\\b)','gi'),(_,n,tail)=>plain(n,kind)+tail);
+    }catch(_){ }
+  }
+  return out;
+}
+function v416VoiceUnitOracle(written='',spoken='',state={},dataset=null){
+  const repairedWritten=v426TypedScreenUnitGuard(v416RepairCanonicalEventYears(written,state),dataset),repairedSpoken=v426TypedScreenUnitGuard(v416RepairCanonicalEventYears(spoken,state),dataset);
   const allowed=v416ExplicitMoneyValues(repairedWritten),claims=v416SpokenEuroClaims(repairedSpoken),allowedBag=new Map();
   for(const n of allowed)allowedBag.set(n,(allowedBag.get(n)||0)+1);
   const unsupported=[];
   for(const c of claims){const left=allowedBag.get(c.value)||0;if(left>0)allowedBag.set(c.value,left-1);else unsupported.push(c);}
   const euroWords=(repairedSpoken.match(/\beuros?\b|€/gi)||[]).length,writtenMoneyMarkers=(repairedWritten.match(/(?:€|\bEUR\b|\beuros?\b)/gi)||[]).length;
   const suspicious=unsupported.length>0||euroWords>writtenMoneyMarkers;
-  return{written:repairedWritten,spoken:suspicious?repairedWritten:repairedSpoken,guarded:suspicious||repairedWritten!==written||repairedSpoken!==spoken,reason:suspicious?`voz monetizó cifras no monetarias: ${unsupported.map(x=>x.raw).slice(0,6).join(' / ')||`${euroWords} marcas de euro frente a ${writtenMoneyMarkers} monetarias en pantalla`}`:(repairedWritten!==written||repairedSpoken!==spoken?'se restauraron años dentro de nombres canónicos':'')};
+  return{written:repairedWritten,spoken:suspicious?repairedWritten:repairedSpoken,guarded:suspicious||repairedWritten!==written||repairedSpoken!==spoken,reason:suspicious?`voz monetizó cifras no monetarias: ${unsupported.map(x=>x.raw).slice(0,6).join(' / ')||`${euroWords} marcas de euro frente a ${writtenMoneyMarkers} monetarias en pantalla`}`:(repairedWritten!==written||repairedSpoken!==spoken?'se restauraron unidades/años desde el schema tipado':'')};
 }
 function v73RawFinalParse(payload){const calls=v261FunctionCalls(payload).filter(c=>trim(c?.name)==='zuzu_final_presentation'),tool=calls.length?calls[calls.length-1]?.arguments:null,envelope=v261OutputText(payload),body=text(envelope).trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();let parsed=tool&&typeof tool==='object'?tool:{};if(!Object.keys(parsed).length&&body){try{parsed=parsePlanJsonLenientHf37(body).parsed||{};}catch(_){}}if(!trim(parsed?.written_answer)&&body){const wm=body.match(/(?:^|\n)\s*written_answer\s*:\s*([\s\S]*?)(?=\n\s*spoken_answer\s*:|$)/i),sm=body.match(/(?:^|\n)\s*spoken_answer\s*:\s*([\s\S]*?)$/i);if(wm)parsed.written_answer=trim(wm[1]);if(sm)parsed.spoken_answer=trim(sm[1]);}const written=typeof parsed?.written_answer==='string'?parsed.written_answer:(typeof parsed?.answer==='string'?parsed.answer:''),spoken=typeof parsed?.spoken_answer==='string'?parsed.spoken_answer:written,pp=parsed?.presentation||{},ct=['bar','line','pie','donut','horizontalBar'].includes(trim(pp.chart_type))?trim(pp.chart_type):'';return{title:trim(parsed?.title)||'Zuzu',written:trim(written)||body,spoken:trim(spoken)||trim(written)||body,presentation:{table:pp.table===true,chart:pp.chart===true,chart_type:pp.chart===true?(ct||'bar'):''},envelope:tool?JSON.stringify(tool):envelope};}
 function v73SpokenCoverageNeedsRepair(final={},plan={}){
@@ -16707,7 +16723,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     zuzuTracePush(flowTrace,'v4_0_exp · PRESENTACIÓN · RESPUESTA ZUZU','OK',`Pantalla=${text(answer).length} caracteres · voz=${text(spokenAnswer).length} caracteres · presentación local autoritativa.`);
   }else try{
     const rawFinal=await v73RawFinalWithGemini({userPrompt,rawPlan:raw,plan:normalizedPlan,status,execution,dataset,view,finalBundle,session,model,flowTrace,externalSignal,voiceConversation,audience:{usuario:profile.identificacion||display,nombre:profile.nombre||display,nivel:profile.nivel},state,selectedEventId,authoritativePayload:answerPayload,timeContext:{iso:clientNowIso,local:clientLocalDateTime,timezone:clientTimeZone}});
-    title=rawFinal.title||title;const unitGuard=v416VoiceUnitOracle(rawFinal.written,rawFinal.spoken,state),humanSpeech=humanizeSpokenEntities(unitGuard.spoken,state,{currentDate:clientLocalDateTime||clientNowIso,seed:`${conversation.conversationId}|${arr(session?.recentTurns).length+1}`});answer=unitGuard.written;spokenAnswer=humanSpeech.text;finalPresentation=rawFinal.presentation||{};
+    title=rawFinal.title||title;const unitGuard=v416VoiceUnitOracle(rawFinal.written,rawFinal.spoken,state,dataset),humanSpeech=humanizeSpokenEntities(unitGuard.spoken,state,{currentDate:clientLocalDateTime||clientNowIso,seed:`${conversation.conversationId}|${arr(session?.recentTurns).length+1}`});answer=unitGuard.written;spokenAnswer=humanSpeech.text;finalPresentation=rawFinal.presentation||{};
     execution={...(execution||{}),gemini_final_raw:rawFinal.envelope,gemini_final_answer:answer,gemini_spoken_answer:spokenAnswer,gemini_spoken_answer_raw:rawFinal.spoken,gemini_presentation:finalPresentation,response_mode:humanSpeech.changed?'gemini_dual_presentation_human_speech_lexicon':unitGuard.guarded?'gemini_dual_presentation_voice_unit_guard':'gemini_dual_presentation'};
     if(unitGuard.guarded)zuzuTracePush(flowTrace,'v4_0_exp · BANK4_16 · ORÁCULO DE UNIDADES DE VOZ','WARN',`${unitGuard.reason}. La voz usa una redacción segura derivada de la pantalla cuando detecta euros añadidos a cifras no monetarias.`);
     if(humanSpeech.changed)zuzuTracePush(flowTrace,'v4_0_exp · BANK4_19 · LENGUAJE ORAL HUMANO','OK',`Perfil=${humanSpeech.profileVersion} · eventos=${humanSpeech.eventChanges.slice(0,6).join(' / ')||'—'} · personas=${humanSpeech.personChanges.slice(0,8).join(' / ')||'—'} · formas=${humanSpeech.formChanges?.slice(0,6).join(' / ')||'—'}. La pantalla conserva nombres canónicos; solo la voz usa forma social/humana.`);

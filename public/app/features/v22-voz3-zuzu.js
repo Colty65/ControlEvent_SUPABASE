@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-BANK4_24-Z1H-VOICE-V54';
+  var BUILD='v4_0_exp-BANK4_26-Z1H-VOICE-V55';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v54', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v54', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v54', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v54', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v54'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v55', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v55', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v55', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v55', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v55'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -331,22 +331,32 @@
     if(n===100)return'cien';if(n<1000){var h=['','','doscientos','trescientos','cuatrocientos','quinientos','seiscientos','setecientos','ochocientos','novecientos'][Math.floor(n/100)]||'ciento',r2=n%100;return (Math.floor(n/100)===1?'ciento':h)+(r2?' '+spokenNumberEs(r2):'');}
     var th=Math.floor(n/1000),rest=n%1000,head=th===1?'mil':spokenNumberEs(th)+' mil';return head+(rest?' '+spokenNumberEs(rest):'');
   }
+  function spokenDecimalEs(value){
+    var raw=String(value==null?'':value).trim().replace(/\s/g,''),neg=raw.charAt(0)==='-';if(neg)raw=raw.slice(1);raw=raw.replace(',','.');var n=Number(raw);if(!Number.isFinite(n))return String(value||'');
+    var whole=Math.floor(Math.abs(n)),frac=raw.indexOf('.')>=0?raw.split('.')[1].replace(/0+$/,''):'';var head=spokenNumberEs(whole);if(frac){var digits=frac.split('').map(function(d){return spokenNumberEs(Number(d));}).join(' ');head+=' coma '+digits;}return (neg?'menos ':'')+head;
+  }
   function spokenQuantity(value,unit){
     var raw=String(value||'').replace(',','.'),n=Number(raw),u=String(unit||'').toLowerCase();if(!Number.isFinite(n))return value+' '+unit;
-    if(u==='ml'){if(Math.abs(n-500)<0.001)return'medio litro';if(Math.abs(n-1000)<0.001)return'un litro';if(Math.abs(n-1500)<0.001)return'litro y medio';return spokenNumberEs(n)+' mililitros';}
-    if(u==='cl'){if(Math.abs(n-50)<0.001)return'medio litro';if(Math.abs(n-100)<0.001)return'un litro';if(Math.abs(n-150)<0.001)return'litro y medio';return spokenNumberEs(n)+' centilitros';}
-    if(u==='l'||u==='lt'){if(Math.abs(n-0.5)<0.001)return'medio litro';if(Math.abs(n-1)<0.001)return'un litro';if(Math.abs(n-1.5)<0.001)return'litro y medio';return spokenNumberEs(n)+' litros';}
-    if(u==='kg')return spokenNumberEs(n)+(Math.abs(n-1)<0.001?' kilo':' kilos');if(u==='g'||u==='gr')return spokenNumberEs(n)+(Math.abs(n-1)<0.001?' gramo':' gramos');
-    if(u==='cm')return spokenNumberEs(n)+' centímetros';if(u==='mm')return spokenNumberEs(n)+' milímetros';return value+' '+unit;
+    if(u==='ml'){if(Math.abs(n-500)<0.001)return'medio litro';if(Math.abs(n-1000)<0.001)return'un litro';if(Math.abs(n-1500)<0.001)return'litro y medio';return spokenDecimalEs(n)+' mililitros';}
+    if(u==='cl'){if(Math.abs(n-50)<0.001)return'medio litro';if(Math.abs(n-100)<0.001)return'un litro';if(Math.abs(n-150)<0.001)return'litro y medio';return spokenDecimalEs(n)+' centilitros';}
+    if(u==='l'||u==='lt'){if(Math.abs(n-0.5)<0.001)return'medio litro';if(Math.abs(n-1)<0.001)return'un litro';if(Math.abs(n-1.5)<0.001)return'litro y medio';return spokenDecimalEs(n)+' litros';}
+    if(u==='kg')return spokenDecimalEs(n)+(Math.abs(n-1)<0.001?' kilo':' kilos');if(u==='g'||u==='gr')return spokenDecimalEs(n)+(Math.abs(n-1)<0.001?' gramo':' gramos');
+    if(u==='cm')return spokenDecimalEs(n)+' centímetros';if(u==='mm')return spokenDecimalEs(n)+' milímetros';return value+' '+unit;
   }
   function humanizeSpokenLabels(v){
     var out=String(v==null?'':v);
     out=out.replace(/\s*[-–—/]?\s*\b(?:ENE|FEB|MAR|ABR|MAY|JUN|JUL|AGO|SEP|SEPT|OCT|NOV|DIC)[._\/-]?(?:20)?\d{2}\b/gi,' ');
+    // BANK4_26 · oralización meteorológica/numérica. El símbolo de grados NO es un ordinal.
+    out=out.replace(/(-?\d+(?:[.,]\d+)?)\s*[º°](?![sS])\s*(?:C|Celsius|centígrados?)?/gi,function(_,n){return spokenDecimalEs(n)+' grados';});
+    out=out.replace(/(-?\d+(?:[.,]\d+)?)\s*%/g,function(_,n){return spokenDecimalEs(n)+' por ciento';});
+    out=out.replace(/(-?\d+(?:[.,]\d+)?)\s*(?:km\s*\/\s*h|kmh)\b/gi,function(_,n){return spokenDecimalEs(n)+' kilómetros por hora';});
+    out=out.replace(/(-?\d+(?:[.,]\d+)?)\s*hPa\b/gi,function(_,n){return spokenDecimalEs(n)+' hectopascales';});
     // RAW14C: no uses \b tras unidades de una letra: en JavaScript la í de «líneas» no cuenta como ASCII word-char y «40 líneas» se interpretaba como «40 l» + «íneas» (litrosíneas).
     out=out.replace(/\b(\d+(?:[.,]\d+)?)\s*(ml|cl|lt|l|kg|gr|g|cm|mm)(?![A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/gi,function(_,n,u){return spokenQuantity(n,u);});
     out=out.replace(/\bzero\b/gi,'cero').replace(/\b\d{1,2}en\d{1,2}\b/gi,' ');
     var ordSing={1:'primero',2:'segundo',3:'tercero',4:'cuarto',5:'quinto',6:'sexto',7:'séptimo',8:'octavo',9:'noveno',10:'décimo'},ordPlur={1:'primeros',2:'segundos',3:'terceros',4:'cuartos',5:'quintos',6:'sextos',7:'séptimos',8:'octavos',9:'novenos',10:'décimos'};
-    out=out.replace(/\b(10|[1-9])\s*[º°]([sS])?\b/g,function(_,n,p){return p?ordPlur[Number(n)]:ordSing[Number(n)];}).replace(/\bcuartos\s+final\b/gi,'cuartos de final');
+    // El ordinal tipográfico es º. El símbolo ° queda reservado a grados/temperatura.
+    out=out.replace(/\b(10|[1-9])\s*º([sS])?\b/g,function(_,n,p){return p?ordPlur[Number(n)]:ordSing[Number(n)];}).replace(/\bcuartos\s+final\b/gi,'cuartos de final');
     out=out.replace(/[()[\]{}]/g,' ').replace(/([A-Za-zÁÉÍÓÚÜÑáéíóúüñ])\s*[-–—/]\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ])/g,'$1 $2');
     out=out.replace(/(^|\s)([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{2,4})(?=\s|$)/g,function(m,pre,tok){return /[aeiouáéíóúü]/i.test(tok)?m:pre;});
     return out.replace(/\s+([,.;:!?])/g,'$1').replace(/([,;:])\s*([,;:])/g,'$1').replace(/\s{2,}/g,' ').trim();
@@ -358,14 +368,31 @@
     return res;
   }
   function parseSpokenEuroNumber(raw){var t=clean(raw).replace(/\s/g,'');if(!t)return NaN;var sign=t.charAt(0)==='-'?-1:1;if(sign<0)t=t.slice(1);if(t.indexOf(',')>=0){t=t.replace(/\./g,'').replace(',','.');}else if((t.match(/\./g)||[]).length>1||/^\d{1,3}(?:\.\d{3})+$/.test(t)){t=t.replace(/\./g,'');}var n=Number(t);return Number.isFinite(n)?sign*n:NaN;}
-  function spokenEuroInteger(n){n=Math.trunc(Number(n)||0);var neg=n<0,a=Math.abs(n),words=spokenNumberEs(a);if(a===1)words='un';return (neg?'menos ':'')+words+' euro'+(a===1?'':'s');}
-  function humanizeSpokenMoney(v){return String(v==null?'':v).replace(/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|euros?\b)/gi,function(_,numtxt){var n=parseSpokenEuroNumber(numtxt);return Number.isFinite(n)?spokenEuroInteger(n):_;});}
+  function spokenEuroAmount(n){n=Number(n);if(!Number.isFinite(n))return'';var neg=n<0,a=Math.abs(n),whole=Math.floor(a+1e-9),cents=Math.round((a-whole)*100);if(cents===100){whole+=1;cents=0;}var words=whole===1?'un':spokenNumberEs(whole),out=(neg?'menos ':'')+words+' euro'+(whole===1?'':'s');if(cents)out+=' con '+(cents===1?'un':spokenNumberEs(cents))+' céntimo'+(cents===1?'':'s');return out;}
+  function humanizeSpokenMoney(v){return String(v==null?'':v).replace(/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|euros?\b)/gi,function(_,numtxt){var n=parseSpokenEuroNumber(numtxt);return Number.isFinite(n)?spokenEuroAmount(n):_;});}
   function voiceExplicitMoneyValues(v){var out=[],re=/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|EUR\b|euros?\b)/gi,m;while((m=re.exec(String(v==null?'':v)))){var n=parseSpokenEuroNumber(m[1]);if(Number.isFinite(n))out.push(Math.trunc(n));}return out;}
   function safeVoiceAgainstScreen(screen,spoken){var w=String(screen==null?'':screen),s=String(spoken==null?'':spoken);if(!s)return w;if(!w)return s;var allowed=voiceExplicitMoneyValues(w),claims=voiceExplicitMoneyValues(s),bad=claims.some(function(n){return allowed.indexOf(n)<0;});if(bad){try{console.warn('[CE VOZ BANK4_24] spoken_answer añade un importe numérico no acreditado; fallback a pantalla.');}catch(_){}return w;}try{if(s!==w)console.info('[CE VOZ BANK4_24] TTS usa spoken_answer certificado del servidor; la pantalla queda intacta.');}catch(_){}return s;}
   function prepareSpeechText(v){var text=String(v==null?'':v).replace(/[*_`#>|]/g,' ');text=humanizeSpokenMoney(text);text=humanizeSpokenListRhythm(text);text=humanizeSpokenLabels(text);return stripReservedFromSpeech(clean(text));}
-  function chunkSpeech(v){var text=prepareSpeechText(v);if(!text)return[];var sentences=text.split(/(?<=[.!?;:])\s+/),out=[],cur='';sentences.forEach(function(s){if((cur+' '+s).trim().length<=170)cur=clean(cur+' '+s);else{if(cur)out.push(cur);cur=s;}});if(cur)out.push(cur);return out.length?out:[text];}
+  function speechProsodySegments(v){
+    var text=prepareSpeechText(v);if(!text)return[];var out=[],buf='',i=0;
+    function push(pause){var t=clean(buf);buf='';if(t)out.push({text:t,pauseAfter:pause||0});}
+    function digit(c){return /[0-9]/.test(c||'');}
+    for(i=0;i<text.length;i++){
+      var ch=text.charAt(i),prev=text.charAt(i-1),next=text.charAt(i+1);buf+=ch;
+      // No partir cifras, horas ni decimales: 5.882,22 / 18:30.
+      if((ch==='.'||ch===','||ch===':')&&digit(prev)&&digit(next))continue;
+      if(ch==='.'&&text.substr(i,3)==='...'){buf+='..';i+=2;push(320);continue;}
+      if(ch===',' ){push(135);continue;}
+      if(ch===';'||ch===':'){push(230);continue;}
+      if(ch==='.'||ch==='!'||ch==='?'){push(330);continue;}
+      // Salvaguarda de Chrome/Edge: una cláusula muy larga se trocea en un espacio, nunca a mitad de palabra.
+      if(buf.length>=205){var cut=buf.lastIndexOf(' ');if(cut>120){var tail=buf.slice(cut+1);buf=buf.slice(0,cut);push(80);buf=tail;}}
+    }
+    push(0);return out;
+  }
+  function chunkSpeech(v){return speechProsodySegments(v);}
   function stopSpeaking(interrupted){state.speechGeneration++;state.localControlGeneration++;state.localControlSpeaking=false;state.speaking=false;state.currentUtterance=null;state.speechChunks=[];state.speechIndex=0;stopBarge();try{window.speechSynthesis.pause();window.speechSynthesis.cancel();}catch(_){}updateBadge();if(!interrupted&&state.conversationMode&&!state.requestInFlight&&!state.awaitingResponse)setTimeout(startUser,180);}
-  function speakChunks(answer){if(!supportsSpeech()||!state.conversationMode){startUser();return;}pauseCloudListening();stopRecognition();stopBarge();try{window.speechSynthesis.cancel();}catch(_){}state.speechGeneration++;var gen=state.speechGeneration;state.speechChunks=chunkSpeech(answer);state.speechIndex=0;state.speaking=true;state.mode='speaking';setVoicePhase('SPEAKING','respuesta Zuzu');updateBadge();setStatus('Zuzu está hablando. «Perdona» o «Espera» para cortar.','ok');function next(){if(gen!==state.speechGeneration||!state.speaking)return;if(state.speechIndex>=state.speechChunks.length){state.speaking=false;stopBarge();updateBadge();setStatus('Te escucho…','ok');setVoicePhase('REPLY_WINDOW','respuesta terminada');setTimeout(startUser,180);return;}var u=new SpeechSynthesisUtterance(state.speechChunks[state.speechIndex++]);u.lang='es-ES';u.rate=speechRate();u.pitch=0.82;u.volume=1;var voice=chooseVoice();if(voice)u.voice=voice;state.currentUtterance=u;u.onstart=function(){if(gen===state.speechGeneration)startBarge();};u.onend=function(){if(gen===state.speechGeneration)next();};u.onerror=function(){if(gen===state.speechGeneration)next();};try{window.speechSynthesis.speak(u);}catch(_){next();}}next();}
+  function speakChunks(answer){if(!supportsSpeech()||!state.conversationMode){startUser();return;}pauseCloudListening();stopRecognition();stopBarge();try{window.speechSynthesis.cancel();}catch(_){}state.speechGeneration++;var gen=state.speechGeneration;state.speechChunks=chunkSpeech(answer);state.speechIndex=0;state.speaking=true;state.mode='speaking';setVoicePhase('SPEAKING','respuesta Zuzu · prosodia BANK4_26');updateBadge();setStatus('Zuzu está hablando. «Perdona» o «Espera» para cortar.','ok');function next(){if(gen!==state.speechGeneration||!state.speaking)return;if(state.speechIndex>=state.speechChunks.length){state.speaking=false;stopBarge();updateBadge();setStatus('Te escucho…','ok');setVoicePhase('REPLY_WINDOW','respuesta terminada');setTimeout(startUser,180);return;}var seg=state.speechChunks[state.speechIndex++]||{},phrase=typeof seg==='string'?seg:seg.text,pause=Number(seg&&seg.pauseAfter)||0;if(!phrase){setTimeout(next,pause);return;}var u=new SpeechSynthesisUtterance(phrase);u.lang='es-ES';u.rate=speechRate();u.pitch=0.82;u.volume=1;var voice=chooseVoice();if(voice)u.voice=voice;state.currentUtterance=u;u.onstart=function(){if(gen===state.speechGeneration)startBarge();};u.onend=function(){if(gen===state.speechGeneration)setTimeout(next,pause);};u.onerror=function(){if(gen===state.speechGeneration)setTimeout(next,Math.min(120,pause));};try{window.speechSynthesis.speak(u);}catch(_){setTimeout(next,Math.min(120,pause));}}next();}
   function speakResponse(){var dedicated=clean(window.__ceZuzuLastSpokenAnswer||'');var a=q('#ceAiResult .ce-ai-answer');var txt=dedicated||clean(a&&a.textContent);if(txt){if(!state.conversationMode)state.conversationMode=true;speakChunks(txt);}}
   function previewVoice(){if(!supportsSpeech())return;try{window.speechSynthesis.cancel();var u=new SpeechSynthesisUtterance('Esta es la voz de Zuzu. Estoy listo. Vamos al lío.');u.lang='es-ES';u.rate=speechRate();u.pitch=0.82;u.volume=1;var v=chooseVoice();if(v)u.voice=v;window.speechSynthesis.speak(u);}catch(_){} }
 
