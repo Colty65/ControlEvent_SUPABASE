@@ -1,0 +1,27 @@
+const fs=require('fs');
+const path=require('path');
+const root=path.resolve(__dirname,'..');
+const read=f=>fs.readFileSync(path.join(root,f),'utf8');
+const checks=[];
+function ok(name,cond){checks.push([name,!!cond]);}
+const norm=read('lib/supabase-normalized.js');
+const html=read('public/index.html');
+const crud=read('public/app/features/v8-5-crud-root-fix28.js');
+const human=read('services/zuzu-human-language.service.js');
+const exp=read('routes/export.routes.js');
+const restore=read('public/app/features/v26-prod-fix1-conciliacion-backup.js');
+const sql=read('sql/ControlEvent_SQL_BANK4_23_EVENTOS_NOMBRE_HABLADO.sql');
+ok('DB escribe nombre_hablado',norm.includes('nombre_hablado: nullableText'));
+ok('DB lee nombreHablado',norm.includes("nombreHablado: row.nombre_hablado || ''"));
+ok('Alta EVENTOS expone Nombre hablado',html.includes('newEventoNombreHablado'));
+ok('Edición EVENTOS captura nombreHablado',crud.includes('edit-evento-nombrehablado'));
+ok('Alta EVENTOS persiste nombreHablado',crud.includes("nombreHablado:elVal('newEventoNombreHablado')"));
+ok('Voz prioriza BBDD',human.includes('spoken=event.spokenDb||humanizeEventName'));
+ok('Traza marca dato BBDD',human.includes('[BBDD]'));
+ok('Backup exporta EVENTO_NOMBRE_HABLADO',exp.includes('EVENTO_NOMBRE_HABLADO'));
+ok('Restore importa EVENTO_NOMBRE_HABLADO',restore.includes('EVENTO_NOMBRE_HABLADO'));
+ok('SQL crea nombre_hablado',sql.includes('add column if not exists nombre_hablado text'));
+const fail=checks.filter(x=>!x[1]);
+checks.forEach(([n,v])=>console.log(`${v?'OK':'KO'} ${n}`));
+console.log(`TOTAL ${checks.length} · OK ${checks.length-fail.length} · KO ${fail.length}`);
+if(fail.length)process.exit(1);

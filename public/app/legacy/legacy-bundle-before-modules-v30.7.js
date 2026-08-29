@@ -1395,6 +1395,7 @@ function renderEventos(){
       ${e.id===state.selectedEventId ? '<div class="badge-active">Activo</div>' : ''}
       <div class="rowline evento">
         <div class="field"><label>Título</label><input value="${escapeHtml(e.titulo)}" data-action="edit-evento-titulo" data-id="${e.id}" /></div>
+        <div class="field"><label>Nombre hablado</label><input value="${escapeHtml(e.nombreHablado||e.nombre_hablado||'')}" data-action="edit-evento-nombrehablado" data-id="${e.id}" /></div>
         <div class="field"><label>Precio</label><input type="number" min="0" step="0.01" value="${Number(e.precio||0)}" data-action="edit-evento-precio" data-id="${e.id}" /></div>
         <div class="field"><label>Fecha ini</label><input value="${escapeHtml(e.fechaIni||'')}" data-action="edit-evento-fechaini" data-id="${e.id}" /></div>
         <div class="field"><label>Fecha fin</label><input value="${escapeHtml(e.fechaFin||'')}" data-action="edit-evento-fechafin" data-id="${e.id}" /></div>
@@ -1512,7 +1513,7 @@ function renderLockState(){
     });
     document.querySelectorAll('[data-action="delete-evento"]').forEach(el => setElementEnabled(el, false));
 
-    ['newEventoTitulo','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion','btnAddEvento'].forEach(id => {
+    ['newEventoTitulo','newEventoNombreHablado','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion','btnAddEvento'].forEach(id => {
       setElementEnabled(document.getElementById(id), false);
     });
   }
@@ -1550,6 +1551,7 @@ function addEvento(){
   });
   if(!state.selectedEventId) state.selectedEventId = state.eventos[state.eventos.length-1].id;
   document.getElementById('newEventoTitulo').value = '';
+  if(document.getElementById('newEventoNombreHablado')) document.getElementById('newEventoNombreHablado').value = '';
   document.getElementById('newEventoPrecio').value = '0.00';
   document.getElementById('newEventoFechaIni').value = '';
   document.getElementById('newEventoFechaFin').value = '';
@@ -1832,6 +1834,7 @@ function saveEventRecord(id){
     ev.precio = Number(currentValuesByAction('edit-evento-precio', id) || 0);
     ev.fechaIni = currentValuesByAction('edit-evento-fechaini', id).trim();
     ev.fechaFin = currentValuesByAction('edit-evento-fechafin', id).trim();
+    ev.nombreHablado = currentValuesByAction('edit-evento-nombrehablado', id).trim();
     ev.descripcion = currentValuesByAction('edit-evento-descripcion', id).trim();
     ev.situacion = currentValuesByAction('edit-evento-situacion', id);
   }
@@ -1946,7 +1949,8 @@ function handleClick(e){
           ev.precio = Number(currentValuesByAction('edit-evento-precio', id) || 0);
           ev.fechaIni = currentValuesByAction('edit-evento-fechaini', id).trim();
           ev.fechaFin = currentValuesByAction('edit-evento-fechafin', id).trim();
-          ev.descripcion = currentValuesByAction('edit-evento-descripcion', id).trim();
+          ev.nombreHablado = currentValuesByAction('edit-evento-nombrehablado', id).trim();
+    ev.descripcion = currentValuesByAction('edit-evento-descripcion', id).trim();
           ev.situacion = currentValuesByAction('edit-evento-situacion', id);
         }
         render();
@@ -2105,8 +2109,8 @@ async function exportSeedWorkbook(){
   state.productos.forEach((p,i)=> productCode[p.id] = 'PR' + String(i+1).padStart(4,'0'));
 
   makeSheet('EVENTOS',
-    ['EVENTO_CODIGO','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'],
-    state.eventos.map(e => [eventCode[e.id], e.titulo || '', Number(e.precio || 0), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || ''])
+    ['EVENTO_CODIGO','EVENTO_TITULO','EVENTO_NOMBRE_HABLADO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'],
+    state.eventos.map(e => [eventCode[e.id], e.titulo || '', e.nombreHablado || e.nombre_hablado || '', Number(e.precio || 0), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || ''])
   );
   makeSheet('PERSONAS',
     ['PERSONA_CODIGO','PERSONA_NOMBRE','PERSONA_NOMBRE_AMIGO','PERSONA_RANGO'],
@@ -2980,7 +2984,7 @@ function donorOptions(){
       });
       document.querySelectorAll('[data-action="delete-evento"]').forEach(el => setElementEnabled(el, false));
 
-      ['newEventoTitulo','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion','btnAddEvento'].forEach(id => {
+      ['newEventoTitulo','newEventoNombreHablado','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion','btnAddEvento'].forEach(id => {
         setElementEnabled(opt(id), false);
       });
     }
@@ -3438,8 +3442,8 @@ function donorOptions(){
     const storeCode = {}; state.tiendas.forEach((t,i)=> storeCode[t.id]='TI'+String(i+1).padStart(4,'0'));
     const productCode = {}; state.productos.forEach((p,i)=> productCode[p.id]='PR'+String(i+1).padStart(4,'0'));
 
-    makeSheet('EVENTOS', ['EVENTO_CODIGO','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'],
-      state.eventos.map(e => [eventCode[e.id], e.titulo || '', Number(e.precio || 0), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
+    makeSheet('EVENTOS', ['EVENTO_CODIGO','EVENTO_TITULO','EVENTO_NOMBRE_HABLADO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'],
+      state.eventos.map(e => [eventCode[e.id], e.titulo || '', e.nombreHablado || e.nombre_hablado || '', Number(e.precio || 0), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
     makeSheet('PERSONAS', ['PERSONA_CODIGO','PERSONA_NOMBRE','PERSONA_RANGO'],
       state.personas.map(p => [personCode[p.id], p.nombre || '', p.rango || 'SOCIO']));
     makeSheet('TIENDAS', ['TIENDA_CODIGO','TIENDA_NOMBRE'],
@@ -3560,7 +3564,8 @@ function donorOptions(){
           ev.precio = Number(currentValuesByAction('edit-evento-precio', id) || 0);
           ev.fechaIni = currentValuesByAction('edit-evento-fechaini', id).trim();
           ev.fechaFin = currentValuesByAction('edit-evento-fechafin', id).trim();
-          ev.descripcion = currentValuesByAction('edit-evento-descripcion', id).trim();
+          ev.nombreHablado = currentValuesByAction('edit-evento-nombrehablado', id).trim();
+    ev.descripcion = currentValuesByAction('edit-evento-descripcion', id).trim();
           ev.situacion = currentValuesByAction('edit-evento-situacion', id);
           render();
         }
@@ -10099,7 +10104,7 @@ setInterval(() => { const dt=document.getElementById('headerDateTime'); if(dt) d
       return ws;
     }
     makeSheet('METADATOS', ['CAMPO','VALOR'], [['VERSION', VERSION], ['ALCANCE', scope === 'TODOS' ? 'TODOS' : selectedTitle], ['EVENTO_CODIGO', scope === 'TODOS' ? 'TODOS' : selectedCode], ['FECHA_DESCARGA', nowStamp()], ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'], ['NOTA', 'Las imágenes grandes de tickets se dividen en TICKETS_PARTES para evitar ficheros Excel corruptos.']]);
-    makeSheet('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo||'', Number(e.precio||0), e.fechaIni||'', e.fechaFin||'', e.situacion||'En curso', e.descripcion||'']));
+    makeSheet('EVENTOS', ['EVENTO_CODIGO','EVENTO_ID','EVENTO_TITULO','EVENTO_NOMBRE_HABLADO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [eventCode[e.id], e.id, e.titulo||'', e.nombreHablado||e.nombre_hablado||'', Number(e.precio||0), e.fechaIni||'', e.fechaFin||'', e.situacion||'En curso', e.descripcion||'']));
     makeSheet('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre||'', p.rango||'SOCIO']));
     makeSheet('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre||'']));
     const wsProductosBackupV190 = makeSheet('PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO'], scoped.productos.map(p => [productCode[p.id], p.id, p.nombre||'', p.segmento||'', p.destino||'', Number((p.defaultPrecio ?? p.precio) || 0)]));
@@ -14653,7 +14658,7 @@ window.addCellNote = addCellNote;
     if(ro){$('mtImportar')?.classList.add('hidden');}
     const excel=$('btnExportExcel'); if(excel){excel.classList.remove('ce-v225-hidden','ce-v225-ro-disabled','locked'); excel.disabled=false; excel.removeAttribute('aria-disabled');}
     const allow=canEvents();
-    ['mtEventosBtn','btnAddEvento','newEventoTitulo','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion'].forEach(id=>setDisabled($(id),!allow));
+    ['mtEventosBtn','btnAddEvento','newEventoTitulo','newEventoNombreHablado','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion'].forEach(id=>setDisabled($(id),!allow));
     document.querySelectorAll('[data-action^="edit-evento"],button[data-action="save-evento"],button[data-action="delete-evento"]').forEach(el=>setDisabled(el,!allow));
   }
   document.addEventListener('click',ev=>{const blocked=ev.target?.closest?.('#btnOpenImport,#btnExportSeed,#btnStartImport,#importWorkbookFile,#importTicketFiles,#ceBackupOkV181'); if(blocked&&isRO()){ev.preventDefault();ev.stopPropagation();ev.stopImmediatePropagation();alert('Usuario RO: no autorizado para cargas ni descargas de datos. Sí puede descargar INFOEVENTO.'); return false;}},true);
@@ -14783,6 +14788,7 @@ window.addCellNote = addCellNote;
     ev.precio=Number(val('edit-evento-precio',ev.precio||0)||0);
     ev.fechaIni=String(val('edit-evento-fechaini',ev.fechaIni||'')).trim();
     ev.fechaFin=String(val('edit-evento-fechafin',ev.fechaFin||'')).trim();
+    ev.nombreHablado=String(val('edit-evento-nombrehablado',ev.nombreHablado||ev.nombre_hablado||'')).trim();
     ev.descripcion=String(val('edit-evento-descripcion',ev.descripcion||'')).trim();
     ev.situacion=String(val('edit-evento-situacion',ev.situacion||'En curso')||'En curso');
     try{ localStorage.setItem(typeof STORAGE_KEY!=='undefined'?STORAGE_KEY:'controlevent_v6_4', JSON.stringify(s)); }catch(_){ }
@@ -15121,6 +15127,7 @@ window.addCellNote = addCellNote;
     ev.precio=Number(val('edit-evento-precio',ev.precio||0)||0);
     ev.fechaIni=String(val('edit-evento-fechaini',ev.fechaIni||'')).trim();
     ev.fechaFin=String(val('edit-evento-fechafin',ev.fechaFin||'')).trim();
+    ev.nombreHablado=String(val('edit-evento-nombrehablado',ev.nombreHablado||ev.nombre_hablado||'')).trim();
     ev.descripcion=String(val('edit-evento-descripcion',ev.descripcion||'')).trim();
     ev.situacion=String(val('edit-evento-situacion',ev.situacion||'En curso')||'En curso');
     persistStateLocal(); try{if(typeof saveState==='function')saveState();}catch(_){}
@@ -15531,7 +15538,7 @@ window.addCellNote = addCellNote;
     document.querySelectorAll('.mobile-menu-action[data-target="mtAccesoBtn"]').forEach(el=>show(el,isGD()));
     // EVENTOS editable para GD y RW.
     const canEvents=isGD()||isRW();
-    ['mtEventosBtn','btnAddEvento','newEventoTitulo','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion'].forEach(id=>setEnabled($(id),canEvents));
+    ['mtEventosBtn','btnAddEvento','newEventoTitulo','newEventoNombreHablado','newEventoPrecio','newEventoFechaIni','newEventoFechaFin','newEventoSituacion','newEventoDescripcion'].forEach(id=>setEnabled($(id),canEvents));
     document.querySelectorAll('#mtEventos input,#mtEventos select,#mtEventos textarea,#mtEventos button,[data-action^="edit-evento"],button[data-action="save-evento"],button[data-action="delete-evento"]').forEach(el=>setEnabled(el,canEvents));
     // Evento finalizado: navegar/visualizar sí, cambios de fotos no.
     if(isFinalized()){

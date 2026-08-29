@@ -235,7 +235,7 @@
       ['ALCANCE', scope === 'TODOS' ? 'TODOS' : (selected?.titulo || scope)], ['EVENTO_ID', scope === 'TODOS' ? 'TODOS' : scope],
       ['FECHA_DESCARGA', `${now.yyyy}${now.mm}${now.dd}-${now.hh}_${now.mi}_${now.ss}`], ['NOTA', 'EVENTO_CODIGO contiene el EVENTO_ID real en hojas relacionales; EVENTOS no incluye EVxxx.']
     ]);
-    sheet(wb, 'EVENTOS', ['EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
+    sheet(wb, 'EVENTOS', ['EVENTO_ID','EVENTO_TITULO','EVENTO_NOMBRE_HABLADO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [e.id || '', e.titulo || '', e.nombreHablado || e.nombre_hablado || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
     sheet(wb, 'PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id] || '', p.id || '', p.nombre || '', p.rango || 'SOCIO']));
     sheet(wb, 'TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id] || '', t.id || '', t.nombre || '']));
     sheet(wb, 'PRODUCTOS', ['PRODUCTO_CODIGO','PRODUCTO_ID','PRODUCTO_NOMBRE','PRODUCTO_SEGMENTO','PRODUCTO_DESTINO','PRODUCTO_PRECIO_REFERENCIA'], scoped.productos.map(p => [productCode[p.id] || '', p.id || '', p.nombre || '', p.segmento || '', p.destino || '', num(p.defaultPrecio ?? p.precio)]));

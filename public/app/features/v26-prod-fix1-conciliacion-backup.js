@@ -94,7 +94,7 @@
   function isV26Backup(wb){return (wb.SheetNames||[]).some(n=>up(n)==='METADATOS')&&(wb.SheetNames||[]).some(n=>up(n)==='CE_COMPRAS_BBDD');}
   function coreState(wb){
     const eventRows=sheetRows(wb,'EVENTOS');
-    const eventos=eventRows.map(r=>({id:norm(pick(r,'EVENTO_ID')),titulo:norm(pick(r,'EVENTO_TITULO')),precio:number(pick(r,'EVENTO_PRECIO')),fechaIni:norm(pick(r,'EVENTO_FECHAINI')),fechaFin:norm(pick(r,'EVENTO_FECHAFIN')),situacion:norm(pick(r,'EVENTO_SITUACION'))||'En curso',descripcion:norm(pick(r,'EVENTO_DESCRIPCION'))})).filter(r=>r.id);
+    const eventos=eventRows.map(r=>({id:norm(pick(r,'EVENTO_ID')),titulo:norm(pick(r,'EVENTO_TITULO')),nombreHablado:norm(pick(r,'EVENTO_NOMBRE_HABLADO')),precio:number(pick(r,'EVENTO_PRECIO')),fechaIni:norm(pick(r,'EVENTO_FECHAINI')),fechaFin:norm(pick(r,'EVENTO_FECHAFIN')),situacion:norm(pick(r,'EVENTO_SITUACION'))||'En curso',descripcion:norm(pick(r,'EVENTO_DESCRIPCION'))})).filter(r=>r.id);
     const eventCodeToId=new Map(eventRows.map(r=>[norm(pick(r,'EVENTO_CODIGO')),norm(pick(r,'EVENTO_ID'))]).filter(([code,id])=>code&&id));
     const resolveEventId=value=>{const code=norm(value);return eventCodeToId.get(code)||code;};
     const personaRows=sheetRows(wb,'PERSONAS');

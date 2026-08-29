@@ -80,6 +80,7 @@
       ...ev,
       id:String(id),
       titulo:String(fieldValue('edit-evento-titulo', id, ev.titulo || '', root)).trim(),
+      nombreHablado:String(fieldValue('edit-evento-nombrehablado', id, ev.nombreHablado || ev.nombre_hablado || '', root)).trim(),
       precio:parseEuro(fieldValue('edit-evento-precio', id, ev.precio || 0, root)),
       fechaIni:String(fieldValue('edit-evento-fechaini', id, ev.fechaIni || '', root)).trim(),
       fechaFin:String(fieldValue('edit-evento-fechafin', id, ev.fechaFin || '', root)).trim(),

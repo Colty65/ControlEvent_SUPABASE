@@ -111,8 +111,8 @@ export function humanizePersonNames(value='',state={},opts={}){
   return{text:out,changes:[...new Set(changes)]};
 }
 export function humanizeSpokenEntities(value='',state={},opts={}){
-  let out=text(value),eventChanges=[];const events=arr(state?.eventos).map(e=>trim(e?.titulo||e?.nombre)).filter(Boolean).sort((a,b)=>b.length-a.length);
-  for(const canonical of events){const core=stripVisualEventDateSuffix(canonical),spoken=humanizeEventName(canonical,opts),variants=[canonical,core].filter(Boolean).sort((a,b)=>b.length-a.length);for(const variant of variants){const before=out;out=replaceWholeName(out,variant,spoken);if(out!==before){eventChanges.push(`${variant}→${spoken}`);break;}}}
+  let out=text(value),eventChanges=[];const events=arr(state?.eventos).map(e=>({canonical:trim(e?.titulo||e?.nombre),spokenDb:trim(e?.nombreHablado||e?.nombre_hablado||e?.tituloVoz||e?.titulo_voz)})).filter(e=>e.canonical).sort((a,b)=>b.canonical.length-a.canonical.length);
+  for(const event of events){const canonical=event.canonical,core=stripVisualEventDateSuffix(canonical),spoken=event.spokenDb||humanizeEventName(canonical,opts),variants=[canonical,core].filter(Boolean).sort((a,b)=>b.length-a.length);for(const variant of variants){const before=out;out=replaceWholeName(out,variant,spoken);if(out!==before){eventChanges.push(`${variant}→${spoken}${event.spokenDb?' [BBDD]':''}`);break;}}}
   const people=humanizePersonNames(out,state,opts);out=people.text;
   const staticForms=applySpokenReplacements(out);out=staticForms.text;
   return{text:out,eventChanges:[...new Set(eventChanges)],personChanges:people.changes,formChanges:staticForms.changes,changed:eventChanges.length>0||people.changes.length>0||staticForms.changes.length>0,profileVersion:trim(profile?.version)||'unknown'};
@@ -141,4 +141,4 @@ export function familiarPersonAliasCandidates(state={},prompt=''){
   for(const alias of unique){if(!containsPhrase(prompt,alias))continue;const r=resolveFamiliarPersonAlias(state,alias);const candidates=r.ok?[r]:r.ambiguous?arr(r.candidates):[];for(const c of candidates){const key=`${c.id}|${normPhrase(alias)}`;if(seen.has(key))continue;seen.add(key);out.push({id:c.id,name:c.nombre,score:r.ok?1:0.99,matched:alias,match_kind:r.ok?'exact_social_alias':'ambiguous_social_alias',resolution:c.resolution||'db_person_alias'});}}
   return out;
 }
-export function humanLanguageProfile(){return JSON.parse(JSON.stringify({...profile,version:'BANK4_21'}));}
+export function humanLanguageProfile(){return JSON.parse(JSON.stringify({...profile,version:'BANK4_23'}));}

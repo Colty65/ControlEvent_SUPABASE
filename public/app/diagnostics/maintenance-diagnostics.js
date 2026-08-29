@@ -10,7 +10,7 @@ const SECTIONS = [
   },
   {
     name: 'eventos', label: 'EVENTOS', rootId: 'mtEventos', listId: 'eventosList',
-    fields: ['newEventoTitulo', 'newEventoPrecio', 'newEventoFechaIni', 'newEventoFechaFin', 'newEventoSituacion', 'newEventoDescripcion'],
+    fields: ['newEventoTitulo', 'newEventoNombreHablado', 'newEventoPrecio', 'newEventoFechaIni', 'newEventoFechaFin', 'newEventoSituacion', 'newEventoDescripcion'],
     buttons: ['btnAddEvento'], actions: ['addEvento'], stateKey: 'eventos'
   },
   {

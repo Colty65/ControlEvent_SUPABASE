@@ -692,7 +692,7 @@ async function buildBackupWorkbook(fullState, scope){
     ['PROTECCION', 'Hojas protegidas para evitar cambios accidentales en la descarga.'],
     ['NOTA', 'Exportación generada en servidor con clonado plano y tickets divididos para evitar RangeError.']
   ]);
-  addRows('EVENTOS', ['EVENTO_ID','EVENTO_TITULO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [e.id || '', e.titulo || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
+  addRows('EVENTOS', ['EVENTO_ID','EVENTO_TITULO','EVENTO_NOMBRE_HABLADO','EVENTO_PRECIO','EVENTO_FECHAINI','EVENTO_FECHAFIN','EVENTO_SITUACION','EVENTO_DESCRIPCION'], scoped.eventos.map(e => [e.id || '', e.titulo || '', e.nombreHablado || e.nombre_hablado || '', num(e.precio), e.fechaIni || '', e.fechaFin || '', e.situacion || 'En curso', e.descripcion || '']));
   addRows('PERSONAS', ['PERSONA_CODIGO','PERSONA_ID','PERSONA_NOMBRE','PERSONA_NOMBRE_AMIGO','PERSONA_RANGO'], scoped.personas.map(p => [personCode[p.id], p.id, p.nombre || '', p.nombreAmigo || p.nombre_amigo || '', p.rango || 'SOCIO']));
   addRows('PERSONAS_ALIAS', ['PERSONA_ID','ALIAS','PRIORIDAD','ES_PREFERIDO','ACTIVO'], (scoped.personAliases || []).map(a => [a.personaId || a.persona_id || '', a.alias || '', Number(a.prioridad ?? 50), (a.preferido === true || a.es_preferido === true) ? 'SI' : 'NO', a.activo === false ? 'NO' : 'SI']));
   addRows('TIENDAS', ['TIENDA_CODIGO','TIENDA_ID','TIENDA_NOMBRE'], scoped.tiendas.map(t => [storeCode[t.id], t.id, t.nombre || '']));

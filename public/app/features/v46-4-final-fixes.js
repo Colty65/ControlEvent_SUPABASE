@@ -322,6 +322,7 @@
       e.situacion = getVal('edit-evento-situacion', id) || e.situacion;
     }else{
       e.titulo = norm(getVal('edit-evento-titulo', id));
+      e.nombreHablado = norm(getVal('edit-evento-nombrehablado', id));
       e.precio = parseEuro(getVal('edit-evento-precio', id));
       e.fechaIni = norm(getVal('edit-evento-fechaini', id));
       e.fechaFin = norm(getVal('edit-evento-fechafin', id));
