@@ -56,3 +56,6 @@ P1.12 corrige únicamente el laboratorio:
 - las baterías Excel y las pruebas históricas mantienen su motor anterior salvo que declaren expresamente `engine: VNEXT`.
 
 No se modifica `event-ai.service.js` ni se añade interpretación lingüística. **NHC intacto.**
+
+## P1.13 · ITV language race guard
+Se corrige una carrera de inicialización: al abrir ITV, la carga automática de la batería legacy podía terminar después de pulsar una batería de lenguaje y sustituir silenciosamente `preview` por los 78 casos históricos, dejando el reloj/etiqueta de Lenguaje. P1.13 serializa las cargas mediante un epoch y añade un preflight que impide iniciar una batería de lenguaje si no hay exactamente el perfil/cantidad esperados y todos los casos no declaran `engine: VNEXT`. NHC intacto; no se modifica el runtime lingüístico de Zuzu.

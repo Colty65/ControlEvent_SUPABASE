@@ -7,7 +7,7 @@
 
   const ITV_CONTRACT_VERSION=4;
   const ITV_BUILD='20260828-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE';
-  const ITV_LANGUAGE_BUILD='20260830-P111-LANGUAGE-REACH-260-NHC';
+  const ITV_LANGUAGE_BUILD='20260830-P113-LANGUAGE-REACH-260-VNEXT-RACE-GUARD-NHC';
   const ITV_OBSERVATION_MODE=false;
   window.__CE_ZUZU_ITV_BUILD__=ITV_BUILD;
   window.__CE_ZUZU_ITV_CONTRACT_VERSION__=ITV_CONTRACT_VERSION;
@@ -28,6 +28,7 @@
   let currentAbort=null,currentFetchAbort=null,currentCaseCancel=null,currentReader=null,preview=null,rows=[],lastSummary=null,activeFilter='TODOS',lastMode='FAST';
   let streamWatchdog=null,lastStreamAt=0,currentCase=null,stopRequested=false,uiRunning=false;
   let batterySeed=0,batteryClock='',currentRunKey='',historyRuns=[],historyStorage='',historicReplayKey='',batterySource='generated',batteryCode='';
+  let batteryLoadEpoch=0,requestedLanguageLevel='';
   let authEventUser=null;
 
   function renewBatterySeed(){
@@ -228,10 +229,11 @@
 
   async function loadLanguageBattery(level='BASIC'){
     if(uiRunning){setPhase('Detén la ejecución antes de preparar otra batería de lenguaje.');return;}
-    const lvl=trim(level).toUpperCase();renewBatterySeed();setPhase(`Preparando batería de alcance ${lvl} con datos reales…`);
+    const lvl=trim(level).toUpperCase(),epoch=++batteryLoadEpoch;requestedLanguageLevel=lvl;renewBatterySeed();setPhase(`Preparando batería de alcance ${lvl} con datos reales…`);
     try{
       historicReplayKey='';batterySource='language';batteryCode='';
       const data=await fetchJson(`/api/zuzu-tests/language-battery?level=${encodeURIComponent(lvl)}&seed=${encodeURIComponent(batterySeed)}`,{cache:'no-store',headers:apiHeaders()},90000);
+      if(epoch!==batteryLoadEpoch||requestedLanguageLevel!==lvl)return;
       preview=data;batterySeed=num(data?.seed)||batterySeed;batteryCode=trim(data?.batteryCode);batteryClock=`Lenguaje ${data?.languageProfile?.label||lvl} · ${new Date().toLocaleTimeString('es-ES')}`;currentRunKey=`language-${lvl.toLowerCase()}-${batterySeed}-${Date.now()}`;
       for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;lastMode='FULL-CERT';
       document.querySelectorAll('.zt-language-btn').forEach(b=>b.classList.toggle('active',trim(b.dataset.level).toUpperCase()===lvl));
@@ -243,8 +245,9 @@
 
   async function loadPreview(forceNew=false){
     if(uiRunning){setPhase('Hay una ejecución en curso. Pulsa DETENER antes de generar otra batería.');return;}
+    const epoch=++batteryLoadEpoch;requestedLanguageLevel='';
     if(forceNew||!batterySeed)renewBatterySeed();setPhase('Leyendo tablas reales y generando una batería nueva…');
-    try{historicReplayKey='';batterySource='generated';batteryCode='';document.querySelectorAll('.zt-language-btn').forEach(b=>b.classList.remove('active'));preview=await fetchJson(`/api/zuzu-tests/preview?seed=${encodeURIComponent(batterySeed)}`,{cache:'no-store',headers:apiHeaders()},45000);batterySeed=num(preview?.seed)||batterySeed;currentRunKey=`seed-${batterySeed}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);setPhase('Batería nueva preparada. Todavía NO se guarda en el histórico: se guardará automáticamente cuando termines de procesar al menos un modo con esta semilla.');}
+    try{historicReplayKey='';batterySource='generated';batteryCode='';document.querySelectorAll('.zt-language-btn').forEach(b=>b.classList.remove('active'));const data=await fetchJson(`/api/zuzu-tests/preview?seed=${encodeURIComponent(batterySeed)}`,{cache:'no-store',headers:apiHeaders()},45000);if(epoch!==batteryLoadEpoch||requestedLanguageLevel)return;preview=data;batterySeed=num(preview?.seed)||batterySeed;currentRunKey=`seed-${batterySeed}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);setPhase('Batería nueva preparada. Todavía NO se guarda en el histórico: se guardará automáticamente cuando termines de procesar al menos un modo con esta semilla.');}
     catch(e){setPhase(e.name==='AbortError'?'La lectura de datos tardó demasiado. Vuelve a pulsar NUEVA BATERÍA.':'No se pudo generar la batería: '+(e.message||e),true);}
   }
   function renderPreview(){const c=preview?.dataCounts||{},t=preview?.tests||{},isExcel=(preview?.source==='excel'||batterySource==='excel'),isLanguage=(preview?.source==='language'||batterySource==='language'),lp=preview?.languageProfile||{};$('ztData').innerHTML=(isLanguage?[["Origen","Alcance lenguaje"],["Motor","VNEXT"],["Nivel",lp.label||batteryCode],["Preguntas",t['FULL-CERT']||lp.count],["Expectativa",lp.expectedBand||'—'],["NHC","solo ITV"]]:isExcel?[['Origen','Excel'],['Código',preview?.batteryCode||batteryCode],['Preguntas',t['FULL-CERT']||t['AI-SMOKE']],['AI-SMOKE',t['AI-SMOKE']],['FULL-CERT',t['FULL-CERT']]]:[['Eventos',c.events],['Personas',c.people],['Productos',c.products],['Tiendas',c.stores],['Compras',c.purchases],['Ingresos',c.incomes],['DOC',c.documents],['Fototickets',c.ticketImages],['Donaciones',c.donationLines],['Hitos',c.hitos],['LG',c.lgs],['FAST',t.FAST],['AI-SMOKE',t['AI-SMOKE']],['FULL-CERT',t['FULL-CERT']]]).map(x=>`<span class="zt-pill">${esc(x[0])}: <strong>${typeof x[1]==='number'?fmtN(x[1]):esc(x[1]||'—')}</strong></span>`).join('');if($('ztSeedInfo'))$('ztSeedInfo').textContent=isLanguage?`Batería ${lp.label||batteryCode} · MOTOR VNEXT · ${lp.count||t['FULL-CERT']||0} preguntas · expectativa inicial ${lp.expectedBand||'—'} · NHC: estas frases son solo pruebas, nunca reglas del runtime.`:isExcel?`Batería Excel ${preview?.batteryCode||batteryCode} · semilla estable ${batterySeed} · ${t['FULL-CERT']||0} preguntas · FULL-CERT conserva toda la conversación en el mismo ledger.`:`Batería ${batteryClock||'reloj local'} · semilla ${batterySeed} · FAST recorre todos los registros estructurales y FULL-CERT incluye continuidad Z1 sobre todos los eventos reales.`;}
@@ -291,6 +294,11 @@
   async function run(onlyIssues){
     if(uiRunning){setPhase('Ya hay una ejecución en curso. Usa DETENER si quieres interrumpirla.');return;}if(!preview)await loadPreview();if(!preview)return;
     lastMode=document.querySelector('.zt-mode.active')?.dataset.mode||lastMode;
+    if(requestedLanguageLevel||batterySource==='language'||preview?.source==='language'){
+      const langCases=Array.isArray(preview?.cases?.['FULL-CERT'])?preview.cases['FULL-CERT']:[],expected=num(preview?.languageProfile?.count)||num(preview?.tests?.['FULL-CERT']);
+      const valid=preview?.source==='language'&&batterySource==='language'&&trim(preview?.languageProfile?.id).toUpperCase()===trim(requestedLanguageLevel||preview?.languageProfile?.id).toUpperCase()&&langCases.length===expected&&langCases.length>0&&langCases.every(c=>trim(c?.engine).toUpperCase()==='VNEXT');
+      if(!valid){setPhase('SEGURIDAD ITV: la batería de lenguaje no está íntegra o fue sustituida por otra carga. No se ejecuta nada. Pulsa de nuevo la batería deseada.',true);return;}
+    }
     if(lastMode==='FAST'){if(['excel','language'].includes(trim(preview?.source))||['excel','language'].includes(trim(batterySource))){setPhase('Esta batería contiene preguntas literales de lenguaje: ejecútala con FULL-CERT. FAST sigue reservado a invariantes autogeneradas de CE.');return;}return runFastStream(onlyIssues);}
     return runPaidCases(onlyIssues);
   }
