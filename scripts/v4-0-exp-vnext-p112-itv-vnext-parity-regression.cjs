@@ -1,0 +1,13 @@
+const fs=require('fs'),path=require('path');
+const root=path.resolve(__dirname,'..');
+const svc=fs.readFileSync(path.join(root,'services/zuzu-test-lab.service.js'),'utf8');
+const ai=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+let ko=0;const ok=(v,m)=>{console.log(`${v?'OK':'KO'} ${m}`);if(!v)ko++;};
+ok(svc.includes('runZuzuVNextUserTurn'),'ITV importa el motor VNext real');
+ok(svc.includes("engine:'VNEXT'")||svc.includes("engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':''"),'Casos de lenguaje declaran VNEXT');
+ok(svc.includes("useVNext=trim(caseDef?.engine).toUpperCase()==='VNEXT'"),'Selector de motor es configuración estructurada, no lenguaje');
+ok(svc.includes('return runZuzuVNextUserTurn({...common'),'runSaved ejecuta VNEXT cuando el caso lo exige');
+ok(svc.includes("previousInteractionId:(result?.meta?.resetInteractionId===true?'':"),'FULL-CERT respeta resetInteractionId de VNext');
+ok(svc.includes("engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':'LEDGER'")&&svc.includes('provider:text(result?.provider)')&&svc.includes('architecture:text(result?.meta?.architecture)'),'Informe expone motor/proveedor/arquitectura');
+ok(!ai.includes('P1.12 · Corrección de paridad ITV'),'NHC: runtime de Zuzu no recibe reglas de la ITV P1.12');
+if(ko){console.error(`P1.12 ITV VNEXT PARITY: ${ko} KO`);process.exit(1);}console.log('P1.12 ITV VNEXT PARITY: OK');

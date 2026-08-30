@@ -41,3 +41,18 @@ Cuando una pregunta de estas baterías falle:
 ## Alcance de P1.11
 
 P1.11 es instrumentación diagnóstica. No modifica `services/event-ai.service.js` ni añade nuevas reglas de lenguaje al runtime. Primero medimos el terreno con 260 pruebas; después usamos los resultados para limpiar/ampliar la arquitectura con evidencia, no por tanteo.
+
+
+## P1.12 · Corrección de paridad ITV ↔ VNext
+
+Se detectó que las baterías P1.11 se enviaban por `runZuzuUserTurn`, es decir, por el motor Ledger de `/event-ai/analyze`, mientras que el botón experimental **🧪 VNext** usa `runZuzuVNextUserTurn` (`/event-ai/analyze-vnext`). Por tanto los tiempos y resultados de P1.11 no medían VNext.
+
+P1.12 corrige únicamente el laboratorio:
+
+- cada caso `LANG-*` declara `engine: VNEXT`;
+- `runSavedZuzuTestCase` ejecuta esos casos con `runZuzuVNextUserTurn`;
+- en FULL-CERT se conserva el `previousInteractionId` de VNext y el historial visible del escenario;
+- el informe guarda `engine`, `provider`, `architecture` y `performance` para que sea imposible confundir el motor ejecutado;
+- las baterías Excel y las pruebas históricas mantienen su motor anterior salvo que declaren expresamente `engine: VNEXT`.
+
+No se modifica `event-ai.service.js` ni se añade interpretación lingüística. **NHC intacto.**
