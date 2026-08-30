@@ -159,7 +159,18 @@ function restoredHistoricalCase(raw={},mode=''){
 function makeCase({id,group,label,prompt='',expected='',meta={},run}){ return {id,group,label,prompt,expected,meta,run}; }
 function outcome(c,status,actual,extra={}){ return {id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:trim(actual),status,...extra}; }
 const ITV_ESCAPE_FREE=false;
-function observedOutcome(c,result,usage={},extra={}){const verdict=validatePaidCase(c,result);return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:verdict.status,validationReasons:verdict.reasons,usage,performance:result?.meta?.performance||{},tools:arr(result?.meta?.tools),engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':'LEDGER',provider:text(result?.provider),architecture:text(result?.meta?.architecture),oracleEnabled:true,observationMode:'ORACLE_ACTIVE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),...ledgerAuditOf(result),...extra};}
+function vNextAuditOf(result={}){
+  const ctx=(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:{};
+  const tables=arr(result?.tables).map(t=>({key:trim(t?.key),title:trim(t?.title),columns:arr(t?.columns).map(trim).filter(Boolean),rowCount:arr(t?.rows).length}));
+  const visible=[...new Set(tables.flatMap(t=>t.columns))];
+  return{
+    resultContext:ctx,kind:trim(ctx?.kind),operation:trim(ctx?.operation),event:trim(ctx?.event),events:arr(ctx?.events).map(trim).filter(Boolean),person:trim(ctx?.person),
+    orderBy:trim(ctx?.order_by),visibleColumns:arr(ctx?.visible_columns).map(trim).filter(Boolean),hiddenColumns:arr(ctx?.hidden_columns).map(trim).filter(Boolean),
+    tableCount:tables.length,tables,renderedRows:tables.reduce((n,t)=>n+num(t.rowCount),0),renderedColumns:visible,chartCount:arr(result?.charts).length,
+    tools:arr(result?.meta?.tools).map(trim).filter(Boolean),warnings:arr(result?.warnings).map(trim).filter(Boolean)
+  };
+}
+function observedOutcome(c,result,usage={},extra={}){const verdict=validatePaidCase(c,result);const vnext=trim(c?.engine).toUpperCase()==='VNEXT';return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:verdict.status,validationReasons:verdict.reasons,usage,performance:result?.meta?.performance||{},tools:arr(result?.meta?.tools),engine:vnext?'VNEXT':'LEDGER',provider:text(result?.provider),architecture:text(result?.meta?.architecture),oracleEnabled:true,observationMode:'ORACLE_ACTIVE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),resultContext:(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:null,vnextAudit:vnext?vNextAuditOf(result):null,debugTrace:arr(result?.meta?.debugTrace).slice(0,60),...ledgerAuditOf(result),...extra};}
 function technicalErrorOutcome(c,message,usage={},extra={}){return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(message),status:'KO',validationReasons:['fallo técnico/timeout'],usage,oracleEnabled:true,observationMode:'ORACLE_ACTIVE',...extra};}
 
 // FIX2.10 · ORÁCULO FUERTE -----------------------------------------------------
@@ -375,7 +386,13 @@ function validateOracle(caseDef,result){
     const d=oracle.data||{},answerText=text(result?.answer);
     if(claimsKnownEventMissing(result,oracle.event)||/\b(?:no\s+(?:se\s+)?(?:han\s+)?encontrad[oa]s?|no\s+hay|sin)\b[^.\n]{0,80}\b(?:datos|detalle|informaci[oó]n)\b/i.test(answerText))reasons.push(`resumen de evento: afirma ausencia de datos canónicos para ${oracle.event}`);
     const money=[d.income,d.purchases,d.pending,d.donations,d.balance,d.valuation].filter(v=>Number.isFinite(Number(v))&&Math.abs(Number(v))>0.004);
-    if(money.length&&!money.some(v=>hasMoney(blob,v))&&!arr(result?.tables).length&&!resultUsedTool(result,'event_dossier'))reasons.push('resumen de evento: no acredita ninguna magnitud canónica disponible');
+    if(money.length&&!money.some(v=>hasMoney(blob,v))&&!arr(result?.tables).length&&!resultUsedTool(result,'event_dossier')&&!resultUsedTool(result,'query_ce'))reasons.push('resumen de evento: no acredita ninguna magnitud canónica disponible');
+    for(const metric of arr(oracle.requiredMetrics)){
+      if(metric==='income'&&!hasMoney(blob,d.income))reasons.push(`objetivo múltiple: falta ingreso ${euro(d.income)}`);
+      if(metric==='purchases'&&!hasMoney(blob,d.purchases))reasons.push(`objetivo múltiple: faltan compras ${euro(d.purchases)}`);
+      if(metric==='balance'&&!hasMoney(blob,d.balance))reasons.push(`objetivo múltiple: falta saldo ${euro(d.balance)}`);
+      if(metric==='attendees'&&!new RegExp(`\b${Number(d.attendees)}\b[^.\n]{0,45}(?:asistent|person|gente)|(?:asistent|person|gente)[^.\n]{0,45}\b${Number(d.attendees)}\b`,'i').test(blob))reasons.push(`objetivo múltiple: falta asistencia ${Number(d.attendees)}`);
+    }
   }else if(oracle.kind==='purchase-set'){
     if(oracle.productCount>0&&claimsNoProducts(result))reasons.push(`afirma que no hay productos, pero CE tiene ${oracle.productCount}`);
     if(ev?.kind==='product_set'){
@@ -416,7 +433,10 @@ function validateOracle(caseDef,result){
     if(!trim(result?.answer))reasons.push('resumen personal vacío');
     if(oracle.data&&oracle.data.eventCount>0&&!hasNameInText(blob,oracle.person)&&!resultHasPerson(result,oracle.person))reasons.push('no mantiene la identidad personal');
   }else if(oracle.kind==='person-events'){
-    const names=arr(oracle.data?.summaryRows).map(r=>trim(r?.Evento)).filter(Boolean);if(names.length&&!names.some(n=>hasNameInText(blob,n))&&arr(result?.tables).length===0)reasons.push('no muestra ningún evento real de la persona');
+    const names=arr(oracle.data?.summaryRows).map(r=>trim(r?.Evento)).filter(Boolean),expectedCount=num(oracle.data?.eventCount);
+    if(expectedCount>0&&/(?:aparece|figura|participa|est[aá])[^.\n]{0,45}\b0\s+eventos?\b|\b0\s+eventos?\b/i.test(blob))reasons.push(`afirma 0 eventos, pero CE acredita ${expectedCount}`);
+    const m=blob.match(/\b(\d+)\s+eventos?\b/i);if(m&&expectedCount>0&&Number(m[1])!==expectedCount)reasons.push(`recuento de eventos ${Number(m[1])} != ${expectedCount}`);
+    if(names.length&&!names.some(n=>hasNameInText(blob,n))&&arr(result?.tables).length===0&&!(m&&Number(m[1])===expectedCount))reasons.push('no muestra ningún evento real de la persona');
   }else if(oracle.kind==='person-income'){
     if(oracle.known!==false&&!hasMoney(blob,oracle.total))reasons.push(`ingreso vinculado no coincide con ${euro(oracle.total)}`);
   }else if(oracle.kind==='person-relation'){
@@ -579,10 +599,40 @@ function vItvPerformanceHealth(result={}){
   if(tokens>18000&&status!=='KO'){status='WARN';reasons.push(`${Math.round(tokens)} tokens en un turno`);}
   return{status,reasons};
 }
+function vNextDomainFromAudit(a={}){
+  const op=norm(a?.operation);
+  if(op.includes('purchase'))return'purchases';if(op.includes('attendance'))return'attendance';if(op.includes('donation'))return'donations';if(op.includes('income'))return'incomes';
+  if(op.includes('document'))return'documents';if(op.includes('bank'))return'bank';if(op.includes('management'))return'management';if(op.includes('compare'))return'comparison';
+  if(op.includes('person')||op.includes('participation'))return'person';if(op.includes('catalog')||op.includes('overview'))return'catalog';return'';
+}
+function vNextTableHasColumn(a={},field=''){const f=norm(field);return arr(a?.renderedColumns).some(x=>norm(x)===f)||arr(a?.visibleColumns).some(x=>norm(x)===f);}
+function validateVNextStructural(caseDef,result){
+  const o=caseDef?.oracle;if(!o||trim(o.kind)!=='ledger-structural')return{status:'OK',reasons:[]};
+  const a=vNextAuditOf(result),reasons=[],uncertified=[];
+  const expectedDomain=trim(o.domain||o.expectedDomain),actualDomain=vNextDomainFromAudit(a);
+  if(expectedDomain&&actualDomain&&norm(actualDomain)!==norm(expectedDomain))reasons.push(`dominio VNext ${actualDomain} != ${expectedDomain}`);
+  if(expectedDomain&&!actualDomain&&a.kind==='data')uncertified.push(`dominio esperado ${expectedDomain} no queda tipado en resultContext`);
+  const expectedEvent=trim(o.event||o.expectedEvent||caseDef?.event);if(expectedEvent){const names=[a.event,...a.events].filter(Boolean);if(!names.some(x=>norm(x)===norm(expectedEvent))&&!resultHasEvent(result,expectedEvent))reasons.push(`evento VNext esperado «${expectedEvent}» no materializado`);}
+  const expectedEntity=trim(o.entity||o.expectedEntity||caseDef?.person);if(expectedEntity){const names=[a.person].filter(Boolean);if(!names.some(x=>norm(x).includes(norm(expectedEntity))||norm(expectedEntity).includes(norm(x)))&&!resultHasPerson(result,expectedEntity))reasons.push(`entidad VNext esperada «${expectedEntity}» no materializada`);}
+  const expectedFields=arr(o.fields||o.expectedFields).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean);for(const f of expectedFields)if(!vNextTableHasColumn(a,f))reasons.push(`campo visible esperado «${f}» no aparece en VNext`);
+  const absentFields=arr(o.absentFields).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean);for(const f of absentFields){const explicitlyHidden=arr(a.hiddenColumns).some(x=>norm(x)===norm(f));if(vNextTableHasColumn(a,f)&&!explicitlyHidden)reasons.push(`campo «${f}» debería estar oculto en VNext`);}
+  const ops=arr(o.operations||o.expectedOperations).flatMap(x=>typeof x==='string'?x.split('|'):x).map(trim).filter(Boolean);
+  for(const op of ops){const parts=op.split(':').map(trim),kind=norm(parts[0]),field=parts[1]||'';
+    if(kind==='remove field'){if(!arr(a.hiddenColumns).some(x=>norm(x)===norm(field))&&vNextTableHasColumn(a,field))reasons.push(`VNext no ocultó el campo «${field}»`);}
+    else if(kind==='add field'){if(!vNextTableHasColumn(a,field))reasons.push(`VNext no restauró el campo «${field}»`);}
+    else if(kind==='sort'&&field){const requested=norm(`${field} ${parts[2]||''}`);if(!norm(a.orderBy).includes(norm(field)))uncertified.push(`orden ${requested} no queda acreditado en resultContext`);}
+    else if(['filter','rank','compare','set fields','add fields','remove fields'].includes(kind))uncertified.push(`operación ${op} no dispone todavía de evidencia estructural suficiente en VNext`);
+  }
+  if(o.chart===true&&a.chartCount<1)reasons.push('se esperaba gráfica y VNext no generó ninguna');
+  if(expectedDomain==='purchases'&&!ops.length&&a.tableCount<1&&!resultUsedTool(result,'query_ce'))reasons.push('consulta de compras sin tabla ni contrato materializado');
+  if(reasons.length)return{status:'KO',reasons};
+  if(uncertified.length)return{status:'WARN',reasons:uncertified.map(x=>`ITV VNext: ${x}`)};
+  return{status:'OK',reasons:[]};
+}
 function validatePaidCase(caseDef,result){
-  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result),ledger=validateLedgerStructural(caseDef,result),health=vItvGenericHealth(result),perf=vItvPerformanceHealth(result);
-  const reasons=[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons,...ledger.reasons,...health.reasons,...perf.reasons];
-  let status='OK';if(!base||!oracle.ok||ledger.status==='KO'||health.status==='KO'||perf.status==='KO')status='KO';else if(ledger.status==='WARN'||health.status==='WARN'||perf.status==='WARN')status='WARN';
+  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result),structural=trim(caseDef?.engine).toUpperCase()==='VNEXT'?validateVNextStructural(caseDef,result):validateLedgerStructural(caseDef,result),health=vItvGenericHealth(result),perf=vItvPerformanceHealth(result);
+  const reasons=[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons,...structural.reasons,...health.reasons,...perf.reasons];
+  let status='OK';if(!base||!oracle.ok||structural.status==='KO'||health.status==='KO'||perf.status==='KO')status='KO';else if(structural.status==='WARN'||health.status==='WARN'||perf.status==='WARN')status='WARN';
   return{ok:status==='OK',status,reasons};
 }
 
@@ -981,19 +1031,21 @@ async function buildLanguageReachCases(state,rawLevel='BASIC',seed=1){
       en=>`Háblame de ${en}.`,en=>`Dame los datos clave de ${en}.`,en=>`¿Cómo quedó ${en}?`,en=>`Repásame ${en}.`,en=>`Cuéntame lo importante de ${en}.`
     ];
     for(let i=0;i<profile.count;i++){
-      const en=eName(i),pn=pName(i),sn=sName(i),eo=await eventData(en),po=purchaseOracle(state,en),d=await donData(en),doc=await docsData(en),b=await bankData(en),m=await mgmtData(en),pp=await personData(pn),slot=i%16,scenario=`LANG BASIC ${String(i+1).padStart(2,'0')}`;
-      if(slot===0)await add({group:'BÁSICO · EVENTO',label:'Resumen explícito',prompt:eventPhrases[i%eventPhrases.length](en),scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null});
-      else if(slot===1)await add({group:'BÁSICO · INGRESOS',label:'Total de ingresos',prompt:`¿Cuánto se ingresó en ${en}?`,scenario,event:en,oracle:eo?{kind:'event-metric',event:en,label:'Ingresos',value:eo.income}:null});
-      else if(slot===2)await add({group:'BÁSICO · COMPRAS',label:'Compras del evento',prompt:`¿Qué compras hubo en ${en}?`,scenario,event:en,oracle:po?{kind:'purchase-set',event:en,productCount:po.productCount,total:po.total}:null});
-      else if(slot===3)await add({group:'BÁSICO · PTE.COMPRA',label:'Pendiente de compra',prompt:`¿Cuánto queda pendiente de compra en ${en}?`,scenario,event:en,oracle:eo?{kind:'event-metric',event:en,label:'Compras pendientes',value:eo.pending}:null});
-      else if(slot===4)await add({group:'BÁSICO · ASISTENCIA',label:'Asistencia total',prompt:`¿Cuánta gente asistió a ${en}?`,scenario,event:en,oracle:eo?{kind:'attendance',event:en,data:attendanceOracle(eo,en)}:null});
-      else if(slot===5)await add({group:'BÁSICO · DONACIONES',label:'Donaciones',prompt:`¿Qué donaciones hubo en ${en}?`,scenario,event:en,oracle:d?{kind:'donations',event:en,data:d}:null});
-      else if(slot===6)await add({group:'BÁSICO · DOCUMENTOS',label:'Documentación',prompt:`Revisa la documentación de ${en}.`,scenario,event:en,oracle:doc?{kind:'documentation',event:en,data:doc}:null});
-      else if(slot===7)await add({group:'BÁSICO · BANCO',label:'Cuadre banco',prompt:`Dame el Cuadre Banco de ${en}.`,scenario,event:en,oracle:b?{kind:'bank-summary',event:en,data:b}:null});
-      else if(slot===8)await add({group:'BÁSICO · GESTIÓN',label:'Hitos y LG',prompt:`¿Cómo van los hitos y tareas LG de ${en}?`,scenario,event:en,oracle:m?{kind:'management',event:en,data:m}:null});
-      else if(slot===9)await add({group:'BÁSICO · PERSONA',label:'Dossier personal',prompt:`Háblame de ${pn}.`,scenario,person:pn,oracle:pp?{kind:'person-summary',person:pn,data:pp}:null});
-      else if(slot===10)await add({group:'BÁSICO · PERSONA',label:'Eventos de una persona',prompt:`¿En qué eventos aparece ${pn}?`,scenario,person:pn,oracle:pp?{kind:'person-events',person:pn,data:pp}:null});
-      else if(slot===11)await add({group:'BÁSICO · PERSONA',label:'Ingresos de una persona',prompt:`¿Qué ingresos tiene vinculados ${pn}?`,scenario,person:pn,oracle:pp?{kind:'person-income',person:pn,total:pp.income,known:true}:null});
+      const en=eName(i),pn=pName(i),sn=sName(i),slot=i%16,scenario=`LANG BASIC ${String(i+1).padStart(2,'0')}`;
+      // P1.14: oráculos LAZY. Cada pregunta calcula únicamente la fuente factual que necesita.
+      // BASIC deja de precalcular evento+compras+donaciones+documentos+banco+gestión+persona para luego tirar 6/7 resultados.
+      if(slot===0){const eo=await eventData(en);await add({group:'BÁSICO · EVENTO',label:'Resumen explícito',prompt:eventPhrases[i%eventPhrases.length](en),scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null});}
+      else if(slot===1){const eo=await eventData(en);await add({group:'BÁSICO · INGRESOS',label:'Total de ingresos',prompt:`¿Cuánto se ingresó en ${en}?`,scenario,event:en,oracle:eo?{kind:'event-metric',event:en,label:'Ingresos',value:eo.income}:null});}
+      else if(slot===2){const po=purchaseOracle(state,en);await add({group:'BÁSICO · COMPRAS',label:'Compras del evento',prompt:`¿Qué compras hubo en ${en}?`,scenario,event:en,oracle:po?{kind:'purchase-set',event:en,productCount:po.productCount,total:po.total}:null});}
+      else if(slot===3){const eo=await eventData(en);await add({group:'BÁSICO · PTE.COMPRA',label:'Pendiente de compra',prompt:`¿Cuánto queda pendiente de compra en ${en}?`,scenario,event:en,oracle:eo?{kind:'event-metric',event:en,label:'Compras pendientes',value:eo.pending}:null});}
+      else if(slot===4){const eo=await eventData(en);await add({group:'BÁSICO · ASISTENCIA',label:'Asistencia total',prompt:`¿Cuánta gente asistió a ${en}?`,scenario,event:en,oracle:eo?{kind:'attendance',event:en,data:attendanceOracle(eo,en)}:null});}
+      else if(slot===5){const d=await donData(en);await add({group:'BÁSICO · DONACIONES',label:'Donaciones',prompt:`¿Qué donaciones hubo en ${en}?`,scenario,event:en,oracle:d?{kind:'donations',event:en,data:d}:null});}
+      else if(slot===6){const doc=await docsData(en);await add({group:'BÁSICO · DOCUMENTOS',label:'Documentación',prompt:`Revisa la documentación de ${en}.`,scenario,event:en,oracle:doc?{kind:'documentation',event:en,data:doc}:null});}
+      else if(slot===7){const b=await bankData(en);await add({group:'BÁSICO · BANCO',label:'Cuadre banco',prompt:`Dame el Cuadre Banco de ${en}.`,scenario,event:en,oracle:b?{kind:'bank-summary',event:en,data:b}:null});}
+      else if(slot===8){const m=await mgmtData(en);await add({group:'BÁSICO · GESTIÓN',label:'Hitos y LG',prompt:`¿Cómo van los hitos y tareas LG de ${en}?`,scenario,event:en,oracle:m?{kind:'management',event:en,data:m}:null});}
+      else if(slot===9){const pp=await personData(pn);await add({group:'BÁSICO · PERSONA',label:'Dossier personal',prompt:`Háblame de ${pn}.`,scenario,person:pn,oracle:pp?{kind:'person-summary',person:pn,data:pp}:null});}
+      else if(slot===10){const pp=await personData(pn);await add({group:'BÁSICO · PERSONA',label:'Eventos de una persona',prompt:`¿En qué eventos aparece ${pn}?`,scenario,person:pn,oracle:pp?{kind:'person-events',person:pn,data:pp}:null});}
+      else if(slot===11){const pp=await personData(pn);await add({group:'BÁSICO · PERSONA',label:'Ingresos de una persona',prompt:`¿Qué ingresos tiene vinculados ${pn}?`,scenario,person:pn,oracle:pp?{kind:'person-income',person:pn,total:pp.income,known:true}:null});}
       else if(slot===12){const ce=catalogs[i%catalogs.length],co=catalogOracle(state,ce);await add({group:'BÁSICO · CATÁLOGO',label:`Catálogo ${ce}`,prompt:`¿Cuántos ${ce==='events'?'eventos':ce==='people'?'personas':ce==='products'?'productos':'tiendas'} hay registrados?`,scenario,oracle:{kind:'catalog-count',...co}});}
       else if(slot===13){const so=await storeData(sn);await add({group:'BÁSICO · TIENDA',label:'Compras por tienda',prompt:`¿Qué compras se han hecho en ${sn}?`,scenario,oracle:so?{kind:'store-purchases',...so}:null});}
       else if(slot===14){const co=await canonicalSociosOracle(state);await add({group:'BÁSICO · SOCIOS',label:'Censo canónico',prompt:'Dame el censo de socios canónicos.',scenario,oracle:co?{kind:'canonical-socios',records:co.records,people:co.people}:null});}
@@ -1023,7 +1075,7 @@ async function buildLanguageReachCases(state,rawLevel='BASIC',seed=1){
         await add({group:'MEDIA · COMPARACIÓN',label:'Ganador ingresos',prompt:'¿Cuál tuvo más ingresos?',scenario,events:[en,en2],oracle:{kind:'compare-metric',compare:cmp,metric:'income'}});
         await add({group:'MEDIA · COMPARACIÓN',label:'Ganador compras',prompt:'¿Y cuál gastó más en compras?',scenario,events:[en,en2],oracle:{kind:'compare-metric',compare:cmp,metric:'purchases'}});
       }else if(type===4){
-        await add({group:'MEDIA · DOS OBJETIVOS',label:'Ingresos y asistencia',prompt:`Dime cuánto se ingresó y cuánta gente asistió a ${en}.`,scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null});
+        await add({group:'MEDIA · DOS OBJETIVOS',label:'Ingresos y asistencia',prompt:`Dime cuánto se ingresó y cuánta gente asistió a ${en}.`,scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo,requiredMetrics:['income','attendees']}:null});
         await add({group:'MEDIA · DOS OBJETIVOS',label:'Añadir donaciones',prompt:'Añade ahora las donaciones al resumen.',scenario,event:en,oracle:don?{kind:'donations',event:en,data:don}:null});
         await add({group:'MEDIA · DOS OBJETIVOS',label:'Volver al balance',prompt:'Vale, con eso dime cómo quedó el saldo operativo.',scenario,event:en,oracle:eo?{kind:'event-metric',event:en,label:'Saldo operativo',value:eo.balance}:null});
       }else if(type===5){

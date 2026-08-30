@@ -1,0 +1,21 @@
+const fs=require('fs'),path=require('path'),crypto=require('crypto');
+const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const lab=read('services/zuzu-test-lab.service.js'),ui=read('public/app/features/zuzu-test-console-gd.js'),html=read('public/index.html'),ai=fs.readFileSync(path.join(root,'services/event-ai.service.js'));
+let n=0,f=0;function t(name,ok){n++;if(!ok){f++;console.error('KO',name)}else console.log('OK',name)}
+t('NHC runtime idéntico a baseline P1.13',crypto.createHash('sha256').update(ai).digest('hex')==='1cbdbe41832f3db4f581bec0ef0d3783fc584cb347071f0e70727672635dd4f7');
+t('BASIC usa oráculos lazy',lab.includes('P1.14: oráculos LAZY')&&!/eo=await eventData\(en\),po=purchaseOracle\(state,en\),d=await donData\(en\),doc=await docsData\(en\),b=await bankData\(en\),m=await mgmtData\(en\),pp=await personData\(pn\)/.test(lab));
+t('oráculo VNext separado de Ledger',lab.includes('function validateVNextStructural')&&lab.includes("trim(caseDef?.engine).toUpperCase()==='VNEXT'?validateVNextStructural"));
+t('auditoría VNext exporta contexto/tablas/gráficas',lab.includes('function vNextAuditOf')&&lab.includes('resultContext:')&&lab.includes('renderedColumns:visible')&&lab.includes('chartCount:arr(result?.charts).length'));
+t('columnas VNext se validan por efecto observable',lab.includes('VNext no ocultó el campo')&&lab.includes('VNext no restauró el campo'));
+t('operación no certificable queda WARN, no falso KO',lab.includes('no dispone todavía de evidencia estructural suficiente en VNext')&&lab.includes("return{status:'WARN',reasons:uncertified"));
+t('multiobjetivo exige ingresos y asistencia',lab.includes("requiredMetrics:['income','attendees']")&&lab.includes('objetivo múltiple: falta asistencia'));
+t('persona-eventos detecta contradicción 0 vs real',lab.includes('afirma 0 eventos, pero CE acredita'));
+t('resultado guarda debugTrace y vnextAudit',lab.includes('debugTrace:arr(result?.meta?.debugTrace).slice(0,60)')&&lab.includes('vnextAudit:vnext?vNextAuditOf(result):null'));
+t('manifiesto se congela al iniciar',ui.includes('function freezeManifestForRun')&&ui.includes('activeRunManifest=clone(base)'));
+t('ejecución usa el manifiesto congelado',ui.includes('paidCases(onlyIssues,activeRunManifest)')&&ui.includes("Array.isArray(activeRunManifest?.cases?.['FULL-CERT'])"));
+t('auditoría exige done/resultados/manifiesto/prompts',ui.includes('function auditRunManifest')&&ui.includes('done=${num(done)} != manifiesto')&&ui.includes('prompt distinto en'));
+t('informe inválido no calcula cobertura',ui.includes('INFORME NO VÁLIDO')&&ui.includes('No se calcula cobertura'));
+t('exporta exactamente generatedBattery ejecutada + hash',ui.includes('generatedBattery:executed')&&ui.includes('executedManifestHash')&&ui.includes('manifestValidation'));
+t('race guard P1.13 se conserva',ui.includes('batteryLoadEpoch')&&ui.includes('SEGURIDAD ITV: la batería de lenguaje no está íntegra'));
+t('build P1.14 visible y cache-bust nuevo',ui.includes('P114-ITV-TRUSTED-ORACLE-MANIFEST-VNEXT-NHC')&&html.includes('P114-ITV-TRUSTED-ORACLE-MANIFEST-LANG260'));
+console.log(`${n-f}/${n} OK`);process.exit(f?1:0);

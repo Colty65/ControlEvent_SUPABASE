@@ -59,3 +59,15 @@ No se modifica `event-ai.service.js` ni se añade interpretación lingüística.
 
 ## P1.13 · ITV language race guard
 Se corrige una carrera de inicialización: al abrir ITV, la carga automática de la batería legacy podía terminar después de pulsar una batería de lenguaje y sustituir silenciosamente `preview` por los 78 casos históricos, dejando el reloj/etiqueta de Lenguaje. P1.13 serializa las cargas mediante un epoch y añade un preflight que impide iniciar una batería de lenguaje si no hay exactamente el perfil/cantidad esperados y todos los casos no declaran `engine: VNEXT`. NHC intacto; no se modifica el runtime lingüístico de Zuzu.
+
+
+## P1.14 · ITV trusted oracle + manifiesto congelado
+La ITV deja de juzgar VNext con el contrato estructural de Ledger. Para casos `engine=VNEXT`, el laboratorio valida el efecto observable del contrato VNext mediante `resultContext`, operación tipada, evento/sujeto, columnas visibles/ocultas, tablas renderizadas, orden declarado y gráficas. Las operaciones que todavía no pueden acreditarse estructuralmente no se convierten en KO ficticio: quedan WARN explícito de "no certificado".
+
+La batería ejecutada se congela al pulsar INICIAR. El informe exporta exactamente ese manifiesto y su hash; al terminar se exige igualdad entre `done`, resultados, IDs y prompts del manifiesto. Si no coincide, el informe se marca **NO VÁLIDO** y no publica porcentaje de cobertura.
+
+BÁSICA 50 calcula los oráculos de forma lazy: cada pregunta consulta únicamente la fuente factual que necesita. Esto evita que una pregunta de ingresos precalcule también compras, donaciones, documentos, banco, gestión y persona.
+
+Se refuerzan objetivos múltiples explícitos (por ejemplo ingresos + asistencia) y contradicciones factuales simples de continuidad (por ejemplo afirmar 0 eventos cuando el oráculo acredita varios). El resultado exporta además `resultContext`, auditoría VNext y traza de decisión para separar fallo de interpretación, fallo CE y fallo del oráculo.
+
+**NHC:** `services/event-ai.service.js` permanece byte a byte idéntico a P1.13. P1.14 modifica exclusivamente ITV/laboratorio, su presentación y su instrumentación.

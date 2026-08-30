@@ -8,6 +8,6 @@ ok(svc.includes("engine:'VNEXT'")||svc.includes("engine:trim(c?.engine).toUpperC
 ok(svc.includes("useVNext=trim(caseDef?.engine).toUpperCase()==='VNEXT'"),'Selector de motor es configuración estructurada, no lenguaje');
 ok(svc.includes('return runZuzuVNextUserTurn({...common'),'runSaved ejecuta VNEXT cuando el caso lo exige');
 ok(svc.includes("previousInteractionId:(result?.meta?.resetInteractionId===true?'':"),'FULL-CERT respeta resetInteractionId de VNext');
-ok(svc.includes("engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':'LEDGER'")&&svc.includes('provider:text(result?.provider)')&&svc.includes('architecture:text(result?.meta?.architecture)'),'Informe expone motor/proveedor/arquitectura');
+ok((svc.includes("engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':'LEDGER'")||svc.includes("engine:vnext?'VNEXT':'LEDGER'"))&&svc.includes('provider:text(result?.provider)')&&svc.includes('architecture:text(result?.meta?.architecture)'),'Informe expone motor/proveedor/arquitectura');
 ok(!ai.includes('P1.12 · Corrección de paridad ITV'),'NHC: runtime de Zuzu no recibe reglas de la ITV P1.12');
 if(ko){console.error(`P1.12 ITV VNEXT PARITY: ${ko} KO`);process.exit(1);}console.log('P1.12 ITV VNEXT PARITY: OK');

@@ -7,7 +7,7 @@
 
   const ITV_CONTRACT_VERSION=4;
   const ITV_BUILD='20260828-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE';
-  const ITV_LANGUAGE_BUILD='20260830-P113-LANGUAGE-REACH-260-VNEXT-RACE-GUARD-NHC';
+  const ITV_LANGUAGE_BUILD='20260830-P114-ITV-TRUSTED-ORACLE-MANIFEST-VNEXT-NHC';
   const ITV_OBSERVATION_MODE=false;
   window.__CE_ZUZU_ITV_BUILD__=ITV_BUILD;
   window.__CE_ZUZU_ITV_CONTRACT_VERSION__=ITV_CONTRACT_VERSION;
@@ -19,6 +19,9 @@
   const esc=v=>text(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const fmtN=n=>new Intl.NumberFormat('es-ES').format(num(n));
   const fmtE=n=>new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:4}).format(num(n))+' €';
+  const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
+  function stableObject(v){if(Array.isArray(v))return v.map(stableObject);if(v&&typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>o[k]=stableObject(v[k]));return o;}return v;}
+  function manifestHash(v){const raw=JSON.stringify(stableObject(v||{}));let h=2166136261>>>0;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(16).padStart(8,'0');}
   function percentile(values,p){const a=values.map(num).filter(v=>v>0).sort((x,y)=>x-y);if(!a.length)return 0;const i=(a.length-1)*p,lo=Math.floor(i),hi=Math.min(a.length-1,lo+1),f=i-lo;return Math.round(a[lo]*(1-f)+a[hi]*f);}
   function performanceSummary(list=[]){const a=list.filter(r=>num(r?.durationMs)>0),dur=a.map(r=>num(r.durationMs)),calls=a.map(r=>num(r?.usage?.calls)),tokens=a.map(r=>num(r?.usage?.tokens)),cost=a.map(r=>num(r?.usage?.costEur));const avg=x=>x.length?x.reduce((m,v)=>m+v,0)/x.length:0;return{cases:a.length,medianMs:percentile(dur,.5),p90Ms:percentile(dur,.9),p95Ms:percentile(dur,.95),maxMs:dur.length?Math.max(...dur):0,avgCalls:Number(avg(calls).toFixed(2)),avgTokens:Math.round(avg(tokens)),avgCostEur:Number(avg(cost).toFixed(6)),over12s:dur.filter(x=>x>12000).length,over18s:dur.filter(x=>x>18000).length};}
   const MODES=['FAST','AI-SMOKE','FULL-CERT'];
@@ -28,7 +31,8 @@
   let currentAbort=null,currentFetchAbort=null,currentCaseCancel=null,currentReader=null,preview=null,rows=[],lastSummary=null,activeFilter='TODOS',lastMode='FAST';
   let streamWatchdog=null,lastStreamAt=0,currentCase=null,stopRequested=false,uiRunning=false;
   let batterySeed=0,batteryClock='',currentRunKey='',historyRuns=[],historyStorage='',historicReplayKey='',batterySource='generated',batteryCode='';
-  let batteryLoadEpoch=0,requestedLanguageLevel='';
+  let batteryLoadEpoch=0,requestedLanguageLevel='',activeRunManifest=null,activeRunExpectedCases=[];
+  const modeManifests={FAST:null,'AI-SMOKE':null,'FULL-CERT':null};
   let authEventUser=null;
 
   function renewBatterySeed(){
@@ -223,7 +227,7 @@
       if(!raw.length)throw new Error('No se han encontrado preguntas debajo de la cabecera PREGUNTA.');
       const signature=raw.map(x=>`${x.seq}|${x.prompt}|${x.expected}`).join('\n'),hash=itvHash(signature)||0x6d2b79f5,binary=hash.toString(36).toUpperCase();batterySeed=hash;batteryCode=`XLS-${binary.slice(0,9)}`;batteryClock=`Excel · ${file.name}`;const defaultScenario=`EXCEL-${batteryCode}`;
       const cases=raw.map((x,i)=>({id:`excel-${String(i+1).padStart(3,'0')}`,group:x.group||'EXCEL',label:x.label||`Pregunta ${i+1}`,prompt:x.prompt,expected:x.expected||'Respuesta coherente con los datos reales y el hilo conversacional.',scenario:x.scenario||defaultScenario,mode:'FULL-CERT',oracle:x.oracle&&typeof x.oracle==='object'?x.oracle:null,requireAnswer:true,validationRule:'',meta:{excelRow:x.seq}}));
-      document.querySelectorAll('.zt-language-btn').forEach(b=>b.classList.remove('active'));preview={ok:true,source:'excel',batteryCode,replayContractVersion:ITV_CONTRACT_VERSION,seed:batterySeed,generatedAt:new Date().toISOString(),fileName:file.name,sheetName:trim(imported?.sheetName),dataCounts:{},tests:{FAST:0,'AI-SMOKE':cases.length,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':cases.map(x=>({...x,scenario:''})),'FULL-CERT':cases}};batterySource='excel';historicReplayKey='';currentRunKey=`excel-${batteryCode}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;lastMode='FULL-CERT';renderPreview();renderModeStatuses();selectMode('FULL-CERT');setPhase(`Excel cargado · ${cases.length} preguntas · código ${batteryCode}. La semilla depende del contenido: si vuelves a cargar el mismo Excel obtendrás la misma semilla.`);
+      document.querySelectorAll('.zt-language-btn').forEach(b=>b.classList.remove('active'));preview={ok:true,source:'excel',batteryCode,replayContractVersion:ITV_CONTRACT_VERSION,seed:batterySeed,generatedAt:new Date().toISOString(),fileName:file.name,sheetName:trim(imported?.sheetName),dataCounts:{},tests:{FAST:0,'AI-SMOKE':cases.length,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':cases.map(x=>({...x,scenario:''})),'FULL-CERT':cases}};batterySource='excel';historicReplayKey='';currentRunKey=`excel-${batteryCode}-${Date.now()}`;for(const mode of MODES){modeCache[mode]={rows:[],summary:null};modeManifests[mode]=null;}activeRunManifest=null;activeRunExpectedCases=[];rows=[];lastSummary=null;lastMode='FULL-CERT';renderPreview();renderModeStatuses();selectMode('FULL-CERT');setPhase(`Excel cargado · ${cases.length} preguntas · código ${batteryCode}. La semilla depende del contenido: si vuelves a cargar el mismo Excel obtendrás la misma semilla.`);
     }catch(e){setPhase('No se pudo cargar el Excel: '+(e.message||e),true);}
   }
 
@@ -235,7 +239,7 @@
       const data=await fetchJson(`/api/zuzu-tests/language-battery?level=${encodeURIComponent(lvl)}&seed=${encodeURIComponent(batterySeed)}`,{cache:'no-store',headers:apiHeaders()},90000);
       if(epoch!==batteryLoadEpoch||requestedLanguageLevel!==lvl)return;
       preview=data;batterySeed=num(data?.seed)||batterySeed;batteryCode=trim(data?.batteryCode);batteryClock=`Lenguaje ${data?.languageProfile?.label||lvl} · ${new Date().toLocaleTimeString('es-ES')}`;currentRunKey=`language-${lvl.toLowerCase()}-${batterySeed}-${Date.now()}`;
-      for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;lastMode='FULL-CERT';
+      for(const mode of MODES){modeCache[mode]={rows:[],summary:null};modeManifests[mode]=null;}activeRunManifest=null;activeRunExpectedCases=[];rows=[];lastSummary=null;lastMode='FULL-CERT';
       document.querySelectorAll('.zt-language-btn').forEach(b=>b.classList.toggle('active',trim(b.dataset.level).toUpperCase()===lvl));
       const count=num(data?.languageProfile?.count)||num(data?.tests?.['FULL-CERT']);$('ztMaxCases').value=String(count||100);$('ztMaxCost').value=String(Number(data?.estimated?.['FULL-CERT']?.hardCapSuggested||Math.max(.5,count*.025)).toFixed(2));
       renderPreview();renderModeStatuses();selectMode('FULL-CERT');
@@ -247,7 +251,7 @@
     if(uiRunning){setPhase('Hay una ejecución en curso. Pulsa DETENER antes de generar otra batería.');return;}
     const epoch=++batteryLoadEpoch;requestedLanguageLevel='';
     if(forceNew||!batterySeed)renewBatterySeed();setPhase('Leyendo tablas reales y generando una batería nueva…');
-    try{historicReplayKey='';batterySource='generated';batteryCode='';document.querySelectorAll('.zt-language-btn').forEach(b=>b.classList.remove('active'));const data=await fetchJson(`/api/zuzu-tests/preview?seed=${encodeURIComponent(batterySeed)}`,{cache:'no-store',headers:apiHeaders()},45000);if(epoch!==batteryLoadEpoch||requestedLanguageLevel)return;preview=data;batterySeed=num(preview?.seed)||batterySeed;currentRunKey=`seed-${batterySeed}-${Date.now()}`;for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);setPhase('Batería nueva preparada. Todavía NO se guarda en el histórico: se guardará automáticamente cuando termines de procesar al menos un modo con esta semilla.');}
+    try{historicReplayKey='';batterySource='generated';batteryCode='';document.querySelectorAll('.zt-language-btn').forEach(b=>b.classList.remove('active'));const data=await fetchJson(`/api/zuzu-tests/preview?seed=${encodeURIComponent(batterySeed)}`,{cache:'no-store',headers:apiHeaders()},45000);if(epoch!==batteryLoadEpoch||requestedLanguageLevel)return;preview=data;batterySeed=num(preview?.seed)||batterySeed;currentRunKey=`seed-${batterySeed}-${Date.now()}`;for(const mode of MODES){modeCache[mode]={rows:[],summary:null};modeManifests[mode]=null;}activeRunManifest=null;activeRunExpectedCases=[];rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);setPhase('Batería nueva preparada. Todavía NO se guarda en el histórico: se guardará automáticamente cuando termines de procesar al menos un modo con esta semilla.');}
     catch(e){setPhase(e.name==='AbortError'?'La lectura de datos tardó demasiado. Vuelve a pulsar NUEVA BATERÍA.':'No se pudo generar la batería: '+(e.message||e),true);}
   }
   function renderPreview(){const c=preview?.dataCounts||{},t=preview?.tests||{},isExcel=(preview?.source==='excel'||batterySource==='excel'),isLanguage=(preview?.source==='language'||batterySource==='language'),lp=preview?.languageProfile||{};$('ztData').innerHTML=(isLanguage?[["Origen","Alcance lenguaje"],["Motor","VNEXT"],["Nivel",lp.label||batteryCode],["Preguntas",t['FULL-CERT']||lp.count],["Expectativa",lp.expectedBand||'—'],["NHC","solo ITV"]]:isExcel?[['Origen','Excel'],['Código',preview?.batteryCode||batteryCode],['Preguntas',t['FULL-CERT']||t['AI-SMOKE']],['AI-SMOKE',t['AI-SMOKE']],['FULL-CERT',t['FULL-CERT']]]:[['Eventos',c.events],['Personas',c.people],['Productos',c.products],['Tiendas',c.stores],['Compras',c.purchases],['Ingresos',c.incomes],['DOC',c.documents],['Fototickets',c.ticketImages],['Donaciones',c.donationLines],['Hitos',c.hitos],['LG',c.lgs],['FAST',t.FAST],['AI-SMOKE',t['AI-SMOKE']],['FULL-CERT',t['FULL-CERT']]]).map(x=>`<span class="zt-pill">${esc(x[0])}: <strong>${typeof x[1]==='number'?fmtN(x[1]):esc(x[1]||'—')}</strong></span>`).join('');if($('ztSeedInfo'))$('ztSeedInfo').textContent=isLanguage?`Batería ${lp.label||batteryCode} · MOTOR VNEXT · ${lp.count||t['FULL-CERT']||0} preguntas · expectativa inicial ${lp.expectedBand||'—'} · NHC: estas frases son solo pruebas, nunca reglas del runtime.`:isExcel?`Batería Excel ${preview?.batteryCode||batteryCode} · semilla estable ${batterySeed} · ${t['FULL-CERT']||0} preguntas · FULL-CERT conserva toda la conversación en el mismo ledger.`:`Batería ${batteryClock||'reloj local'} · semilla ${batterySeed} · FAST recorre todos los registros estructurales y FULL-CERT incluye continuidad Z1 sobre todos los eventos reales.`;}
@@ -317,10 +321,23 @@
   }
 
   function issueIds(){return new Set(rows.filter(r=>r.status==='KO'||r.status==='WARN').map(r=>String(r.id)));}
-  function paidCases(onlyIssues){
-    let list=Array.isArray(preview?.cases?.[lastMode])?preview.cases[lastMode].slice():[];
+  function paidCases(onlyIssues,manifest=activeRunManifest||preview){
+    let list=Array.isArray(manifest?.cases?.[lastMode])?manifest.cases[lastMode].slice():[];
     if(onlyIssues){const ids=issueIds();list=list.filter(c=>ids.has(String(c.id)));}
     const max=Math.max(1,num($('ztMaxCases').value)||24);return list.slice(0,max);
+  }
+  function freezeManifestForRun(onlyIssues=false){
+    const base=onlyIssues&&modeManifests[lastMode]?modeManifests[lastMode]:preview;
+    activeRunManifest=clone(base);modeManifests[lastMode]=clone(base);return activeRunManifest;
+  }
+  function auditRunManifest(expectedCases=[],actualRows=[],done=0){
+    const expected=Array.isArray(expectedCases)?expectedCases:[],actual=Array.isArray(actualRows)?actualRows:[],reasons=[];
+    if(num(done)!==expected.length)reasons.push(`done=${num(done)} != manifiesto=${expected.length}`);
+    if(actual.length!==expected.length)reasons.push(`resultados=${actual.length} != manifiesto=${expected.length}`);
+    const byId=new Map(actual.map(r=>[String(r?.id||''),r]));
+    for(const c of expected){const r=byId.get(String(c?.id||''));if(!r){reasons.push(`falta resultado ${c?.id}`);continue;}if(trim(r?.prompt)!==trim(c?.prompt))reasons.push(`prompt distinto en ${c?.id}`);}
+    if(new Set(actual.map(r=>String(r?.id||''))).size!==actual.length)reasons.push('hay IDs de resultado duplicados');
+    return{valid:reasons.length===0,reasons,done:num(done),expectedResults:expected.length,actualResults:actual.length,manifestHash:manifestHash(activeRunManifest),checkedAt:new Date().toISOString()};
   }
   function fullCertScenarioStart(list,index){
     if(!Array.isArray(list)||index<0||index>=list.length)return index;
@@ -335,7 +352,7 @@
     const masterAbort=()=>child.abort();currentAbort?.signal?.addEventListener?.('abort',masterAbort,{once:true});
     let timeoutId=null,cancelResolve=null;
     const cancelPromise=new Promise(resolve=>{cancelResolve=()=>resolve({kind:'stopped'});currentCaseCancel=cancelResolve;});
-    const custom=!historicReplayKey&&(['excel','language'].includes(trim(preview?.source))||['excel','language'].includes(trim(batterySource))),endpoint=historicReplayKey?`/api/zuzu-tests/history/${encodeURIComponent(historicReplayKey)}/run-case`:custom?'/api/zuzu-tests/run-custom-case':'/api/zuzu-tests/run-case';
+    const runSource=trim(activeRunManifest?.source)||trim(preview?.source)||trim(batterySource),custom=!historicReplayKey&&['excel','language'].includes(runSource),endpoint=historicReplayKey?`/api/zuzu-tests/history/${encodeURIComponent(historicReplayKey)}/run-case`:custom?'/api/zuzu-tests/run-custom-case':'/api/zuzu-tests/run-case';
     const payload=custom?{mode:lastMode,savedCase:caseDef,conversationState:conversationState||{}}:{mode:lastMode,caseId:caseDef.id,conversationState:conversationState||{},seed:batterySeed};
     const networkPromise=fetch(endpoint,{method:'POST',headers:apiHeaders(),signal:child.signal,body:JSON.stringify(payload)})
       .then(async res=>{let d={};try{d=await res.json();}catch(_){}if(!res.ok)throw new Error(d.error||`HTTP ${res.status}`);return{kind:'ok',data:d};})
@@ -348,10 +365,10 @@
   }
 
   async function runPaidCases(onlyIssues){
-    const cases=paidCases(onlyIssues);if(!cases.length){setPhase(onlyIssues?'No hay KO/avisos que repetir.':'No hay casos generados para este modo.',true);return;}
+    freezeManifestForRun(!!onlyIssues);const cases=paidCases(onlyIssues,activeRunManifest);activeRunExpectedCases=clone(cases);if(!cases.length){setPhase(onlyIssues?'No hay KO/avisos que repetir.':'No hay casos generados para este modo.',true);return;}
     resetRun();stopRequested=false;currentAbort=new AbortController();setRunning(true);
     const total=cases.length,maxCost=Math.max(.02,num($('ztMaxCost').value)||.25),reserve=lastMode==='AI-SMOKE'?.012:.015,clientTimeout=lastMode==='AI-SMOKE'?46000:50000;
-    const fullCases=lastMode==='FULL-CERT'&&onlyIssues&&Array.isArray(preview?.cases?.['FULL-CERT'])?preview.cases['FULL-CERT'].slice():[];
+    const fullCases=lastMode==='FULL-CERT'&&onlyIssues&&Array.isArray(activeRunManifest?.cases?.['FULL-CERT'])?activeRunManifest.cases['FULL-CERT'].slice():[];
     const fullIndex=new Map(fullCases.map((c,i)=>[String(c?.id||''),i]));
     let fullBlockStart=-1,fullThrough=-1,contextWarmups=0,contextWarmupFailures=0;
     let ok=0,warn=0,ko=0,done=0,costEur=0,calls=0,tokens=0,budgetStopped=false,conversationState={conversationId:'',previousInteractionId:'',history:[],scenario:''};
@@ -430,7 +447,8 @@
         rows.push(r);appendRow(r);updateProgress({done,total,ok,warn,ko,percent:Math.round(done*100/total),costEur,calls,tokens});renderFilters();cacheCurrent();currentCase=null;setLive('');
       }
       const aborted=stopRequested||currentAbort.signal.aborted,incomplete=done<total;
-      lastSummary={type:'summary',mode:lastMode,done,total,ok,warn,ko,costEur,calls,tokens,aborted,incomplete,budgetStopped,contextWarmups,contextWarmupFailures,finishedAt:new Date().toISOString(),certified:!aborted&&!incomplete&&ko===0,observationMode:'ORACLE_ACTIVE',oracleEnabled:true,performance:performanceSummary(rows)};
+      const auditValidity=auditRunManifest(activeRunExpectedCases,rows,done);
+      lastSummary={type:'summary',mode:lastMode,done,total,ok,warn,ko,costEur,calls,tokens,aborted,incomplete,budgetStopped,contextWarmups,contextWarmupFailures,finishedAt:new Date().toISOString(),certified:!aborted&&!incomplete&&ko===0&&auditValidity.valid,observationMode:'ORACLE_ACTIVE',oracleEnabled:true,performance:performanceSummary(rows),auditValidity};
       updateProgress(lastSummary);releaseControls();finish(lastSummary);
     }catch(e){if(stopRequested||e.name==='AbortError')setPhase('Prueba detenida. Puedes continuar con otro chequeo sin cerrar la ventana.');else setPhase('Error de ejecución: '+(e.message||e),true);}
     finally{currentFetchAbort=null;currentCaseCancel=null;currentAbort=null;releaseControls();cacheCurrent();currentCase=null;}
@@ -449,7 +467,14 @@
   }
 
   function updateProgress(p){const total=num(p.total),done=num(p.done),pct=total?Math.round(done*100/total):num(p.percent);if($('ztBar'))$('ztBar').style.width=Math.max(0,Math.min(100,pct))+'%';if($('ztPct'))$('ztPct').textContent=pct+'%';if($('ztDone'))$('ztDone').textContent=`${fmtN(done)}/${fmtN(total)}`;if($('ztOk'))$('ztOk').textContent=fmtN(p.ok);if($('ztWarn'))$('ztWarn').textContent=fmtN(p.warn);if($('ztKo'))$('ztKo').textContent=fmtN(p.ko);if($('ztCalls'))$('ztCalls').textContent=fmtN(p.calls);if($('ztTokens'))$('ztTokens').textContent=fmtN(p.tokens);if($('ztCost'))$('ztCost').textContent=fmtE(p.costEur);}
-  function renderFinishState(s,updatePhase=true){const incomplete=num(s.done)<num(s.total),errors=num(s.ko),warns=num(s.warn),pf=s.performance||performanceSummary(rows),perfText=lastMode==='FAST'?'':` · mediana ${(num(pf.medianMs)/1000).toFixed(1)} s · P90 ${(num(pf.p90Ms)/1000).toFixed(1)} s · ${num(pf.over12s)} >12 s`,isLanguage=(preview?.source==='language'||batterySource==='language'),coverage=num(s.done)?Math.round(num(s.ok)*100/num(s.done)):0,coverageText=isLanguage?` · COBERTURA OK ${coverage}% (referencia inicial ${preview?.languageProfile?.expectedBand||'—'})`:'';if(updatePhase)setPhase(s.aborted?'Ejecución detenida.':errors?`ITV terminada con ${fmtN(errors)} KO y ${fmtN(warns)} avisos.${coverageText}${perfText}`:incomplete?`ITV incompleta.${coverageText}${perfText}`:`ITV completa: ${fmtN(s.ok)} OK, ${fmtN(warns)} avisos, 0 KO.${coverageText}${perfText}`);const cert=$('ztCert');if(!cert)return;if(s.aborted){cert.textContent='⏹ ITV DETENIDA';cert.className='zt-cert bad';}else if(errors){cert.textContent=`🔴 ${fmtN(errors)} KO · ORÁCULO ACTIVO`;cert.className='zt-cert bad';}else if(incomplete){cert.textContent=`🟠 ITV INCOMPLETA · ${fmtN(s.done)}/${fmtN(s.total)} · ORÁCULO ACTIVO`;cert.className='zt-cert warn';}else if(warns){cert.textContent=`🟠 SIN KO · ${fmtN(warns)} AVISOS · ORÁCULO ACTIVO`;cert.className='zt-cert warn';}else{cert.textContent=`🟢 CERTIFICADA · ${fmtN(s.done)} CASOS · ORÁCULO ACTIVO`;cert.className='zt-cert good';}if(isLanguage&&!s.aborted){cert.textContent=`🧭 ${preview?.languageProfile?.label||'LENGUAJE'} · COBERTURA OK ${coverage}% · ${fmtN(s.ok)}/${fmtN(s.done)} · ${fmtN(errors)} KO · ${fmtN(warns)} avisos`;cert.className='zt-cert '+(coverage>=90?'good':coverage>=50?'warn':'bad');}}
+  function renderFinishState(s,updatePhase=true){
+    const incomplete=num(s.done)<num(s.total),errors=num(s.ko),warns=num(s.warn),pf=s.performance||performanceSummary(rows),perfText=lastMode==='FAST'?'':` · mediana ${(num(pf.medianMs)/1000).toFixed(1)} s · P90 ${(num(pf.p90Ms)/1000).toFixed(1)} s · ${num(pf.over12s)} >12 s`,manifest=modeManifests[lastMode]||preview,isLanguage=(manifest?.source==='language'||batterySource==='language'),auditValid=s?.auditValidity?.valid!==false,coverage=num(s.done)?Math.round(num(s.ok)*100/num(s.done)):0,coverageText=isLanguage&&auditValid?` · COBERTURA OK ${coverage}% (referencia inicial ${manifest?.languageProfile?.expectedBand||'—'})`:'';
+    if(updatePhase){if(!auditValid)setPhase(`INFORME NO VÁLIDO: ${arr(s?.auditValidity?.reasons).join(' · ')||'manifiesto/resultados no coinciden'}. No se calcula cobertura.`,true);else setPhase(s.aborted?'Ejecución detenida.':errors?`ITV terminada con ${fmtN(errors)} KO y ${fmtN(warns)} avisos.${coverageText}${perfText}`:incomplete?`ITV incompleta.${coverageText}${perfText}`:`ITV completa: ${fmtN(s.ok)} OK, ${fmtN(warns)} avisos, 0 KO.${coverageText}${perfText}`);}
+    const cert=$('ztCert');if(!cert)return;
+    if(!auditValid){cert.textContent='⚫ INFORME NO VÁLIDO · MANIFIESTO ≠ RESULTADOS';cert.className='zt-cert bad';return;}
+    if(s.aborted){cert.textContent='⏹ ITV DETENIDA';cert.className='zt-cert bad';}else if(errors){cert.textContent=`🔴 ${fmtN(errors)} KO · ORÁCULO ACTIVO`;cert.className='zt-cert bad';}else if(incomplete){cert.textContent=`🟠 ITV INCOMPLETA · ${fmtN(s.done)}/${fmtN(s.total)} · ORÁCULO ACTIVO`;cert.className='zt-cert warn';}else if(warns){cert.textContent=`🟠 SIN KO · ${fmtN(warns)} AVISOS · ORÁCULO ACTIVO`;cert.className='zt-cert warn';}else{cert.textContent=`🟢 CERTIFICADA · ${fmtN(s.done)} CASOS · ORÁCULO ACTIVO`;cert.className='zt-cert good';}
+    if(isLanguage&&!s.aborted){cert.textContent=`🧭 ${manifest?.languageProfile?.label||'LENGUAJE'} · COBERTURA OK ${coverage}% · ${fmtN(s.ok)}/${fmtN(s.done)} · ${fmtN(errors)} KO · ${fmtN(warns)} avisos`;cert.className='zt-cert '+(coverage>=90?'good':coverage>=50?'warn':'bad');}
+  }
 
   function setRetryState(){const b=$('ztRetry');if(b)b.style.display='none';}
   function finish(s){releaseControls();renderFinishState(s,true);setRetryState();saveHistory(s);cacheCurrent();renderHistory();renderModeStatuses();saveServerRun();setLive('Puedes pasar al SIGUIENTE CHEQUEO sin cerrar esta ventana.');}
@@ -469,12 +494,12 @@ ${fmtE(r.usage.costEur)} · ${fmtN(r.usage.calls)} IA · ${fmtN(r.usage.tokens)}
   function applyFilter(){document.querySelectorAll('#ztResults .zt-row').forEach(el=>{const show=activeFilter==='TODOS'||(['OK','WARN','KO'].includes(activeFilter)&&el.dataset.status===activeFilter)||el.dataset.group===activeFilter;el.style.display=show?'grid':'none';});}
 
   async function saveServerRun(){
-    if(!preview||!batterySeed||!currentRunKey||!isGD())return;
+    const executed=modeManifests[lastMode]||preview;if(!executed||!batterySeed||!currentRunKey||!isGD())return;
     const processed=MODES.some(m=>modeCache[m]?.summary&&num(modeCache[m].summary.done)>0);
     if(!processed)return;
     try{
       const summary=Object.fromEntries(MODES.map(m=>[m,modeCache[m]?.summary||null]));
-      const payload={runKey:currentRunKey,seed:batterySeed,batteryClock,appVersion:'v4_0_exp',generatedAt:preview?.generatedAt,dataCounts:preview?.dataCounts||{},generatedBattery:preview,report:reportPayload(),summary};
+      const report=reportPayload(),payload={runKey:currentRunKey,seed:batterySeed,batteryClock,appVersion:'v4_0_exp',generatedAt:executed?.generatedAt,dataCounts:executed?.dataCounts||{},generatedBattery:report.generatedBattery||executed,report,summary};
       const d=await fetchJson('/api/zuzu-tests/history',{method:'POST',headers:apiHeaders(),body:JSON.stringify(payload)},30000);
       historyStorage=d?.storage||historyStorage;if($('ztHistoryStorage'))$('ztHistoryStorage').textContent=`Histórico persistente: ${historyStorage||'guardado'} · clave ${currentRunKey}`;await loadServerHistory();
     }catch(e){if($('ztHistoryStorage'))$('ztHistoryStorage').textContent=`Histórico: no se pudo guardar (${e.message||e}). La prueba actual sigue disponible en esta sesión.`;}
@@ -505,15 +530,15 @@ ${fmtE(r.usage.costEur)} · ${fmtN(r.usage.calls)} IA · ${fmtN(r.usage.tokens)}
   function countsChanged(a={},b={}){const keys=['events','people','products','stores','purchases','incomes','documents','ticketImages','donationLines','hitos','lgs'];return keys.some(k=>a?.[k]!=null&&b?.[k]!=null&&num(a[k])!==num(b[k]));}
   async function loadHistoricalRun(){
     if(uiRunning){setPhase('Detén la ejecución antes de cargar un histórico.');return;}const d=await selectedHistorical();const run=d?.run;if(!run)return;
-    historicReplayKey='';currentRunKey=run.runKey;batterySeed=num(run.seed);batteryClock=run.batteryClock||'';preview=run.generatedBattery||null;batterySource=trim(preview?.source)||'generated';batteryCode=preview?.batteryCode||'';
-    const rep=run.report||{};for(const mode of MODES){modeCache[mode]={rows:Array.isArray(rep?.modes?.[mode]?.results)?rep.modes[mode].results:[],summary:rep?.modes?.[mode]?.summary||null};}
+    historicReplayKey='';currentRunKey=run.runKey;batterySeed=num(run.seed);batteryClock=run.batteryClock||'';const rep=run.report||{};preview=rep?.generatedBattery||run.generatedBattery||null;batterySource=trim(preview?.source)||'generated';batteryCode=preview?.batteryCode||'';activeRunManifest=null;activeRunExpectedCases=[];
+    for(const mode of MODES){modeCache[mode]={rows:Array.isArray(rep?.modes?.[mode]?.results)?rep.modes[mode].results:[],summary:rep?.modes?.[mode]?.summary||null};modeManifests[mode]=modeCache[mode].rows.length&&preview?clone(preview):null;}
     renderPreview();renderModeStatuses();restoreMode(lastMode);setPhase(`Histórico cargado · semilla ${batterySeed}. Estás viendo sus preguntas, esperados y respuestas originales; no se ha vuelto a ejecutar nada.`);
   }
   async function replayHistoricalRun(){
     if(uiRunning){setPhase('Detén la ejecución antes de repetir una batería histórica.');return;}const d=await selectedHistorical();const run=d?.run;if(!run)return;
     const saved=run.generatedBattery||null;const savedContract=num(saved?.replayContractVersion);if(!saved?.cases||savedContract!==ITV_CONTRACT_VERSION){setPhase(`Esta batería histórica usa contrato v${savedContract||'?'}, pero la ITV actual exige v${ITV_CONTRACT_VERSION}. No se permite certificar una repetición exacta con un contrato distinto: vuelve a cargar el Excel actual y ejecútalo de nuevo. El histórico sigue disponible solo para consulta.`,true);return;}
     historicReplayKey=run.runKey;batterySeed=num(run.seed);batterySource=trim(saved?.source)||'generated';batteryCode=saved?.batteryCode||'';{const baseClock=text(run.batteryClock||run.seed).replace(/^(?:repetición exacta\s*·\s*)+/i,'');batteryClock=`repetición exacta · ${baseClock||run.seed}`;}preview=saved;currentRunKey=`exact-${batterySeed}-${Date.now()}`;
-    for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);
+    for(const mode of MODES){modeCache[mode]={rows:[],summary:null};modeManifests[mode]=null;}activeRunManifest=null;activeRunExpectedCases=[];rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);
     setPhase(`Batería histórica ${batterySeed} cargada para REPETICIÓN EXACTA. AI-SMOKE y FULL-CERT usarán literalmente las preguntas y esperados guardados; FAST vuelve a comprobar la estructura actual con la misma semilla.`);
   }
   async function replayManualSeed(){
@@ -524,7 +549,7 @@ ${fmtE(r.usage.costEur)} · ${fmtN(r.usage.calls)} IA · ${fmtN(r.usage.tokens)}
       historicReplayKey='';batterySource='generated';batteryCode='';
       const fresh=await fetchJson(`/api/zuzu-tests/preview?seed=${encodeURIComponent(seed)}`,{cache:'no-store',headers:apiHeaders()},45000);
       batterySeed=seed;batteryClock=`semilla manual ${seed}`;preview=fresh;currentRunKey=`manual-${seed}-${Date.now()}`;
-      for(const mode of MODES)modeCache[mode]={rows:[],summary:null};rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);
+      for(const mode of MODES){modeCache[mode]={rows:[],summary:null};modeManifests[mode]=null;}activeRunManifest=null;activeRunExpectedCases=[];rows=[];lastSummary=null;renderPreview();renderModeStatuses();restoreMode(lastMode);
       setPhase(`Semilla ${seed} regenerada contra los datos actuales. Para una regresión literal de una batería antigua usa el desplegable y REPETIR BATERÍA EXACTA.`);
     }catch(e){setPhase('No se pudo regenerar la semilla: '+(e.message||e),true);}
   }
@@ -547,8 +572,9 @@ ${fmtE(r.usage.costEur)} · ${fmtN(r.usage.calls)} IA · ${fmtN(r.usage.tokens)}
   }
   function itvFilePrefix(){return `ControlEvent_${itvVersionToken()}`;}
   function reportPayload(){
-    const modes={};for(const mode of MODES){modes[mode]={summary:modeCache[mode].summary||null,results:modeCache[mode].rows||[]};}
-    return{type:'ControlEvent Zuzu ITV',version:itvVersionToken(),itvContractVersion:ITV_CONTRACT_VERSION,itvBuild:ITV_BUILD,itvLanguageBuild:ITV_LANGUAGE_BUILD,languageProfile:preview?.languageProfile||null,itvObservationMode:'ORACLE_ACTIVE',oracleEnabled:true,batteryReplayContractVersion:num(preview?.replayContractVersion)||0,exportedAt:new Date().toISOString(),batterySeed,batteryClock,batterySource,batteryCode,historicReplayKey:historicReplayKey||'',generatedBattery:preview||null,dataCounts:preview?.dataCounts||{},modes,history:history().slice(0,10)};
+    const modes={};for(const mode of MODES){modes[mode]={summary:modeCache[mode].summary||null,results:modeCache[mode].rows||[],manifestHash:modeManifests[mode]?manifestHash(modeManifests[mode]):''};}
+    const executed=modeManifests[lastMode]||preview||null,summary=modeCache[lastMode]?.summary||lastSummary||null;
+    return{type:'ControlEvent Zuzu ITV',version:itvVersionToken(),itvContractVersion:ITV_CONTRACT_VERSION,itvBuild:ITV_BUILD,itvLanguageBuild:ITV_LANGUAGE_BUILD,languageProfile:executed?.languageProfile||null,itvObservationMode:'ORACLE_ACTIVE',oracleEnabled:true,batteryReplayContractVersion:num(executed?.replayContractVersion)||0,exportedAt:new Date().toISOString(),batterySeed,batteryClock,batterySource:trim(executed?.source)||batterySource,batteryCode:trim(executed?.batteryCode)||batteryCode,historicReplayKey:historicReplayKey||'',generatedBattery:executed,executedManifestHash:executed?manifestHash(executed):'',manifestValidation:summary?.auditValidity||null,dataCounts:executed?.dataCounts||{},modes,history:history().slice(0,10)};
   }
   function modeFileSuffix(mode=lastMode){return mode==='FAST'?'FAST_CE':mode==='AI-SMOKE'?'AI_SMOKE':'FULL_CERT';}
   function downloadReport(){const payload=reportPayload(),has=MODES.some(m=>modeCache[m].rows.length||modeCache[m].summary);if(!has){alert('Todavía no hay resultados que exportar.');return;}const suffix=modeFileSuffix(lastMode),downloadName=`${itvFilePrefix()}_ITV_Zuzu_${new Date().toISOString().replace(/[:.]/g,'-')}-${suffix}.json`;payload.intendedDownloadName=downloadName;const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=downloadName;document.body.appendChild(a);const nativeClick=window.__CE_NATIVE_ANCHOR_CLICK__;if(typeof nativeClick==='function')nativeClick.call(a);else a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);setPhase(`Informe ${suffix} descargado como ${downloadName}. Puedes adjuntarlo directamente para analizar este chequeo.`);}

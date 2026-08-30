@@ -7,5 +7,5 @@ t('respuesta language obsoleta no pisa selección',/if\(epoch!==batteryLoadEpoch
 t('preflight exige source language',/preview\?\.source==='language'&&batterySource==='language'/.test(s));
 t('preflight exige 100% casos VNEXT',/langCases\.every\(c=>trim\(c\?\.engine\)\.toUpperCase\(\)==='VNEXT'\)/.test(s));
 t('preflight bloquea en vez de caer a 78 legacy',/SEGURIDAD ITV: la batería de lenguaje no está íntegra/.test(s));
-t('cache-bust P1.13 impide servir JS anterior',/zuzu-test-console-gd\.js\?v=20260830-VNEXT-P113-ITV-LANGUAGE-RACE-GUARD-LANG260/.test(html));
+t('cache-bust P1.13 impide servir JS anterior',/zuzu-test-console-gd\.js\?v=20260830-VNEXT-P11(?:3-ITV-LANGUAGE-RACE-GUARD|4-ITV-TRUSTED-ORACLE-MANIFEST)-LANG260/.test(html));
 console.log(`${n-f}/${n} OK`);process.exit(f?1:0);
