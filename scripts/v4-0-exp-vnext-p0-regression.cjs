@@ -11,5 +11,5 @@ t('catálogo eventos incluye Nombre hablado',/events_catalog[\s\S]{0,1200}Nombre
 t('previous interaction se usa en VNext',/previousInteractionId:vnext\?loadZuzuInteractionId\(\):''/.test(ui));
 t('historia solo como fallback VNext',/conversationHistory:vnext\?history:\[\]/.test(ui));
 t('toggle A\/B en UI',/ceAiVNextMode/.test(ui)&&/VNext ACTIVO/.test(ui));
-t('soft failure conversa y no registro no ejecutable',/Zuzu VNext sigue contigo/.test(svc)&&!/ControlEvent no pudo ejecutar este registro/.test(svc.slice(svc.indexOf('runZuzuVNextOpenAgent'),svc.indexOf('async function runZuzuV62NativeToolAgent'))));
+t('soft failure conversa y no registro no ejecutable',/Zuzu sigue contigo/.test(svc)&&!/ControlEvent no pudo ejecutar este registro/.test(svc.slice(svc.indexOf('runZuzuVNextOpenAgent'),svc.indexOf('async function runZuzuV62NativeToolAgent'))));
 console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exit(ko?1:0);})().catch(e=>{console.error(e);process.exit(1)});

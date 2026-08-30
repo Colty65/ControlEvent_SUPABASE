@@ -17073,11 +17073,125 @@ async function runZuzuVNextP1Agent({userPrompt,state,selectedEventId,flowTrace=[
   return{ok:true,rejected:false,title:trim(final.title)||'Zuzu VNext',answer,spokenAnswer,warnings:arr(final.warnings),charts:[],tables,files:[],provider:'zuzu-vnext-p1-data-contracts',model,interactionId:currentId,conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P1 · open-world · 4 capability families · typed business data contracts · one-Interaction fast path',experimental:true,voiceConversation:!!voiceConversation,interactionId:currentId,resetInteractionId:false,spokenAnswer,performance:{totalMs,decisionModelMs:model1Ms,dataMs:toolMs,narrationModelMs:model2Ms,interactionCalls:calls},decision:{mode,operation:trim(decision?.operation),needsNarration:decision?.needs_narration===true},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
+
+// ============================================================================
+// v4_0_exp · ZUZU VNEXT P1.1 · NATIVE TOOL DECISION + LOCAL FAST CLOSE
+// P1.0 intentó obtener una decisión por JSON estructurado. En producción Gemini podía
+// devolver mode=conversation sin answer y CE terminaba mostrando el inútil «Vale, seguimos.».
+// P1.1 vuelve a la decisión nativa por function_call, pero conserva los contratos de datos
+// estrechos de P1 y CIERRA LOCALMENTE el resultado: una consulta factual normal consume
+// UNA sola Interaction IA + ejecución local, sin segunda IA de narración.
+// ============================================================================
+function vnextP11Tools(){
+  const ops=['people_catalog','events_catalog','person_profile','person_events','person_income_status','event_income_status','event_income_lines','event_attendance','event_summary','event_purchases','event_donations','event_bank','event_weather','event_stores_used','event_products','compare_events'];
+  const common={type:'object',properties:{
+    operation:{type:'string',enum:ops},event:{type:'string'},events:{type:'array',items:{type:'string'}},person:{type:'string'},store:{type:'string'},product:{type:'string'},ticket:{type:'string'},responsible:{type:'string'},
+    status:{type:'string',enum:['pending','received','all']},population:{type:'string',enum:['socios','all']},detail:{type:'string',enum:['brief','standard','full']}
+  },required:['operation']};
+  return [
+    {type:'function',name:'query_ce',description:'FUENTE CANÓNICA para cualquier dato estructurado de ControlEvent. Si la respuesta depende de personas, socios, eventos, ingresos, asistencia, compras, donaciones, banco, tiendas, productos, tiempo o comparaciones, llama esta función en vez de contestar de memoria. El servidor resuelve motes/nombres hablados y separa estrictamente ingresos, asistencia, compras, donaciones y banco.',parameters:common},
+    {type:'function',name:'resolve_entity',description:'Solo para una pregunta de identidad o cuando realmente no sabes si el nombre es persona, evento, tienda o producto. Si el usuario pide información de alguien o de un evento, prefiere query_ce directamente: el servidor ya resuelve alias y nombres hablados.',parameters:{type:'object',properties:{text:{type:'string'},kind:{type:'string',enum:['auto','person','event','store','product']},limit:{type:'integer'}},required:['text']}},
+    {type:'function',name:'search_documents',description:'Busca documentos, notas, descripciones o evidencias textuales de un evento. Úsala solo para información no estructurada/documental.',parameters:{type:'object',properties:{event:{type:'string'},scope:{type:'string',enum:['screen_event','named_event','all_events']},query:{type:'string'},detail:{type:'string',enum:['brief','standard','full']}},required:['scope']}},
+    {type:'function',name:'recall_memory',description:'Busca o lee conversaciones pasadas persistentes. Úsala solo cuando el usuario pide recordar, localizar o volver a una conversación anterior.',parameters:{type:'object',properties:{action:{type:'string',enum:['search','list','read']},query:{type:'string'},conversation_id:{type:'string'},matched_turn_id:{type:'string'},limit:{type:'integer'}},required:['action']}}
+  ];
+}
+function vnextP11SystemInstruction(state={},selectedEventId='',opts={}){
+  const active=v26EventById(state,selectedEventId),display=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||opts?.usuarioLogado||opts?.user||opts?.authUser||opts?.ce_acceso||null}),voice=opts?.voiceConversation===true;
+  return `Eres Zuzu VNext P1.1, interlocutor natural de ControlEvent con ${display}. El lenguaje es OPEN-WORLD: una corrección, una broma, una hipótesis, un dato nuevo o un cambio de tema siempre son conversación válida.
+
+REGLA CENTRAL:
+- Si puedes responder SIN consultar datos reales de ControlEvent, responde directamente y con contenido útil.
+- Si la respuesta depende de datos reales, NO redactes una respuesta tentativa: llama a UNA función canónica en esta misma Interaction. ControlEvent ejecutará la función y cerrará localmente la respuesta para ahorrar tiempo.
+- Nunca devuelvas una respuesta vacía, una mera confirmación tipo «Vale, seguimos» ni prometas consultar después.
+
+CONTRATOS DE query_ce:
+- people_catalog = lista/censo de personas o socios, incluidos Nombre hablado y motes. population=socios si pide socios.
+- events_catalog = catálogo de eventos con Nombre hablado.
+- person_profile = información/dossier general de una persona.
+- person_events = eventos en los que aparece una persona.
+- person_income_status = si UNA persona o pareja ha ingresado/pagado o sigue Pendiente en UN evento.
+- event_income_status = quién figura Pendiente/recibido en UN evento. status=pending para quién queda por pagar.
+- event_income_lines = ingresos del evento uno por uno.
+- event_attendance = asistencia; JAMÁS la uses como prueba de pago.
+- event_summary = resumen del evento.
+- event_purchases / event_donations / event_bank son dominios distintos y no se sustituyen entre sí.
+- event_stores_used = tiendas con compras reales del evento, no el maestro de tiendas.
+- event_products = productos; event_weather = tiempo; compare_events = comparación.
+
+EJEMPLOS DE ELECCIÓN (son semánticos, no frases rígidas):
+- pedir información de «La Estercita» -> query_ce person_profile, person="La Estercita".
+- pedir socios con nombre hablado -> query_ce people_catalog, population="socios".
+- preguntar si «el primo» ha pagado Función 2026 -> query_ce person_income_status, person="el primo", event="Función 2026".
+- preguntar quién queda Pendiente -> query_ce event_income_status, status="pending", conservando el evento claro del hilo.
+- pedir esos ingresos uno por uno -> query_ce event_income_lines del mismo evento.
+
+IDENTIDAD Y CONTEXTO:
+- Los motes/nombres hablados son identidades de BBDD. El servidor los convierte al nombre canónico; no conviertas un mote individual en una pareja ni en un evento.
+- «ha pagado», «ha ingresado», «queda por pagar», «Pendiente» hablan de INGRESOS del evento, no de donaciones, compras ni asistencia salvo que el usuario lo diga expresamente.
+- El evento visible (${active?trim(active?.titulo):'ninguno'}) es solo contexto ambiental. Úsalo para «este evento» o cuando el hilo lo mantenga claramente; no secuestres otro asunto.
+- Si el usuario corrige una interpretación, la corrección manda desde ese momento y debes soltar la linde anterior.
+- No afirmes «no existe», «0 €», «no ha pagado» o «no asistió» desde una fuente incapaz de acreditar exactamente ese hecho.
+
+LATENCIA:
+- Una consulta factual normal debe resolverse con UNA llamada IA. Elige la función exacta y evita consultas auxiliares por curiosidad.
+- Puedes emitir varias function_call en la misma Interaction solo si la petición realmente necesita varias fuentes independientes.
+${voice?'MODO ORAL: responde breve, natural y directo; la salida local de datos será preparada para voz por ControlEvent.':''}
+
+Cuando respondas sin herramientas, usa el JSON final solicitado por la API y asegúrate de que answer contiene la respuesta real.`;
+}
+function vnextP11ResolveFinal(result={}){
+  const c=arr(result?.facts?.candidates);if(!c.length)return{title:'Identidad',answer:`No encuentro una identidad canónica suficiente para «${trim(result?.facts?.text)}».`,warnings:[]};
+  if(c.length===1){const x=c[0],spoken=trim(x?.spoken_name),canon=trim(x?.canonical_name);return{title:'Identidad',answer:spoken&&vnextNorm(spoken)!==vnextNorm(canon)?`«${trim(result?.facts?.text)}» corresponde a ${canon}; su nombre hablado es ${spoken}.`:`«${trim(result?.facts?.text)}» corresponde a ${canon}.`,warnings:[]};}
+  return{title:'Identidad',answer:`Encuentro varias identidades plausibles para «${trim(result?.facts?.text)}»: ${c.slice(0,5).map(x=>trim(x?.canonical_name)).filter(Boolean).join(', ')}.`,warnings:[]};
+}
+function vnextP11DocsFinal(result={}){
+  const rows=arr(result?.tables).flatMap(t=>arr(t?.rows));return{title:trim(result?.title)||'Documentos',answer:rows.length?`He encontrado ${rows.length} coincidencia${rows.length===1?'':'s'} documental${rows.length===1?'':'es'} útil${rows.length===1?'':'es'}. Te dejo el detalle disponible.`:'No he encontrado una coincidencia documental suficiente con esa búsqueda.',warnings:[]};
+}
+function vnextP11MemoryFinal(result={}){
+  const rows=arr(result?.tables).flatMap(t=>arr(t?.rows));return{title:trim(result?.title)||'Recuerdos',answer:rows.length?`He encontrado ${rows.length} elemento${rows.length===1?'':'s'} de memoria relacionado${rows.length===1?'':'s'}. Te dejo los más útiles para seguir desde ahí.`:'No he encontrado un recuerdo suficientemente claro con esa referencia.',warnings:[]};
+}
+async function runZuzuVNextP11Agent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
+  const started=Date.now(),actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP11Tools(),systemInstruction=vnextP11SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime});
+  let currentPrev=trim(previousInteractionId),payload,calls=0,modelMs=0,toolMs=0,hadTools=false,final={title:'Zuzu',answer:'',warnings:[]},tables=[],results=[];
+  zuzuTracePush(flowTrace,'VNEXT P1.1 · NATIVE TOOL FAST PATH','OK',`1 Interaction IA por turno factual + cierre local; predecessor=${currentPrev?'sí':'no'}; sin Semantic Core, sin Memory Gate, sin segunda IA.`);
+  const input=currentPrev?userPrompt:vnextP1Input(userPrompt,conversationHistory),m1=Date.now();
+  try{payload=await v261CallInteraction({input,previousInteractionId:currentPrev,model,systemInstruction,tools,flowTrace,stage:'VNEXT P1.1 · Gemini conversa/elige contrato',externalSignal,maxCalls:2,maxOutputTokens:voiceConversation?700:1000});calls++;}
+  catch(error){if(currentPrev&&v261PreviousIdFailure(error)){zuzuTracePush(flowTrace,'VNEXT P1.1 · predecessor','WARN','La Interaction anterior expiró; se usa el puente local de los últimos turnos.');currentPrev='';payload=await v261CallInteraction({input:vnextP1Input(userPrompt,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'VNEXT P1.1 · recupera hilo',externalSignal,maxCalls:2,maxOutputTokens:voiceConversation?700:1000});calls++;}else throw error;}
+  modelMs=Date.now()-m1;const payloadId=trim(payload?.id),functionCalls=v261FunctionCalls(payload);hadTools=functionCalls.length>0;
+  if(!hadTools){
+    const parsed=v261ParseFinal(payload),raw=trim(parsed?.answer)||trim(v261OutputText(payload));
+    final={title:trim(parsed?.title)||'Zuzu',answer:raw||'No he recibido contenido útil para contestarte. Repite solo esta pregunta y la proceso de nuevo.',warnings:arr(parsed?.warnings)};
+  }else{
+    const ts=Date.now();
+    for(const call of functionCalls){
+      try{
+        let result,name=trim(call?.name),args=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{};
+        if(name==='query_ce')result=await vnextP1ExecuteData(args,state,selectedEventId,flowTrace);
+        else if(name==='resolve_entity')result=vnextResolveTool(call,state);
+        else if(name==='search_documents')result=await vnextSearchDocuments(call,state,selectedEventId,flowTrace);
+        else if(name==='recall_memory')result=await vnextRecallMemory(call,actor,conversationId,clientLocalDateTime||clientNowIso);
+        else throw new Error(`Contrato VNext desconocido: ${name}.`);
+        results.push({call,result,args});tables.push(...vnextP1LocalPresentation(result));
+        zuzuTracePush(flowTrace,`VNEXT P1.1 · ${name}`,'OK',`${trim(result?.title)||'Resultado'} · operación=${trim(result?._vnext_operation||args?.operation)||'—'} · filas=${arr(result?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}.`);
+      }catch(error){const msg=cleanGeminiError(error);results.push({call,error:msg,args:(call?.arguments&&typeof call.arguments==='object')?call.arguments:{}});zuzuTracePush(flowTrace,`VNEXT P1.1 · ${trim(call?.name)}`,'WARN',msg);}
+    }
+    toolMs=Date.now()-ts;const good=results.filter(x=>x.result),bad=results.filter(x=>x.error);
+    if(good.length){const parts=good.map(x=>trim(x.call?.name)==='query_ce'?vnextP1LocalFinal(x.result,x.args,state):trim(x.call?.name)==='resolve_entity'?vnextP11ResolveFinal(x.result):trim(x.call?.name)==='search_documents'?vnextP11DocsFinal(x.result):vnextP11MemoryFinal(x.result));final={title:parts.length===1?parts[0].title:'Zuzu',answer:parts.map(x=>trim(x.answer)).filter(Boolean).join('\n\n'),warnings:bad.map(x=>x.error)};}
+    else{const msg=bad.map(x=>x.error).filter(Boolean).join(' · ');final={title:'No tengo ese dato cerrado',answer:`No he podido obtener ese dato con una fuente que lo acredite exactamente${msg?`: ${msg}`:'.'}`,warnings:bad.map(x=>x.error)};}
+  }
+  let answer=v29SanitizeAnswerMarkup(trim(final.answer));if(voiceConversation)answer=v40ConversationalPolish(answer,userPrompt,true);const unitGuard=v416VoiceUnitOracle(answer,answer,state,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||answer,state,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp11|${payloadId||currentPrev}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true),usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started;
+  // Un function_call no recibe function_result porque cerramos localmente para ahorrar una segunda IA.
+  // Por eso NO encadenamos ese Interaction incompleto: el siguiente turno recibe los últimos turnos visibles como puente local compacto.
+  const nextInteractionId=hadTools?'':(payloadId||currentPrev),resetInteractionId=hadTools;
+  zuzuTracePush(flowTrace,'VNEXT P1.1 · LATENCIA','OK',`total=${totalMs} ms · IA=${modelMs} ms · datos=${toolMs} ms · llamadas IA=${calls} · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu VNext',answer,spokenAnswer,warnings:arr(final.warnings),charts:[],tables:tables.filter(Boolean).slice(0,8),files:[],provider:'zuzu-vnext-p11-native-tool-fast-close',model,interactionId:nextInteractionId,conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P1.1 · open-world · native function decision · typed business contracts · one-Interaction local close',experimental:true,voiceConversation:!!voiceConversation,interactionId:nextInteractionId,resetInteractionId,spokenAnswer,performance:{totalMs,decisionModelMs:modelMs,dataMs:toolMs,interactionCalls:calls,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+}
+
 export async function runZuzuVNextUserTurn(input={}){
   const flowTrace=[],userPrompt=trim(input?.prompt);if(!userPrompt){const e=new Error('Escribe una pregunta o petición para Zuzu.');e.status=400;throw e;}if(userPrompt.length>3000){const e=new Error('El prompt es demasiado largo. Resume la petición.');e.status=413;throw e;}
   const state=attachLoggedUserFix10(input?.stateOverride&&typeof input.stateOverride==='object'?input.stateOverride:await getState(),{usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso});
-  try{return await runZuzuVNextP1Agent({userPrompt,state,selectedEventId:input?.selectedEventId,flowTrace,previousInteractionId:input?.previousInteractionId,conversationHistory:arr(input?.conversationHistory).slice(-6),voiceConversation:input?.voiceConversation===true,usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso,clientNowIso:input?.clientNowIso,clientLocalDateTime:input?.clientLocalDateTime,clientTimeZone:input?.clientTimeZone,externalSignal:input?.externalSignal,conversationId:input?.conversationId});}
-  catch(error){zuzuTracePush(flowTrace,'VNEXT P1 · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu sigue contigo',answer:'No he podido cerrar esa consulta de datos, pero la conversación sigue viva. Dímelo de otra forma o concreta el dato y continúo desde aquí.',spokenAnswer:'No he podido cerrar ese dato, pero seguimos. Dímelo de otra forma y continúo.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-p1-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P1 · soft failure conversacional',experimental:true,resetInteractionId:true,debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
+  try{return await runZuzuVNextP11Agent({userPrompt,state,selectedEventId:input?.selectedEventId,flowTrace,previousInteractionId:input?.previousInteractionId,conversationHistory:arr(input?.conversationHistory).slice(-6),voiceConversation:input?.voiceConversation===true,usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso,clientNowIso:input?.clientNowIso,clientLocalDateTime:input?.clientLocalDateTime,clientTimeZone:input?.clientTimeZone,externalSignal:input?.externalSignal,conversationId:input?.conversationId});}
+  catch(error){zuzuTracePush(flowTrace,'VNEXT P1.1 · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu sigue contigo',answer:'No he podido cerrar esa consulta de datos, pero la conversación sigue viva. Dímelo de otra forma o concreta el dato y continúo desde aquí.',spokenAnswer:'No he podido cerrar ese dato, pero seguimos. Dímelo de otra forma y continúo.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-p1-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P1.1 · soft failure conversacional',experimental:true,resetInteractionId:true,debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
 }
 
 async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[],conversationDigest='',voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){

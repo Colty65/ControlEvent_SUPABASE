@@ -2,7 +2,7 @@ const fs=require('fs');
 const svc=fs.readFileSync('services/event-ai.service.js','utf8');
 const ui=fs.readFileSync('public/app/features/v11-3-zuzu-analitica-libre.js','utf8');
 let ok=0,ko=0;function t(n,c){if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}}
-t('P1 export usa agente P1',/runZuzuVNextUserTurn[\s\S]{0,1600}runZuzuVNextP1Agent/.test(svc));
+t('P1 export usa agente P1/P1.1',/runZuzuVNextUserTurn[\s\S]{0,2200}runZuzuVNextP11Agent/.test(svc));
 t('P1 open-world siempre admite conversation',/mode:\{type:'string',enum:\['conversation','data','documents','memory'\]/.test(svc));
 t('contratos de ingresos separados',/person_income_status/.test(svc)&&/event_income_status/.test(svc)&&/event_income_lines/.test(svc));
 t('pagado se define como ingresos no donaciones',/ha pagado[\s\S]{0,260}INGRESOS/.test(svc)&&/nunca donaciones ni asistencia/.test(svc));
