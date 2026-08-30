@@ -9,8 +9,8 @@ const p13End=svc.indexOf('\nasync function runZuzuVNextP11Agent',p13Start);
 const p13=svc.slice(p13Start,p13End>p13Start?p13End:undefined);
 const p13Instruction=svc.slice(svc.indexOf('function vnextP12SystemInstruction'),p13Start);
 t('export usa agente P1.3',/runZuzuVNextP13Agent\(/.test(svc)&&/return await runZuzuVNextP13Agent\(/.test(svc));
-t('UI identifica VNext P1.3 o P1.4',/VNext P1\.[34]/.test(ui));
-t('cache bust P1.3 o P1.4',/VNEXT-P1(?:3-CONTEXT-ALIAS-WEATHER|4-PENA-FRIEND-COMPARE-CHARTS)/.test(html));
+t('UI identifica VNext P1.3, P1.4 o P1.5',/VNext P1\.[345]/.test(ui));
+t('cache bust P1.3/P1.4/P1.5',/VNEXT-P1(?:3-CONTEXT-ALIAS-WEATHER|4-PENA-FRIEND-COMPARE-CHARTS|5-CONVERSATION-REGISTERS-GROUNDED-BANTER)/.test(html));
 t('alias sociales toleran artículo omitido',/vnextSocialNormVariants/.test(svc)&&/exact_alias_article_tolerant/.test(svc));
 t('resolución de evento acepta ID interno sin tratarlo como nombre',/const byId=arr\(state\?\.eventos\).*selectedEventId/.test(svc));
 t('prompt P1.3 ordena omitir event para este evento y no exponer IDs',/OMITE el argumento event/.test(p13Instruction)&&/No copies ni inventes IDs internos/.test(p13Instruction));
@@ -27,5 +27,5 @@ t('gráfica meteorológica se materializa localmente',/v73WeatherChartFromResult
 t('consulta factual P1.3 limita decisión a una Interaction',/maxCalls:1/.test(p13));
 t('segunda IA queda reservada a narración excepcional',/narración excepcional/.test(p13)&&/args\?\.narrate===true/.test(p13));
 t('estilo humano evita confirmar obviedades',/evita el reflejo robótico "¿te refieres a\.\.\.\?"/.test(p13Instruction));
-t('soft failure sigue conversando y está etiquetado P1.3+',/zuzu-vnext-p1(?:3|4)-soft-failure/.test(svc)&&/VNext P1\.[34] · soft failure conversacional/.test(svc));
+t('soft failure sigue conversando y está etiquetado P1.3+',/zuzu-vnext-p1(?:3|4|5)-soft-failure/.test(svc)&&/VNext P1\.[345] · soft failure conversacional/.test(svc));
 console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;

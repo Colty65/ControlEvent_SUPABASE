@@ -1,0 +1,24 @@
+const fs=require('fs'),path=require('path');
+const root=path.join(__dirname,'..');
+const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'public/app/features/v11-3-zuzu-analitica-libre.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+let ok=0,ko=0;function t(n,c){if(c){console.log('OK ',n);ok++;}else{console.error('KO ',n);ko++;}}
+const p15=svc.slice(svc.indexOf('function vnextP15SocialRegister'),svc.indexOf('\nasync function runZuzuVNextP11Agent'));
+t('UI identifica P1.5',/VNext P1\.5/.test(ui));
+t('cache bust P1.5',/VNEXT-P15-CONVERSATION-REGISTERS-GROUNDED-BANTER/.test(html));
+t('cuatro niveles conceptuales',/FACTUAL\/ESCRITO/.test(svc)&&/NORMAL:/.test(svc)&&/CLOSE \/ AMIGO CERCANO/.test(svc)&&/BANTER \/ COLEGUEO/.test(svc));
+t('tool publica register y tease',/register:\{type:'string',enum:\['normal','close','banter'\]\}/.test(svc)&&/tease:\{type:'boolean'\}/.test(svc));
+t('pantalla factual separada de spoken social',/let answer=v29SanitizeAnswerMarkup\(trim\(final\.answer\)\);\s*const humanState/.test(svc)&&/vnextP15SpokenAnswer/.test(svc));
+t('banter corrige el vacile en la misma locución',/Te estoy vacilando|te estoy vacilando/.test(p15)&&/pagada y bien pagada/.test(p15));
+t('persona pagada tiene tres registros',/reg==='normal'/.test(p15)&&/reg==='close'/.test(p15)&&/BANTER/.test(p15));
+t('weather tiene oralización de colega',/Nos vamos a cocer vivos/.test(p15)&&/bebida fría/.test(p15));
+t('compras propias usan mine',/decision\?\.mine===true/.test(svc)&&/zuzuLoggedUserDisplayName\(state\)/.test(svc));
+t('compras permiten ordenar tienda producto',/order_by/.test(svc)&&/vnextP15OrderPurchaseResult/.test(svc)&&/store_product/.test(svc));
+t('escenario plan B publicado',/event_scenario/.test(svc)&&/income_delta/.test(svc)&&/adjusted_operating_balance/.test(svc));
+t('plan B no modifica BBDD',/No altera BBDD/.test(svc));
+t('contexto guarda registro social',/social_register:trim\(args\?\.register\)/.test(svc));
+t('fast path conserva una Interaction factual',/PARALLEL FAST PATH/.test(svc)&&/maxCalls:1/.test(svc));
+t('evento hablado en oralizaciones',/vnextP14EventSpokenLabel/.test(p15));
+t('memoria/documentos también reciben oralización y registro',/vnextP15AuxSpokenAnswer/.test(svc)&&/He rebuscado/.test(p15)&&/recall_memory[\s\S]{0,800}register/.test(svc)&&/search_documents[\s\S]{0,800}register/.test(svc));
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;

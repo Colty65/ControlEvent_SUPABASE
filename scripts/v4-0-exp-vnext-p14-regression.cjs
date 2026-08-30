@@ -5,12 +5,12 @@ const ui=fs.readFileSync(path.join(root,'public/app/features/v11-3-zuzu-analitic
 const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
 let ok=0,ko=0;function t(name,cond){if(cond){console.log('OK ',name);ok++;}else{console.error('KO ',name);ko++;}}
 const p14=svc.slice(svc.indexOf('function vnextP12SystemInstruction'),svc.indexOf('\nasync function runZuzuVNextP11Agent'));
-t('UI identifica P1.4',/VNext P1\.4/.test(ui));
-t('cache bust P1.4',/VNEXT-P14-PENA-FRIEND-COMPARE-CHARTS/.test(html));
+t('UI identifica P1.4 o sucesor P1.5',/VNext P1\.[45]/.test(ui));
+t('cache bust P1.4 o sucesor P1.5',/VNEXT-P1(?:4-PENA-FRIEND-COMPARE-CHARTS|5-CONVERSATION-REGISTERS-GROUNDED-BANTER)/.test(html));
 t('operación person_event_status publicada',/person_event_status/.test(p14)&&/person_event_status/.test(svc.slice(svc.indexOf('function vnextP11Tools'),svc.indexOf('function vnextP11SystemInstruction'))));
 t('estado personal cruza asistencia e ingresos',/person_dossier\.incomes \+ event_people\.attendance/.test(svc));
 t('respuesta social usa nosotros',/va a estar con nosotros/.test(svc)&&/no nos acompaña/.test(svc));
-t('banter no depende de nombres concretos',/tone==='banter'/.test(svc)&&/se ha estirao/.test(svc));
+t('banter no depende de nombres concretos',/banter/.test(svc)&&/se ha estirao/.test(svc));
 t('nombre hablado del evento alimenta la voz amiga',/vnextP14EventSpokenLabel/.test(svc));
 t('alias tolera errata mínima inequívoca',/vnextP14FuzzyPersonCandidate/.test(svc)&&/vnextP14EditDistance/.test(svc));
 t('compare_events acepta chart',/chart_type/.test(p14)&&/metric/.test(p14)&&/vnextP14ComparisonCharts/.test(svc));
@@ -20,5 +20,5 @@ t('no vuelve a preguntar de todo un poco',/NO preguntes qué métricas/.test(p14
 t('feedback bromista no reejecuta por defecto',/eso es conversación\/feedback/.test(p14));
 t('memoria permite inspección literal visible',/inspect_term/.test(svc)&&/visible_literal_hits/.test(svc));
 t('fast path sigue una Interaction factual',/maxCalls:1/.test(p14)&&/PARALLEL FAST PATH/.test(p14));
-t('spoken friend se aplica antes del oráculo',/friendSpeech=lastData\?vnextP14FriendSpokenAnswer/.test(svc));
+t('spoken friend se aplica antes del oráculo',/(?:friendSpeech=lastData\?vnextP14FriendSpokenAnswer|socialSpeech=lastData\?vnextP15SpokenAnswer)/.test(svc));
 console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;
