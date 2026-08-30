@@ -53,7 +53,8 @@
     "test:v4-bank426": "node scripts/v4-0-exp-bank426-voice-oralization-regression.cjs",
     "test:v4-bank427": "node scripts/v4-0-exp-bank427-human-voice-lifecycle-regression.cjs",
     "test:vnext-p0": "node scripts/v4-0-exp-vnext-p0-regression.cjs",
-    "test:vnext-p13": "node scripts/v4-0-exp-vnext-p13-regression.cjs"
+    "test:vnext-p13": "node scripts/v4-0-exp-vnext-p13-regression.cjs",
+    "test:vnext-p14": "node scripts/v4-0-exp-vnext-p14-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

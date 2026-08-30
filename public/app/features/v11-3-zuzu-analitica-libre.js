@@ -451,7 +451,7 @@
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
   function isZuzuVNextMode(){ try{return sessionStorage.getItem(zuzuVNextKey())==='1';}catch(_){return false;} }
-  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.3</span><span class="ce-ai-mode-help">Open-world + contratos tipados. Alias sociales robustos, memoria de hilo y tiempo con rango/gráfica; una sola IA en consultas factuales normales. Modo experimental A/B.</span>';}}
+  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.4</span><span class="ce-ai-mode-help">Open-world + contratos tipados. Modo amigo de la Peña, estado social de personas, gráficas comparativas y alias tolerantes; una sola IA en consultas factuales normales. Modo experimental A/B.</span>';}}
   function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} var on=!isZuzuVNextMode(); try{sessionStorage.setItem(zuzuVNextKey(),on?'1':'0');}catch(_){} saveZuzuInteractionId(''); renderZuzuVNextMode(); setStatus(on?'VNext experimental activado.':'BANK4_27 activo.',''); }
 
   function openModal(){
