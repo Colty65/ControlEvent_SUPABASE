@@ -11,6 +11,7 @@ let calls=vnextP19ExpandCompoundCalls([{id:'x',name:'query_ce',arguments:{}}],'d
 
 a=vnextP19NormalizeDataArgs({},[],'Y AHORA DAME LOS QUE NO HAYAN PAGADO AUN Y LOS SOCIOS NO ASISTENTES');t('exact PDF compound flags',a.operation==='event_income_status'&&a.status==='pending');
 calls=vnextP19ExpandCompoundCalls([{id:'pdf',name:'query_ce',arguments:{}}],'Y AHORA DAME LOS QUE NO HAYAN PAGADO AUN Y LOS SOCIOS NO ASISTENTES',[]);t('exact PDF compound => pending + absents',calls.length>=2&&calls.some(c=>c.arguments.operation==='event_income_status'&&c.arguments.status==='pending')&&calls.some(c=>c.arguments.operation==='event_attendance'&&c.arguments.attendance_mode==='non_attending_members'));
+const exactPdf='dAME QUINES NO HAYAN PAGADO ESTE EVENTO Y TAMBIEN LOS SOCIOS NO ASISTENTES';calls=vnextP19ExpandCompoundCalls([{id:'pdf2',name:'query_ce',arguments:{}}],exactPdf,[]);const normalized=calls.map(c=>vnextP19NormalizeDataArgs(c.arguments,[],exactPdf));t('exact PDF compound survives per-call normalization',normalized.some(a=>a.operation==='event_income_status'&&a.status==='pending')&&normalized.some(a=>a.operation==='event_attendance'&&a.attendance_mode==='non_attending_members'));
 const ctx=vnextP19ContextFromResults([{call:{name:'query_ce'},args:{operation:'event_scenario',income_delta:-520},result:{facts:{event:'FUNCION 2026',income_delta:-720,scenario_people:['Pocholo y Celes','Isabel y Angel Téllez']}}}],{});t('certified scenario delta persists',ctx.income_delta===-720&&ctx.scenario_people.length===2);
 
 

@@ -56,7 +56,8 @@
     "test:vnext-p13": "node scripts/v4-0-exp-vnext-p13-regression.cjs",
     "test:vnext-p14": "node scripts/v4-0-exp-vnext-p14-regression.cjs",
     "test:vnext-p18": "node scripts/v4-0-exp-vnext-p18-regression.cjs && node scripts/v4-0-exp-vnext-p18-behavior-regression.cjs",
-    "test:vnext-p19": "node scripts/v4-0-exp-vnext-p19-regression.cjs && node scripts/v4-0-exp-vnext-p19-behavior-regression.cjs"
+    "test:vnext-p19": "node scripts/v4-0-exp-vnext-p19-regression.cjs && node scripts/v4-0-exp-vnext-p19-behavior-regression.cjs",
+    "test:vnext-p110": "node scripts/v4-0-exp-vnext-p110-regression.cjs && node scripts/v4-0-exp-vnext-p110-behavior-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -454,7 +454,7 @@
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
   function isZuzuVNextMode(){ try{return sessionStorage.getItem(zuzuVNextKey())==='1';}catch(_){return false;} }
-  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.9</span><span class="ce-ai-mode-help">Open-world + contratos tipados. Quita/pon reversible de filas y columnas, pagos negativos/compuestos blindados y Plan B producto a producto; conserva borrador y fast path. Modo experimental A/B.</span>';}}
+  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.10</span><span class="ce-ai-mode-help">Open-world + contratos tipados. Estado de tabla genérico: quitar/poner filas y columnas, filtrar y ordenar en cualquier tabla; pagos negativos/compuestos y Plan B siguen blindados. Conserva borrador y fast path.</span>';}}
   function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} var on=!isZuzuVNextMode(); try{sessionStorage.setItem(zuzuVNextKey(),on?'1':'0');}catch(_){} saveZuzuInteractionId(''); renderZuzuVNextMode(); setStatus(on?'VNext experimental activado.':'BANK4_27 activo.',''); }
 
   function openModal(){
@@ -513,7 +513,7 @@
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); setZuzuButtonHeartbeat(false); window.__ceZuzuThinkingState=null; }
   function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v4_0_exp').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
-  var ZUZU_RUNTIME_BUILD='20260830-VNEXT-P19-CONTINUITY-PLAN';
+  var ZUZU_RUNTIME_BUILD='20260830-VNEXT-P110-GENERIC-TABLE-VIEW'; // compat: VNext P1.9
   function zuzuRuntimeBuildKey(){ return zuzuStorageKey('runtime_build'); }
   function ensureZuzuRuntimeBuild(){
     var prev='';try{prev=String(sessionStorage.getItem(zuzuRuntimeBuildKey())||'');}catch(_){ }
