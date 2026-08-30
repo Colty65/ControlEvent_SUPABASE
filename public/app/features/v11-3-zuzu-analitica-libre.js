@@ -451,7 +451,7 @@
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
   function isZuzuVNextMode(){ try{return sessionStorage.getItem(zuzuVNextKey())==='1';}catch(_){return false;} }
-  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.1</span><span class="ce-ai-mode-help">Conversación open-world + contratos tipados. Decisión nativa por función y cierre local: una sola llamada IA en consultas normales. Modo experimental A/B.</span>';}}
+  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.2</span><span class="ce-ai-mode-help">Conversación open-world + contratos tipados. Gemini y Supabase trabajan en paralelo; una sola llamada IA factual y cierre local. Modo experimental A/B.</span>';}}
   function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} var on=!isZuzuVNextMode(); try{sessionStorage.setItem(zuzuVNextKey(),on?'1':'0');}catch(_){} saveZuzuInteractionId(''); renderZuzuVNextMode(); setStatus(on?'VNext experimental activado.':'BANK4_27 activo.',''); }
 
   function openModal(){
@@ -509,7 +509,7 @@
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); setZuzuButtonHeartbeat(false); window.__ceZuzuThinkingState=null; }
   function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v4_0_exp').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
-  var ZUZU_RUNTIME_BUILD='20260823-PRESENTACION-RAW4';
+  var ZUZU_RUNTIME_BUILD='20260830-VNEXT-P12-SCREEN-PARALLEL';
   function zuzuRuntimeBuildKey(){ return zuzuStorageKey('runtime_build'); }
   function ensureZuzuRuntimeBuild(){
     var prev='';try{prev=String(sessionStorage.getItem(zuzuRuntimeBuildKey())||'');}catch(_){ }
@@ -1038,7 +1038,9 @@
     return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-vbars">'+bars+'</div></div>';
   }
   function tableHtml(tb){
-    var cols=tb.columns||[];
+    tb=tb||{};var rawRows=Array.isArray(tb.rows)?tb.rows:[];var cols=Array.isArray(tb.columns)?tb.columns.slice():[];
+    if(!cols.length&&tb.schema&&typeof tb.schema==='object')cols=Object.keys(tb.schema);
+    if(!cols.length){rawRows.forEach(function(r){if(r&&typeof r==='object'&&!Array.isArray(r)){Object.keys(r).forEach(function(k){if(cols.indexOf(k)<0)cols.push(k);});}});}
     function colClass(name){
       var n=String(name||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
       if(/producto|concepto|descripcion/.test(n))return 'ce-col-product';
@@ -1048,9 +1050,9 @@
       return '';
     }
     var head=cols.map(function(c){var cls=colClass(c);return '<th'+(cls?' class="'+cls+'"':'')+'>'+esc(c)+'</th>';}).join('');
-    var rows=(tb.rows||[]).map(function(r){ return '<tr>'+r.map(function(c,i){var cls=colClass(cols[i]);return '<td'+(cls?' class="'+cls+'"':'')+'>'+esc(c)+'</td>';}).join('')+'</tr>'; }).join('');
+    var rows=rawRows.map(function(r){var cells=Array.isArray(r)?r:cols.map(function(c){return r&&typeof r==='object'?r[c]:'';});return '<tr>'+cells.map(function(c,i){var cls=colClass(cols[i]);return '<td'+(cls?' class="'+cls+'"':'')+'>'+esc(c)+'</td>';}).join('')+'</tr>'; }).join('');
     var shape=cols.length>7?' ce-ai-table-wide':(cols.length>5?' ce-ai-table-medium':' ce-ai-table-compact');if(String(tb&&tb.density||'').toLowerCase()==='compact')shape+=' ce-ai-table-user-compact';
-    var count=Number(tb.logicalCount||0),shown=Number(tb.displayCount||((tb.rows||[]).length)||0),kind=String(tb.presentationKind||'');var label=kind==='products'?'productos':kind==='purchases'?'registros de compra':kind==='donations'?'registros de donación':kind==='events'?'eventos':kind==='groups'?'grupos':'filas';var meta=count>0?'<span style="margin-left:8px;font-size:11px;color:#64748b;font-weight:800">('+(shown<count?esc(shown)+' mostrados de ':'')+esc(count)+' '+esc(label)+')</span>':'';
+    var count=Number(tb.logicalCount||0),shown=Number(tb.displayCount||rawRows.length||0),kind=String(tb.presentationKind||'');var label=kind==='products'?'productos':kind==='purchases'?'registros de compra':kind==='donations'?'registros de donación':kind==='events'?'eventos':kind==='groups'?'grupos':'filas';var meta=count>0?'<span style="margin-left:8px;font-size:11px;color:#64748b;font-weight:800">('+(shown<count?esc(shown)+' mostrados de ':'')+esc(count)+' '+esc(label)+')</span>':'';
     return '<div class="ce-ai-card ce-ai-table-card"><h3>'+esc(tb.title||'Tabla')+meta+'</h3><div class="ce-ai-table-wrap"><table class="ce-ai-table'+shape+'"><thead><tr>'+head+'</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
   }
   function tick(){ injectStyle(); injectButton(); bindOpenButton($('ceGeminiLibreBtn')); var title=$('ceAiEventTitle'); if(title) title.innerHTML=eventTitleHtml(); }

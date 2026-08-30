@@ -8423,7 +8423,7 @@ async function v261ExecuteAgentTool(call,state,selectedEventId,flowTrace=[]){
   return v26ExecuteTool(tool,state,selectedEventId);
 }
 
-async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto',externalSignal=null,maxOutputTokens=0,maxCalls=2,responseSchema=null}){
+async function v261CallInteraction({input,previousInteractionId='',model,systemInstruction,tools,flowTrace=[],stage='Gemini',toolChoice='auto',externalSignal=null,maxOutputTokens=0,maxCalls=2,responseSchema=null,plainTextResponse=false,minOutputTokens=1200}){
   const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para Zuzu.');e.status=503;throw e;}
   // v4_0_exp · calidad conversacional antes que microahorro: un turno con herramientas necesita
   // poder completar su segunda Interaction. Mantenemos normalmente máximo 2 llamadas exitosas por turno; una gráfica bancaria puede necesitar una tercera Interaction para materializarse, pero
@@ -8436,14 +8436,14 @@ async function v261CallInteraction({input,previousInteractionId='',model,systemI
   if(num(spent?.calls)>=1&&num(spent?.costEurApprox)+num(predicted?.costEurApprox)>hardCap){
     zuzuTracePush(flowTrace,'v30 · Presupuesto conversacional','INFO',`La segunda llamada necesaria puede superar el objetivo interno (${hardCap.toFixed(3)} €); se completa porque forma parte del mismo turno y evita dejar herramientas sin respuesta.`);
   }
-  const thinkingLevel=trim(process.env.CONTROLEVENT_ZUZU_THINKING_LEVEL||'low')||'low';const requestedMax=Number(maxOutputTokens)||0;const maxOutput=Math.max(1200,Math.min(4800,requestedMax||Number(process.env.CONTROLEVENT_ZUZU_MAX_OUTPUT_TOKENS)||1600));
+  const thinkingLevel=trim(process.env.CONTROLEVENT_ZUZU_THINKING_LEVEL||'low')||'low';const requestedMax=Number(maxOutputTokens)||0;const minOut=Math.max(128,Math.min(1200,Number(minOutputTokens)||1200));const maxOutput=Math.max(minOut,Math.min(4800,requestedMax||Number(process.env.CONTROLEVENT_ZUZU_MAX_OUTPUT_TOKENS)||1600));
   // FIX12 · Gemini 2.5 Flash-Lite tiene pensamiento desactivado por defecto. En la ruta
   // Interactions evitamos enviar controles de pensamiento a Lite: algunas revisiones del endpoint
   // traducen `thinking_level=low` a un presupuesto no válido y la petición cae inmediatamente al
   // respaldo Flash. Para Lite solo fijamos el límite de salida; Flash conserva el nivel configurado.
   const generationConfig={max_output_tokens:maxOutput};
   if(!/^gemini-2\.5-flash-lite(?:$|-)/i.test(trim(model))){generationConfig.thinking_level=thinkingLevel;generationConfig.thinking_summaries='none';}
-  const body={model,input,system_instruction:systemInstruction,response_format:{type:'text',mime_type:'application/json',schema:responseSchema||v261FinalSchema()},generation_config:generationConfig,store:true};
+  const body={model,input,system_instruction:systemInstruction,generation_config:generationConfig,store:true};if(!plainTextResponse)body.response_format={type:'text',mime_type:'application/json',schema:responseSchema||v261FinalSchema()};
   if(arr(tools).length){body.tools=tools;generationConfig.tool_choice=toolChoice;}
   if(trim(previousInteractionId))body.previous_interaction_id=trim(previousInteractionId);
   const url='https://generativelanguage.googleapis.com/v1/interactions';
@@ -17150,6 +17150,74 @@ function vnextP11DocsFinal(result={}){
 function vnextP11MemoryFinal(result={}){
   const rows=arr(result?.tables).flatMap(t=>arr(t?.rows));return{title:trim(result?.title)||'Recuerdos',answer:rows.length?`He encontrado ${rows.length} elemento${rows.length===1?'':'s'} de memoria relacionado${rows.length===1?'':'s'}. Te dejo los más útiles para seguir desde ahí.`:'No he encontrado un recuerdo suficientemente claro con esa referencia.',warnings:[]};
 }
+// ============================================================================
+// v4_0_exp · ZUZU VNEXT P1.2 · SCREEN FIX + PARALLEL FAST PATH
+// - Gemini decide la herramienta mientras ControlEvent carga el estado en paralelo.
+// - La Interaction factual usa salida de texto nativa (sin schema JSON final) y límite corto.
+// - Las tablas V26 (filas objeto) se adaptan al formato clásico de UI (columns + filas array).
+// ============================================================================
+function vnextP12SystemInstruction(selectedEventId='',opts={}){
+  const display=zuzuLoggedUserDisplayName({usuarioLogado:opts?.usuarioLogado||opts?.user||opts?.authUser||opts?.ce_acceso||null}),voice=opts?.voiceConversation===true;
+  return `Eres Zuzu VNext P1.2, interlocutor natural de ControlEvent con ${display}. Conversa con libertad: una corrección, una broma, una hipótesis, un dato nuevo o un cambio de tema nunca son un error de protocolo.
+
+Si la respuesta depende de datos reales, llama UNA función canónica y no adelantes cifras. Si no necesita datos, contesta directamente con contenido útil.
+
+query_ce usa operaciones empresariales estrictas: people_catalog (personas/socios + nombre hablado), events_catalog, person_profile, person_events, person_income_status (si una persona/pareja ha pagado un evento), event_income_status (quién queda Pendiente/recibido), event_income_lines (ingresos uno por uno), event_attendance, event_summary, event_purchases, event_donations, event_bank, event_stores_used, event_products, event_weather y compare_events. Ingresos, asistencia, compras, donaciones y banco NO se sustituyen entre sí.
+
+Los alias y nombres hablados son datos de identidad: el servidor los resuelve al nombre canónico. Una identidad individual no se convierte en pareja salvo que el usuario pida la pareja. "ha pagado", "ha ingresado", "queda por pagar" y "Pendiente" significan ingresos del evento salvo que el usuario diga otra cosa. No afirmes no existe / 0 € / no ha pagado / no asistió desde una fuente que no lo pueda acreditar.
+
+El evento visible está identificado internamente como ${trim(selectedEventId)||'ninguno'}; para "este evento" puedes omitir el nombre y el servidor aplicará el evento de pantalla. Si el usuario corrige el rumbo, la corrección manda inmediatamente.
+
+LATENCIA: una consulta factual normal = una sola Interaction. Elige el contrato exacto; no abras consultas auxiliares por curiosidad. Puedes emitir varias function_call solo si la petición exige varias fuentes independientes.
+${voice?'MODO ORAL: breve, natural y directo.':''}`;
+}
+function vnextP12UiTable(table={}){
+  const srcRows=arr(table?.rows);let columns=arr(table?.columns).map(x=>trim(x)).filter(Boolean);
+  if(!columns.length){
+    for(const key of Object.keys(table?.schema&&typeof table.schema==='object'?table.schema:{}))if(!columns.includes(key))columns.push(key);
+    for(const row of srcRows){if(row&&typeof row==='object'&&!Array.isArray(row))for(const key of Object.keys(row))if(!columns.includes(key))columns.push(key);}
+  }
+  const rows=srcRows.map(row=>Array.isArray(row)?row.map(v=>text(v)):columns.map(c=>text(row?.[c])));
+  return {...table,columns,rows,logicalCount:Number(table?.logicalCount||srcRows.length)||srcRows.length,displayCount:Number(table?.displayCount||rows.length)||rows.length};
+}
+function vnextP12LocalPresentation(result={}){return arr(result?.tables).filter(Boolean).slice(0,8).map(vnextP12UiTable);}
+async function runZuzuVNextP12Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
+  const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP11Tools(),systemInstruction=vnextP12SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime});
+  let currentPrev=trim(previousInteractionId),payload,calls=0,modelMs=0,toolMs=0,stateWaitMs=0,hadTools=false,final={title:'Zuzu',answer:'',warnings:[]},tables=[],results=[],state=null;
+  const ensureState=async()=>{if(state)return state;const t=Date.now();const loaded=await statePromise;stateWaitMs+=Date.now()-t;state=attachLoggedUserFix10(loaded||{},{usuarioLogado,user,authUser,ce_acceso});return state;};
+  zuzuTracePush(flowTrace,'VNEXT P1.2 · PARALLEL FAST PATH','OK',`Gemini y lectura de Supabase arrancan en paralelo; 1 Interaction factual; predecessor=${currentPrev?'sí':'no'}; sin Semantic Core, sin Memory Gate, sin segunda IA.`);
+  const input=currentPrev?userPrompt:vnextP1Input(userPrompt,conversationHistory),m1=Date.now();
+  try{payload=await v261CallInteraction({input,previousInteractionId:currentPrev,model,systemInstruction,tools,flowTrace,stage:'VNEXT P1.2 · Gemini conversa/elige contrato',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?320:480,minOutputTokens:256,plainTextResponse:true});calls++;}
+  catch(error){if(currentPrev&&v261PreviousIdFailure(error)){zuzuTracePush(flowTrace,'VNEXT P1.2 · predecessor','WARN','La Interaction anterior expiró; se usa el puente local compacto.');currentPrev='';payload=await v261CallInteraction({input:vnextP1Input(userPrompt,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'VNEXT P1.2 · recupera hilo',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?320:480,minOutputTokens:256,plainTextResponse:true});calls++;}else throw error;}
+  modelMs=Date.now()-m1;const payloadId=trim(payload?.id),functionCalls=v261FunctionCalls(payload);hadTools=functionCalls.length>0;
+  if(!hadTools){
+    const raw=trim(v261OutputText(payload));
+    final={title:'Zuzu',answer:raw||'No he recibido contenido útil para contestarte. Repite solo esta pregunta y la proceso de nuevo.',warnings:[]};
+  }else{
+    const ts=Date.now();
+    for(const call of functionCalls){
+      try{
+        let result,name=trim(call?.name),args=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{};
+        if(name==='query_ce'){const st=await ensureState();result=await vnextP1ExecuteData(args,st,selectedEventId,flowTrace);}
+        else if(name==='resolve_entity'){const st=await ensureState();result=vnextResolveTool(call,st);}
+        else if(name==='search_documents'){const st=await ensureState();result=await vnextSearchDocuments(call,st,selectedEventId,flowTrace);}
+        else if(name==='recall_memory')result=await vnextRecallMemory(call,actor,conversationId,clientLocalDateTime||clientNowIso);
+        else throw new Error(`Contrato VNext desconocido: ${name}.`);
+        results.push({call,result,args});tables.push(...vnextP12LocalPresentation(result));
+        zuzuTracePush(flowTrace,`VNEXT P1.2 · ${name}`,'OK',`${trim(result?.title)||'Resultado'} · operación=${trim(result?._vnext_operation||args?.operation)||'—'} · filas=${arr(result?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}.`);
+      }catch(error){const msg=cleanGeminiError(error);results.push({call,error:msg,args:(call?.arguments&&typeof call.arguments==='object')?call.arguments:{}});zuzuTracePush(flowTrace,`VNEXT P1.2 · ${trim(call?.name)}`,'WARN',msg);}
+    }
+    toolMs=Date.now()-ts;const good=results.filter(x=>x.result),bad=results.filter(x=>x.error);
+    if(good.length){const parts=[];for(const x of good){const name=trim(x.call?.name);if(name==='query_ce'){const st=await ensureState();parts.push(vnextP1LocalFinal(x.result,x.args,st));}else if(name==='resolve_entity')parts.push(vnextP11ResolveFinal(x.result));else if(name==='search_documents')parts.push(vnextP11DocsFinal(x.result));else parts.push(vnextP11MemoryFinal(x.result));}final={title:parts.length===1?parts[0].title:'Zuzu',answer:parts.map(x=>trim(x.answer)).filter(Boolean).join('\n\n'),warnings:bad.map(x=>x.error)};}
+    else{const msg=bad.map(x=>x.error).filter(Boolean).join(' · ');final={title:'No tengo ese dato cerrado',answer:`No he podido obtener ese dato con una fuente que lo acredite exactamente${msg?`: ${msg}`:'.'}`,warnings:bad.map(x=>x.error)};}
+  }
+  let answer=v29SanitizeAnswerMarkup(trim(final.answer));if(voiceConversation)answer=v40ConversationalPolish(answer,userPrompt,true);
+  const humanState=state||{},unitGuard=v416VoiceUnitOracle(answer,answer,humanState,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||answer,humanState,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp12|${payloadId||currentPrev}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true),usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started;
+  const nextInteractionId=hadTools?'':(payloadId||currentPrev),resetInteractionId=hadTools;
+  zuzuTracePush(flowTrace,'VNEXT P1.2 · LATENCIA','OK',`total=${totalMs} ms · IA=${modelMs} ms · espera estado tras IA=${stateWaitMs} ms · datos=${toolMs} ms · llamadas IA=${calls} · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu VNext',answer,spokenAnswer,warnings:arr(final.warnings),charts:[],tables:tables.filter(Boolean).slice(0,8),files:[],provider:'zuzu-vnext-p12-parallel-native-fast-close',model,interactionId:nextInteractionId,conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P1.2 · open-world · native function decision · parallel Supabase prefetch · classic UI table adapter · one-Interaction local close',experimental:true,voiceConversation:!!voiceConversation,interactionId:nextInteractionId,resetInteractionId,spokenAnswer,performance:{totalMs,decisionModelMs:modelMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,interactionCalls:calls,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+}
+
 async function runZuzuVNextP11Agent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
   const started=Date.now(),actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP11Tools(),systemInstruction=vnextP11SystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime});
   let currentPrev=trim(previousInteractionId),payload,calls=0,modelMs=0,toolMs=0,hadTools=false,final={title:'Zuzu',answer:'',warnings:[]},tables=[],results=[];
@@ -17189,9 +17257,11 @@ async function runZuzuVNextP11Agent({userPrompt,state,selectedEventId,flowTrace=
 
 export async function runZuzuVNextUserTurn(input={}){
   const flowTrace=[],userPrompt=trim(input?.prompt);if(!userPrompt){const e=new Error('Escribe una pregunta o petición para Zuzu.');e.status=400;throw e;}if(userPrompt.length>3000){const e=new Error('El prompt es demasiado largo. Resume la petición.');e.status=413;throw e;}
-  const state=attachLoggedUserFix10(input?.stateOverride&&typeof input.stateOverride==='object'?input.stateOverride:await getState(),{usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso});
-  try{return await runZuzuVNextP11Agent({userPrompt,state,selectedEventId:input?.selectedEventId,flowTrace,previousInteractionId:input?.previousInteractionId,conversationHistory:arr(input?.conversationHistory).slice(-6),voiceConversation:input?.voiceConversation===true,usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso,clientNowIso:input?.clientNowIso,clientLocalDateTime:input?.clientLocalDateTime,clientTimeZone:input?.clientTimeZone,externalSignal:input?.externalSignal,conversationId:input?.conversationId});}
-  catch(error){zuzuTracePush(flowTrace,'VNEXT P1.1 · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu sigue contigo',answer:'No he podido cerrar esa consulta de datos, pero la conversación sigue viva. Dímelo de otra forma o concreta el dato y continúo desde aquí.',spokenAnswer:'No he podido cerrar ese dato, pero seguimos. Dímelo de otra forma y continúo.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-p1-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P1.1 · soft failure conversacional',experimental:true,resetInteractionId:true,debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
+  // P1.2: no bloqueamos la llamada IA esperando diez lecturas secuenciales de Supabase.
+  // La carga completa empieza ya y solo se espera si Gemini solicita una herramienta que la necesita.
+  const statePromise=input?.stateOverride&&typeof input.stateOverride==='object'?Promise.resolve(input.stateOverride):getState({parallel:true});
+  try{return await runZuzuVNextP12Agent({userPrompt,statePromise,selectedEventId:input?.selectedEventId,flowTrace,previousInteractionId:input?.previousInteractionId,conversationHistory:arr(input?.conversationHistory).slice(-6),voiceConversation:input?.voiceConversation===true,usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso,clientNowIso:input?.clientNowIso,clientLocalDateTime:input?.clientLocalDateTime,clientTimeZone:input?.clientTimeZone,externalSignal:input?.externalSignal,conversationId:input?.conversationId});}
+  catch(error){zuzuTracePush(flowTrace,'VNEXT P1.2 · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu sigue contigo',answer:'No he podido cerrar esa consulta de datos, pero la conversación sigue viva. Dímelo de otra forma o concreta el dato y continúo desde aquí.',spokenAnswer:'No he podido cerrar ese dato, pero seguimos. Dímelo de otra forma y continúo.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-p12-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P1.2 · soft failure conversacional',experimental:true,resetInteractionId:true,debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
 }
 
 async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[],conversationDigest='',voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){

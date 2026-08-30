@@ -2,7 +2,7 @@ const fs=require('fs');
 const svc=fs.readFileSync('services/event-ai.service.js','utf8');
 const ui=fs.readFileSync('public/app/features/v11-3-zuzu-analitica-libre.js','utf8');
 let ok=0,ko=0;function t(n,c){if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}}
-t('P1 export usa agente P1/P1.1',/runZuzuVNextUserTurn[\s\S]{0,2200}runZuzuVNextP11Agent/.test(svc));
+t('P1 export usa agente P1.1 o sucesor P1.2',/runZuzuVNextUserTurn[\s\S]{0,2600}runZuzuVNextP1(?:1|2)Agent/.test(svc));
 t('P1 open-world siempre admite conversation',/mode:\{type:'string',enum:\['conversation','data','documents','memory'\]/.test(svc));
 t('contratos de ingresos separados',/person_income_status/.test(svc)&&/event_income_status/.test(svc)&&/event_income_lines/.test(svc));
 t('pagado se define como ingresos no donaciones',/ha pagado[\s\S]{0,260}INGRESOS/.test(svc)&&/nunca donaciones ni asistencia/.test(svc));
@@ -15,6 +15,6 @@ t('correcciones son hechos de sesión sin fingir BBDD',/HECHO DE SESIÓN/.test(s
 t('fast path una decisión IA',/1 decisión IA \+ ejecución local tipada/.test(svc)&&/needs_narration=false por defecto/.test(svc));
 t('segunda IA solo narración explícita',/decision\?\.needs_narration===true/.test(svc)&&/narración opcional/.test(svc));
 t('métrica de latencia desglosada',/IA decisión=.*datos=.*IA narración=.*llamadas IA=/.test(svc));
-t('UI identifica VNext P1',/VNext P1/.test(ui)&&/ce_zuzu_vnext_p1_mode/.test(ui));
+t('UI identifica VNext P1.x',/VNext P1\.[12]|VNext P1/.test(ui)&&/ce_zuzu_vnext_p1_mode/.test(ui));
 t('soft failure conversa',/Zuzu sigue contigo/.test(svc)&&/conversación sigue viva/.test(svc));
 console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;
