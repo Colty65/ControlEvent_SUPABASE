@@ -451,7 +451,7 @@
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
   function isZuzuVNextMode(){ try{return sessionStorage.getItem(zuzuVNextKey())==='1';}catch(_){return false;} }
-  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.2</span><span class="ce-ai-mode-help">Conversación open-world + contratos tipados. Gemini y Supabase trabajan en paralelo; una sola llamada IA factual y cierre local. Modo experimental A/B.</span>';}}
+  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.3</span><span class="ce-ai-mode-help">Open-world + contratos tipados. Alias sociales robustos, memoria de hilo y tiempo con rango/gráfica; una sola IA en consultas factuales normales. Modo experimental A/B.</span>';}}
   function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} var on=!isZuzuVNextMode(); try{sessionStorage.setItem(zuzuVNextKey(),on?'1':'0');}catch(_){} saveZuzuInteractionId(''); renderZuzuVNextMode(); setStatus(on?'VNext experimental activado.':'BANK4_27 activo.',''); }
 
   function openModal(){
@@ -618,7 +618,7 @@
     }
   }
   function conversationHistoryForApi(){
-    return loadZuzuConversation().slice(-8).map(function(turn){
+    return loadZuzuConversation().slice(-30).map(function(turn){
       return {turnId:String(turn&&turn.turnId||''),user:String(turn&&turn.user||'').slice(0,700),assistant:String(turn&&turn.assistant||'').slice(0,1200),assistantTail:String(turn&&turn.assistantTail||'').slice(-1000),title:String(turn&&turn.title||'').slice(0,160),provider:String(turn&&turn.provider||'').slice(0,80),intent:String(turn&&turn.intent||'').slice(0,120),tools:Array.isArray(turn&&turn.tools)?turn.tools.slice(0,6):[],selectedEventId:String(turn&&turn.selectedEventId||'').slice(0,120),conversationContext:(turn&&turn.conversationContext&&typeof turn.conversationContext==='object')?turn.conversationContext:null,pendingAction:(turn&&turn.pendingAction&&typeof turn.pendingAction==='object')?turn.pendingAction:null,resultContext:(turn&&turn.resultContext&&typeof turn.resultContext==='object')?turn.resultContext:null,routerShadow:(turn&&turn.routerShadow&&typeof turn.routerShadow==='object')?turn.routerShadow:null};
     });
   }
@@ -750,7 +750,7 @@
       var fullAnswer=String(data.answer||'');
       if(!(data.meta&&data.meta.doNotArchiveTurn===true)){
         // Ledger v1: el navegador guarda solo el índice ligero. Tablas, trazas, DATASET y VIEW se recuperan del servidor bajo demanda (PDF/recuerdo).
-        window.__ceZuzuConversationV26.push({turnId:turnId,turnSeq:Number(data.turnSeq||(data.meta&&data.meta.turnSeq)||conversationTurnNumber)||conversationTurnNumber,user:prompt.slice(0,700),assistant:fullAnswer.slice(0,420),assistantTail:fullAnswer.slice(-300),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:[],selectedEventId:selectedEventId(),conversationContext:null,pendingAction:pendingAction,resultContext:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:'',archiveMeta:archiveMetaForData(data)});
+        window.__ceZuzuConversationV26.push({turnId:turnId,turnSeq:Number(data.turnSeq||(data.meta&&data.meta.turnSeq)||conversationTurnNumber)||conversationTurnNumber,user:prompt.slice(0,700),assistant:fullAnswer.slice(0,vnext?1200:420),assistantTail:fullAnswer.slice(-(vnext?700:300)),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:null,pendingAction:pendingAction,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:'',archiveMeta:archiveMetaForData(data)});
         if(window.__ceZuzuConversationV26.length>ZUZU_LOCAL_HISTORY_LIMIT)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-ZUZU_LOCAL_HISTORY_LIMIT);
         saveZuzuConversation();
       }

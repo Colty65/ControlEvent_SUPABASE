@@ -2,7 +2,7 @@ const fs=require('fs');
 const s=fs.readFileSync('services/event-ai.service.js','utf8');
 const ui=fs.readFileSync('public/app/features/v11-3-zuzu-analitica-libre.js','utf8');
 let ok=0,ko=0;function t(n,c){if(c){console.log('OK',n);ok++;}else{console.error('KO',n);ko++;}}
-t('export usa P1.1 o sucesor P1.2',/runZuzuVNextUserTurn[\s\S]{0,2400}runZuzuVNextP1(?:1|2)Agent/.test(s));
+t('export usa P1.1 o sucesor P1.3',/runZuzuVNextUserTurn[\s\S]{0,2400}runZuzuVNextP1(?:1|2|3)Agent/.test(s));
 t('P1.1 usa function calling nativo',/function vnextP11Tools\(\)/.test(s)&&/tools=vnextP11Tools\(\)/.test(s));
 t('P1.1 conserva contratos tipados',/person_income_status/.test(s)&&/event_income_status/.test(s)&&/event_income_lines/.test(s));
 t('P1.1 una sola IA factual y cierre local',/one-Interaction local close/.test(s)&&/hadTools\?'':\(payloadId\|\|currentPrev\)/.test(s));
@@ -12,5 +12,5 @@ t('mote La Estercita ejemplo a person_profile',/La Estercita[\s\S]{0,100}person_
 t('pago persona usa person_income_status',/el primo[\s\S]{0,140}person_income_status/.test(s));
 t('pendientes usa event_income_status',/quién queda Pendiente[\s\S]{0,130}event_income_status/.test(s));
 t('ingresos uno a uno usa event_income_lines',/ingresos uno por uno[\s\S]{0,100}event_income_lines/.test(s));
-t('UI identifica P1.1 o sucesor P1.2',/VNext P1\.[12]/.test(ui));
+t('UI identifica P1.1 o sucesor P1.3',/VNext P1\.[123]/.test(ui));
 console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;
