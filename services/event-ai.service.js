@@ -16790,6 +16790,153 @@ function v65SafeResetResult({flowTrace=[],model='',voiceConversation=false,reaso
   return{ok:true,rejected:false,title:'Contexto de Zuzu reiniciado',answer:'No he podido resolver esta petición con suficiente seguridad y he reiniciado el contexto interno de Zuzu para no arrastrar un estado incorrecto. Reformula la pregunta indicando el evento o el contexto necesario.',warnings:[],charts:[],tables:[],files:[],provider:'gemini-native-tools-scc-lite-safe-reset',model,interactionId:'',meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',voiceConversation:!!voiceConversation,architecture:'Gemini Native Tool Calling + SCC-Lite + SAFE_RESET',modelTier:'safe-reset',interactionId:'',resetInteractionId:true,pendingAction:null,resultContext,tools:[],scc:resultContext.scc,scc_lite:resultContext.scc_lite,geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
+
+// ============================================================================
+// v4_0_exp · ZUZU VNEXT P0 · OPEN-WORLD + 4 TOOLS
+// Prototipo A/B deliberadamente paralelo al Ledger BANK4_27.
+// - Gemini mantiene la conversación nativa mediante previous_interaction_id.
+// - Una frase humana NO tiene que compilar a un dominio CE: puede ser conversación normal.
+// - ControlEvent solo expone cuatro capacidades: resolver identidad, consultar CE,
+//   buscar documentación y recordar conversaciones persistentes.
+// - No hay MEMORY EVIDENCE GATE, Semantic Core, reparador lingüístico ni segunda IA auditora.
+// ============================================================================
+function vnextNorm(value=''){return norm(value).replace(/[^a-z0-9ñ ]+/g,' ').replace(/\s+/g,' ').trim();}
+function vnextPersonAliasRows(state={},personId=''){
+  const person=arr(state?.personas).find(x=>trim(x?.id)===trim(personId))||{},out=[],seen=new Set();
+  const add=v=>{const t=trim(v),k=vnextNorm(t);if(t&&k&&!seen.has(k)){seen.add(k);out.push(t);}};
+  add(person?.nombreAmigo||person?.nombre_amigo);for(const a of arr(person?.aliases))add(a);
+  for(const row of arr(state?.personAliases||state?.person_aliases))if(trim(row?.personaId||row?.persona_id)===trim(personId)&&row?.activo!==false)add(row?.alias);
+  return out;
+}
+function vnextEntityCandidates(state={},kind='auto',value='',limit=6){
+  const raw=trim(value),needle=vnextNorm(raw),wanted=trim(kind||'auto').toLowerCase(),rows=[];if(!needle)return[];
+  const push=(candidate)=>{if(!candidate?.id||!candidate?.canonical_name)return;const key=`${candidate.kind}|${candidate.id}`;const prior=rows.findIndex(x=>`${x.kind}|${x.id}`===key);if(prior<0)rows.push(candidate);else if(Number(candidate.score)>Number(rows[prior].score))rows[prior]=candidate;};
+  if(['auto','person'].includes(wanted)){
+    const social=resolveFamiliarPersonAlias(state,raw);
+    if(social?.ok)push({kind:'person',id:trim(social.id),canonical_name:trim(social.nombre),spoken_name:vnextPersonAliasRows(state,social.id)[0]||trim(social.nombre),matched:raw,match:'exact_social_alias',score:1});
+    else if(social?.ambiguous)for(const c of arr(social.candidates))push({kind:'person',id:trim(c.id),canonical_name:trim(c.nombre),spoken_name:vnextPersonAliasRows(state,c.id)[0]||trim(c.nombre),matched:raw,match:'social_alias',score:.99});
+    for(const p of arr(state?.personas)){
+      const name=trim(p?.nombre);if(!name)continue;const aliases=vnextPersonAliasRows(state,p?.id),exact=vnextNorm(name)===needle||aliases.some(a=>vnextNorm(a)===needle);
+      if(exact)push({kind:'person',id:trim(p?.id),canonical_name:name,spoken_name:trim(p?.nombreAmigo||p?.nombre_amigo)||aliases[0]||name,matched:raw,match:vnextNorm(name)===needle?'exact_name':'exact_alias',score:1});
+    }
+  }
+  if(['auto','event'].includes(wanted))for(const e of arr(state?.eventos)){
+    const canonical=trim(e?.titulo||e?.nombre),spoken=trim(e?.nombreHablado||e?.nombre_hablado||e?.tituloVoz||e?.titulo_voz),exact=vnextNorm(canonical)===needle||(spoken&&vnextNorm(spoken)===needle);
+    if(exact)push({kind:'event',id:trim(e?.id),canonical_name:canonical,spoken_name:spoken||canonical,matched:raw,match:spoken&&vnextNorm(spoken)===needle?'exact_spoken_name':'exact_name',score:1});
+  }
+  const catalogKinds=wanted==='auto'?['person','event','store','product']:[wanted];
+  for(const type of catalogKinds){
+    if(!['person','event','store','product'].includes(type))continue;
+    const r=semanticResolveEntity(state,type,raw);
+    if(r?.ok)push({kind:type,id:trim(r.id),canonical_name:trim(r.nombre),spoken_name:type==='event'?trim(arr(state?.eventos).find(x=>trim(x?.id)===trim(r.id))?.nombreHablado||r.nombre):type==='person'?(vnextPersonAliasRows(state,r.id)[0]||trim(r.nombre)):trim(r.nombre),matched:raw,match:'catalog',score:Number(r.score)||.9});
+    else if(r?.ambiguous)for(const c of arr(r.candidates).slice(0,4))push({kind:type,id:trim(c.id),canonical_name:trim(c.nombre),spoken_name:trim(c.nombre),matched:raw,match:'catalog_candidate',score:Number(c.score)||.8});
+  }
+  const exacts=rows.filter(x=>/^exact/.test(trim(x.match))||x.match==='exact_social_alias');
+  const ordered=(exacts.length?exacts:rows).sort((a,b)=>Number(b.score)-Number(a.score)||String(a.canonical_name).localeCompare(String(b.canonical_name),'es',{numeric:true,sensitivity:'base'}));
+  return ordered.slice(0,Math.max(1,Math.min(12,Number(limit)||6)));
+}
+function vnextPeopleCatalogResult(state={},callId=''){
+  const aliasRows=arr(state?.personAliases||state?.person_aliases),rows=arr(state?.personas).map(p=>{
+    const preferred=trim(p?.nombreAmigo||p?.nombre_amigo)||vnextPersonAliasRows(state,p?.id)[0]||'',aliases=vnextPersonAliasRows(state,p?.id).filter(a=>vnextNorm(a)!==vnextNorm(preferred));
+    return{Nombre:trim(p?.nombre),'Nombre hablado':preferred,'Otros nombres / motes':aliases.join(' | '),Rango:trim(p?.rango)};
+  }).filter(r=>r.Nombre).sort((a,b)=>a.Nombre.localeCompare(b.Nombre,'es',{numeric:true,sensitivity:'base'}));
+  return{id:callId,name:'query_ce',ok:true,title:'Personas · identidad social',facts:{operation:'people_catalog',record_count:rows.length,source:'ce_personas + ce_persona_aliases'},facts_schema:{record_count:v26CountSchema('personas')},provenance:'ControlEvent · ce_personas + ce_persona_aliases',tables:[v26Table('people_catalog','Personas · nombre canónico y hablado',rows,{Nombre:v26TextSchema(),'Nombre hablado':v26TextSchema(),'Otros nombres / motes':v26TextSchema(),Rango:v26TextSchema()})]};
+}
+function vnextEventsCatalogResult(state={},callId=''){
+  const rows=arr(state?.eventos).map(e=>({Evento:trim(e?.titulo||e?.nombre),'Nombre hablado':trim(e?.nombreHablado||e?.nombre_hablado||e?.tituloVoz||e?.titulo_voz),'Fecha inicio':trim(e?.fechaIni),'Fecha fin':trim(e?.fechaFin),Estado:trim(e?.situacion),Precio:v26Money(e?.precio),Descripción:trim(e?.descripcion)})).filter(r=>r.Evento).sort((a,b)=>String(b['Fecha inicio']).localeCompare(String(a['Fecha inicio']))||a.Evento.localeCompare(b.Evento,'es',{numeric:true,sensitivity:'base'}));
+  return{id:callId,name:'query_ce',ok:true,title:'Eventos · catálogo humano',facts:{operation:'events_catalog',record_count:rows.length,source:'ce_eventos'},facts_schema:{record_count:v26CountSchema('eventos')},provenance:'ControlEvent · ce_eventos',tables:[v26Table('events_catalog','Eventos · nombre canónico y hablado',rows,{Evento:v26TextSchema(),'Nombre hablado':v26TextSchema(),'Fecha inicio':v26DateSchema(),'Fecha fin':v26DateSchema(),Estado:v26StatusSchema(),Precio:v26MoneySchema(),Descripción:v26TextSchema()})]};
+}
+function vnextTools(){
+  const queryOps=['events_catalog','people_catalog','product_catalog','store_catalog','event_dossier','event_breakdowns','event_people','person_dossier','event_products','event_purchase_lines','event_donation_lines','event_documentation','event_management','event_bank','event_weather','store_purchases','canonical_socios','participation_events','people_activity','events_overview','compare_events'];
+  return [
+    {type:'function',name:'resolve_entity',description:'Resuelve un nombre, mote, nombre hablado o referencia canónica contra las entidades reales de ControlEvent. Úsala cuando no estés seguro del TIPO o identidad. Un alias social exacto de una persona identifica a esa persona individual; una pareja solo compite si el usuario la nombra explícitamente.',parameters:{type:'object',properties:{text:{type:'string'},kind:{type:'string',enum:['auto','person','event','store','product']},limit:{type:'integer'}},required:['text']}},
+    {type:'function',name:'query_ce',description:'Consulta datos estructurados canónicos de ControlEvent. Elige una operación y pasa únicamente filtros/ámbito ya comprendidos. No uses esta tool para charla, correcciones sociales o hechos nuevos que el usuario simplemente te está contando.',parameters:{type:'object',properties:{operation:{type:'string',enum:queryOps},scope:{type:'string',enum:['screen_event','named_event','all_events','named_events','year']},event:{type:'string'},events:{type:'array',items:{type:'string'}},year:{type:'integer'},person:{type:'string'},store:{type:'string'},product:{type:'string'},donor:{type:'string'},responsible:{type:'string'},ticket:{type:'string'},status:{type:'string',enum:['realized','pending','all']},detail:{type:'string',enum:['brief','standard','full']},view:{type:'string',enum:['products','records','donors']},query:{type:'string'}},required:['operation']}},
+    {type:'function',name:'search_documents',description:'Busca descripción/evidencias/documentos de un evento sin convertir la petición en otro dominio. Úsala para textos, notas, justificantes, documentos o información no estructurada del evento.',parameters:{type:'object',properties:{event:{type:'string'},scope:{type:'string',enum:['screen_event','named_event','all_events']},query:{type:'string'},detail:{type:'string',enum:['brief','standard','full']}},required:['scope']}},
+    {type:'function',name:'recall_memory',description:'Busca o lee conversaciones pasadas persistentes de Zuzu. No se ejecuta en cada turno: úsala solo cuando el usuario realmente pide recordar, localizar o volver a una conversación pasada.',parameters:{type:'object',properties:{action:{type:'string',enum:['search','list','read']},query:{type:'string'},conversation_id:{type:'string'},matched_turn_id:{type:'string'},limit:{type:'integer'}},required:['action']}}
+  ];
+}
+function vnextSystemInstruction(state={},selectedEventId='',opts={}){
+  const active=v26EventById(state,selectedEventId),display=zuzuLoggedUserDisplayName({usuarioLogado:state?.usuarioLogado||state?.ce_acceso_usuario_logado||opts?.usuarioLogado||opts?.user||opts?.authUser||opts?.ce_acceso||null}),localNow=trim(opts?.clientLocalDateTime)||new Intl.DateTimeFormat('es-ES',{timeZone:'Europe/Madrid',dateStyle:'full',timeStyle:'medium'}).format(new Date()),voice=opts?.voiceConversation===true;
+  return `Eres Zuzu VNext P0, interlocutor de ControlEvent. Hablas en español natural con ${display}. Ahora es ${localNow}.\n\nPRINCIPIO OPEN-WORLD:\n- TODO mensaje humano es conversable. Una frase nueva, una corrección, una broma, un dato que no conocías o un cambio de tema NO es un error de protocolo y NO necesita encajar en un dominio de ControlEvent.\n- Si el usuario te cuenta un hecho nuevo, incorpóralo al hilo actual y sigue hablando. No fuerces una tool solo para poder responder.\n- Usa tools únicamente cuando la respuesta dependa de datos reales de ControlEvent, documentos o memoria persistente.\n- Si no estás seguro de si un nombre es persona/evento/tienda/producto, llama resolve_entity(kind=auto). NO adivines el tipo.\n- Los motes y nombres hablados son datos de identidad. Un alias social exacto como \"La Estercita\" identifica a la persona individual; NO la conviertas en pareja salvo que el usuario pida explícitamente la pareja, ambos o el nombre compuesto.\n- El evento visible (${active?trim(active?.titulo):'ninguno'}) es solo ambiente. No lo uses para secuestrar un asunto distinto.\n- \"¿X ha pagado el importe del evento?\", \"queda por pagar\", \"ingreso pendiente\" o equivalentes hablan de INGRESOS/estado de pago; NO de donaciones salvo que el usuario diga donación. Para una persona concreta usa query_ce(operation=person_dossier) y para el detalle colectivo del evento query_ce(operation=event_people).\n- Si el usuario corrige tu interpretación, la corrección manda inmediatamente. No defiendas la respuesta anterior ni continúes por la misma linde.\n\nCUATRO TOOLS:\n1) resolve_entity: identidad, alias, mote y nombre hablado.\n2) query_ce: datos estructurados.\n3) search_documents: texto/documentos/evidencias.\n4) recall_memory: conversaciones pasadas.\nNo existen otras herramientas para ti.\n\nCONVERSACIÓN Y LATENCIA:\n- Mantén el hilo con previous_interaction_id. No pidas a ControlEvent un resumen histórico en cada turno.\n- Si no necesitas datos, responde en UNA sola Interaction. Si necesitas datos, intenta pedir todas las fuentes necesarias en una sola ronda y responde después de recibirlas.\n- No hagas auditorías, reparaciones ni nuevas consultas si ya tienes hechos suficientes.\n- Cuando una tool devuelva error o cero resultados, intégralo como información y continúa: no presentes \"registro no ejecutable\" ni un fallo de compilador. Pregunta solo si de verdad quedan dos interpretaciones plausibles.\n\nVERDAD Y ESTILO:\n- No inventes cifras ni relaciones. Los hechos de CE vienen de las tools; la conversación libre puede usar lo dicho por el usuario como contexto, diferenciándolo de los datos de CE.\n- En voz, responde normalmente en 2 a 5 frases; en pantalla puedes ampliar si se pide. No leas tablas celda por celda.\n- Los campos \"Nombre hablado\" de eventos y personas son la forma preferida para la salida oral.\n- Nunca muestres JSON, nombres de tools, datasets ni protocolo interno.\n${voice?'MODO ORAL ACTIVO: prioriza ritmo humano, respuesta corta y directa.':''}`;
+}
+function vnextHistoryInput(userPrompt='',history=[]){
+  const turns=arr(history).slice(-4).map(x=>`Usuario: ${trim(x?.user).slice(0,500)}\nZuzu: ${trim(x?.assistant).slice(0,800)}`).join('\n\n');
+  return turns?`CONTEXTO RECIENTE DE RESPALDO (úsalo solo porque no hay predecessor nativo utilizable):\n${turns}\n\nMENSAJE ACTUAL:\n${userPrompt}`:userPrompt;
+}
+function vnextQueryToolCall(call={},state={},selectedEventId=''){
+  const a=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{},op=trim(a.operation),id=trim(call.id),detail=trim(a.detail)||'standard';
+  if(op==='people_catalog')return vnextPeopleCatalogResult(state,id);
+  if(op==='events_catalog')return vnextEventsCatalogResult(state,id);
+  const alias={product_catalog:['master_catalog',{entity:'products'}],store_catalog:['master_catalog',{entity:'stores'}]};
+  const mapped=alias[op]?.[0]||op,base=alias[op]?.[1]||{};
+  const allowed=new Set(['master_catalog','event_dossier','event_breakdowns','event_people','person_dossier','event_products','event_purchase_lines','event_donation_lines','event_documentation','event_management','event_bank','event_weather','store_purchases','canonical_socios','participation_events','people_activity','events_overview','compare_events']);
+  if(!allowed.has(mapped))throw new Error(`Operación query_ce no admitida: ${op||'vacía'}.`);
+  let args={...base};for(const k of ['scope','event','events','year','person','store','product','donor','responsible','ticket','status','detail','view','query'])if(a[k]!==undefined&&a[k]!==null&&a[k]!=='')args[k]=a[k];
+  if(args.scope==='screen_event')args.scope='active_event';
+  if(!args.scope&&['event_dossier','event_breakdowns','event_people','person_dossier','event_products','event_purchase_lines','event_donation_lines','event_documentation','event_management','event_bank','event_weather','store_purchases'].includes(mapped))args.scope=trim(args.event)?'named_event':'active_event';
+  if(trim(args.person)){const r=resolveFamiliarPersonAlias(state,args.person);if(r?.ok)args.person=r.nombre;}
+  if(trim(args.event)){const exact=vnextEntityCandidates(state,'event',args.event,1)[0];if(exact?.canonical_name)args.event=exact.canonical_name;}
+  const native={id,name:mapped,arguments:args};return Promise.resolve(v261ExecuteAgentTool(native,state,selectedEventId,[])).then(full=>({...full,id,name:'query_ce',facts:{operation:op,...(full?.facts||{})},_vnext_operation:op,_vnext_source_name:mapped,_vnext_detail:detail}));
+}
+async function vnextSearchDocuments(call={},state={},selectedEventId='',flowTrace=[]){
+  const a=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{},id=trim(call.id),scope=trim(a.scope)==='screen_event'?'active_event':trim(a.scope),event=trim(a.event),query=trim(a.query),detail=trim(a.detail)||'full';
+  const native={id,name:'event_documentation',arguments:{scope,event,detail}};let full=await v261ExecuteAgentTool(native,state,selectedEventId,flowTrace);full={...full,id,name:'search_documents',facts:{query,...(full?.facts||{})}};
+  if(query){const terms=vnextNorm(query).split(' ').filter(x=>x.length>=3),tables=arr(full.tables).map(t=>({...t,rows:arr(t?.rows).filter(r=>{const hay=vnextNorm(Object.values(r||{}).join(' '));return !terms.length||terms.every(x=>hay.includes(x));})})).filter(t=>arr(t.rows).length);full={...full,tables,facts:{...(full.facts||{}),matched_rows:tables.reduce((n,t)=>n+arr(t.rows).length,0)}};}
+  return full;
+}
+async function vnextRecallMemory(call={},actor={},currentConversationId='',nowIso=''){
+  const a=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{},id=trim(call.id),action=trim(a.action),limit=Math.max(1,Math.min(30,Number(a.limit)||8));
+  if(action==='list'){
+    const eps=await listZuzuMemoryEpisodes({actor,conversationId:currentConversationId,limit});const rows=eps.map(e=>({Referencia:e.ref,Fecha:trim(e.episode_started_at||e.created_at),Resumen:trim(e.episode_summary||e.summary),Temas:arr(e.episode_topics).join(' → '),'Conversation ID':trim(e.conversation_id)}));
+    return{id,name:'recall_memory',ok:true,title:'Recuerdos disponibles',facts:{action,count:rows.length},tables:[v26Table('memory_episodes','Recuerdos disponibles',rows,{Referencia:v26TextSchema(),Fecha:v26TextSchema(),Resumen:v26TextSchema(),Temas:v26TextSchema(),'Conversation ID':v26TextSchema()})]};
+  }
+  if(action==='read'){
+    const cid=trim(a.conversation_id);if(!cid)throw new Error('recall_memory/read necesita conversation_id.');const ep=await readZuzuMemoryEpisode({conversationId:cid,actor,matchedTurnId:trim(a.matched_turn_id),includeAnswers:true,limit:500});if(!ep)throw new Error('No encuentro ese episodio de memoria.');
+    const rows=arr(ep.turns).slice(-30).map(t=>({Fecha:trim(t.created_at),Pregunta:trim(t.question),Respuesta:trim(t.answer),Resumen:trim(t.summary),Coincidencia:t.matched?'★':''}));
+    return{id,name:'recall_memory',ok:true,title:'Conversación recordada',facts:{action,conversation_id:cid,summary:trim(ep.conversation_summary),topics:arr(ep.main_topics),turn_count:rows.length},tables:[v26Table('memory_turns','Conversación recordada',rows,{Fecha:v26TextSchema(),Pregunta:v26TextSchema(),Respuesta:v26TextSchema(),Resumen:v26TextSchema(),Coincidencia:v26TextSchema()})]};
+  }
+  const q=trim(a.query);if(!q)throw new Error('recall_memory/search necesita query.');const found=await searchZuzuHistoryCandidates({actor,prompt:q,conversationId:currentConversationId,limit,nowIso});const rows=found.map(x=>({Referencia:x.ref,Fecha:trim(x.episode_started_at||x.created_at),Título:trim(x.title),Resumen:trim(x.episode_summary||x.summary),'Conversation ID':trim(x.conversation_id),'Turn ID':trim(x.turn_id),Puntuación:Number(x.score)||0}));
+  return{id,name:'recall_memory',ok:true,title:'Recuerdos encontrados',facts:{action:'search',query:q,count:rows.length},tables:[v26Table('memory_matches','Recuerdos encontrados',rows,{Referencia:v26TextSchema(),Fecha:v26TextSchema(),Título:v26TextSchema(),Resumen:v26TextSchema(),'Conversation ID':v26TextSchema(),'Turn ID':v26TextSchema(),Puntuación:v26SchemaField('number','')})]};
+}
+function vnextCompactResult(full={}){
+  if(trim(full?.name)==='resolve_entity')return{ok:full.ok!==false,candidates:arr(full?.facts?.candidates).slice(0,8),count:Number(full?.facts?.count)||0};
+  const sourceName=trim(full?._vnext_source_name)||trim(full?.name),copy={...full,name:sourceName};return{ok:full?.ok!==false,operation:trim(full?._vnext_operation),title:trim(full?.title),data:v261CompactToolResult(copy,trim(full?._vnext_detail)||'standard')};
+}
+function vnextResolveTool(call={},state={}){
+  const a=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{},candidates=vnextEntityCandidates(state,trim(a.kind)||'auto',a.text,Number(a.limit)||6);return{id:trim(call.id),name:'resolve_entity',ok:true,title:'Identidad resuelta',facts:{text:trim(a.text),kind:trim(a.kind)||'auto',count:candidates.length,candidates},tables:[]};
+}
+async function runZuzuVNextOpenAgent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
+  const started=Date.now(),actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{},tools=vnextTools(),systemInstruction=vnextSystemInstruction(state,selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime}),model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),allResults=[];let payload,currentId=trim(previousInteractionId),calls=0,toolRounds=0;
+  zuzuTracePush(flowTrace,'VNEXT P0 · OPEN WORLD','OK',`Gemini conversa libremente; 4 tools; predecessor=${currentId?'sí':'no'}; sin Semantic Core, sin Memory Gate, sin auditor IA.`);
+  const firstInput=currentId?userPrompt:vnextHistoryInput(userPrompt,conversationHistory);
+  try{payload=await v261CallInteraction({input:firstInput,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:'VNEXT · Gemini conversa/decide tools',externalSignal,maxCalls:3,maxOutputTokens:voiceConversation?900:1600});calls++;}
+  catch(error){if(currentId&&v261PreviousIdFailure(error)){zuzuTracePush(flowTrace,'VNEXT · predecessor','WARN','Interaction previa no utilizable; se reconstruyen solo los últimos turnos y se continúa sin reiniciar semántica.');currentId='';payload=await v261CallInteraction({input:vnextHistoryInput(userPrompt,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'VNEXT · Gemini recupera hilo',externalSignal,maxCalls:3,maxOutputTokens:voiceConversation?900:1600});calls++;}else{error._ceOrigin='gemini';throw error;}}
+  currentId=trim(payload?.id)||currentId;
+  for(let round=1;round<=2;round++){
+    const functionCalls=v261FunctionCalls(payload);if(!functionCalls.length)break;toolRounds=round;const functionResults=[];
+    for(const call of functionCalls){
+      try{
+        let full;if(trim(call.name)==='resolve_entity')full=vnextResolveTool(call,state);else if(trim(call.name)==='query_ce')full=await vnextQueryToolCall(call,state,selectedEventId);else if(trim(call.name)==='search_documents')full=await vnextSearchDocuments(call,state,selectedEventId,flowTrace);else if(trim(call.name)==='recall_memory')full=await vnextRecallMemory(call,actor,conversationId,clientLocalDateTime||clientNowIso);else throw new Error(`Tool VNext desconocida: ${trim(call.name)}`);
+        allResults.push(full);functionResults.push({type:'function_result',name:trim(call.name),call_id:trim(call.id),result:vnextCompactResult(full)});zuzuTracePush(flowTrace,`VNEXT · ${trim(call.name)}`,'OK',`${trim(full.title)||'Resultado'} · filas=${arr(full.tables).reduce((n,t)=>n+arr(t.rows).length,0)}.`);
+      }catch(error){const msg=cleanGeminiError(error);functionResults.push({type:'function_result',name:trim(call.name),call_id:trim(call.id),is_error:true,result:{ok:false,error:msg}});zuzuTracePush(flowTrace,`VNEXT · ${trim(call.name)}`,'WARN',`${msg}. Se devuelve el error a Gemini como parte normal del diálogo; CE no cae.`);}
+    }
+    payload=await v261CallInteraction({input:functionResults,previousInteractionId:currentId,model,systemInstruction,tools,flowTrace,stage:`VNEXT · Gemini responde tras tools ${round}`,externalSignal,maxCalls:3,maxOutputTokens:voiceConversation?1100:1800});calls++;currentId=trim(payload?.id)||currentId;
+  }
+  let final=v261ParseFinal(payload),answer=trim(final.answer);if(!answer){const good=allResults.filter(r=>r?.ok!==false);answer=good.length?`He encontrado ${good.length===1?'la fuente':'las fuentes'} que necesitas. Te dejo los datos disponibles y seguimos desde ahí.`:'No necesito convertir esto en una consulta de ControlEvent. Cuéntame y seguimos.';final={...final,answer};}
+  answer=v29SanitizeAnswerMarkup(answer);if(voiceConversation)answer=v40ConversationalPolish(answer,userPrompt,true);
+  const unitGuard=v416VoiceUnitOracle(answer,answer,state,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||answer,state,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnext|${currentId}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true);
+  const presentation=voiceConversation?{tables:[],charts:[],stats:{}}:v26BuildPresentation(final,allResults,userPrompt,{wantsCharts:arr(final.chartSpecs).length>0,bankContext:false,staticPointLabels:false});
+  const usage=summarizeGeminiUsageFromTrace(flowTrace);zuzuTracePush(flowTrace,'VNEXT · LATENCIA','OK',`Interactions=${calls}; rondas tools=${toolRounds}; tiempo servidor=${Date.now()-started} ms; tokens=${num(usage?.totalTokens)}; coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu VNext',answer,spokenAnswer,warnings:arr(final.warnings),charts:presentation.charts||[],tables:presentation.tables||[],files:[],provider:'zuzu-vnext-open-agent-p0',model,interactionId:currentId,conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P0 · open-world · Gemini native conversation + 4 tools · CE data plane',experimental:true,voiceConversation:!!voiceConversation,interactionId:currentId,resetInteractionId:false,spokenAnswer,tools:[...new Set(allResults.map(r=>trim(r?.name)).filter(Boolean))],performance:{totalMs:Date.now()-started,interactionCalls:calls,toolRounds},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+}
+
+export async function runZuzuVNextUserTurn(input={}){
+  const flowTrace=[],userPrompt=trim(input?.prompt);if(!userPrompt){const e=new Error('Escribe una pregunta o petición para Zuzu.');e.status=400;throw e;}if(userPrompt.length>3000){const e=new Error('El prompt es demasiado largo. Resume la petición.');e.status=413;throw e;}
+  const state=attachLoggedUserFix10(input?.stateOverride&&typeof input.stateOverride==='object'?input.stateOverride:await getState(),{usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso});
+  try{return await runZuzuVNextOpenAgent({userPrompt,state,selectedEventId:input?.selectedEventId,flowTrace,previousInteractionId:input?.previousInteractionId,conversationHistory:arr(input?.conversationHistory).slice(-6),voiceConversation:input?.voiceConversation===true,usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso,clientNowIso:input?.clientNowIso,clientLocalDateTime:input?.clientLocalDateTime,clientTimeZone:input?.clientTimeZone,externalSignal:input?.externalSignal,conversationId:input?.conversationId});}
+  catch(error){zuzuTracePush(flowTrace,'VNEXT · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu VNext sigue contigo',answer:'No he podido cerrar esa consulta de datos, pero la conversación no se ha roto. Puedes repetirla o concretar el dato y continúo desde aquí.',spokenAnswer:'No he podido cerrar esa consulta de datos, pero seguimos. Repítemela o concreta el dato y continúo desde aquí.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-open-agent-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P0 · soft failure conversacional',experimental:true,resetInteractionId:true,debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
+}
+
 async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[],conversationDigest='',voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
   userPrompt=v336NormalizeStructuredPromptRefs(userPrompt);
   let memory=v62LiteMemoryFromHistory(conversationHistory),modelPolicy=v332InteractionPolicy(userPrompt),model=modelPolicy.model,payload,currentId='',escalated=false,fastFinal=null,protocolRepairUsed=false,integrityConflictSeen=false;

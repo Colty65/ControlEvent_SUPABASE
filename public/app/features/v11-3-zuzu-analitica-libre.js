@@ -180,6 +180,7 @@
       '#ceGeminiLibreOverlay .ce-ai-mode-strip{display:flex;align-items:center;gap:12px;padding:9px 18px;border-bottom:1px solid #e2e8f0;font-weight:900;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-mode-strip.is-new{background:#eff6ff;color:#1d4ed8}#ceGeminiLibreOverlay .ce-ai-mode-strip.is-conversation{background:#f0fdf4;color:#166534}#ceGeminiLibreOverlay .ce-ai-mode-pill{display:inline-flex;align-items:center;gap:7px;border-radius:999px;padding:5px 11px;background:#fff;border:1px solid currentColor;font-size:13px;letter-spacing:.02em}#ceGeminiLibreOverlay .ce-ai-mode-help{font-size:12px;font-weight:800;color:#475569;flex:1;min-width:260px}#ceGeminiLibreOverlay .ce-ai-conversation-card{border-color:#a7f3d0;background:linear-gradient(180deg,#f0fdf4,#fff)}#ceGeminiLibreOverlay .ce-ai-conversation-turn{border-top:1px dashed #bbf7d0;padding:8px 0}#ceGeminiLibreOverlay .ce-ai-conversation-turn:first-child{border-top:0;padding-top:0}#ceGeminiLibreOverlay .ce-ai-conversation-user{font-weight:900;color:#14532d}#ceGeminiLibreOverlay .ce-ai-conversation-zuzu{margin:5px 0 0 14px;color:#475569;white-space:pre-wrap;line-height:1.35}#ceGeminiLibreOverlay .ce-ai-resume-note{font-size:12px;color:#475569;font-weight:800;margin-bottom:9px}\n'+
       '#ceGeminiLibreOverlay .ce-ai-prompt-grid{display:grid;grid-template-columns:minmax(0,13fr) minmax(290px,7fr);gap:12px;align-items:stretch}#ceGeminiLibreOverlay .ce-ai-prompt-main{min-width:0;display:flex;flex-direction:column}#ceGeminiLibreOverlay .ce-ai-conversation-rail{min-width:0;min-height:121px;max-height:145px;border:1px solid #86efac;border-radius:13px;background:linear-gradient(180deg,#f0fdf4,#ffffff);display:flex;flex-direction:column;overflow:hidden}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid #bbf7d0;color:#166534;font-size:12px;font-weight:950;background:rgba(240,253,244,.92)}#ceGeminiLibreOverlay .ce-ai-conversation-rail-count{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:999px;background:#fff;border:1px solid #86efac;color:#166534;font-size:11px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-body{flex:1;overflow:auto;padding:6px 9px;scrollbar-width:thin}#ceGeminiLibreOverlay .ce-ai-conversation-rail-empty{padding:16px 8px;text-align:center;color:#64748b;font-size:11px;font-weight:800;line-height:1.35}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turn{padding:7px 0;border-top:1px dashed #bbf7d0;font-size:11px;line-height:1.25;color:#334155}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turn:first-child{border-top:0;padding-top:2px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turnno{font-weight:950;color:#166534;margin-bottom:3px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-line{margin-top:2px;overflow-wrap:anywhere}#ceGeminiLibreOverlay .ce-ai-conversation-rail-line b{color:#14532d}\n'+
       '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-mode-strip{padding:8px 12px;gap:7px}#ceGeminiLibreOverlay .ce-ai-mode-help{min-width:100%;font-size:11px}#ceGeminiLibreOverlay .ce-ai-prompt-grid{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-conversation-rail{min-height:118px;max-height:160px}}';
+    css.textContent += '#ceGeminiLibreOverlay .ce-ai-vnext-toggle{border-color:#7c3aed;color:#6d28d9;background:#faf5ff}#ceGeminiLibreOverlay .ce-ai-vnext-toggle.is-active{background:#6d28d9!important;color:#fff!important;border-color:#6d28d9!important;box-shadow:0 0 0 3px rgba(109,40,217,.14)}';
     document.head.appendChild(css);
   }
 
@@ -213,7 +214,7 @@
           '<div class="ce-ai-prompt-grid">'+
             '<div class="ce-ai-prompt-main">'+
               '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
-              '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
+              '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary ce-ai-vnext-toggle" id="ceAiVNextMode" title="Prototipo paralelo: conversación open-world + 4 tools">🧪 VNext</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
             '</div>'+
             '<aside class="ce-ai-conversation-rail" aria-label="Rastro de la conversación">'+
               '<div class="ce-ai-conversation-rail-head"><span>💬 Rastro de conversación</span><span class="ce-ai-conversation-rail-count" id="ceAiConversationRailCount">0</span></div>'+
@@ -315,6 +316,7 @@
   }
   function updateConversationMode(){
     var node=$('ceAiConversationMode'); if(!node) return;
+    if(typeof isZuzuVNextMode==='function'&&isZuzuVNextMode()){ renderZuzuVNextMode(); return; }
     var turns=zuzuConversationTurnCount();
     if(!turns){
       node.className='ce-ai-mode-strip is-new';
@@ -446,6 +448,12 @@
       document.body.classList.remove('ce-g92-tip-open');
     }catch(_){ }
   }
+
+  function zuzuVNextKey(){ return 'ce_zuzu_vnext_p0_mode'; }
+  function isZuzuVNextMode(){ try{return sessionStorage.getItem(zuzuVNextKey())==='1';}catch(_){return false;} }
+  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P0</span><span class="ce-ai-mode-help">Gemini conversa libremente y solo llama a 4 herramientas cuando necesita datos. Modo experimental A/B.</span>';}}
+  function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} var on=!isZuzuVNextMode(); try{sessionStorage.setItem(zuzuVNextKey(),on?'1':'0');}catch(_){} saveZuzuInteractionId(''); renderZuzuVNextMode(); setStatus(on?'VNext experimental activado.':'BANK4_27 activo.',''); }
+
   function openModal(){
     closeGraphInfoBubble();
     injectStyle();
@@ -458,6 +466,7 @@
     $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(); });
     document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(); document.removeEventListener('keydown', escClose, true); } }, true);
     $('ceAiRun').onclick=runAi;
+    var vnextBtn=$('ceAiVNextMode'); if(vnextBtn)vnextBtn.onclick=toggleZuzuVNextMode;
     $('ceAiClear').onclick=function(ev){ clearZuzu(ev); };
     var pdfBtn=$('ceAiDownloadResult');
     if(pdfBtn){
@@ -469,6 +478,7 @@
     ensureZuzuRuntimeBuild();
     restoreConversationScreen();
     restoreServerConversationIfNeeded();
+    renderZuzuVNextMode();
     setTimeout(function(){ try{$('ceAiPrompt').focus();}catch(_){ } },80);
   }
   function closeModal(){
@@ -694,7 +704,7 @@
       var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();}
       requestController=typeof AbortController!=='undefined'?new AbortController():null;
       if(requestController)requestWatchdog=setTimeout(function(){try{requestController.abort();}catch(_){}},75000);
-      var res=await fetch('/api/event-ai/analyze',{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationId:loadZuzuServerConversationId(),previousInteractionId:'',conversationHistory:[],conversationDigest:'',conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:null,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
+      var vnext=isZuzuVNextMode(); var endpoint=vnext?'/api/event-ai/analyze-vnext':'/api/event-ai/analyze'; var res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationId:vnext?'':loadZuzuServerConversationId(),previousInteractionId:vnext?loadZuzuInteractionId():'',conversationHistory:vnext?history:[],conversationDigest:'',conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:null,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
       var raw=await res.text();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }

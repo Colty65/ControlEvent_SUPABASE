@@ -1,6 +1,6 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { runZuzuUserTurn, planificacionInicialZuzu, readZuzuLedgerTurnPresentation } from '../services/event-ai.service.js';
+import { runZuzuUserTurn, runZuzuVNextUserTurn, planificacionInicialZuzu, readZuzuLedgerTurnPresentation } from '../services/event-ai.service.js';
 import { classifyZuzuShadow } from '../services/zuzu-router-shadow.service.js';
 import { readZuzuConversation, listZuzuConversations } from '../services/zuzu-conversation-ledger.service.js';
 
@@ -8,6 +8,11 @@ const router = express.Router();
 
 router.post('/event-ai/analyze', asyncHandler(async (req, res) => {
   res.json(await runZuzuUserTurn(req.body || {}));
+}));
+
+
+router.post('/event-ai/analyze-vnext', asyncHandler(async (req, res) => {
+  res.json(await runZuzuVNextUserTurn(req.body || {}));
 }));
 
 
