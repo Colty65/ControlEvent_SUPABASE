@@ -1,0 +1,18 @@
+const fs=require('fs');
+const svc=fs.readFileSync('services/event-ai.service.js','utf8');
+const ui=fs.readFileSync('public/app/features/v11-3-zuzu-analitica-libre.js','utf8');
+const html=fs.readFileSync('public/index.html','utf8');
+let ok=0,ko=0;const t=(n,c)=>{if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}};
+t('UI P1.9',/VNext P1\.9/.test(ui));
+t('cache P1.9',/VNEXT-P19-CONTINUITY-PLAN/.test(html));
+t('negative payment flags',/function vnextP19PromptFlags/.test(svc)&&/paid:paid&&!pending/.test(svc));
+t('missing op local repair',/function vnextP19NormalizeDataArgs/.test(svc)&&/if\(!trim\(a\.operation\)\)/.test(svc));
+t('compound pending + nonattendees',/vnextP19ExpandCompoundCalls/.test(svc)&&/attendance_mode:'non_attending_members'/.test(svc));
+t('canonical non-attendees',/function vnextP19ExecuteAttendance/.test(svc)&&/sociosNoAsistentes/.test(svc));
+t('scenario named rows override',/vnextP19ScenarioMentionRows/.test(svc)&&/mentioned\.reduce/.test(svc));
+t('repeat scenario reuses delta',/if\(flags\.repeat\)a\.income_delta=Number\(prevScenario\?\.income_delta\)/.test(svc));
+t('detailed plan table',/adjustment_plan/.test(svc)&&/Unidades antes/.test(svc)&&/Unidades después/.test(svc));
+t('plan is simulation',/no modifica la BBDD/i.test(svc));
+t('fast path preserved',/Gemini y Supabase arrancan en paralelo/.test(svc));
+t('provider p19',/zuzu-vnext-p19-contract-continuity-plan-fast/.test(svc));
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;

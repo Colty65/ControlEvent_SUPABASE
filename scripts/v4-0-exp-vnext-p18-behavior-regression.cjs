@@ -1,0 +1,27 @@
+const fs=require('fs'),src=fs.readFileSync('services/event-ai.service.js','utf8');
+function extract(name){const needle='function '+name+'(';let i=src.indexOf(needle);if(i<0)throw new Error('missing '+name);let b=src.indexOf('{',i),d=0,j=b;for(;j<src.length;j++){if(src[j]==='{')d++;else if(src[j]==='}'){d--;if(d===0){j++;break;}}}return src.slice(i,j);}
+const names=['vnextP16LastContext','vnextP16MergeUniqueText','vnextP16NormalizeDataArgs','vnextP17LooseNorm','vnextP17StoreFilterMatches','vnextP17StoreCatalog','vnextP17ResolveStoreLabel','vnextP17CanonicalStoreList','vnextP18StoreMentionEntries','vnextP18ActionBefore','vnextP18StoreMutations','vnextP18ColumnTokens','vnextP18ColumnIntent','vnextP18RepairPurchaseView','vnextP18ColumnMatches','vnextP18ApplyColumnView','vnextP18IsPurchaseTableContinuation','vnextP1ResolveEventName'];
+global.arr=v=>Array.isArray(v)?v:[]; global.trim=v=>String(v??'').trim(); global.norm=v=>trim(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' '); global.zuzuTracePush=()=>{}; global.v26EventById=(state,id)=>arr(state.eventos).find(e=>trim(e.id)===trim(id))||null; global.vnextEntityCandidates=()=>[];
+for(const n of names){eval(extract(n)+'\n;global["'+n+'"]='+n+';');}
+let ok=0,ko=0; const t=(n,c)=>{if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}};
+const state={tiendas:[{id:'s1',nombre:'GASOLINERA-HNOS FDEZ'},{id:'s2',nombre:'JOSE (Fragua)'},{id:'s3',nombre:'El Mirador de la Mancha (Tienda)'},{id:'s4',nombre:'TIENDA DE BARRIO'},{id:'s5',nombre:'Satur (congelados)'},{id:'s6',nombre:'Ambulante Turleque'},{id:'s7',nombre:'ALMACEN'},{id:'s8',nombre:'GALAN'}],eventos:[{id:'ev1',titulo:'FUNCION 2026'}]};
+const hist=rc=>[{user:'',resultContext:rc}];let rc={operation:'event_purchases',event:'FUNCION 2026',mine:true,responsible:'Colty',purchase_status:'pending',order_by:'store_product',store_filter_mode:'all',include_stores:[],exclude_stores:[],hidden_columns:[],visible_columns:[]};
+let a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'quita los registros de las tiendas GASOLINERA, "JOSE (Fragua)", El Mirador.....',hist(rc),[]);
+t('exclude exact three stores',a.store_filter_mode==='exclude'&&a.exclude_stores.length===3&&a.exclude_stores.includes('GASOLINERA-HNOS FDEZ')&&a.exclude_stores.includes('JOSE (Fragua)')&&a.exclude_stores.includes('El Mirador de la Mancha (Tienda)'));
+t('does not invent TIENDA DE BARRIO',!a.exclude_stores.includes('TIENDA DE BARRIO'));
+rc={...rc,...a};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'Quita a Satur..... y pon a GASOLINERA....',hist(rc),[]);
+t('mixed remove/add',a.exclude_stores.includes('Satur (congelados)')&&!a.exclude_stores.includes('GASOLINERA-HNOS FDEZ'));
+rc={...rc,...a};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'Añade GASOLINERA...',hist(rc),[]);
+t('add restores from exclusion',a.store_filter_mode==='exclude'&&!a.exclude_stores.includes('GASOLINERA-HNOS FDEZ')&&a.include_stores.length===0);
+rc={...rc,...a};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'quiero las compras de las tiendas ALMACEN, GASOLINERA y GALAN',hist(rc),[]);
+t('positive selection is include set',a.store_filter_mode==='include'&&a.include_stores.length===3&&a.exclude_stores.length===0);
+rc={...rc,...a};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'quita GALAN',hist(rc),[]);
+t('remove from include shrinks set',a.store_filter_mode==='include'&&a.include_stores.length===2&&!a.include_stores.includes('GALAN'));
+rc={...rc,...a};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'pon GALAN',hist(rc),[]);
+t('put restores include row',a.store_filter_mode==='include'&&a.include_stores.includes('GALAN')&&a.include_stores.length===3);
+rc={...rc,...a};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'dame la tabla original',hist(rc),[]);
+t('original resets rows',a.store_filter_mode==='all'&&a.include_stores.length===0&&a.exclude_stores.length===0);
+rc={...rc,store_filter_mode:'all',include_stores:[],exclude_stores:[],hidden_columns:[],visible_columns:[]};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'quita la columna Precio',hist(rc),[]);
+t('remove column',a.hidden_columns.includes('Precio'));rc={...rc,...a};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'pon la columna Precio',hist(rc),[]);t('put column',!a.hidden_columns.includes('Precio'));rc={...rc,...a};a=vnextP18RepairPurchaseView({operation:'event_purchases'},state,'solo columnas Producto e Importe',hist(rc),[]);t('only columns',a.visible_columns.includes('Producto')&&a.visible_columns.includes('Importe'));const viewed=vnextP18ApplyColumnView({facts:{},tables:[{schema:{Producto:{},Precio:{},Importe:{},Tienda:{}},rows:[{Producto:'Pan',Precio:1,Importe:2,Tienda:'ALMACEN'}]}]},a);t('physical column projection',Object.keys(viewed.tables[0].rows[0]).join('|')==='Producto|Importe');
+t('este evento selected',vnextP1ResolveEventName(state,'este evento','ev1')==='FUNCION 2026');let n=vnextP16NormalizeDataArgs({operation:'person_event_status',person:'Placidín'},[{resultContext:{operation:'person_event_status',person:'Placidín',event:'FUNCION 2026'}}],'dime uno por uno los socios que ya hayan pagado');t('paid list escapes person',n.operation==='event_income_status'&&n.status==='received'&&n.population==='socios'&&!n.person);
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;

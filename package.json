@@ -54,7 +54,9 @@
     "test:v4-bank427": "node scripts/v4-0-exp-bank427-human-voice-lifecycle-regression.cjs",
     "test:vnext-p0": "node scripts/v4-0-exp-vnext-p0-regression.cjs",
     "test:vnext-p13": "node scripts/v4-0-exp-vnext-p13-regression.cjs",
-    "test:vnext-p14": "node scripts/v4-0-exp-vnext-p14-regression.cjs"
+    "test:vnext-p14": "node scripts/v4-0-exp-vnext-p14-regression.cjs",
+    "test:vnext-p18": "node scripts/v4-0-exp-vnext-p18-regression.cjs && node scripts/v4-0-exp-vnext-p18-behavior-regression.cjs",
+    "test:vnext-p19": "node scripts/v4-0-exp-vnext-p19-regression.cjs && node scripts/v4-0-exp-vnext-p19-behavior-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

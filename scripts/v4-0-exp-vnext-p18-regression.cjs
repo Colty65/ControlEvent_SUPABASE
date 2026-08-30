@@ -1,0 +1,20 @@
+const fs=require('fs');
+const svc=fs.readFileSync('services/event-ai.service.js','utf8');
+const ui=fs.readFileSync('public/app/features/v11-3-zuzu-analitica-libre.js','utf8');
+const html=fs.readFileSync('public/index.html','utf8');
+let ok=0,ko=0;function t(n,c){if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}}
+t('UI P1.8',/VNext P1\.8/.test(ui));
+t('cache P1.8',/VNEXT-P18-TABLE-VIEW-STATE/.test(html));
+t('store filter mode explicit',/store_filter_mode:\{type:'string',enum:\['all','include','exclude'\]/.test(svc));
+t('purchase include empty means zero',/storeFilterMode==='include'\)rows=includeStoreFilters\.length\?rows\.filter[\s\S]*?:\[\]/.test(svc));
+t('reversible view engine',/function vnextP18RepairPurchaseView/.test(svc)&&/m\.action==='add'/.test(svc)&&/m\.action==='remove'/.test(svc));
+t('generic tienda false-positive guard',/stop=new Set\(\['tienda','tiendas'/.test(svc));
+t('mixed per-store actions',/function vnextP18ActionBefore/.test(svc));
+t('pronoun put-back',/pronounAdd/.test(svc)&&/vnextP18StoreMentionEntries\(state,q\)/.test(svc));
+t('table original reset',/mut\.reset\|\|a\.reset_table===true/.test(svc));
+t('column remove-put state',/hidden_columns/.test(svc)&&/visible_columns/.test(svc)&&/vnextP18ApplyColumnView/.test(svc));
+t('local continuation if Gemini omits tool',/VNEXT P1\.8 · CONTINUIDAD DE TABLA/.test(svc));
+t('plural paid list repair',/asksPaidList/.test(svc)&&/a\.operation='event_income_status';a\.status='received'/.test(svc));
+t('this event physical fallback',/screenAliases=new Set\(\['este evento','el evento'/.test(svc));
+t('provider p18',/zuzu-vnext-p18-table-view-state-fast/.test(svc));
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;

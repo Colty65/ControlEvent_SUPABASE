@@ -7964,14 +7964,14 @@ async function v274ToolMasterCatalog(tool,state,selectedEventId=''){
 async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
   const rr=v26ResolveEvent(state,selectedEventId,tool?.event,tool?.scope);if(!rr.ok)throw new Error(rr.error);
   const sr=v274ResolveOptionalStore(state,tool?.store),eventStatus=trim(rr?.row?.situacion),inProgress=isEventInProgressValue(eventStatus),explicitStatus=trim(tool?.status||tool?.purchase_status),status=explicitStatus||(inProgress?'all':'realized');
-  const ticketFilter=trim(tool?.ticket),productFilter=trim(tool?.product),responsibleFilter=trim(tool?.responsible),includeStoreFilters=arr(tool?.include_stores).map(trim).filter(Boolean),excludeStoreFilters=arr(tool?.exclude_stores).map(trim).filter(Boolean),excludeProductFilters=arr(tool?.exclude_products).map(trim).filter(Boolean);
+  const ticketFilter=trim(tool?.ticket),productFilter=trim(tool?.product),responsibleFilter=trim(tool?.responsible),includeStoreFilters=arr(tool?.include_stores).map(trim).filter(Boolean),excludeStoreFilters=arr(tool?.exclude_stores).map(trim).filter(Boolean),excludeProductFilters=arr(tool?.exclude_products).map(trim).filter(Boolean),storeFilterMode=['all','include','exclude'].includes(trim(tool?.store_filter_mode))?trim(tool.store_filter_mode):(includeStoreFilters.length?'include':excludeStoreFilters.length?'exclude':'all');
   const eventAllRows=v274PurchaseRowsForEvent(state,rr.id,{status:'all',detail:'standard'}),eventRealizedRows=eventAllRows.filter(r=>trim(r?.Tipo)==='REALIZADA'),eventPendingRows=eventAllRows.filter(r=>trim(r?.Tipo)==='PENDIENTE');
   const allRows=v274PurchaseRowsForEvent(state,rr.id,{storeId:sr.id,status,detail:trim(tool?.detail)||'standard'});
   let rows=ticketFilter?allRows.filter(r=>v281TicketEqual(r?.['Ticket u otros gastos'],ticketFilter)):allRows;
   if(productFilter){const q=norm(productFilter);rows=rows.filter(r=>norm(r?.Producto).includes(q)||nameMatches(r?.Producto,productFilter));}
   if(responsibleFilter)rows=rows.filter(r=>nameMatches(r?.Responsable,responsibleFilter));
-  if(includeStoreFilters.length)rows=rows.filter(r=>includeStoreFilters.some(x=>vnextP17StoreFilterMatches(r?.Tienda,x)));
-  if(excludeStoreFilters.length)rows=rows.filter(r=>!excludeStoreFilters.some(x=>vnextP17StoreFilterMatches(r?.Tienda,x)));
+  if(storeFilterMode==='include')rows=includeStoreFilters.length?rows.filter(r=>includeStoreFilters.some(x=>vnextP17StoreFilterMatches(r?.Tienda,x))):[];
+  else if(storeFilterMode==='exclude'&&excludeStoreFilters.length)rows=rows.filter(r=>!excludeStoreFilters.some(x=>vnextP17StoreFilterMatches(r?.Tienda,x)));
   if(excludeProductFilters.length)rows=rows.filter(r=>!excludeProductFilters.some(x=>nameMatches(r?.Producto,x)||norm(r?.Producto).includes(norm(x))||norm(x).includes(norm(r?.Producto))));
   const groups=new Map(),storeSegDestGroups=new Map(),segDestGroups=new Map(),segDestTotals=new Map();
   for(const r of rows){
@@ -7995,7 +7995,7 @@ async function v274ToolEventPurchaseLines(tool,state,selectedEventId=''){
     .sort((a,b)=>trim(a.Segmento).localeCompare(trim(b.Segmento),'es',{sensitivity:'base'})||trim(a.Destino).localeCompare(trim(b.Destino),'es',{sensitivity:'base'}));
   const total=v26Money(rows.reduce((a,r)=>a+num(r.Importe),0)),realizedAmount=v26Money(eventRealizedRows.reduce((a,r)=>a+num(r.Importe),0)),pendingAmount=v26Money(eventPendingRows.reduce((a,r)=>a+num(r.Importe),0));
   const purchaseNotice=inProgress?(status==='realized'?`Evento En curso: este detalle contiene solo compras realizadas; quedan ${eventPendingRows.length} compras previstas pendientes no incluidas.`:status==='pending'?`Evento En curso: este detalle contiene ${eventPendingRows.length} compras previstas pendientes.`:`Evento En curso: la consulta de compras incluye todas las compras no donadas, ${eventRealizedRows.length} realizadas y ${eventPendingRows.length} pendientes previstas.`):'';
-  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de compras · ${rr.nombre}`,facts:{event:rr.nombre,event_status:eventStatus,event_in_progress:inProgress,status,purchase_status_explicit:!!explicitStatus,store:sr.nombre||'',ticket:trim(tool?.ticket)||'',product:productFilter||'',responsible:responsibleFilter||'',include_stores:includeStoreFilters,exclude_stores:excludeStoreFilters,exclude_products:excludeProductFilters,store_filter_mode:includeStoreFilters.length?'include':excludeStoreFilters.length?'exclude':'all',purchase_line_count:rows.length,product_count:summary.length,total_amount:total,realized_purchase_count:eventRealizedRows.length,pending_purchase_count:eventPendingRows.length,realized_purchase_amount:realizedAmount,pending_purchase_amount:pendingAmount,purchase_status_rule:'REALIZADA = Ticket u otros gastos contiene TKxx o GASTOS CORRIENTES; PENDIENTE = compra no donada sin justificante informado (incluye marcadores legacy Pte.Compra/PENDIENTE).',purchase_notice:purchaseNotice,detail_semantics:'purchase_lines conserva cada registro de compra no donada producto a producto. En eventos En curso, si no se pide un estado concreto, status=all incluye realizadas + pendientes.'},facts_schema:{purchase_line_count:v26CountSchema('registros','Registros detallados de compra'),product_count:v26CountSchema('productos','Productos distintos'),total_amount:v26MoneySchema('Importe total de los registros entregados'),realized_purchase_count:v26CountSchema('compras','Compras realizadas del evento'),pending_purchase_count:v26CountSchema('compras','Compras pendientes previstas del evento'),realized_purchase_amount:v26MoneySchema('Importe de compras realizadas del evento'),pending_purchase_amount:v26MoneySchema('Importe de compras pendientes previstas del evento')},provenance:'ControlEvent · ce_compras + catálogos humanizados',tables:[
+  return{id:tool.id,name:tool.name,ok:true,title:`Detalle de compras · ${rr.nombre}`,facts:{event:rr.nombre,event_status:eventStatus,event_in_progress:inProgress,status,purchase_status_explicit:!!explicitStatus,store:sr.nombre||'',ticket:trim(tool?.ticket)||'',product:productFilter||'',responsible:responsibleFilter||'',include_stores:includeStoreFilters,exclude_stores:excludeStoreFilters,exclude_products:excludeProductFilters,store_filter_mode:storeFilterMode,purchase_line_count:rows.length,product_count:summary.length,total_amount:total,realized_purchase_count:eventRealizedRows.length,pending_purchase_count:eventPendingRows.length,realized_purchase_amount:realizedAmount,pending_purchase_amount:pendingAmount,purchase_status_rule:'REALIZADA = Ticket u otros gastos contiene TKxx o GASTOS CORRIENTES; PENDIENTE = compra no donada sin justificante informado (incluye marcadores legacy Pte.Compra/PENDIENTE).',purchase_notice:purchaseNotice,detail_semantics:'purchase_lines conserva cada registro de compra no donada producto a producto. En eventos En curso, si no se pide un estado concreto, status=all incluye realizadas + pendientes.'},facts_schema:{purchase_line_count:v26CountSchema('registros','Registros detallados de compra'),product_count:v26CountSchema('productos','Productos distintos'),total_amount:v26MoneySchema('Importe total de los registros entregados'),realized_purchase_count:v26CountSchema('compras','Compras realizadas del evento'),pending_purchase_count:v26CountSchema('compras','Compras pendientes previstas del evento'),realized_purchase_amount:v26MoneySchema('Importe de compras realizadas del evento'),pending_purchase_amount:v26MoneySchema('Importe de compras pendientes previstas del evento')},provenance:'ControlEvent · ce_compras + catálogos humanizados',tables:[
     v26Table('purchase_lines',`Compras producto a producto · ${rr.nombre}`,rows,{Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades del registro'),Precio:v26MoneySchema('Precio unitario registrado'),Importe:v26MoneySchema('Importe del registro'),'Ticket u otros gastos':v26TextSchema(),Tienda:v26TextSchema(),Responsable:v26TextSchema(),Donante:v26TextSchema(),Tipo:v26StatusSchema(),'ID compra':v26TextSchema(),'ID producto':v26TextSchema(),'ID tienda':v26TextSchema(),'ID responsable':v26TextSchema(),Creado:v26DateSchema(),Actualizado:v26DateSchema()}),
     v26Table('by_store_segment_destination_product',`Compras por Tienda/Segmento/Destino/Producto · ${rr.nombre}`,byStoreSegmentDestinationProduct,{Tienda:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Precios registrados':v26TextSchema('Todos los precios unitarios distintos encontrados'),Importe:v26MoneySchema('Importe acumulado'),'Nº registros':v26CountSchema('registros')}),
     v26Table('by_product',`Compras agrupadas por producto · ${rr.nombre}`,summary,{Producto:v26TextSchema(),Unidades:v26SchemaField('quantity','uds','Unidades acumuladas'),'Precios registrados':v26TextSchema('Todos los precios unitarios distintos encontrados'),Importe:v26MoneySchema('Importe acumulado'),'Nº registros':v26CountSchema('registros'),Tiendas:v26TextSchema()}),
@@ -17187,16 +17187,18 @@ function vnextP1ResolvePersonName(state={},value=''){
   const top=Number(c[0]?.score)||0,same=c.filter(x=>Math.abs((Number(x.score)||0)-top)<0.0001);if(same.length>1)throw new Error(`La identidad «${raw}» es ambigua: ${same.map(x=>x.canonical_name).join(' / ')}.`);return trim(c[0].canonical_name);
 }
 function vnextP1ResolveEventName(state={},value='',selectedEventId=''){
-  const raw=trim(value);if(!raw){const e=v26EventById(state,selectedEventId);if(e?.titulo)return trim(e.titulo);throw new Error('Falta indicar el evento.');}
+  const raw=trim(value),rn=norm(raw),screenAliases=new Set(['este evento','el evento','evento actual','evento activo','actual','este']);
+  if(!raw||screenAliases.has(rn)){const e=v26EventById(state,selectedEventId);if(e?.titulo)return trim(e.titulo);throw new Error('Falta indicar el evento.');}
   const byId=arr(state?.eventos).find(e=>trim(e?.id)===raw)||(raw===trim(selectedEventId)?v26EventById(state,selectedEventId):null);if(byId?.titulo)return trim(byId.titulo);
   const c=vnextEntityCandidates(state,'event',raw,5);if(!c.length)throw new Error(`No encuentro el evento «${raw}».`);const top=Number(c[0]?.score)||0,same=c.filter(x=>Math.abs((Number(x.score)||0)-top)<0.0001);if(same.length>1)throw new Error(`El evento «${raw}» es ambiguo: ${same.map(x=>x.canonical_name).join(' / ')}.`);return trim(c[0].canonical_name);
 }
-function vnextP1FilteredIncomeResult(base={},status='pending',id='p1_income'){
-  const all=arr(vnextP1Table(base,'people')?.rows),s=trim(status)||'pending';let rows=all;
-  if(s==='pending')rows=all.filter(r=>norm(r?.['Situación / forma registrada'])==='pendiente');
-  else if(s==='received')rows=all.filter(r=>norm(r?.['Situación / forma registrada'])!=='pendiente');
+function vnextP1FilteredIncomeResult(base={},status='pending',id='p1_income',population='all'){
+  const all=arr(vnextP1Table(base,'people')?.rows),s=trim(status)||'pending',pop=trim(population)||'all';let rows=all;
+  if(s==='pending')rows=rows.filter(r=>norm(r?.['Situación / forma registrada'])==='pendiente');
+  else if(s==='received')rows=rows.filter(r=>norm(r?.['Situación / forma registrada'])!=='pendiente');
+  if(pop==='socios')rows=rows.filter(r=>norm(r?.Rango)==='socio');
   const total=v26Money(rows.reduce((a,r)=>a+num(r?.['Importe total']),0));
-  return{id,name:'query_ce',ok:true,title:`Ingresos ${s==='pending'?'pendientes':s==='received'?'recibidos':'registrados'} · ${trim(base?.facts?.event)}`,facts:{operation:'event_income_status',event:trim(base?.facts?.event),status:s,record_count:rows.length,people_units:round(rows.reduce((a,r)=>a+num(r?.Número),0),3),amount_total:total,source_contract:'EXCLUSIVAMENTE filas de ingresos/colaboradores y su campo Situación / forma registrada. No asistencia, no donaciones, no Pte.Compra.'},facts_schema:{record_count:v26CountSchema('registros'),people_units:v26CountSchema('personas'),amount_total:v26MoneySchema('Importe total de las filas seleccionadas')},provenance:'ControlEvent · event_people.people',tables:[v26Table('income_status','Ingresos por estado',rows,vnextP1Table(base,'people')?.schema||{})],_vnext_operation:'event_income_status'};
+  return{id,name:'query_ce',ok:true,title:`Ingresos ${s==='pending'?'pendientes':s==='received'?'recibidos':'registrados'} · ${trim(base?.facts?.event)}`,facts:{operation:'event_income_status',event:trim(base?.facts?.event),status:s,population:pop,record_count:rows.length,people_units:round(rows.reduce((a,r)=>a+num(r?.Número),0),3),amount_total:total,source_contract:'EXCLUSIVAMENTE filas de ingresos/colaboradores y su campo Situación / forma registrada. No asistencia, no donaciones, no Pte.Compra.'},facts_schema:{record_count:v26CountSchema('registros'),people_units:v26CountSchema('personas'),amount_total:v26MoneySchema('Importe total de las filas seleccionadas')},provenance:'ControlEvent · event_people.people',tables:[v26Table('income_status','Ingresos por estado',rows,vnextP1Table(base,'people')?.schema||{})],_vnext_operation:'event_income_status'};
 }
 async function vnextP1ExecuteData(decision={},state={},selectedEventId='',flowTrace=[]){
   let op=trim(decision?.operation),event=trim(decision?.event),person=trim(decision?.person),detail=trim(decision?.detail)||'standard',id=`p1_${Date.now().toString(36)}`;
@@ -17221,7 +17223,7 @@ async function vnextP1ExecuteData(decision={},state={},selectedEventId='',flowTr
   }
   if(op==='event_income_status'||op==='event_income_lines'||op==='event_attendance'){
     const base=await v26ToolEventPeople({id,name:'event_people',event,scope:'named_event',detail:'full'},state,selectedEventId);
-    if(op==='event_income_status')return vnextP1FilteredIncomeResult(base,trim(decision?.status)||'pending',id);
+    if(op==='event_income_status')return vnextP1FilteredIncomeResult(base,trim(decision?.status)||'pending',id,trim(decision?.population)||'all');
     if(op==='event_income_lines')return{id,name:'query_ce',ok:true,title:`Ingresos · ${event}`,facts:{operation:op,event,record_count:arr(vnextP1Table(base,'people')?.rows).length,income_total:v26Money(base?.facts?.income_total),source_contract:'Una fila por registro real de ingreso/colaborador del evento.'},tables:[{...vnextP1Table(base,'people'),key:'income_lines'}],provenance:'ControlEvent · event_people.people',_vnext_operation:op};
     return{id,name:'query_ce',ok:true,title:`Asistencia · ${event}`,facts:{operation:op,event,attendees_canonical:num(base?.facts?.attendees_canonical),members_attending:num(base?.facts?.members_attending),nonmembers_attending:num(base?.facts?.nonmembers_attending),source_contract:'Asistencia canónica. NO acredita pagos ni ingresos.'},tables:[vnextP1Table(base,'attendance')].filter(Boolean),provenance:'ControlEvent · asistencia canónica',_vnext_operation:op};
   }
@@ -17261,7 +17263,7 @@ function vnextP1LocalFinal(result={},decision={},state={}){
   else if(op==='event_attendance'){const rows=arr(table('attendance')?.rows),names=rows.map(r=>trim(r?.Asistente)).filter(Boolean);answer=`En ${f.event} constan ${num(f.attendees_canonical)} asistentes: ${names.slice(0,12).join(', ')}${names.length>12?'…':''}.`;}
   else if(op==='event_summary'){answer=`${trim(f.event)||trim(decision?.event)}: ingresos ${fmt(f.income_total)}, compras realizadas ${fmt(f.purchases_realized)}, compras pendientes ${fmt(f.purchases_pending)}, donaciones ${fmt(f.donations_value)} y saldo operativo ${fmt(f.operating_balance)}.`;}
   else if(op==='event_scenario'){const plan=decision?.plan===true,gap=num(f.gap_to_zero),cut=num(f.recommended_cut);answer=plan?(num(f.adjusted_operating_balance)<0?`${trim(f.event)||trim(decision?.event)} · Plan B: con la caída de ${fmt(Math.abs(f.income_delta))} el saldo quedaría en ${fmt(f.adjusted_operating_balance)}. Para volver al menos a cero hay que recortar ${fmt(gap)}; yo pondría un objetivo de unos ${fmt(cut)} para dejar algo de colchón. Refrescos/alcohol u otras compras pendientes flexibles pueden ser candidatas, pero los importes concretos hay que contrastarlos en el detalle de compras antes de decidir.`:`${trim(f.event)||trim(decision?.event)} · Plan B: aun aplicando el escenario, el saldo queda en ${fmt(f.adjusted_operating_balance)}; no hace falta recortar para llegar a cero.`):`${trim(f.event)||trim(decision?.event)} · escenario: si los ingresos cambian ${num(f.income_delta)<0?'en ':'en +'}${fmt(f.income_delta)}, los ingresos pasarían de ${fmt(f.base_income)} a ${fmt(f.adjusted_income)} y el saldo operativo de ${fmt(f.base_operating_balance)} a ${fmt(f.adjusted_operating_balance)}. Es una simulación; no modifica la BBDD.`;}
-  else if(op==='event_purchases'){const resp=trim(f.responsible)||trim(decision?.responsible),st=trim(f.status||decision?.purchase_status),stTxt=st==='pending'?' pendientes':st==='realized'?' realizadas':'';answer=`${trim(f.event)||trim(decision?.event)}: ${num(f.purchase_line_count)} registros de compra${stTxt}${resp?` asignados a ${resp}`:''} por ${fmt(f.total_amount)}. Te dejo el detalle${decision?.order_by?` ordenado por ${trim(decision.order_by).replace('_',' / ')}`:''}${arr(f.include_stores).length?`; solo tiendas: ${arr(f.include_stores).join(', ')}`:''}${arr(f.exclude_stores).length?`; excluidas tiendas: ${arr(f.exclude_stores).join(', ')}`:''}.`;}
+  else if(op==='event_purchases'){const resp=trim(f.responsible)||trim(decision?.responsible),st=trim(f.status||decision?.purchase_status),stTxt=st==='pending'?' pendientes':st==='realized'?' realizadas':'',mode=trim(f.store_filter_mode||decision?.store_filter_mode)||'all';answer=`${trim(f.event)||trim(decision?.event)}: ${num(f.purchase_line_count)} registros de compra${stTxt}${resp?` asignados a ${resp}`:''} por ${fmt(f.total_amount)}. Te dejo el detalle${decision?.order_by?` ordenado por ${trim(decision.order_by).replace('_',' / ')}`:''}${mode==='include'?`; solo tiendas: ${arr(f.include_stores).join(', ')||'ninguna'}`:''}${mode==='exclude'&&arr(f.exclude_stores).length?`; excluidas tiendas: ${arr(f.exclude_stores).join(', ')}`:''}${arr(decision?.visible_columns).length?`; columnas visibles: ${arr(decision.visible_columns).join(', ')}`:''}${arr(decision?.hidden_columns).length?`; columnas ocultas: ${arr(decision.hidden_columns).join(', ')}`:''}.`;}
   else if(op==='event_donations'){answer=`${trim(f.event)||trim(decision?.event)}: ${num(f.donation_record_count)} registros de donación, ${num(f.donor_count)} donantes y ${fmt(f.total_value)} de valor registrado.`;}
   else if(op==='event_bank'){answer=`${trim(f.event)||trim(decision?.event)}: ${num(f.included_movement_count)} movimientos incluidos en el Cuadre, ${num(f.justified_movement_count)} justificados, impacto ${fmt(f.bank_impact)} y saldo calculado ${fmt(f.closing_balance)}.`;}
   else if(op==='event_weather'){const rows=arr(table('weather')?.rows),bits=rows.slice(0,6).map(r=>{const date=trim(r?.Fecha||r?.Día),sky=trim(r?.Cielo),lo=v40MaybeNumber(r?.['Temp. mín']),hi=v40MaybeNumber(r?.['Temp. máx']),rain=v40MaybeNumber(r?.['Prob. lluvia %']);return `${date||'día'}: ${sky||'previsión disponible'}${lo!=null&&hi!=null?`, ${lo} a ${hi} °C`:''}${rain!=null?`, lluvia ${rain}%`:''}`;}).filter(Boolean);answer=`Previsión para ${trim(f.event)||trim(decision?.event)}${bits.length?`: ${bits.join('; ')}`:'.'}`;}
@@ -17311,7 +17313,7 @@ function vnextP11Tools(){
   const ops=['people_catalog','events_catalog','person_profile','person_events','person_income_status','person_event_status','event_income_status','event_income_lines','event_attendance','event_summary','event_scenario','event_purchases','event_donations','event_bank','event_weather','event_stores_used','event_products','compare_events'];
   const common={type:'object',properties:{
     operation:{type:'string',enum:ops},event:{type:'string'},events:{type:'array',items:{type:'string'}},person:{type:'string'},store:{type:'string'},product:{type:'string'},ticket:{type:'string'},responsible:{type:'string'},
-    status:{type:'string',enum:['pending','received','all']},purchase_status:{type:'string',enum:['pending','realized','all']},population:{type:'string',enum:['socios','all']},detail:{type:'string',enum:['brief','standard','full']},start_date:{type:'string'},end_date:{type:'string'},chart:{type:'boolean'},chart_type:{type:'string',enum:['line','bar','horizontalBar']},metric:{type:'string',enum:['all','purchases','income','donations','attendance']},tone:{type:'string',enum:['friendly','banter','neutral']},register:{type:'string',enum:['normal','close','banter']},tease:{type:'boolean'},mine:{type:'boolean'},order_by:{type:'string',enum:['store_product','product','store','amount_desc']},include_stores:{type:'array',items:{type:'string'}},exclude_stores:{type:'array',items:{type:'string'}},exclude_products:{type:'array',items:{type:'string'}},income_delta:{type:'number'},plan:{type:'boolean'},narrate:{type:'boolean'}
+    status:{type:'string',enum:['pending','received','all']},purchase_status:{type:'string',enum:['pending','realized','all']},population:{type:'string',enum:['socios','all']},attendance_mode:{type:'string',enum:['attendees','attending_members','attending_non_members','non_attending_members','attendance_full']},detail:{type:'string',enum:['brief','standard','full']},start_date:{type:'string'},end_date:{type:'string'},chart:{type:'boolean'},chart_type:{type:'string',enum:['line','bar','horizontalBar']},metric:{type:'string',enum:['all','purchases','income','donations','attendance']},tone:{type:'string',enum:['friendly','banter','neutral']},register:{type:'string',enum:['normal','close','banter']},tease:{type:'boolean'},mine:{type:'boolean'},order_by:{type:'string',enum:['store_product','product','store','amount_desc']},store_filter_mode:{type:'string',enum:['all','include','exclude']},include_stores:{type:'array',items:{type:'string'}},exclude_stores:{type:'array',items:{type:'string'}},exclude_products:{type:'array',items:{type:'string'}},visible_columns:{type:'array',items:{type:'string'}},hidden_columns:{type:'array',items:{type:'string'}},reset_table:{type:'boolean'},income_delta:{type:'number'},scenario_people:{type:'array',items:{type:'string'}},plan:{type:'boolean'},plan_detail:{type:'boolean'},plan_focus:{type:'array',items:{type:'string'}},plan_target:{type:'number'},narrate:{type:'boolean'}
   },required:['operation']};
   return [
     {type:'function',name:'query_ce',description:'FUENTE CANÓNICA para cualquier dato estructurado de ControlEvent. Si la respuesta depende de personas, socios, eventos, ingresos, asistencia, compras, donaciones, banco, tiendas, productos, tiempo o comparaciones, llama esta función en vez de contestar de memoria. El servidor resuelve motes/nombres hablados y separa estrictamente ingresos, asistencia, compras, donaciones y banco.',parameters:common},
@@ -17401,9 +17403,10 @@ function vnextP16NormalizeDataArgs(raw={},history=[],userPrompt=''){
     if(!trim(a.purchase_status)&&trim(prev?.operation)==='event_purchases'&&trim(prev?.purchase_status))a.purchase_status=trim(prev.purchase_status);
     if(/\bpendient/.test(p)||/quita(?:r|me)?\s+(?:las\s+)?(?:ya\s+)?realizad/.test(p)||/sin\s+(?:las\s+)?realizad/.test(p))a.purchase_status='pending';
     else if(/\bsolo\b[^.]{0,30}\brealizad/.test(p)||/\brealizad\w*\s+solo\b/.test(p))a.purchase_status='realized';
-    if(!arr(a.include_stores).length&&prev?.operation==='event_purchases'&&arr(prev?.include_stores).length)a.include_stores=arr(prev.include_stores).slice();
-    a.exclude_stores=vnextP16MergeUniqueText(prev?.operation==='event_purchases'?prev?.exclude_stores:[],a.exclude_stores);
+    if(!trim(a.store_filter_mode)&&prev?.operation==='event_purchases'&&trim(prev?.store_filter_mode))a.store_filter_mode=trim(prev.store_filter_mode);
     a.exclude_products=vnextP16MergeUniqueText(prev?.operation==='event_purchases'?prev?.exclude_products:[],a.exclude_products);
+    if(!arr(a.visible_columns).length&&prev?.operation==='event_purchases'&&arr(prev?.visible_columns).length)a.visible_columns=arr(prev.visible_columns).slice();
+    if(!arr(a.hidden_columns).length&&prev?.operation==='event_purchases'&&arr(prev?.hidden_columns).length)a.hidden_columns=arr(prev.hidden_columns).slice();
   }
   if(op==='event_scenario'){
     if(!trim(a.event)&&trim(prev?.operation)==='event_scenario'&&trim(prev?.event))a.event=trim(prev.event);
@@ -17411,9 +17414,12 @@ function vnextP16NormalizeDataArgs(raw={},history=[],userPrompt=''){
     if(/\bplan\s*b\b|contingenc|recort|ajustar\s+gastos|apretar\s+el\s+cintur/.test(p))a.plan=true;
     if(/\bgraf|gr[aá]fic|chart/.test(p))a.chart=true;
   }
+  // P1.8: una petición plural/listado de pagos no puede quedar secuestrada por la persona del turno anterior.
+  const asksPaidList=/\b(?:lista|personas|socios|uno\s+por\s+uno|qui[eé]nes|los\s+que|las\s+que)\b[^.]{0,80}\b(?:pagad|ingresad|abonad)/.test(p)||/\b(?:ya\s+)?(?:han|hayan|hayamos)\s+pagad/.test(p);
+  if(asksPaidList){a.operation='event_income_status';a.status='received';if(/\bsocios\b/.test(p))a.population='socios';delete a.person;}
   // Reparación de contrato, no de lenguaje: una operación de PERSONA sin persona no es ejecutable.
   // Si el propio turno pide el estado PENDIENTE del evento, el contrato correcto es event_income_status.
-  if(['person_income_status','person_event_status'].includes(op)&&!trim(a.person)){
+  if(['person_income_status','person_event_status'].includes(trim(a.operation))&&!trim(a.person)){
     if(trim(a.status)==='pending'||/\bqui[eé]n(?:es)?\b[^.]{0,50}\b(?:falta|pendient|pagar)/.test(p)){a.operation='event_income_status';a.status='pending';}
     else if(trim(prev?.person))a.person=trim(prev.person);
   }
@@ -17470,6 +17476,215 @@ function vnextP17RepairPurchaseFilters(args={},state={},userPrompt='',history=[]
   zuzuTracePush(flowTrace,'VNEXT P1.7 · FILTER ENGINE','OK',`modo=${intent||'continuidad'} · incluir=${arr(a.include_stores).join(' | ')||'—'} · excluir=${arr(a.exclude_stores).join(' | ')||'—'}.`);
   return a;
 }
+
+
+// ============================================================================
+// v4_0_exp · ZUZU VNEXT P1.9 · CONTINUITY CONTRACTS + GROUNDED PLAN B
+// - Las peticiones negativas de pago se distinguen de las positivas.
+// - Una petición compuesta puede materializar ingresos pendientes + socios no asistentes
+//   en la MISMA Interaction sin volver al compilador lingüístico antiguo.
+// - El Plan B puede derivar la caída de ingresos desde las filas reales nombradas y construir
+//   un recorte producto a producto sobre compras PENDIENTE, sin tocar la BBDD.
+// ============================================================================
+function vnextP19LastContextByOperation(history=[],operation=''){
+  const op=trim(operation);for(let i=arr(history).length-1;i>=0;i--){const rc=arr(history)[i]?.resultContext;if(rc&&typeof rc==='object'&&trim(rc.operation)===op)return rc;}return{};
+}
+function vnextP19PromptFlags(prompt=''){
+  const p=vnextP17LooseNorm(prompt),pending=/\b(?:no\s+(?:han|hayan|ha|haya|hemos|hayamos)\s+(?:pagad\w*|ingresad\w*|abonad\w*)|sin\s+pagar|falta[nr]?\s+por\s+pagar|quedan?\s+por\s+pagar|pendient\w*\s+(?:de\s+)?pagar|no\s+hayan\s+ingresad\w*)\b/.test(p)||/\b(?:quien|quienes|los que|las que|personas|socios)\b[^.]{0,90}\b(?:no\s+(?:han|hayan)\s+pagad\w*|pendient\w*|falta\w*\s+por\s+pagar)/.test(p),paid=/\b(?:lista|personas|socios|uno\s+por\s+uno|quien|quienes|los\s+que|las\s+que)\b[^.]{0,90}\b(?:ya\s+)?(?:han|hayan|hemos|hayamos)?\s*(?:pagad\w*|ingresad\w*|abonad\w*)/.test(p)||/\b(?:ya\s+)?(?:han|hayan|hayamos)\s+(?:pagad\w*|ingresad\w*|abonad\w*)/.test(p),nonatt=/\b(?:socios?\s+no\s+asistent\w*|socios?\s+que\s+no\s+(?:asisten|vienen|vendran|acompanan)|no\s+asistent\w*\s+socios?)\b/.test(p),repeat=/\b(?:repit\w*|repite|ponla\s+otra\s+vez|ponlo\s+otra\s+vez|no\s+he\s+comprendido|no\s+lo\s+he\s+entendido|otra\s+vez)\b/.test(p),plan=/\b(?:plan\s*b|contingenc\w*|recort\w*|ajust\w*|antes\s+y\s+despues|antes\s+de\s+ajustar|despues\s+de\s+ajustar|para\s+que\s+no\s+nos\s+falte|hazlo|dame\s+ese\s+detalle)\b/.test(p),planDetail=/\b(?:producto|productos|lista\s+de\s+productos|antes\s+y\s+despues|antes\s+de\s+ajustar|despues\s+de\s+ajustar|recorta\s+algo|dame\s+ese\s+detalle|hazlo)\b/.test(p);return{p,pending,paid:paid&&!pending,nonatt,repeat,plan,planDetail};
+}
+function vnextP19EuroValues(prompt=''){
+  const out=[],re=/(\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?)\s*(?:€|euros?)/gi;let m;while((m=re.exec(String(prompt||'')))){let raw=m[1];if(raw.includes(',')&&raw.includes('.'))raw=raw.replace(/\./g,'').replace(',','.');else if(raw.includes(','))raw=raw.replace(',','.');const n=Number(raw);if(Number.isFinite(n)&&n>0)out.push(n);}return out;
+}
+function vnextP19NormalizeDataArgs(raw={},history=[],userPrompt=''){
+  const a=vnextP16NormalizeDataArgs(raw,history,userPrompt),flags=vnextP19PromptFlags(userPrompt),prevScenario=vnextP19LastContextByOperation(history,'event_scenario');
+  if(flags.pending){a.operation='event_income_status';a.status='pending';if(/\bsocios\b/.test(flags.p))a.population='socios';delete a.person;}
+  else if(flags.paid){a.operation='event_income_status';a.status='received';if(/\bsocios\b/.test(flags.p))a.population='socios';delete a.person;}
+  if(flags.nonatt&&!flags.pending&&!flags.paid){a.operation='event_attendance';a.attendance_mode='non_attending_members';delete a.person;}
+  if(!trim(a.operation)){
+    if(flags.pending){a.operation='event_income_status';a.status='pending';}
+    else if(flags.paid){a.operation='event_income_status';a.status='received';}
+    else if(flags.nonatt){a.operation='event_attendance';a.attendance_mode='non_attending_members';}
+  }
+  const scenarioish=trim(a.operation)==='event_scenario'||flags.plan||flags.repeat&&trim(prevScenario?.operation)==='event_scenario';
+  if(scenarioish&&trim(prevScenario?.operation)==='event_scenario'){
+    a.operation='event_scenario';if(!trim(a.event)&&trim(prevScenario?.event))a.event=trim(prevScenario.event);
+    if(flags.repeat)a.income_delta=Number(prevScenario?.income_delta)||0;else if(!Number.isFinite(Number(a.income_delta))||Number(a.income_delta)===0)a.income_delta=Number(prevScenario?.income_delta)||0;
+    if(!arr(a.scenario_people).length&&arr(prevScenario?.scenario_people).length)a.scenario_people=arr(prevScenario.scenario_people).slice();
+    if(flags.repeat||prevScenario?.plan===true)a.plan=a.plan===true||prevScenario?.plan===true;
+    if(flags.plan)a.plan=true;if(flags.planDetail||prevScenario?.plan_detail===true)a.plan_detail=a.plan_detail===true||flags.planDetail||prevScenario?.plan_detail===true;
+    if(!arr(a.plan_focus).length&&arr(prevScenario?.plan_focus).length)a.plan_focus=arr(prevScenario.plan_focus).slice();
+    if(!Number.isFinite(Number(a.plan_target))&&Number(prevScenario?.plan_target)>0)a.plan_target=Number(prevScenario.plan_target);
+  }
+  const euros=vnextP19EuroValues(userPrompt);if(trim(a.operation)==='event_scenario'&&euros.length===1&&/\b(?:quita|resta|menos|caida|repercute|en\s+el\s+aire|no\s+(?:pagan|ingresan|paguen|ingresen))\b/.test(flags.p))a.income_delta=-Math.abs(euros[0]);
+  a._user_prompt=String(userPrompt||'');return a;
+}
+function vnextP19CallSignature(call={}){return `${trim(call?.name)}|${JSON.stringify(vnextP13StableObject((call?.arguments&&typeof call.arguments==='object')?call.arguments:{}))}`;}
+function vnextP19ExpandCompoundCalls(calls=[],prompt='',history=[]){
+  const flags=vnextP19PromptFlags(prompt),out=arr(calls).filter(c=>!(trim(c?.name)==='query_ce'&&(!c?.arguments||typeof c.arguments!=='object'))).slice();
+  if(flags.pending&&flags.nonatt){
+    const keep=out.filter(c=>!(trim(c?.name)==='query_ce'&&!trim(c?.arguments?.operation)));out.length=0;out.push(...keep);
+    const wanted=[{name:'query_ce',arguments:{operation:'event_income_status',status:'pending'}},{name:'query_ce',arguments:{operation:'event_attendance',attendance_mode:'non_attending_members'}}];
+    for(const w of wanted){if(!out.some(c=>trim(c?.name)===w.name&&trim(c?.arguments?.operation)===w.arguments.operation))out.push({id:`p19_comp_${w.arguments.operation}_${Date.now().toString(36)}_${out.length}`, ...w});}
+  }
+  return vnextP13UniqueCalls(out);
+}
+function vnextP19LocalCalls(prompt='',history=[]){
+  const flags=vnextP19PromptFlags(prompt),prevScenario=vnextP19LastContextByOperation(history,'event_scenario');
+  if(flags.pending&&flags.nonatt)return[{id:`p19_pending_${Date.now().toString(36)}`,name:'query_ce',arguments:{operation:'event_income_status',status:'pending'}},{id:`p19_abs_${Date.now().toString(36)}`,name:'query_ce',arguments:{operation:'event_attendance',attendance_mode:'non_attending_members'}}];
+  if(flags.pending)return[{id:`p19_pending_${Date.now().toString(36)}`,name:'query_ce',arguments:{operation:'event_income_status',status:'pending'}}];
+  if(flags.paid)return[{id:`p19_paid_${Date.now().toString(36)}`,name:'query_ce',arguments:{operation:'event_income_status',status:'received'}}];
+  if(flags.nonatt)return[{id:`p19_abs_${Date.now().toString(36)}`,name:'query_ce',arguments:{operation:'event_attendance',attendance_mode:'non_attending_members'}}];
+  if(trim(prevScenario?.operation)==='event_scenario'&&(flags.repeat||flags.plan))return[{id:`p19_scenario_${Date.now().toString(36)}`,name:'query_ce',arguments:{operation:'event_scenario',event:trim(prevScenario.event),income_delta:Number(prevScenario.income_delta)||0,scenario_people:arr(prevScenario.scenario_people),plan:flags.plan||prevScenario.plan===true,plan_detail:flags.planDetail||prevScenario.plan_detail===true,plan_focus:arr(prevScenario.plan_focus),plan_target:Number(prevScenario.plan_target)||0}}];
+  return[];
+}
+function vnextP19ScenarioMentionRows(basePeople={},prompt='',requested=[]){
+  const rows=arr(vnextP1Table(basePeople,'people')?.rows),p=vnextP17LooseNorm(prompt),wanted=arr(requested).map(vnextP17LooseNorm).filter(Boolean),hits=[];
+  for(const r of rows){const name=trim(r?.Persona),n=vnextP17LooseNorm(name);if(!n)continue;let yes=wanted.some(w=>vnextP17StoreFilterMatches(n,w));if(!yes&&p){if(p.includes(n))yes=true;else{const words=n.split(' ').filter(w=>w.length>=4&&w!=='socio');yes=words.length>=2&&words.every(w=>p.includes(w));}}if(yes&&!hits.some(x=>vnextP17LooseNorm(x?.Persona)===n))hits.push(r);}return hits;
+}
+function vnextP19PlanFocusFromRows(rows=[],prompt='',requested=[]){
+  const p=vnextP17LooseNorm(prompt),out=[];const add=v=>{const t=trim(v);if(t&&!out.some(x=>vnextP17LooseNorm(x)===vnextP17LooseNorm(t)))out.push(t);};for(const x of arr(requested))add(x);
+  for(const r of arr(rows)){for(const k of ['Segmento','Destino']){const v=trim(r?.[k]),n=vnextP17LooseNorm(v);if(n&&n.length>=4&&p.includes(n))add(v);}}return out;
+}
+function vnextP19BuildAdjustmentPlan(purchaseResult={},targetCut=0,focus=[],prompt=''){
+  const rows=arr(vnextP1Table(purchaseResult,'by_segment_destination')?.rows),target=Math.max(0,num(targetCut));if(!rows.length||target<=0)return{rows:[],saving:0,target,focus:arr(focus),shortfall:target};
+  const focusNorm=arr(focus).map(vnextP17LooseNorm).filter(Boolean),match=r=>!focusNorm.length||focusNorm.some(f=>vnextP17StoreFilterMatches(`${trim(r?.Segmento)} ${trim(r?.Destino)} ${trim(r?.Producto)}`,f));
+  const candidates=rows.filter(match).slice().sort((a,b)=>num(b?.Importe)-num(a?.Importe)||trim(a?.Producto).localeCompare(trim(b?.Producto),'es',{sensitivity:'base'}));let saving=0;const plan=[];
+  for(const r of candidates){if(saving>=target-0.005)break;const beforeUnits=Math.max(0,num(r?.Unidades)),beforeAmount=Math.max(0,num(r?.Importe));if(beforeAmount<=0)continue;const remain=Math.max(0,target-saving);let cutAmount=0,afterUnits=beforeUnits;
+    if(beforeUnits>0){const unit=beforeAmount/beforeUnits,cutUnits=Math.min(beforeUnits,Math.max(1,Math.ceil((remain-1e-9)/Math.max(unit,0.000001))));afterUnits=Math.max(0,round(beforeUnits-cutUnits,3));cutAmount=v26Money(beforeAmount*(cutUnits/beforeUnits));}
+    else cutAmount=v26Money(Math.min(beforeAmount,remain));
+    const afterAmount=v26Money(Math.max(0,beforeAmount-cutAmount));saving=v26Money(saving+cutAmount);plan.push({Producto:trim(r?.Producto),Segmento:trim(r?.Segmento),Destino:trim(r?.Destino),'Unidades antes':round(beforeUnits,3),'Unidades después':afterUnits,'Importe antes':v26Money(beforeAmount),'Importe después':afterAmount,'Ahorro propuesto':cutAmount});}
+  return{rows:plan,saving:v26Money(saving),target,focus:arr(focus),shortfall:v26Money(Math.max(0,target-saving))};
+}
+async function vnextP19ExecuteAttendance(decision={},state={},selectedEventId='',flowTrace=[]){
+  const event=vnextP1ResolveEventName(state,trim(decision?.event),selectedEventId),eventRow=arr(state?.eventos).find(e=>norm(e?.titulo)===norm(event)),eid=trim(eventRow?.id);if(!eid)throw new Error(`No encuentro el evento «${event}».`);const att=arr(buildCanonicalAttendance(state,[eid])?.porEvento)[0]||{},mode=trim(decision?.attendance_mode)||'attendees';
+  const member=v73ExpandCanonicalAttendanceList(att?.sociosAsistentes,'SOCIO asistente',event),nonmember=v73ExpandCanonicalAttendanceList(att?.noSociosAsistentes,'NO SOCIO asistente',event),absent=v73ExpandCanonicalAttendanceList(att?.sociosNoAsistentes,'SOCIO no asistente',event),attendees=[...member,...nonmember],rows=mode==='attending_members'?member:mode==='attending_non_members'?nonmember:mode==='non_attending_members'?absent:mode==='attendance_full'?[...attendees,...absent]:attendees;
+  return{id:`p19_att_${Date.now().toString(36)}`,name:'query_ce',ok:true,title:mode==='non_attending_members'?`Socios no asistentes · ${event}`:`Asistencia · ${event}`,facts:{operation:'event_attendance',event,attendance_mode:mode,attendees_canonical:num(att?.totalAsistentesPersonas),members_attending:num(att?.sociosAsistentesPersonas),nonmembers_attending:num(att?.noSociosAsistentesPersonas),members_not_attending:num(att?.sociosNoAsistentesPersonas),record_count:rows.length,source_contract:'Asistencia canónica por personas físicas. No se deduce desde ingresos.'},tables:[v26Table('attendance',mode==='non_attending_members'?`Socios no asistentes · ${event}`:`Asistencia · ${event}`,rows,{Evento:v26TextSchema(),Grupo:v26TextSchema(),Persona:v26TextSchema(),Personas:v26CountSchema('personas'),'Registro canónico':v26TextSchema()})],provenance:'ControlEvent · buildCanonicalAttendance',_vnext_operation:'event_attendance'};
+}
+async function vnextP19ExecuteScenario(decision={},state={},selectedEventId='',flowTrace=[],history=[]){
+  const d={...(decision||{})},event=vnextP1ResolveEventName(state,trim(d.event),selectedEventId),prompt=trim(d._user_prompt),flags=vnextP19PromptFlags(prompt),peopleBase=await v26ToolEventPeople({id:`p19_people_${Date.now().toString(36)}`,name:'event_people',event,scope:'named_event',detail:'full'},state,selectedEventId),mentioned=vnextP19ScenarioMentionRows(peopleBase,prompt,d.scenario_people),euros=vnextP19EuroValues(prompt);
+  if((/\b(?:no\s+(?:pagan|paguen|ingresan|ingresen)|si\s+.*\bno\s+(?:paga|ingresa)|se\s+caen?|caida|en\s+el\s+aire)\b/.test(flags.p))&&mentioned.length)d.income_delta=-Math.abs(v26Money(mentioned.reduce((a,r)=>a+num(r?.['Importe total']),0)));
+  else if(euros.length===1&&/\b(?:quita|resta|menos|caida|repercute|en\s+el\s+aire)\b/.test(flags.p))d.income_delta=-Math.abs(euros[0]);
+  if(mentioned.length)d.scenario_people=mentioned.map(r=>trim(r?.Persona)).filter(Boolean);
+  const base=await vnextP1ExecuteData(d,state,selectedEventId,flowTrace);if(!d.plan_detail)return base;
+  const prevPurchase=vnextP19LastContextByOperation(history,'event_purchases'),purchase=await v274ToolEventPurchaseLines({id:`p19_plan_${Date.now().toString(36)}`,name:'event_purchase_lines',event,scope:'named_event',status:'pending',detail:'standard',responsible:trim(prevPurchase?.responsible),store_filter_mode:trim(prevPurchase?.store_filter_mode)||'all',include_stores:vnextP17CanonicalStoreList(state,prevPurchase?.include_stores),exclude_stores:vnextP17CanonicalStoreList(state,prevPurchase?.exclude_stores),exclude_products:arr(prevPurchase?.exclude_products)},state,selectedEventId),sourceRows=arr(vnextP1Table(purchase,'by_segment_destination')?.rows),focus=vnextP19PlanFocusFromRows(sourceRows,prompt,d.plan_focus),target=Math.max(num(d.plan_target),num(base?.facts?.recommended_cut)||num(base?.facts?.gap_to_zero)),plan=vnextP19BuildAdjustmentPlan(purchase,target,focus,prompt),projected=v26Money(num(base?.facts?.adjusted_operating_balance)+num(plan.saving)),planTable=v26Table('adjustment_plan',`Plan B de recorte · ${event}`,plan.rows,{Producto:v26TextSchema(),Segmento:v26TextSchema(),Destino:v26TextSchema(),'Unidades antes':v26SchemaField('quantity','uds'),'Unidades después':v26SchemaField('quantity','uds'),'Importe antes':v26MoneySchema(),'Importe después':v26MoneySchema(),'Ahorro propuesto':v26MoneySchema()});
+  return{...base,title:`Plan B detallado · ${event}`,facts:{...(base?.facts||{}),plan_detail:true,scenario_people:arr(d.scenario_people),plan_focus:focus,plan_target:v26Money(target),plan_saving:v26Money(plan.saving),plan_shortfall:v26Money(plan.shortfall),projected_balance_after_plan:projected,plan_source:'Compras PENDIENTE del evento; respeta el último estado de filtros de compras cuando existe. Es simulación, no modifica BBDD.'},tables:[...arr(base?.tables),planTable].filter(t=>arr(t?.rows).length),_vnext_operation:'event_scenario'};
+}
+async function vnextP19ExecuteData(decision={},state={},selectedEventId='',flowTrace=[],history=[]){
+  const op=trim(decision?.operation);if(op==='event_attendance'&&trim(decision?.attendance_mode)&&trim(decision.attendance_mode)!=='attendees')return vnextP19ExecuteAttendance(decision,state,selectedEventId,flowTrace);if(op==='event_scenario')return vnextP19ExecuteScenario(decision,state,selectedEventId,flowTrace,history);return vnextP1ExecuteData(decision,state,selectedEventId,flowTrace);
+}
+function vnextP19LocalFinal(result={},decision={},state={}){
+  const op=trim(result?._vnext_operation||decision?.operation),f=result?.facts||{},fmt=v=>v26FormatEuro(num(v));
+  if(op==='event_income_status'){const rows=arr(vnextP1Table(result,'income_status')?.rows),names=rows.map(r=>trim(r?.Persona)).filter(Boolean),pending=trim(f.status)==='pending',label=pending?'Pendiente':trim(f.status)==='received'?'recibido':'registrado';return{title:trim(result?.title)||'Ingresos por estado',answer:rows.length?`En ${f.event}, ${rows.length} registros figuran como ${label}: ${names.join(', ')}. Importe de esas filas: ${fmt(f.amount_total)}.`:`En ${f.event} no hay registros de ingreso con estado ${label}.`,warnings:[]};}
+  if(op==='event_attendance'&&trim(f.attendance_mode)==='non_attending_members'){const rows=arr(vnextP1Table(result,'attendance')?.rows),names=rows.map(r=>trim(r?.Persona)).filter(Boolean);return{title:trim(result?.title)||'Socios no asistentes',answer:rows.length?`En ${f.event}, los socios que figuran como no asistentes son ${names.join(', ')}.`:`En ${f.event} no figuran socios no asistentes.`,warnings:[]};}
+  if(op==='event_scenario'&&f.plan_detail===true){const rows=arr(vnextP1Table(result,'adjustment_plan')?.rows),focus=arr(f.plan_focus).filter(Boolean),short=num(f.plan_shortfall);return{title:trim(result?.title)||'Plan B detallado',answer:rows.length?`${f.event} · Plan B: propongo recortar ${fmt(f.plan_saving)} en ${rows.length} productos${focus.length?` centrando el ajuste en ${focus.join(', ')}`:''}. El saldo proyectado después del recorte quedaría en ${fmt(f.projected_balance_after_plan)}.${short>0?` Con ese foco aún faltarían ${fmt(short)} por recortar.`:''} Te dejo el antes y el después producto a producto. No modifica la BBDD.`:`${f.event} · no he encontrado compras pendientes suficientes para construir el recorte solicitado con ese foco.`,warnings:[]};}
+  return vnextP1LocalFinal(result,decision,state);
+}
+function vnextP19SpokenAnswer(result={},decision={},state={},userPrompt=''){
+  const f=result?.facts||{},op=trim(result?._vnext_operation||decision?.operation),event=vnextP14EventSpokenLabel(state,trim(f.event)||trim(decision?.event)),reg=vnextP15SocialRegister(decision);
+  if(op==='event_income_status'){const rows=arr(vnextP1Table(result,'income_status')?.rows),allNames=rows.map(r=>vnextP1SpokenPersonLabel(state,trim(r?.Persona))).filter(Boolean),explicitList=/\b(?:recit|uno\s+por\s+uno|lista|listado|todos|todas|quienes|quien)\w*/.test(vnextP17LooseNorm(userPrompt)),names=explicitList?allNames:allNames.slice(0,8),amt=vnextP15EuroOrAmount(f.amount_total),pending=trim(f.status)==='pending';if(!rows.length)return pending?`En ${event} no nos queda nadie pendiente de pagar.`:`En ${event} no encuentro ingresos con ese estado.`;if(reg==='banter'&&pending)return`Nos quedan ${rows.length} por pasar por caja en ${event}: ${vnextP15NaturalJoin(names)}${amt?`. Entre todos son ${amt}`:''}. A ver si se van poniendo las pilas.`;if(reg==='close'&&pending)return`En ${event} todavía nos quedan ${rows.length} pendientes: ${vnextP15NaturalJoin(names)}${amt?`. En total, ${amt}`:''}.`;return`En ${event} hay ${rows.length} registros ${pending?'pendientes':'con el ingreso ya registrado'}${names.length?`: ${vnextP15NaturalJoin(names)}`:''}${amt?`. Importe: ${amt}`:''}.`;}
+  if(op==='event_attendance'&&trim(f.attendance_mode)==='non_attending_members'){const names=arr(vnextP1Table(result,'attendance')?.rows).map(r=>vnextP1SpokenPersonLabel(state,trim(r?.Persona))).filter(Boolean);return names.length?(reg==='banter'?`Y los que este año se nos caen de ${event} son ${vnextP15NaturalJoin(names)}.`:`En ${event}, los socios que no vienen son ${vnextP15NaturalJoin(names)}.`):`En ${event} no tenemos socios marcados como no asistentes.`;}
+  if(op==='event_scenario'&&f.plan_detail===true){const saving=vnextP15EuroOrAmount(f.plan_saving),bal=vnextP15EuroOrAmount(f.projected_balance_after_plan),n=arr(vnextP1Table(result,'adjustment_plan')?.rows).length;if(reg==='banter')return`Ahora sí, plan B con bisturí: recortando ${saving} en ${n} productos, el saldo se nos queda en ${bal}. Te he dejado el antes y el después para no cortar a lo loco.`;return`Te he preparado un recorte de ${saving} en ${n} productos. Con eso, el saldo proyectado queda en ${bal}; tienes el antes y el después en la tabla.`;}
+  return vnextP15SpokenAnswer(result,decision,state,userPrompt);
+}
+function vnextP19ContextFromResults(results=[],final={}){const rc=vnextP13ContextFromResults(results,final),last=arr(results).filter(x=>x?.result).slice(-1)[0],a=last?.args||{},f=last?.result?.facts||{};return{...rc,attendance_mode:trim(a.attendance_mode)||trim(f.attendance_mode),income_delta:Number.isFinite(Number(f?.income_delta))?Number(f.income_delta):(Number(a?.income_delta)||0),scenario_people:arr(f.scenario_people||a.scenario_people).map(trim).filter(Boolean).slice(0,12),plan:a.plan===true||f.plan===true||rc.plan===true,plan_detail:a.plan_detail===true||f.plan_detail===true,plan_focus:arr(f.plan_focus||a.plan_focus).map(trim).filter(Boolean).slice(0,12),plan_target:Number(f.plan_target||a.plan_target)||0};}
+
+// ============================================================================
+// v4_0_exp · ZUZU VNEXT P1.8 · TABLE VIEW STATE MACHINE
+// Una tabla se modifica como una hoja de datos: QUITAR y PONER son operaciones inversas
+// sobre el mismo estado. El usuario no debe conocer nombres literales de BBDD.
+// También conserva/recupera columnas y permite «tabla original» sin perder el evento,
+// responsable, estado PENDIENTE/REALIZADA ni el orden de la consulta base.
+// ============================================================================
+function vnextP18StoreMentionEntries(state={},prompt=''){
+  const p=vnextP17LooseNorm(prompt),words=new Set(p.split(' ').filter(Boolean)),cat=vnextP17StoreCatalog(state),stop=new Set(['tienda','tiendas','de','del','la','el','los','las','y','en','para','por','con','sin','hnos','s','l','sa']);
+  const tokenFreq=new Map(),meta=[];
+  for(const name of cat){const n=vnextP17LooseNorm(name),sig=n.split(' ').filter(w=>w.length>=4&&!stop.has(w));meta.push({name,n,sig});for(const w of new Set(sig))tokenFreq.set(w,(tokenFreq.get(w)||0)+1);}
+  const out=[];
+  for(const x of meta){let pos=-1,matched='';const exact=` ${p} `.indexOf(` ${x.n} `);if(exact>=0){pos=exact;matched=x.n;}
+    if(pos<0){for(const w of x.sig){if((tokenFreq.get(w)||0)===1&&words.has(w)){pos=p.indexOf(w);matched=w;break;}}}
+    if(pos<0&&x.sig.length>=2&&x.sig.slice(0,2).every(w=>words.has(w))){pos=Math.min(...x.sig.slice(0,2).map(w=>p.indexOf(w)).filter(i=>i>=0));matched=x.sig.slice(0,2).join(' ');}
+    if(pos>=0)out.push({name:x.name,pos,matched});
+  }
+  out.sort((a,b)=>a.pos-b.pos||a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+  return out.filter((x,i,a)=>i===0||vnextP17LooseNorm(a[i-1].name)!==vnextP17LooseNorm(x.name));
+}
+function vnextP18ActionBefore(p='',pos=0){
+  const prefix=p.slice(0,Math.max(0,pos)),re=/\b(quita|quitar|quitame|elimina|eliminar|excluye|excluir|fuera|borra|borrar|saca|sacar|pon|poner|anade|anadir|agrega|agregar|incluye|incluir|recupera|recuperar|mete|meter|reincorpora|reincorporar)\b/g;let m,last='';
+  while((m=re.exec(prefix)))last=m[1];
+  if(!last)return'';return /^(pon|poner|anade|anadir|agrega|agregar|incluye|incluir|recupera|recuperar|mete|meter|reincorpora|reincorporar)$/.test(last)?'add':'remove';
+}
+function vnextP18StoreMutations(state={},prompt='',history=[]){
+  const p=vnextP17LooseNorm(prompt),entries=vnextP18StoreMentionEntries(state,prompt),reset=/\b(?:tabla|lista|listado)\s+(?:original|inicial|completa)\b/.test(p)||/\b(?:restaura|restaurar|reinicia|reiniciar)\b[^.]{0,30}\b(?:tabla|filtros)\b/.test(p)||/\b(?:quita|borra|elimina)\b[^.]{0,25}\b(?:todos\s+los\s+)?filtros\b/.test(p),globalSet=/\b(?:solo|unicamente|solamente)\b[^.]{0,35}\b(?:tienda|tiendas)\b/.test(p)||/\b(?:de\s+las\s+tiendas|compras\s+de\s+las\s+tiendas)\b/.test(p),pronounAdd=/\b(?:ponlos|ponlas|anadelos|anadelas|incluyelos|incluyelas|metelos|metelas|recuperalos|recuperalas)\b/.test(p);
+  let list=entries;
+  if(!list.length&&pronounAdd){for(let i=arr(history).length-1;i>=0;i--){const q=trim(arr(history)[i]?.user);if(!q)continue;const prev=vnextP18StoreMentionEntries(state,q);if(prev.length){list=prev;break;}}}
+  const actions=[];
+  for(const e of list){let action=vnextP18ActionBefore(p,e.pos);if(!action&&pronounAdd)action='add';if(!action&&globalSet)action='set';if(action)actions.push({store:e.name,action,pos:e.pos});}
+  return{reset,globalSet,actions,mentions:list.map(x=>x.name)};
+}
+function vnextP18ColumnTokens(prompt=''){
+  const p=vnextP17LooseNorm(prompt);if(!/\b(?:columna|columnas|campo|campos)\b/.test(p))return[];
+  const defs=[['Producto',['producto']],['Segmento',['segmento']],['Destino',['destino']],['Unidades',['unidades','cantidad']],['Precio',['precio']],['Importe',['importe','total']],['Ticket u otros gastos',['ticket','tickets']],['Tienda',['tienda','tiendas']],['Responsable',['responsable']],['Donante',['donante']],['Tipo',['tipo','estado']],['Nº registros',['registros','numero registros']],['Creado',['creado']],['Actualizado',['actualizado']]];
+  const out=[];for(const [name,aliases] of defs){if(aliases.some(a=>new RegExp(`\\b${a.replace(/ /g,'\\\\s+')}\\b`).test(p)))out.push(name);}return vnextP16MergeUniqueText([],out);
+}
+function vnextP18ColumnIntent(prompt=''){
+  const p=vnextP17LooseNorm(prompt);if(!/\b(?:columna|columnas|campo|campos)\b/.test(p))return'';
+  if(/\b(?:solo|unicamente|solamente)\b/.test(p))return'set';
+  if(/\b(?:pon|poner|anade|anadir|agrega|agregar|incluye|incluir|recupera|recuperar|mete|meter)\b/.test(p))return'add';
+  if(/\b(?:quita|quitar|elimina|eliminar|oculta|ocultar|borra|borrar|sin)\b/.test(p))return'remove';
+  return'';
+}
+function vnextP18RepairPurchaseView(args={},state={},userPrompt='',history=[],flowTrace=[]){
+  const a={...(args||{})},prev=vnextP16LastContext(history),prevPurchase=trim(prev?.operation)==='event_purchases',mut=vnextP18StoreMutations(state,userPrompt,history),p=vnextP17LooseNorm(userPrompt);
+  let mode=['all','include','exclude'].includes(trim(prev?.store_filter_mode))?trim(prev.store_filter_mode):(arr(prev?.include_stores).length?'include':arr(prev?.exclude_stores).length?'exclude':'all');
+  let include=vnextP17CanonicalStoreList(state,prevPurchase?prev?.include_stores:[]),exclude=vnextP17CanonicalStoreList(state,prevPurchase?prev?.exclude_stores:[]);
+  if(mut.reset||a.reset_table===true){mode='all';include=[];exclude=[];}
+  else if(mut.actions.length){
+    const setNames=mut.actions.filter(x=>x.action==='set').map(x=>x.store);
+    if(setNames.length){mode='include';include=vnextP17CanonicalStoreList(state,setNames);exclude=[];}
+    for(const m of mut.actions.filter(x=>x.action!=='set')){const store=vnextP17ResolveStoreLabel(state,m.store);if(!store)continue;
+      if(m.action==='remove'){
+        if(mode==='include')include=include.filter(x=>!vnextP17StoreFilterMatches(x,store));
+        else{mode='exclude';exclude=vnextP16MergeUniqueText(exclude,[store]);include=[];}
+      }else if(m.action==='add'){
+        if(mode==='include')include=vnextP16MergeUniqueText(include,[store]);
+        else{exclude=exclude.filter(x=>!vnextP17StoreFilterMatches(x,store));mode=exclude.length?'exclude':'all';include=[];}
+      }
+    }
+  }else{
+    const aiInclude=vnextP17CanonicalStoreList(state,a.include_stores),aiExclude=vnextP17CanonicalStoreList(state,a.exclude_stores);
+    if(aiInclude.length){mode='include';include=aiInclude;exclude=[];}
+    else if(aiExclude.length){mode='exclude';exclude=vnextP16MergeUniqueText(exclude,aiExclude);include=[];}
+  }
+  // Nunca permitimos la contradicción «solo X» y «excluir X» a la vez.
+  if(mode==='include')exclude=[];else if(mode==='exclude')include=[];else{include=[];exclude=[];}
+  a.store_filter_mode=mode;a.include_stores=include;a.exclude_stores=exclude;
+
+  let visible=prevPurchase?vnextP16MergeUniqueText([],prev?.visible_columns):[],hidden=prevPurchase?vnextP16MergeUniqueText([],prev?.hidden_columns):[];
+  const colIntent=vnextP18ColumnIntent(userPrompt),cols=vnextP18ColumnTokens(userPrompt);
+  if(mut.reset||a.reset_table===true){visible=[];hidden=[];}
+  else if(colIntent==='set'&&cols.length){visible=cols.slice();hidden=[];}
+  else if(colIntent==='remove'&&cols.length){if(visible.length)visible=visible.filter(x=>!cols.some(c=>vnextP17StoreFilterMatches(x,c)));else hidden=vnextP16MergeUniqueText(hidden,cols);}
+  else if(colIntent==='add'&&cols.length){if(visible.length)visible=vnextP16MergeUniqueText(visible,cols);hidden=hidden.filter(x=>!cols.some(c=>vnextP17StoreFilterMatches(x,c)));}
+  else{if(arr(a.visible_columns).length)visible=vnextP16MergeUniqueText([],a.visible_columns);if(arr(a.hidden_columns).length)hidden=vnextP16MergeUniqueText(hidden,a.hidden_columns);}
+  a.visible_columns=visible;a.hidden_columns=hidden;
+  zuzuTracePush(flowTrace,'VNEXT P1.8 · TABLE VIEW ENGINE','OK',`filas=${mode} · incluir=${include.join(' | ')||'—'} · excluir=${exclude.join(' | ')||'—'} · columnas visibles=${visible.join(' | ')||'todas'} · ocultas=${hidden.join(' | ')||'—'}${mut.reset?' · ORIGINAL':''}.`);
+  return a;
+}
+function vnextP18ColumnMatches(actual='',requested=''){
+  const a=vnextP17LooseNorm(actual),r=vnextP17LooseNorm(requested);if(!a||!r)return false;if(a===r)return true;if(r.length>=4&&(a.includes(r)||r.includes(a)))return true;return a.split(' ').some(x=>x===r||x.startsWith(r)||r.startsWith(x));
+}
+function vnextP18ApplyColumnView(result={},args={}){
+  const visible=arr(args?.visible_columns).map(trim).filter(Boolean),hidden=arr(args?.hidden_columns).map(trim).filter(Boolean);if(!visible.length&&!hidden.length)return result;
+  const tables=arr(result?.tables).map(t=>{const rows=arr(t?.rows),schema=t?.schema&&typeof t.schema==='object'?t.schema:{},keys=[];for(const k of Object.keys(schema))if(!keys.includes(k))keys.push(k);for(const r of rows)if(r&&typeof r==='object'&&!Array.isArray(r))for(const k of Object.keys(r))if(!keys.includes(k))keys.push(k);
+    let keep=visible.length?keys.filter(k=>visible.some(v=>vnextP18ColumnMatches(k,v))):keys.filter(k=>!hidden.some(h=>vnextP18ColumnMatches(k,h)));
+    if(!keep.length)keep=keys.slice(0,1);
+    const outRows=rows.map(r=>{if(!r||typeof r!=='object'||Array.isArray(r))return r;const o={};for(const k of keep)if(Object.prototype.hasOwnProperty.call(r,k))o[k]=r[k];return o;}),outSchema={};for(const k of keep)if(schema[k])outSchema[k]=schema[k];return{...t,rows:outRows,schema:outSchema,columns:keep};});
+  return{...result,facts:{...(result?.facts||{}),visible_columns:visible,hidden_columns:hidden},tables};
+}
+function vnextP18IsPurchaseTableContinuation(prompt='',history=[]){
+  const prev=vnextP16LastContext(history);if(trim(prev?.operation)!=='event_purchases')return false;const p=vnextP17LooseNorm(prompt);return /\b(?:quita|quitar|elimina|eliminar|excluye|excluir|pon|poner|anade|anadir|agrega|agregar|incluye|incluir|recupera|recuperar|mete|meter|tabla\s+original|lista\s+original|columna|columnas|campo|campos|solo\s+tiendas|ponlos|ponlas)\b/.test(p);
+}
+
 function vnextP16ScenarioCharts(result={},decision={}){
   if(decision?.chart!==true)return[];const f=result?.facts||{},labels=['Plan actual','Plan B'],type=trim(decision?.chart_type)||'bar';
   return [
@@ -17479,7 +17694,7 @@ function vnextP16ScenarioCharts(result={},decision={}){
 }
 function vnextP12SystemInstruction(selectedEventId='',opts={}){
   const display=zuzuLoggedUserDisplayName({usuarioLogado:opts?.usuarioLogado||opts?.user||opts?.authUser||opts?.ce_acceso||null}),voice=opts?.voiceConversation===true;
-  return `Eres Zuzu VNext P1.7. Eres uno más de la Peña: conoces ControlEvent por dentro y llevas tiempo hablando con ${display}. No eres un operador de BBDD ni un asistente de oficina. Eres un amigo útil, rápido, con memoria y confianza, pero los datos reales siguen mandando.
+  return `Eres Zuzu VNext P1.9. Eres uno más de la Peña: conoces ControlEvent por dentro y llevas tiempo hablando con ${display}. No eres un operador de BBDD ni un asistente de oficina. Eres un amigo útil, rápido, con memoria y confianza, pero los datos reales siguen mandando.
 
 CUATRO REGISTROS DE RESPUESTA:
 0. FACTUAL/ESCRITO: la pantalla, tablas, PDF e informes conservan nombres canónicos, cifras exactas y redacción sobria. Nunca metas bromas ni lenguaje deformado en el dato escrito autoritativo.
@@ -17498,6 +17713,8 @@ DATOS: si la respuesta depende de ControlEvent, llama UNA función canónica y n
 PERSONAS Y VIDA DE LA PEÑA:
 - person_income_status responde al pago de una persona en un evento y cruza asistencia para hablar con sentido social.
 - person_event_status es para «qué hay de X», «qué le pasa este año», «cómo va X»: combina asistencia + ingreso del mismo evento.
+- event_attendance admite attendance_mode=non_attending_members para «socios no asistentes». Si el usuario pide EN LA MISMA FRASE quién no ha pagado Y los socios no asistentes, emite DOS query_ce en la misma Interaction: event_income_status(status=pending) + event_attendance(attendance_mode=non_attending_members). No digas «falta operación».
+- «no han pagado / no hayan pagado / sin pagar / faltan por pagar» = event_income_status(status=pending). «ya han pagado / hayan pagado» sin negación = status=received. La negación manda.
 - Si una persona no viene pero su compañero/a sí figura como asistente, dilo de forma natural. No conviertas un 0 € en «no ha pagado» si no asiste o no debía pagar.
 - Alias y nombres hablados son BBDD. Tolera una errata mínima inequívoca; si hay dos candidatos realmente igual de plausibles, pregunta.
 
@@ -17508,7 +17725,10 @@ MI / MIS / YO:
 - event_purchases admite purchase_status=pending|realized|all. «quita las realizadas», «solo pendientes», «las PENDIENTE» = pending. «solo realizadas» = realized. En una continuación conserva mine/responsible, order_by y el evento del resultado anterior salvo que el usuario los cambie.
 - Filtros de compras son operaciones de TABLA y deben conservarse turno a turno. Si dice «quita/elimina/excluye la tienda X», usa exclude_stores. Si dice «quiero las compras DE LAS TIENDAS X, Y, Z», «solo de estas tiendas» o equivalente POSITIVO, usa include_stores; JAMÁS conviertas esa lista positiva en exclusiones.
 - Los nombres de tienda pueden venir truncados con puntos («Satur.....», «El Mirador...», «Gasolinera...»). Pásalos tal como los entiendas: el servidor los canonicaliza contra el maestro de tiendas. No obligues al usuario a escribir el nombre completo.
+- P1.8 trata la tabla como ESTADO: «quita X» retira X de la vista; «pon/añade/recupera X» hace exactamente la operación inversa y vuelve a mostrarlo. Si estaba en exclusiones, PONER significa sacarlo de exclusiones, NO meterlo a la vez en include y exclude.
+- «tabla/lista original» restaura la vista base de esa consulta (mismo evento, responsable, PENDIENTE/REALIZADA y orden), borrando filtros de filas y columnas. No cambies a otro dominio.
 - include_stores y exclude_stores afectan al MISMO dataset base y, por tanto, a TODAS las tablas derivadas del resultado. No puede desaparecer una tienda de una vista y seguir apareciendo en otra.
+- Columnas: «quita/oculta la columna X» usa hidden_columns; «pon/recupera la columna X» la vuelve a mostrar; «solo columnas X,Y» usa visible_columns. Quitar/poner columnas es PRESENTACIÓN, nunca borra datos de BBDD.
 - Si el usuario dice «quita la tienda X», «excluye X» o enumera tiendas/productos a retirar del listado, usa exclude_stores / exclude_products. Son filtros de presentación/dataset, no cambios en BBDD.
 
 ESCENARIOS / PLAN B:
@@ -17516,6 +17736,9 @@ ESCENARIOS / PLAN B:
 - Si vienen de hablar de «plan B», «si no entran esos 720» o «cómo quedaría el saldo», NO vuelvas a enseñar el plan actual: ejecuta event_scenario sobre el mismo evento y responde si el saldo queda por encima o por debajo de cero.
 
 - Si además pide «diseña el plan B», «qué recortamos», «qué hacemos», usa plan=true y conserva el income_delta anterior. No repitas la misma simulación como un loro: da una decisión útil. Si pide gráfica del escenario, chart=true sobre event_scenario y conserva el mismo delta.
+- Si nombra concretamente personas/parejas que podrían NO ingresar, pasa sus nombres en scenario_people. El servidor contrasta esas filas de ingreso y calcula la caída real; una donación NO descuenta la cuota del evento salvo que la BBDD de ingresos lo diga.
+- Si pide «recorta alcohol/refrescos», «lista de productos antes y después», «hazlo» o «dame ese detalle» dentro de un Plan B, usa event_scenario con plan=true y plan_detail=true; plan_focus puede llevar Segmento/Destino/categorías pedidas. La respuesta debe materializar una tabla de ajuste producto a producto, no volver a repetir el total de compras.
+- «repite/pon otra vez/no lo he comprendido» sobre un escenario significa REEJECUTAR el mismo event_scenario con el mismo delta; no improvises números distintos.
 
 COMPARACIONES Y GRÁFICAS:
 - compare_events es amplio por defecto. Si pide «de todo un poco», «potente» o visión general, NO preguntes qué métricas: metric=all.
@@ -17556,17 +17779,23 @@ function vnextP12UiTable(table={}){
 function vnextP12LocalPresentation(result={}){return arr(result?.tables).filter(Boolean).slice(0,8).map(vnextP12UiTable);}
 function vnextP13StableObject(value){if(Array.isArray(value))return value.map(vnextP13StableObject);if(value&&typeof value==='object'){const o={};for(const k of Object.keys(value).sort())o[k]=vnextP13StableObject(value[k]);return o;}return value;}
 function vnextP13UniqueCalls(calls=[]){const out=[],seen=new Set();for(const c of arr(calls)){const sig=`${trim(c?.name)}|${JSON.stringify(vnextP13StableObject((c?.arguments&&typeof c.arguments==='object')?c.arguments:{}))}`;if(seen.has(sig))continue;seen.add(sig);out.push(c);}return out;}
-function vnextP13ContextFromResults(results=[],final={}){const last=arr(results).filter(x=>x?.result).slice(-1)[0],call=last?.call||{},args=last?.args||{},r=last?.result||{},f=r?.facts||{};return{kind:trim(call?.name)==='recall_memory'?'memory':trim(call?.name)==='search_documents'?'documents':trim(call?.name)==='query_ce'?'data':'conversation',operation:trim(r?._vnext_operation||args?.operation||f?.action),event:trim(f?.event||args?.event),events:arr(f?.event_names||args?.events).map(trim).filter(Boolean).slice(0,12),person:trim(f?.person||args?.person),query:trim(f?.query||args?.query),metric:trim(args?.metric),chart:args?.chart===true,chart_type:trim(args?.chart_type),tone:trim(args?.tone),social_register:trim(args?.register)||trim(args?.tone),tease:args?.tease===true,mine:args?.mine===true,responsible:trim(args?.responsible)||trim(f?.responsible),order_by:trim(args?.order_by),purchase_status:trim(args?.purchase_status)||trim(f?.status),include_stores:arr(args?.include_stores).map(trim).filter(Boolean).slice(0,20),exclude_stores:arr(args?.exclude_stores).map(trim).filter(Boolean).slice(0,20),exclude_products:arr(args?.exclude_products).map(trim).filter(Boolean).slice(0,20),income_delta:Number(args?.income_delta)||0,plan:args?.plan===true,chart:args?.chart===true,title:trim(final?.title),record_count:Number(f?.record_count||f?.count)||0};}
-async function vnextP13NarrateToolResult({userPrompt,payloadId,model,systemInstruction,call,result,flowTrace,externalSignal,voiceConversation=false}={}){const compact=vnextCompactResult(result),input=[{type:'function_result',name:trim(call?.name),call_id:trim(call?.id),result:compact}];const payload=await v261CallInteraction({input,previousInteractionId:payloadId,model,systemInstruction,tools:[],flowTrace,stage:'VNEXT P1.7 · narración excepcional',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?520:900,minOutputTokens:128,plainTextResponse:true});const raw=trim(v261OutputText(payload));return{payload,answer:raw};}
+function vnextP13ContextFromResults(results=[],final={}){const last=arr(results).filter(x=>x?.result).slice(-1)[0],call=last?.call||{},args=last?.args||{},r=last?.result||{},f=r?.facts||{};return{kind:trim(call?.name)==='recall_memory'?'memory':trim(call?.name)==='search_documents'?'documents':trim(call?.name)==='query_ce'?'data':'conversation',operation:trim(r?._vnext_operation||args?.operation||f?.action),event:trim(f?.event||args?.event),events:arr(f?.event_names||args?.events).map(trim).filter(Boolean).slice(0,12),person:trim(f?.person||args?.person),query:trim(f?.query||args?.query),metric:trim(args?.metric),chart:args?.chart===true,chart_type:trim(args?.chart_type),tone:trim(args?.tone),social_register:trim(args?.register)||trim(args?.tone),tease:args?.tease===true,mine:args?.mine===true,responsible:trim(args?.responsible)||trim(f?.responsible),order_by:trim(args?.order_by),purchase_status:trim(args?.purchase_status)||trim(f?.status),store_filter_mode:trim(args?.store_filter_mode)||trim(f?.store_filter_mode),include_stores:arr(args?.include_stores).map(trim).filter(Boolean).slice(0,20),exclude_stores:arr(args?.exclude_stores).map(trim).filter(Boolean).slice(0,20),exclude_products:arr(args?.exclude_products).map(trim).filter(Boolean).slice(0,20),visible_columns:arr(args?.visible_columns).map(trim).filter(Boolean).slice(0,30),hidden_columns:arr(args?.hidden_columns).map(trim).filter(Boolean).slice(0,30),income_delta:Number(args?.income_delta)||0,plan:args?.plan===true,chart:args?.chart===true,title:trim(final?.title),record_count:Number(f?.record_count||f?.count)||0};}
+async function vnextP13NarrateToolResult({userPrompt,payloadId,model,systemInstruction,call,result,flowTrace,externalSignal,voiceConversation=false}={}){const compact=vnextCompactResult(result),input=[{type:'function_result',name:trim(call?.name),call_id:trim(call?.id),result:compact}];const payload=await v261CallInteraction({input,previousInteractionId:payloadId,model,systemInstruction,tools:[],flowTrace,stage:'VNEXT P1.9 · narración excepcional',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?520:900,minOutputTokens:128,plainTextResponse:true});const raw=trim(v261OutputText(payload));return{payload,answer:raw};}
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP11Tools(),systemInstruction=vnextP12SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime});
   let currentPrev=trim(previousInteractionId),payload,calls=0,modelMs=0,toolMs=0,stateWaitMs=0,narrationMs=0,hadTools=false,final={title:'Zuzu',answer:'',warnings:[]},tables=[],charts=[],results=[],state=null;
   const ensureState=async()=>{if(state)return state;const t=Date.now(),loaded=await statePromise;stateWaitMs+=Date.now()-t;state=attachLoggedUserFix10(loaded||{},{usuarioLogado,user,authUser,ce_acceso});return state;};
-  zuzuTracePush(flowTrace,'VNEXT P1.7 · PARALLEL FAST PATH','OK',`Gemini y Supabase arrancan en paralelo; una Interaction factual; predecessor=${currentPrev?'sí':'no'}; alias social tolerante; contexto VNext compacto; sin Semantic Core ni Memory Gate.`);
+  zuzuTracePush(flowTrace,'VNEXT P1.9 · PARALLEL FAST PATH','OK',`Gemini y Supabase arrancan en paralelo; una Interaction factual; predecessor=${currentPrev?'sí':'no'}; alias social tolerante; contexto VNext compacto; sin Semantic Core ni Memory Gate.`);
   const input=currentPrev?userPrompt:vnextP1Input(userPrompt,conversationHistory),m1=Date.now();
-  try{payload=await v261CallInteraction({input,previousInteractionId:currentPrev,model,systemInstruction,tools,flowTrace,stage:'VNEXT P1.7 · Gemini conversa/elige contrato',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?320:480,minOutputTokens:192,plainTextResponse:true});calls++;}
-  catch(error){if(currentPrev&&v261PreviousIdFailure(error)){zuzuTracePush(flowTrace,'VNEXT P1.5 · predecessor','WARN','La Interaction anterior expiró; se usa el puente local compacto.');currentPrev='';payload=await v261CallInteraction({input:vnextP1Input(userPrompt,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'VNEXT P1.7 · recupera hilo',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?320:480,minOutputTokens:192,plainTextResponse:true});calls++;}else throw error;}
-  modelMs=Date.now()-m1;let payloadId=trim(payload?.id),functionCalls=vnextP13UniqueCalls(v261FunctionCalls(payload));hadTools=functionCalls.length>0;
+  try{payload=await v261CallInteraction({input,previousInteractionId:currentPrev,model,systemInstruction,tools,flowTrace,stage:'VNEXT P1.9 · Gemini conversa/elige contrato',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?320:480,minOutputTokens:192,plainTextResponse:true});calls++;}
+  catch(error){if(currentPrev&&v261PreviousIdFailure(error)){zuzuTracePush(flowTrace,'VNEXT P1.5 · predecessor','WARN','La Interaction anterior expiró; se usa el puente local compacto.');currentPrev='';payload=await v261CallInteraction({input:vnextP1Input(userPrompt,conversationHistory),model,systemInstruction,tools,flowTrace,stage:'VNEXT P1.9 · recupera hilo',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?320:480,minOutputTokens:192,plainTextResponse:true});calls++;}else throw error;}
+  modelMs=Date.now()-m1;let payloadId=trim(payload?.id),functionCalls=vnextP19ExpandCompoundCalls(vnextP13UniqueCalls(v261FunctionCalls(payload)),userPrompt,conversationHistory);
+  if(!functionCalls.length&&vnextP18IsPurchaseTableContinuation(userPrompt,conversationHistory)){
+    functionCalls=[{id:`p18_local_${Date.now().toString(36)}`,name:'query_ce',arguments:{operation:'event_purchases'}}];
+    zuzuTracePush(flowTrace,'VNEXT P1.9 · CONTINUIDAD DE TABLA','OK','Gemini no emitió tool, pero el turno es una modificación inequívoca de la última tabla de compras; CE conserva la consulta base y aplica solo el cambio de vista.');
+  }
+  if(!functionCalls.length){const local=vnextP19LocalCalls(userPrompt,conversationHistory);if(local.length){functionCalls=local;zuzuTracePush(flowTrace,'VNEXT P1.9 · CONTINUIDAD DE CONTRATO','OK',`CE materializa ${local.length} contrato(s) inequívocos sin una segunda Interaction.`);}}
+  hadTools=functionCalls.length>0;
   if(!hadTools){
     const raw=trim(v261OutputText(payload));
     final={title:'Zuzu',answer:raw||'No he recibido contenido útil para contestarte. Repite solo esta pregunta y la proceso de nuevo.',warnings:[]};
@@ -17575,7 +17804,7 @@ async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flo
     for(const call of functionCalls){
       try{
         let result,name=trim(call?.name),args=(call?.arguments&&typeof call.arguments==='object')?call.arguments:{};
-        if(name==='query_ce'){args=vnextP16NormalizeDataArgs(args,conversationHistory,userPrompt);const st=await ensureState();if(trim(args?.operation)==='event_purchases')args=vnextP17RepairPurchaseFilters(args,st,userPrompt,conversationHistory,flowTrace);result=await vnextP1ExecuteData(args,st,selectedEventId,flowTrace);}
+        if(name==='query_ce'){args=vnextP19NormalizeDataArgs(args,conversationHistory,userPrompt);const st=await ensureState();if(trim(args?.operation)==='event_purchases')args=vnextP18RepairPurchaseView(args,st,userPrompt,conversationHistory,flowTrace);result=await vnextP19ExecuteData(args,st,selectedEventId,flowTrace,conversationHistory);if(trim(args?.operation)==='event_purchases')result=vnextP18ApplyColumnView(result,args);}
         else if(name==='resolve_entity'){const st=await ensureState();result=vnextResolveTool(call,st);}
         else if(name==='search_documents'){const st=await ensureState();result=await vnextSearchDocuments(call,st,selectedEventId,flowTrace);}
         else if(name==='recall_memory')result=await vnextRecallMemory(call,actor,conversationId,clientLocalDateTime||clientNowIso,conversationHistory);
@@ -17584,23 +17813,23 @@ async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flo
         if(name==='query_ce'&&trim(args?.operation)==='event_weather'&&args?.chart===true)charts.push(...v73WeatherChartFromResult(result));
         if(name==='query_ce'&&trim(args?.operation)==='compare_events'&&args?.chart===true)charts.push(...vnextP14ComparisonCharts(result,args));
         if(name==='query_ce'&&trim(args?.operation)==='event_scenario'&&args?.chart===true)charts.push(...vnextP16ScenarioCharts(result,args));
-        zuzuTracePush(flowTrace,`VNEXT P1.7 · ${name}`,'OK',`${trim(result?.title)||'Resultado'} · operación=${trim(result?._vnext_operation||args?.operation||result?.facts?.action)||'—'} · filas=${arr(result?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}.`);
+        zuzuTracePush(flowTrace,`VNEXT P1.9 · ${name}`,'OK',`${trim(result?.title)||'Resultado'} · operación=${trim(result?._vnext_operation||args?.operation||result?.facts?.action)||'—'} · filas=${arr(result?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}.`);
       }catch(error){const msg=cleanGeminiError(error);results.push({call,error:msg,args:(call?.arguments&&typeof call.arguments==='object')?call.arguments:{}});zuzuTracePush(flowTrace,`VNEXT P1.5 · ${trim(call?.name)}`,'WARN',msg);}
     }
     toolMs=Date.now()-ts;const good=results.filter(x=>x.result),bad=results.filter(x=>x.error);
     if(good.length){
-      const parts=[];for(const x of good){const name=trim(x.call?.name);if(name==='query_ce'){const st=await ensureState();parts.push(vnextP1LocalFinal(x.result,x.args,st));}else if(name==='resolve_entity')parts.push(vnextP11ResolveFinal(x.result));else if(name==='search_documents')parts.push(vnextP11DocsFinal(x.result));else parts.push(vnextP11MemoryFinal(x.result,userPrompt,x.args));}
+      const parts=[];for(const x of good){const name=trim(x.call?.name);if(name==='query_ce'){const st=await ensureState();parts.push(vnextP19LocalFinal(x.result,x.args,st));}else if(name==='resolve_entity')parts.push(vnextP11ResolveFinal(x.result));else if(name==='search_documents')parts.push(vnextP11DocsFinal(x.result));else parts.push(vnextP11MemoryFinal(x.result,userPrompt,x.args));}
       final={title:parts.length===1?parts[0].title:'Zuzu',answer:[...new Set(parts.map(x=>trim(x.answer)).filter(Boolean))].join('\n\n'),warnings:bad.map(x=>x.error)};
       const narratable=good.find(x=>x?.args?.narrate===true)||(good.length===1&&trim(good[0]?.call?.name)==='recall_memory'&&trim(good[0]?.args?.action)==='current'?good[0]:null);
-      if(narratable&&payloadId){const n0=Date.now();try{const n=await vnextP13NarrateToolResult({userPrompt,payloadId,model,systemInstruction,call:narratable.call,result:narratable.result,flowTrace,externalSignal,voiceConversation});calls++;narrationMs=Date.now()-n0;if(trim(n?.answer))final={...final,title:trim(narratable?.result?.title)||final.title,answer:trim(n.answer)};payloadId=trim(n?.payload?.id)||payloadId;}catch(error){zuzuTracePush(flowTrace,'VNEXT P1.7 · narración excepcional','WARN',`Se conserva cierre local: ${cleanGeminiError(error)}`);}}
+      if(narratable&&payloadId){const n0=Date.now();try{const n=await vnextP13NarrateToolResult({userPrompt,payloadId,model,systemInstruction,call:narratable.call,result:narratable.result,flowTrace,externalSignal,voiceConversation});calls++;narrationMs=Date.now()-n0;if(trim(n?.answer))final={...final,title:trim(narratable?.result?.title)||final.title,answer:trim(n.answer)};payloadId=trim(n?.payload?.id)||payloadId;}catch(error){zuzuTracePush(flowTrace,'VNEXT P1.9 · narración excepcional','WARN',`Se conserva cierre local: ${cleanGeminiError(error)}`);}}
     }else{const msg=[...new Set(bad.map(x=>x.error).filter(Boolean))].join(' · ');final={title:'No tengo ese dato cerrado',answer:`No he podido obtener ese dato con una fuente que lo acredite exactamente${msg?`: ${msg}`:'.'}`,warnings:[...new Set(bad.map(x=>x.error).filter(Boolean))]};}
   }
   let answer=v29SanitizeAnswerMarkup(trim(final.answer));
-  const humanState=state||{},lastGood=[...results].reverse().find(x=>x?.result),lastData=[...results].reverse().find(x=>x?.result&&trim(x?.call?.name)==='query_ce'),socialDecision=lastData?.args||lastGood?.args||{},socialRegister=vnextP15SocialRegister(socialDecision),socialSpeech=lastData?vnextP15SpokenAnswer(lastData.result,lastData.args,humanState,userPrompt):vnextP15AuxSpokenAnswer(lastGood,answer,humanState,userPrompt),unitGuard=v416VoiceUnitOracle(socialSpeech||answer,answer,humanState,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||socialSpeech||answer,humanState,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp15|${payloadId||currentPrev}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true),usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started;
-  zuzuTracePush(flowTrace,'VNEXT P1.7 · REGISTRO ORAL','OK',`nivel=${socialRegister} · tease=${socialDecision?.tease===true?'sí':'no'} · pantalla=factual · voz=${socialSpeech?'social':'directa'}.`);
-  const nextInteractionId=hadTools?'':(payloadId||currentPrev),resetInteractionId=hadTools,resultContext=vnextP13ContextFromResults(results,final);
-  zuzuTracePush(flowTrace,'VNEXT P1.7 · LATENCIA','OK',`total=${totalMs} ms · IA=${modelMs} ms · espera estado tras IA=${stateWaitMs} ms · datos=${toolMs} ms · narración excepcional=${narrationMs} ms · llamadas IA=${calls} · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu VNext',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:tables.filter(Boolean).slice(0,8),files:[],provider:'zuzu-vnext-p17-filter-engine-voice-emphasis-fast',model,interactionId:nextInteractionId,conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P1.7 · open-world · typed contracts · canonical include/exclude filter engine · 4 conversation registers · draft-safe UI · parallel state · one-Interaction factual close',experimental:true,voiceConversation:!!voiceConversation,interactionId:nextInteractionId,resetInteractionId,spokenAnswer,resultContext,tools:[...new Set(results.map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:modelMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  const humanState=state||{},lastGood=[...results].reverse().find(x=>x?.result),lastData=[...results].reverse().find(x=>x?.result&&trim(x?.call?.name)==='query_ce'),socialDecision=lastData?.args||lastGood?.args||{},socialRegister=vnextP15SocialRegister(socialDecision),socialSpeech=lastData?vnextP19SpokenAnswer(lastData.result,lastData.args,humanState,userPrompt):vnextP15AuxSpokenAnswer(lastGood,answer,humanState,userPrompt),unitGuard=v416VoiceUnitOracle(socialSpeech||answer,answer,humanState,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||socialSpeech||answer,humanState,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp15|${payloadId||currentPrev}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true),usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started;
+  zuzuTracePush(flowTrace,'VNEXT P1.9 · REGISTRO ORAL','OK',`nivel=${socialRegister} · tease=${socialDecision?.tease===true?'sí':'no'} · pantalla=factual · voz=${socialSpeech?'social':'directa'}.`);
+  const nextInteractionId=hadTools?'':(payloadId||currentPrev),resetInteractionId=hadTools,resultContext=vnextP19ContextFromResults(results,final);
+  zuzuTracePush(flowTrace,'VNEXT P1.9 · LATENCIA','OK',`total=${totalMs} ms · IA=${modelMs} ms · espera estado tras IA=${stateWaitMs} ms · datos=${toolMs} ms · narración excepcional=${narrationMs} ms · llamadas IA=${calls} · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu VNext',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:tables.filter(Boolean).slice(0,8),files:[],provider:'zuzu-vnext-p19-contract-continuity-plan-fast',model,interactionId:nextInteractionId,conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P1.9 · open-world · typed contracts · reversible table view · negative/compound payment continuity · grounded Plan B detail · draft-safe UI · parallel state · one-Interaction factual close',experimental:true,voiceConversation:!!voiceConversation,interactionId:nextInteractionId,resetInteractionId,spokenAnswer,resultContext,tools:[...new Set(results.map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:modelMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP11Agent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
@@ -17646,7 +17875,7 @@ export async function runZuzuVNextUserTurn(input={}){
   // La carga completa empieza ya y solo se espera si Gemini solicita una herramienta que la necesita.
   const statePromise=input?.stateOverride&&typeof input.stateOverride==='object'?Promise.resolve(input.stateOverride):getState({parallel:true});
   try{return await runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId:input?.selectedEventId,flowTrace,previousInteractionId:input?.previousInteractionId,conversationHistory:arr(input?.conversationHistory).slice(-40),voiceConversation:input?.voiceConversation===true,usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso,clientNowIso:input?.clientNowIso,clientLocalDateTime:input?.clientLocalDateTime,clientTimeZone:input?.clientTimeZone,externalSignal:input?.externalSignal,conversationId:input?.conversationId});}
-  catch(error){zuzuTracePush(flowTrace,'VNEXT P1.7 · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu sigue contigo',answer:'No he podido cerrar esa consulta de datos, pero la conversación sigue viva. Dímelo de otra forma o concreta el dato y continúo desde aquí.',spokenAnswer:'No he podido cerrar ese dato, pero seguimos. Dímelo de otra forma y continúo.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-p17-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P1.7 · soft failure conversacional',experimental:true,resetInteractionId:true,debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
+  catch(error){zuzuTracePush(flowTrace,'VNEXT P1.9 · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu sigue contigo',answer:'No he podido cerrar esa consulta de datos, pero la conversación sigue viva. Dímelo de otra forma o concreta el dato y continúo desde aquí.',spokenAnswer:'No he podido cerrar ese dato, pero seguimos. Dímelo de otra forma y continúo.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-p19-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P1.9 · soft failure conversacional',experimental:true,resetInteractionId:true,debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
 }
 
 async function runZuzuV62NativeToolAgent({userPrompt,state,selectedEventId,flowTrace=[],conversationHistory=[],conversationDigest='',voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null}){
@@ -23176,6 +23405,13 @@ export async function planificacionInicialZuzu({ mode, modelEventId, content, ti
 
 // Exportaciones de prueba estructural. No se usan por la interfaz ni exponen datos por HTTP.
 export const __zuzuStructuralTesting = Object.freeze({
+  vnextP18StoreMentionEntries,
+  vnextP18StoreMutations,
+  vnextP18RepairPurchaseView,
+  vnextP18ApplyColumnView,
+  vnextP18IsPurchaseTableContinuation,
+  vnextP16NormalizeDataArgs,
+  vnextP1ResolveEventName,
   v73TurnTool,
   v73CommandTools,
   v73CommandCallToRaw,
