@@ -7,7 +7,7 @@
 
   const ITV_CONTRACT_VERSION=4;
   const ITV_BUILD='20260828-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE';
-  const ITV_LANGUAGE_BUILD='20260830-P114-ITV-TRUSTED-ORACLE-MANIFEST-VNEXT-NHC';
+  const ITV_LANGUAGE_BUILD='20260831-P115-ITV-DECISION-MAP-VNEXT-NHC';
   const ITV_OBSERVATION_MODE=false;
   window.__CE_ZUZU_ITV_BUILD__=ITV_BUILD;
   window.__CE_ZUZU_ITV_CONTRACT_VERSION__=ITV_CONTRACT_VERSION;
@@ -23,6 +23,13 @@
   function stableObject(v){if(Array.isArray(v))return v.map(stableObject);if(v&&typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>o[k]=stableObject(v[k]));return o;}return v;}
   function manifestHash(v){const raw=JSON.stringify(stableObject(v||{}));let h=2166136261>>>0;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(16).padStart(8,'0');}
   function percentile(values,p){const a=values.map(num).filter(v=>v>0).sort((x,y)=>x-y);if(!a.length)return 0;const i=(a.length-1)*p,lo=Math.floor(i),hi=Math.min(a.length-1,lo+1),f=i-lo;return Math.round(a[lo]*(1-f)+a[hi]*f);}
+
+  function diagnosisSummary(list=[]){
+    const byCategory={},byTouch={};
+    for(const r of list){const d=r?.decisionDiagnosis;if(!d)continue;const c=trim(d.category)||'INDETERMINATE',t=trim(d.touch)||'REVISAR';byCategory[c]=(byCategory[c]||0)+1;byTouch[t]=(byTouch[t]||0)+1;}
+    return{byCategory,byTouch,total:Object.values(byCategory).reduce((a,b)=>a+b,0)};
+  }
+  function diagnosisText(ds={}){const e=Object.entries(ds?.byCategory||{}).filter(([,v])=>num(v)>0).sort((a,b)=>b[1]-a[1]);return e.map(([k,v])=>`${k} ${v}`).join(' · ');}
   function performanceSummary(list=[]){const a=list.filter(r=>num(r?.durationMs)>0),dur=a.map(r=>num(r.durationMs)),calls=a.map(r=>num(r?.usage?.calls)),tokens=a.map(r=>num(r?.usage?.tokens)),cost=a.map(r=>num(r?.usage?.costEur));const avg=x=>x.length?x.reduce((m,v)=>m+v,0)/x.length:0;return{cases:a.length,medianMs:percentile(dur,.5),p90Ms:percentile(dur,.9),p95Ms:percentile(dur,.95),maxMs:dur.length?Math.max(...dur):0,avgCalls:Number(avg(calls).toFixed(2)),avgTokens:Math.round(avg(tokens)),avgCostEur:Number(avg(cost).toFixed(6)),over12s:dur.filter(x=>x>12000).length,over18s:dur.filter(x=>x>18000).length};}
   const MODES=['FAST','AI-SMOKE','FULL-CERT'];
   const HISTORY_KEY='controlevent_v1_0_exp_zuzu_test_history';
@@ -113,7 +120,7 @@
       .zt-progress-area{padding:6px 9px;border-bottom:1px solid #e2e8f0;background:#fff;flex:0 0 auto}.zt-progress-head{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.zt-progress{height:8px;background:#e2e8f0;border-radius:999px;overflow:hidden}.zt-progress>div{height:100%;width:0;background:linear-gradient(90deg,#0284c7,#22c55e);transition:width .15s}.zt-phase{font-size:10px;font-weight:900;color:#334155;min-height:14px}.zt-live{font-size:9px;color:#64748b;font-weight:850;margin-top:2px;min-height:11px}.zt-stats{display:grid;grid-template-columns:repeat(7,minmax(72px,1fr));gap:5px;margin-top:5px}.zt-stat{min-width:0;border:1px solid #e2e8f0;border-radius:8px;padding:4px 6px;background:#f8fafc;display:flex;align-items:baseline;gap:5px}.zt-stat b{display:block;font-size:13px}.zt-stat span{font-size:8px;color:#64748b;font-weight:850;white-space:nowrap}.zt-stat.ok b{color:#15803d}.zt-stat.ko b{color:#b91c1c}.zt-stat.warn b{color:#c2410c}.zt-stat.cost b{color:#7c3aed}
       .zt-filters{display:flex;gap:4px;flex-wrap:wrap;padding:4px 9px;background:#f8fafc;border-bottom:1px solid #e2e8f0;flex:0 0 auto}.zt-filter{height:24px!important;min-height:24px!important;border:1px solid #cbd5e1!important;background:#fff!important;color:#0f172a!important;-webkit-text-fill-color:#0f172a!important;border-radius:999px!important;padding:0 8px!important;font-size:9px!important;font-weight:900!important;cursor:pointer!important}.zt-filter.active{background:#0f172a!important;color:#fff!important;-webkit-text-fill-color:#fff!important;border-color:#0f172a!important}
       .zt-results{flex:1 1 auto;min-height:0!important;overflow:auto!important;padding:6px 9px;background:#f8fafc;position:relative!important;z-index:1!important}.zt-row{display:grid;grid-template-columns:58px 116px minmax(220px,1.05fr) minmax(220px,.95fr) minmax(280px,1.45fr) 78px;gap:7px;align-items:start;border:1px solid #e2e8f0;border-left:5px solid #94a3b8;border-radius:10px;background:#fff;padding:7px 8px;margin-bottom:6px;font-size:11px}.zt-row.OK{border-left-color:#22c55e}.zt-row.KO{border-left-color:#ef4444;background:#fff7f7}.zt-row.WARN{border-left-color:#f59e0b;background:#fffaf0}.zt-status{font-weight:950}.zt-row.OK .zt-status{color:#15803d}.zt-row.KO .zt-status{color:#b91c1c}.zt-row.WARN .zt-status{color:#b45309}.zt-cell b{display:block;margin-bottom:2px}.zt-cell span{color:#475569;white-space:pre-wrap;overflow-wrap:anywhere}.zt-ms{text-align:right;color:#64748b;font-weight:800;white-space:pre-line}.zt-empty{padding:34px;text-align:center;color:#64748b;font-weight:850}
-      .zt-foot{display:flex;align-items:center;gap:8px;padding:5px 9px;border-top:1px solid #e2e8f0;background:#fff;flex:0 0 auto}.zt-cert{font-weight:950}.zt-cert.good{color:#15803d}.zt-cert.warn{color:#b45309}.zt-cert.bad{color:#b91c1c}.zt-history{margin-left:auto;font-size:10px;color:#64748b;font-weight:800}
+      .zt-foot{display:flex;align-items:center;gap:8px;padding:5px 9px;border-top:1px solid #e2e8f0;background:#fff;flex:0 0 auto}.zt-cert{font-weight:950}.zt-cert.good{color:#15803d}.zt-cert.warn{color:#b45309}.zt-cert.bad{color:#b91c1c}.zt-diagnosis{font-size:10px;color:#334155;font-weight:850;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.zt-history{margin-left:auto;font-size:10px;color:#64748b;font-weight:800}
       @media(max-width:1180px){#ceZuzuTestOverlay{padding:6px!important}#ceZuzuTestOverlay .zt-modal{width:calc(100vw - 12px);height:calc(100vh - 12px)}.zt-top{grid-template-columns:1fr;max-height:46vh;overflow:auto!important}.zt-data{grid-template-columns:repeat(5,minmax(0,1fr))}.zt-history-grid{grid-template-columns:minmax(0,1fr) auto auto auto}.zt-run-controls{grid-template-columns:repeat(3,minmax(0,1fr))}.zt-row{grid-template-columns:55px 90px 1fr}.zt-row .zt-expected,.zt-row .zt-actual{grid-column:3}.zt-ms{grid-column:1}.zt-modes{grid-template-columns:1fr}.zt-language-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.zt-head .zt-sub{display:none}}
     `;document.head.appendChild(s);
   }
@@ -167,7 +174,7 @@
     </div>
     <div class="zt-progress-area"><div class="zt-progress-head"><div class="zt-phase" id="ztPhase">Preparado.</div><b id="ztPct">0%</b></div><div class="zt-progress"><div id="ztBar"></div></div><div class="zt-live" id="ztLive"></div><div class="zt-stats"><div class="zt-stat"><b id="ztDone">0/0</b><span>PROGRESO</span></div><div class="zt-stat ok"><b id="ztOk">0</b><span>OK</span></div><div class="zt-stat warn"><b id="ztWarn">0</b><span>AVISOS</span></div><div class="zt-stat ko"><b id="ztKo">0</b><span>KO</span></div><div class="zt-stat"><b id="ztCalls">0</b><span>LLAMADAS IA</span></div><div class="zt-stat"><b id="ztTokens">0</b><span>TOKENS</span></div><div class="zt-stat cost"><b id="ztCost">0,00 €</b><span>COSTE</span></div></div></div>
     <div class="zt-filters" id="ztFilters"></div><div class="zt-results" id="ztResults"><div class="zt-empty">Pulsa INICIAR. Al terminar puedes pasar al siguiente chequeo sin cerrar esta ventana.</div></div>
-    <div class="zt-foot"><span id="ztCert" class="zt-cert">Sin ejecutar.</span><span class="zt-history" id="ztHistory"></span></div>
+    <div class="zt-foot"><span id="ztCert" class="zt-cert">Sin ejecutar.</span><span id="ztDiagnosis" class="zt-diagnosis"></span><span class="zt-history" id="ztHistory"></span></div>
   </div></div>`;}
 
 
@@ -448,7 +455,7 @@
       }
       const aborted=stopRequested||currentAbort.signal.aborted,incomplete=done<total;
       const auditValidity=auditRunManifest(activeRunExpectedCases,rows,done);
-      lastSummary={type:'summary',mode:lastMode,done,total,ok,warn,ko,costEur,calls,tokens,aborted,incomplete,budgetStopped,contextWarmups,contextWarmupFailures,finishedAt:new Date().toISOString(),certified:!aborted&&!incomplete&&ko===0&&auditValidity.valid,observationMode:'ORACLE_ACTIVE',oracleEnabled:true,performance:performanceSummary(rows),auditValidity};
+      lastSummary={type:'summary',mode:lastMode,done,total,ok,warn,ko,costEur,calls,tokens,aborted,incomplete,budgetStopped,contextWarmups,contextWarmupFailures,finishedAt:new Date().toISOString(),certified:!aborted&&!incomplete&&ko===0&&auditValidity.valid,observationMode:'ORACLE_ACTIVE',oracleEnabled:true,performance:performanceSummary(rows),diagnosis:diagnosisSummary(rows),auditValidity};
       updateProgress(lastSummary);releaseControls();finish(lastSummary);
     }catch(e){if(stopRequested||e.name==='AbortError')setPhase('Prueba detenida. Puedes continuar con otro chequeo sin cerrar la ventana.');else setPhase('Error de ejecución: '+(e.message||e),true);}
     finally{currentFetchAbort=null;currentCaseCancel=null;currentAbort=null;releaseControls();cacheCurrent();currentCase=null;}
@@ -474,6 +481,7 @@
     if(!auditValid){cert.textContent='⚫ INFORME NO VÁLIDO · MANIFIESTO ≠ RESULTADOS';cert.className='zt-cert bad';return;}
     if(s.aborted){cert.textContent='⏹ ITV DETENIDA';cert.className='zt-cert bad';}else if(errors){cert.textContent=`🔴 ${fmtN(errors)} KO · ORÁCULO ACTIVO`;cert.className='zt-cert bad';}else if(incomplete){cert.textContent=`🟠 ITV INCOMPLETA · ${fmtN(s.done)}/${fmtN(s.total)} · ORÁCULO ACTIVO`;cert.className='zt-cert warn';}else if(warns){cert.textContent=`🟠 SIN KO · ${fmtN(warns)} AVISOS · ORÁCULO ACTIVO`;cert.className='zt-cert warn';}else{cert.textContent=`🟢 CERTIFICADA · ${fmtN(s.done)} CASOS · ORÁCULO ACTIVO`;cert.className='zt-cert good';}
     if(isLanguage&&!s.aborted){cert.textContent=`🧭 ${manifest?.languageProfile?.label||'LENGUAJE'} · COBERTURA OK ${coverage}% · ${fmtN(s.ok)}/${fmtN(s.done)} · ${fmtN(errors)} KO · ${fmtN(warns)} avisos`;cert.className='zt-cert '+(coverage>=90?'good':coverage>=50?'warn':'bad');}
+    const diag=$('ztDiagnosis'),ds=s?.diagnosis||diagnosisSummary(rows);if(diag)diag.textContent=ds?.total?`MAPA DE DECISIÓN · ${diagnosisText(ds)}`:'';
   }
 
   function setRetryState(){const b=$('ztRetry');if(b)b.style.display='none';}
@@ -481,17 +489,18 @@
 
   function modelBadge(u={}){const models=Array.isArray(u.models)?u.models:[],attempted=Array.isArray(u.attemptedModels)?u.attemptedModels:[];const actual=models.length?models:attempted.slice(-1);if(!actual.length)return'';const short=m=>/flash-lite/i.test(m)?'LITE':/(?:^|-)flash(?:$|-)/i.test(m)?'FLASH':m;const label=[...new Set(actual.map(short))].join(' + ');const route=attempted.length>1?` · intentos ${attempted.map(short).join(' → ')}`:'';return`Modelo IA: ${label}${route}`;}
   function rowHtml(r){const mb=r.usage?modelBadge(r.usage):'',reasons=Array.isArray(r.validationReasons)&&r.validationReasons.length?`<span>
-Oráculo: ${esc(r.validationReasons.join(' | '))}</span>`:'',pf=r.performance||{},phase=(num(pf.compileMs)||num(pf.executeMs)||num(pf.presentMs))?`
-C/E/P ${fmtN(pf.compileMs||0)}/${fmtN(pf.executeMs||0)}/${fmtN(pf.presentMs||0)} ms${pf.fastLocal?' · cierre local':''}`:'';return `<div class="zt-row ${esc(r.status)}" data-status="${esc(r.status)}" data-group="${esc(r.group)}"><div class="zt-status">${esc(r.status)}</div><div class="zt-cell"><b>${esc(r.group)}</b><span>${esc(r.id)}</span></div><div class="zt-cell"><b>${esc(r.label)}</b><span>${esc(r.prompt||'')}</span></div><div class="zt-cell zt-expected"><b>Oráculo / referencia esperada</b><span>${esc(r.expected||'')}</span>${reasons}</div><div class="zt-cell zt-actual"><b>Obtenido</b><span>${esc(r.actual||'')}</span>${r.tools?.length?`<span>
+Oráculo: ${esc(r.validationReasons.join(' | '))}</span>`:'',diag=r?.decisionDiagnosis?`<span>
+Diagnóstico: ${esc(r.decisionDiagnosis.category||'INDETERMINATE')} · tocar: ${esc(r.decisionDiagnosis.touch||'REVISAR')} · ${esc(r.decisionDiagnosis.reason||'')}</span><span>Contrato esperado/observado: ${esc(r.decisionDiagnosis.expectedCapability||'—')} → ${esc(r.decisionDiagnosis.observedCapability||'—')}</span>`:'',pf=r.performance||{},phase=(num(pf.compileMs)||num(pf.executeMs)||num(pf.presentMs))?`
+C/E/P ${fmtN(pf.compileMs||0)}/${fmtN(pf.executeMs||0)}/${fmtN(pf.presentMs||0)} ms${pf.fastLocal?' · cierre local':''}`:'';return `<div class="zt-row ${esc(r.status)}" data-status="${esc(r.status)}" data-group="${esc(r.group)}" data-diagnosis="${esc(r?.decisionDiagnosis?.category||'')}"><div class="zt-status">${esc(r.status)}</div><div class="zt-cell"><b>${esc(r.group)}</b><span>${esc(r.id)}</span></div><div class="zt-cell"><b>${esc(r.label)}</b><span>${esc(r.prompt||'')}</span></div><div class="zt-cell zt-expected"><b>Oráculo / referencia esperada</b><span>${esc(r.expected||'')}</span>${reasons}${diag}</div><div class="zt-cell zt-actual"><b>Obtenido</b><span>${esc(r.actual||'')}</span>${r.tools?.length?`<span>
 Herramientas: ${esc(r.tools.join(', '))}</span>`:''}${mb?`<span>
 ${esc(mb)}</span>`:''}${r.usage?.fallbackReason?`<span>
 Fallback: ${esc(r.usage.fallbackReason)}</span>`:''}</div><div class="zt-ms">${fmtN(r.durationMs)} ms${r.usage?`
 ${fmtE(r.usage.costEur)} · ${fmtN(r.usage.calls)} IA · ${fmtN(r.usage.tokens)} tok`:''}${phase}</div></div>`;}
 
   function appendRow(r){const box=$('ztResults');if(rows.length===1)box.innerHTML='';box.insertAdjacentHTML('beforeend',rowHtml(r));applyFilter();box.scrollTop=box.scrollHeight;}
-  function groups(){return ['TODOS','OK','WARN','KO',...Array.from(new Set(rows.map(r=>r.group).filter(Boolean)))];}
+  function groups(){return ['TODOS','OK','WARN','KO',...Array.from(new Set(rows.map(r=>r?.decisionDiagnosis?.category).filter(Boolean))),...Array.from(new Set(rows.map(r=>r.group).filter(Boolean)))];}
   function renderFilters(){if(!$('ztFilters'))return;$('ztFilters').innerHTML=groups().map(g=>`<button class="zt-filter ${activeFilter===g?'active':''}" data-f="${esc(g)}">${esc(g)}${['OK','WARN','KO'].includes(g)?` (${rows.filter(r=>r.status===g).length})`:''}</button>`).join('');$('ztFilters').querySelectorAll('button').forEach(b=>b.onclick=()=>{activeFilter=b.dataset.f;renderFilters();applyFilter();});}
-  function applyFilter(){document.querySelectorAll('#ztResults .zt-row').forEach(el=>{const show=activeFilter==='TODOS'||(['OK','WARN','KO'].includes(activeFilter)&&el.dataset.status===activeFilter)||el.dataset.group===activeFilter;el.style.display=show?'grid':'none';});}
+  function applyFilter(){document.querySelectorAll('#ztResults .zt-row').forEach(el=>{const show=activeFilter==='TODOS'||(['OK','WARN','KO'].includes(activeFilter)&&el.dataset.status===activeFilter)||el.dataset.diagnosis===activeFilter||el.dataset.group===activeFilter;el.style.display=show?'grid':'none';});}
 
   async function saveServerRun(){
     const executed=modeManifests[lastMode]||preview;if(!executed||!batterySeed||!currentRunKey||!isGD())return;

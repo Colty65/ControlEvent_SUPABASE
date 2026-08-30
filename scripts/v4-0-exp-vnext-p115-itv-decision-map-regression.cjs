@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path');
+const root=path.resolve(__dirname,'..');
+const lab=fs.readFileSync(path.join(root,'services/zuzu-test-lab.service.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'public/app/features/zuzu-test-console-gd.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+let ok=0,ko=0;const t=(n,c)=>{if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}};
+t('clasificador de capas existe',lab.includes('function itvDecisionDiagnosis')&&lab.includes('decisionDiagnosis:diagnosis'));
+t('categorías mapa de decisión',lab.includes("GAP:'CAPABILITY_GAP'")&&lab.includes("GEMINI:'GEMINI_GUIDANCE'")&&lab.includes("CE:'CE_DATA_CONTRACT'")&&lab.includes("PRESENT:'DERIVATION_PRESENTATION'"));
+t('gap se decide por oráculo estructurado, no por prompt',lab.includes("['events-overview','store-purchases','documentation','management'].includes(kind)"));
+t('persona ingreso usa capacidad general existente',lab.includes("'person-income':['query_ce','person_profile']"));
+t('comparativa derivada se separa de obtención',lab.includes("['compare-metric','purchase-max','purchase-sum'].includes(kind)"));
+t('continuidad y tabla tienen capa propia',lab.includes("group.includes('continuidad')||group.includes('tabla')"));
+t('UI agrega diagnóstico',ui.includes('function diagnosisSummary')&&ui.includes('MAPA DE DECISIÓN'));
+t('fila enseña contrato esperado/observado',ui.includes('Contrato esperado/observado'));
+t('filtro permite categoría diagnóstica',ui.includes('data-diagnosis')&&ui.includes('el.dataset.diagnosis===activeFilter'));
+t('build P1.15',ui.includes('20260831-P115-ITV-DECISION-MAP-VNEXT-NHC'));
+t('cache bust P1.15',html.includes('20260831-VNEXT-P115-ITV-DECISION-MAP-LANG260-NHC'));
+console.log(`RESULTADO ${ok}/${ok+ko}`);process.exitCode=ko?1:0;

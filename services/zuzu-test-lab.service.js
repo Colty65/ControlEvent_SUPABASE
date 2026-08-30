@@ -170,8 +170,57 @@ function vNextAuditOf(result={}){
     tools:arr(result?.meta?.tools).map(trim).filter(Boolean),warnings:arr(result?.warnings).map(trim).filter(Boolean)
   };
 }
-function observedOutcome(c,result,usage={},extra={}){const verdict=validatePaidCase(c,result);const vnext=trim(c?.engine).toUpperCase()==='VNEXT';return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:verdict.status,validationReasons:verdict.reasons,usage,performance:result?.meta?.performance||{},tools:arr(result?.meta?.tools),engine:vnext?'VNEXT':'LEDGER',provider:text(result?.provider),architecture:text(result?.meta?.architecture),oracleEnabled:true,observationMode:'ORACLE_ACTIVE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),resultContext:(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:null,vnextAudit:vnext?vNextAuditOf(result):null,debugTrace:arr(result?.meta?.debugTrace).slice(0,60),...ledgerAuditOf(result),...extra};}
-function technicalErrorOutcome(c,message,usage={},extra={}){return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(message),status:'KO',validationReasons:['fallo técnico/timeout'],usage,oracleEnabled:true,observationMode:'ORACLE_ACTIVE',...extra};}
+// P1.15 · MAPA DE DECISIÓN ITV -------------------------------------------------
+// Clasifica la CAPA probable a tocar usando contratos/oráculos estructurados.
+// NHC: no interpreta palabras del usuario ni añade sinónimos al runtime de Zuzu.
+const ITV_DIAG={
+  OK:'OK', ITV:'ITV', GAP:'CAPABILITY_GAP', CONT:'CONTINUITY', GEMINI:'GEMINI_GUIDANCE',
+  CE:'CE_DATA_CONTRACT', PRESENT:'DERIVATION_PRESENTATION', TECH:'TECHNICAL', UNKNOWN:'INDETERMINATE'
+};
+function itvCapabilityExpectation(c={}){
+  const o=c?.oracle||{},kind=trim(o?.kind),group=norm(c?.group);
+  const direct={
+    'event-summary':['query_ce','event_summary'],'event-economy':['query_ce','event_summary'],'event-metric':['query_ce','event_summary'],
+    'purchase-set':['query_ce','event_purchases'],'purchase-max':['query_ce','event_purchases'],'purchase-sum':['query_ce','event_purchases'],
+    'attendance':['query_ce','event_attendance'],'donations':['query_ce','event_donations'],'bank-summary':['query_ce','event_bank'],
+    'person-summary':['query_ce','person_profile'],'person-events':['query_ce','person_events'],'person-income':['query_ce','person_profile'],
+    'catalog-count':['query_ce',trim(o?.entity)==='events'?'events_catalog':'people_catalog'],'canonical-socios':['query_ce','people_catalog'],
+    'comparison':['query_ce','compare_events'],'compare-metric':['query_ce','compare_events']
+  };
+  if(kind==='ledger-structural')return{available:true,tool:'query_ce',operation:trim(o?.domain)==='purchases'?'event_purchases':'',kind};
+  // Estas familias tienen datos/oráculo en ITV, pero VNext no dispone hoy de un contrato
+  // estructurado equivalente que entregue exactamente esa visión global.
+  if(['events-overview','store-purchases','documentation','management'].includes(kind))return{available:false,tool:'',operation:'',kind,reason:`falta contrato general para ${kind}`};
+  const pair=direct[kind];if(pair)return{available:true,tool:pair[0],operation:pair[1],kind};
+  return{available:null,tool:'',operation:'',kind,reason:'oráculo sin mapeo de capacidad'};
+}
+function itvObservedCapability(result={}){
+  const a=vNextAuditOf(result),tools=arr(a.tools),tool=tools.includes('query_ce')?'query_ce':tools.includes('search_documents')?'search_documents':tools.includes('recall_memory')?'recall_memory':tools.includes('resolve_entity')?'resolve_entity':trim(tools[0]);
+  return{tool,operation:trim(a.operation),event:trim(a.event),person:trim(a.person),warnings:arr(a.warnings),audit:a};
+}
+function itvCapabilitySignature(x={}){return[trim(x.tool)||'—',trim(x.operation)||'—'].join(':');}
+function itvDecisionDiagnosis(c={},result={},verdict={status:'KO',reasons:[]}){
+  const expected=itvCapabilityExpectation(c),observed=itvObservedCapability(result),reasons=arr(verdict?.reasons),status=trim(verdict?.status),group=norm(c?.group),kind=trim(c?.oracle?.kind);
+  const base={category:ITV_DIAG.UNKNOWN,touch:'REVISAR',confidence:'media',expectedCapability:itvCapabilitySignature(expected),observedCapability:itvCapabilitySignature(observed),reason:'No hay evidencia suficiente para asignar una capa única.'};
+  if(status==='OK')return{...base,category:ITV_DIAG.OK,touch:'NINGUNO',confidence:'alta',reason:'Oráculo y ejecución compatibles.'};
+  if(status==='WARN'&&reasons.length&&reasons.every(x=>/^ITV VNext:/i.test(trim(x))))return{...base,category:ITV_DIAG.ITV,touch:'ITV',confidence:'alta',reason:'La ejecución parece correcta pero ITV todavía no puede certificar estructuralmente el efecto.'};
+  if(expected.available===false)return{...base,category:ITV_DIAG.GAP,touch:'SOFTWARE CE · NUEVA CAPACIDAD',confidence:'alta',reason:expected.reason};
+  const technical=arr(result?.warnings).some(x=>/timeout|error t[eé]cnico|fallo t[eé]cnico/i.test(trim(x)))||reasons.some(x=>/fallo t[eé]cnico|timeout/i.test(trim(x)));
+  if(technical)return{...base,category:ITV_DIAG.TECH,touch:'SOFTWARE CE/INFRA',confidence:'alta',reason:'Fallo técnico independiente de la elección semántica.'};
+  const opExpected=trim(expected.operation),opObserved=trim(observed.operation);
+  if(expected.available===true&&opExpected&&opObserved!==opExpected){
+    if(group.includes('continuidad')||group.includes('tabla'))return{...base,category:ITV_DIAG.CONT,touch:'SOFTWARE CONTEXTO + AYUDA GEMINI',confidence:'alta',reason:`La capacidad existe (${opExpected}) pero el turno no conserva/materializa ese contrato.`};
+    return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'alta',reason:`La capacidad existe (${opExpected}) pero se eligió/materializó ${opObserved||'ninguna'}.`};
+  }
+  // Operación correcta pero el cierre no responde una derivación solicitada.
+  if(['compare-metric','purchase-max','purchase-sum'].includes(kind)||arr(c?.oracle?.requiredMetrics).length>1)return{...base,category:ITV_DIAG.PRESENT,touch:'SOFTWARE CE · DERIVACIÓN/PRESENTACIÓN',confidence:'alta',reason:'El contrato de datos es correcto; falta transformar o expresar el resultado pedido.'};
+  if(kind==='ledger-structural'&&status==='WARN')return{...base,category:ITV_DIAG.ITV,touch:'ITV',confidence:'alta',reason:'El efecto de vista no está suficientemente expuesto al laboratorio.'};
+  if(expected.available===true&&opExpected&&opObserved===opExpected)return{...base,category:ITV_DIAG.CE,touch:'SOFTWARE CE / CONTRATO / DATOS',confidence:'media-alta',reason:'Gemini llegó al contrato esperado; el desacuerdo aparece en ejecución, semántica del contrato o datos devueltos.'};
+  if(expected.available===true&&!opExpected&&observed.tool!==expected.tool)return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'media',reason:'Existe herramienta adecuada pero no se materializó.'};
+  return base;
+}
+function observedOutcome(c,result,usage={},extra={}){const verdict=validatePaidCase(c,result);const vnext=trim(c?.engine).toUpperCase()==='VNEXT';const diagnosis=vnext?itvDecisionDiagnosis(c,result,verdict):null;return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:verdict.status,validationReasons:verdict.reasons,usage,performance:result?.meta?.performance||{},tools:arr(result?.meta?.tools),engine:vnext?'VNEXT':'LEDGER',provider:text(result?.provider),architecture:text(result?.meta?.architecture),oracleEnabled:true,observationMode:'ORACLE_ACTIVE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),resultContext:(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:null,vnextAudit:vnext?vNextAuditOf(result):null,decisionDiagnosis:diagnosis,debugTrace:arr(result?.meta?.debugTrace).slice(0,60),...ledgerAuditOf(result),...extra};}
+function technicalErrorOutcome(c,message,usage={},extra={}){return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(message),status:'KO',validationReasons:['fallo técnico/timeout'],usage,oracleEnabled:true,observationMode:'ORACLE_ACTIVE',decisionDiagnosis:{category:ITV_DIAG.TECH,touch:'SOFTWARE CE/INFRA',confidence:'alta',expectedCapability:itvCapabilitySignature(itvCapabilityExpectation(c)),observedCapability:'—:—',reason:'Fallo técnico/timeout antes de disponer de una ejecución certificable.'},...extra};}
 
 // FIX2.10 · ORÁCULO FUERTE -----------------------------------------------------
 // La ITV no debe aprobar una respuesta solo porque conserve la entidad correcta.
