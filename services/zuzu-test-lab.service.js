@@ -920,6 +920,240 @@ const TPL={
   attendanceFollow:['¿Y cuántas personas fueron en total?','Dame solo el total de asistentes.','¿Cuánta gente consta finalmente?','Resúmeme la asistencia en una cifra.']
 };
 
+
+
+// VNext P1.11 · ITV ALCANCE DE LENGUAJE -------------------------------------
+// Estas baterías son DATOS DE PRUEBA, no reglas del runtime. NHC: ninguna frase
+// de aquí se usa para interpretar al usuario ni para decidir qué ejecuta CE.
+// La única misión es lanzar lenguaje cada vez más abierto por la MISMA tubería
+// real de Zuzu y observar PLAN -> CE -> respuesta con oráculo/ledger.
+const LANGUAGE_REACH_PROFILES={
+  BASIC:{id:'BASIC',label:'BÁSICA',count:50,expectedBand:'95–100%',description:'Preguntas simples, explícitas y de un solo objetivo.'},
+  MEDIUM:{id:'MEDIUM',label:'MEDIA',count:60,expectedBand:'≈90%',description:'Continuidad corta, comparaciones, varias acciones y referencias naturales.'},
+  HARD:{id:'HARD',label:'DIFÍCIL',count:70,expectedBand:'<50% de partida',description:'Composición, cambios de foco, tablas, gráficas, elipsis y lenguaje ruidoso.'},
+  EXTREME:{id:'EXTREME',label:'EXTREMA',count:80,expectedBand:'<25% de partida',description:'Peticiones abiertas, derivaciones, cruces y capacidades todavía no garantizadas.'}
+};
+function normalizeLanguageLevel(raw='BASIC'){
+  const n=norm(raw).replace(/\s+/g,'');
+  if(['basic','basica','facil','50'].includes(n))return'BASIC';
+  if(['medium','media','intermedia','60'].includes(n))return'MEDIUM';
+  if(['hard','dificil','dificil70','70'].includes(n))return'HARD';
+  if(['extreme','extrema','imposible','80'].includes(n))return'EXTREME';
+  return'BASIC';
+}
+function languageActiveEvent(events=[]){
+  return arr(events).find(e=>/en\s+curso|activo|abierto/.test(norm(e?.estado||e?.situacion||e?.status)))||arr(events)[0]||null;
+}
+function languageEventAt(events=[],i=0){const a=arr(events);return a.length?a[Math.abs(i)%a.length]:null;}
+function languagePersonAt(people=[],i=0){const a=arr(people);return a.length?a[Math.abs(i)%a.length]:null;}
+function languageStoreAt(stores=[],i=0){const a=arr(stores);return a.length?a[Math.abs(i)%a.length]:null;}
+function languageCase({level,index,group,label,prompt,scenario,event='',events=[],person='',oracle=null,expected='',requireAnswer=true}){
+  return{id:`lang-${level.toLowerCase()}-${String(index+1).padStart(3,'0')}`,group,label,prompt,scenario,event,events,person,oracle,expected:trim(expected)||expectedOracleText(oracle)||'Debe resolver la petición con datos reales y sin inventar hechos.',requireAnswer};
+}
+function languageLedger(extra={}){return{kind:'ledger-structural',...extra};}
+
+async function buildLanguageReachCases(state,rawLevel='BASIC',seed=1){
+  const level=normalizeLanguageLevel(rawLevel),profile=LANGUAGE_REACH_PROFILES[level];
+  const chosen=chooseEvents(state,seed),events=arr(chosen.events),people=choosePeople(state,seed).people,stores=shuffled(arr(state?.tiendas).filter(x=>trim(x?.nombre)),seed,'lang-stores');
+  const active=languageActiveEvent(events),activeName=eventName(active),catalogs=['events','people','products','stores'];
+  const eventCache=new Map(),docsCache=new Map(),bankCache=new Map(),mgmtCache=new Map(),donCache=new Map(),personCache=new Map(),compareCache=new Map(),storeCache=new Map();
+  const eventData=async en=>{const k=norm(en);if(!eventCache.has(k))eventCache.set(k,await eventOracle(state,en));return eventCache.get(k);};
+  const docsData=async en=>{const k=norm(en);if(!docsCache.has(k))docsCache.set(k,await documentationOracle(state,en));return docsCache.get(k);};
+  const bankData=async en=>{const k=norm(en);if(!bankCache.has(k))bankCache.set(k,await bankOracle(state,en));return bankCache.get(k);};
+  const mgmtData=async en=>{const k=norm(en);if(!mgmtCache.has(k))mgmtCache.set(k,await managementOracle(state,en));return mgmtCache.get(k);};
+  const donData=async en=>{const k=norm(en);if(!donCache.has(k))donCache.set(k,await donationOracle(state,en));return donCache.get(k);};
+  const personData=async pn=>{const k=norm(pn);if(!personCache.has(k))personCache.set(k,await personOracle(state,pn));return personCache.get(k);};
+  const compareData=async names=>{const k=arr(names).map(norm).join('|');if(!compareCache.has(k))compareCache.set(k,await comparisonOracle(state,names));return compareCache.get(k);};
+  const storeData=async sn=>{const k=norm(sn);if(!storeCache.has(k))storeCache.set(k,await storePurchasesOracle(state,sn));return storeCache.get(k);};
+  const out=[];
+  const add=async spec=>{if(out.length>=profile.count)return;out.push(languageCase({level,index:out.length,...spec}));};
+  const eName=i=>eventName(languageEventAt(events,i))||activeName||'el evento activo';
+  const pName=i=>personName(languagePersonAt(people,i))||'una persona registrada';
+  const sName=i=>trim(languageStoreAt(stores,i)?.nombre)||'una tienda registrada';
+  const evOracle=async(en,kind='event-summary')=>{const d=await eventData(en);return d?{kind,event:en,data:d}:null;};
+
+  if(level==='BASIC'){
+    const eventPhrases=[
+      en=>`Háblame de ${en}.`,en=>`Dame los datos clave de ${en}.`,en=>`¿Cómo quedó ${en}?`,en=>`Repásame ${en}.`,en=>`Cuéntame lo importante de ${en}.`
+    ];
+    for(let i=0;i<profile.count;i++){
+      const en=eName(i),pn=pName(i),sn=sName(i),eo=await eventData(en),po=purchaseOracle(state,en),d=await donData(en),doc=await docsData(en),b=await bankData(en),m=await mgmtData(en),pp=await personData(pn),slot=i%16,scenario=`LANG BASIC ${String(i+1).padStart(2,'0')}`;
+      if(slot===0)await add({group:'BÁSICO · EVENTO',label:'Resumen explícito',prompt:eventPhrases[i%eventPhrases.length](en),scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null});
+      else if(slot===1)await add({group:'BÁSICO · INGRESOS',label:'Total de ingresos',prompt:`¿Cuánto se ingresó en ${en}?`,scenario,event:en,oracle:eo?{kind:'event-metric',event:en,label:'Ingresos',value:eo.income}:null});
+      else if(slot===2)await add({group:'BÁSICO · COMPRAS',label:'Compras del evento',prompt:`¿Qué compras hubo en ${en}?`,scenario,event:en,oracle:po?{kind:'purchase-set',event:en,productCount:po.productCount,total:po.total}:null});
+      else if(slot===3)await add({group:'BÁSICO · PTE.COMPRA',label:'Pendiente de compra',prompt:`¿Cuánto queda pendiente de compra en ${en}?`,scenario,event:en,oracle:eo?{kind:'event-metric',event:en,label:'Compras pendientes',value:eo.pending}:null});
+      else if(slot===4)await add({group:'BÁSICO · ASISTENCIA',label:'Asistencia total',prompt:`¿Cuánta gente asistió a ${en}?`,scenario,event:en,oracle:eo?{kind:'attendance',event:en,data:attendanceOracle(eo,en)}:null});
+      else if(slot===5)await add({group:'BÁSICO · DONACIONES',label:'Donaciones',prompt:`¿Qué donaciones hubo en ${en}?`,scenario,event:en,oracle:d?{kind:'donations',event:en,data:d}:null});
+      else if(slot===6)await add({group:'BÁSICO · DOCUMENTOS',label:'Documentación',prompt:`Revisa la documentación de ${en}.`,scenario,event:en,oracle:doc?{kind:'documentation',event:en,data:doc}:null});
+      else if(slot===7)await add({group:'BÁSICO · BANCO',label:'Cuadre banco',prompt:`Dame el Cuadre Banco de ${en}.`,scenario,event:en,oracle:b?{kind:'bank-summary',event:en,data:b}:null});
+      else if(slot===8)await add({group:'BÁSICO · GESTIÓN',label:'Hitos y LG',prompt:`¿Cómo van los hitos y tareas LG de ${en}?`,scenario,event:en,oracle:m?{kind:'management',event:en,data:m}:null});
+      else if(slot===9)await add({group:'BÁSICO · PERSONA',label:'Dossier personal',prompt:`Háblame de ${pn}.`,scenario,person:pn,oracle:pp?{kind:'person-summary',person:pn,data:pp}:null});
+      else if(slot===10)await add({group:'BÁSICO · PERSONA',label:'Eventos de una persona',prompt:`¿En qué eventos aparece ${pn}?`,scenario,person:pn,oracle:pp?{kind:'person-events',person:pn,data:pp}:null});
+      else if(slot===11)await add({group:'BÁSICO · PERSONA',label:'Ingresos de una persona',prompt:`¿Qué ingresos tiene vinculados ${pn}?`,scenario,person:pn,oracle:pp?{kind:'person-income',person:pn,total:pp.income,known:true}:null});
+      else if(slot===12){const ce=catalogs[i%catalogs.length],co=catalogOracle(state,ce);await add({group:'BÁSICO · CATÁLOGO',label:`Catálogo ${ce}`,prompt:`¿Cuántos ${ce==='events'?'eventos':ce==='people'?'personas':ce==='products'?'productos':'tiendas'} hay registrados?`,scenario,oracle:{kind:'catalog-count',...co}});}
+      else if(slot===13){const so=await storeData(sn);await add({group:'BÁSICO · TIENDA',label:'Compras por tienda',prompt:`¿Qué compras se han hecho en ${sn}?`,scenario,oracle:so?{kind:'store-purchases',...so}:null});}
+      else if(slot===14){const co=await canonicalSociosOracle(state);await add({group:'BÁSICO · SOCIOS',label:'Censo canónico',prompt:'Dame el censo de socios canónicos.',scenario,oracle:co?{kind:'canonical-socios',records:co.records,people:co.people}:null});}
+      else {const ov=await eventsOverviewOracle(state);await add({group:'BÁSICO · GLOBAL',label:'Panorama de eventos',prompt:'Dame un panorama económico de todos los eventos.',scenario,oracle:ov?{kind:'events-overview',count:ov.count}:null});}
+    }
+  }
+
+  if(level==='MEDIUM'){
+    // 20 bloques de 3 turnos. Cada bloque conserva conversationState; entre bloques se reinicia.
+    for(let block=0;block<20&&out.length<profile.count;block++){
+      const en=eName(block),en2=eName(block+1),pn=pName(block),pn2=pName(block+1),eo=await eventData(en),po=purchaseOracle(state,en),pp=await personData(pn),pp2=await personData(pn2),cmp=en2&&norm(en2)!==norm(en)?await compareData([en,en2]):null,doc=await docsData(en),don=await donData(en),scenario=`LANG MEDIA ${String(block+1).padStart(2,'0')}`;
+      const type=block%7;
+      if(type===0){
+        await add({group:'MEDIA · CONTINUIDAD EVENTO',label:'Abrir evento',prompt:`Sitúame en ${en}.`,scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null});
+        await add({group:'MEDIA · CONTINUIDAD EVENTO',label:'Seguimiento económico',prompt:'¿Y económicamente cómo quedó?',scenario,event:en,oracle:eo?{kind:'event-economy',event:en,data:eo}:null});
+        await add({group:'MEDIA · CONTINUIDAD EVENTO',label:'Seguimiento documental',prompt:'¿Y la documentación?',scenario,event:en,oracle:doc?{kind:'documentation',event:en,data:doc}:null});
+      }else if(type===1){
+        await add({group:'MEDIA · COMPRAS',label:'Lista de compras',prompt:`Sácame las compras de ${en}.`,scenario,event:en,oracle:po?{kind:'purchase-set',event:en,productCount:po.productCount,total:po.total}:null});
+        await add({group:'MEDIA · COMPRAS',label:'Máximo por referencia',prompt:'¿Cuál fue el producto más caro de esos?',scenario,event:en,oracle:po?{kind:'purchase-max',event:en,row:po.max}:null});
+        await add({group:'MEDIA · COMPRAS',label:'Suma del conjunto',prompt:'¿Y cuánto suman todos?',scenario,event:en,oracle:po?{kind:'purchase-sum',event:en,total:po.total}:null});
+      }else if(type===2){
+        await add({group:'MEDIA · PERSONA',label:'Abrir persona',prompt:`Hazme un resumen de ${pn}.`,scenario,person:pn,oracle:pp?{kind:'person-summary',person:pn,data:pp}:null});
+        await add({group:'MEDIA · PERSONA',label:'Eventos de esa persona',prompt:'¿En qué eventos aparece?',scenario,person:pn,oracle:pp?{kind:'person-events',person:pn,data:pp}:null});
+        await add({group:'MEDIA · PERSONA',label:'Ingresos de esa persona',prompt:'¿Y de ingresos qué tiene?',scenario,person:pn,oracle:pp?{kind:'person-income',person:pn,total:pp.income,known:true}:null});
+      }else if(type===3&&cmp){
+        await add({group:'MEDIA · COMPARACIÓN',label:'Comparar eventos',prompt:`Compara ${en} con ${en2}.`,scenario,events:[en,en2],oracle:{kind:'comparison',compare:cmp}});
+        await add({group:'MEDIA · COMPARACIÓN',label:'Ganador ingresos',prompt:'¿Cuál tuvo más ingresos?',scenario,events:[en,en2],oracle:{kind:'compare-metric',compare:cmp,metric:'income'}});
+        await add({group:'MEDIA · COMPARACIÓN',label:'Ganador compras',prompt:'¿Y cuál gastó más en compras?',scenario,events:[en,en2],oracle:{kind:'compare-metric',compare:cmp,metric:'purchases'}});
+      }else if(type===4){
+        await add({group:'MEDIA · DOS OBJETIVOS',label:'Ingresos y asistencia',prompt:`Dime cuánto se ingresó y cuánta gente asistió a ${en}.`,scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null});
+        await add({group:'MEDIA · DOS OBJETIVOS',label:'Añadir donaciones',prompt:'Añade ahora las donaciones al resumen.',scenario,event:en,oracle:don?{kind:'donations',event:en,data:don}:null});
+        await add({group:'MEDIA · DOS OBJETIVOS',label:'Volver al balance',prompt:'Vale, con eso dime cómo quedó el saldo operativo.',scenario,event:en,oracle:eo?{kind:'event-metric',event:en,label:'Saldo operativo',value:eo.balance}:null});
+      }else if(type===5){
+        await add({group:'MEDIA · CAMBIO DE FOCO',label:'Persona inicial',prompt:`Háblame de ${pn}.`,scenario,person:pn,oracle:pp?{kind:'person-summary',person:pn,data:pp}:null});
+        await add({group:'MEDIA · CAMBIO DE FOCO',label:'Cambiar persona',prompt:`Ahora cambia a ${pn2}.`,scenario,person:pn2,oracle:pp2?{kind:'person-summary',person:pn2,data:pp2}:null});
+        await add({group:'MEDIA · CAMBIO DE FOCO',label:'Seguir nuevo foco',prompt:'¿En qué eventos aparece?',scenario,person:pn2,oracle:pp2?{kind:'person-events',person:pn2,data:pp2}:null});
+      }else{
+        await add({group:'MEDIA · TABLA',label:'Abrir tabla de compras',prompt:`Dame las compras de ${en} en tabla.`,scenario,event:en,oracle:languageLedger({action:'query',domain:'purchases',event:en})});
+        await add({group:'MEDIA · TABLA',label:'Ordenar vista',prompt:'Ordénala por Importe de mayor a menor.',scenario,event:en,oracle:languageLedger({action:'local|query',domain:'purchases',operations:['sort:Importe:desc']})});
+        await add({group:'MEDIA · TABLA',label:'Quitar columna',prompt:'Quita la columna Unidades, pero no pierdas los datos.',scenario,event:en,oracle:languageLedger({action:'local|query',domain:'purchases',operations:['remove_field:Unidades'],absentFields:['Unidades']})});
+      }
+    }
+  }
+
+  if(level==='HARD'){
+    // 14 bloques de 5 turnos = 70. Mezcla continuidad, vistas, multientidad y presentación.
+    for(let block=0;block<14&&out.length<profile.count;block++){
+      const en=eName(block),en2=eName(block+2),pn=pName(block),pn2=pName(block+2),eo=await eventData(en),po=purchaseOracle(state,en),pp=await personData(pn),cmp=en2&&norm(en2)!==norm(en)?await compareData([en,en2]):null,scenario=`LANG DIFÍCIL ${String(block+1).padStart(2,'0')}`,type=block%7;
+      if(type===0){
+        await add({group:'DIFÍCIL · VISTA TABLA',label:'Crear tabla',prompt:`Dame las compras de ${en}, con todas las columnas disponibles.`,scenario,event:en,oracle:languageLedger({action:'query',domain:'purchases',event:en})});
+        await add({group:'DIFÍCIL · VISTA TABLA',label:'Filtro semántico',prompt:'Ahora deja solo las que tengan importe mayor que cero.',scenario,event:en,oracle:languageLedger({action:'local|query',domain:'purchases',operations:['filter']})});
+        await add({group:'DIFÍCIL · VISTA TABLA',label:'Ordenación',prompt:'De esas, pon primero las más caras.',scenario,event:en,oracle:languageLedger({action:'local|query',domain:'purchases',operations:['sort']})});
+        await add({group:'DIFÍCIL · VISTA TABLA',label:'Ocultar campo',prompt:'Quita Unidades de la vista, que me estorba.',scenario,event:en,oracle:languageLedger({action:'local|query',domain:'purchases',operations:['remove_field:Unidades'],absentFields:['Unidades']})});
+        await add({group:'DIFÍCIL · VISTA TABLA',label:'Restaurar campo',prompt:'Vale, vuelve a poner Unidades sin cambiar el resto.',scenario,event:en,oracle:languageLedger({action:'local|query',domain:'purchases',operations:['add_field:Unidades'],fields:['Unidades']})});
+      }else if(type===1){
+        await add({group:'DIFÍCIL · CAMBIO DE CONTEXTO',label:'Evento A',prompt:`Estamos con ${en}. Dame lo esencial.`,scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null});
+        await add({group:'DIFÍCIL · CAMBIO DE CONTEXTO',label:'Persona dentro de evento',prompt:`Y dentro de ese evento, ¿qué sabes de ${pn}?`,scenario,event:en,person:pn,oracle:languageLedger({action:'query|reference',entity:pn,event:en})});
+        await add({group:'DIFÍCIL · CAMBIO DE CONTEXTO',label:'Saltar a evento B',prompt:`Cambia un momento a ${en2}.`,scenario,event:en2,oracle:await evOracle(en2)});
+        await add({group:'DIFÍCIL · CAMBIO DE CONTEXTO',label:'Banco del nuevo foco',prompt:'¿Y el banco cómo quedó ahí?',scenario,event:en2,oracle:languageLedger({action:'query|reference',domain:'bank',event:en2})});
+        await add({group:'DIFÍCIL · CAMBIO DE CONTEXTO',label:'Volver al primer foco',prompt:'Vuelve al primero y dime otra vez qué papel tenía esa persona.',scenario,event:en,person:pn,oracle:languageLedger({action:'reference|query',entity:pn,event:en})});
+      }else if(type===2){
+        await add({group:'DIFÍCIL · MULTIOBJETIVO',label:'Dos consultas a la vez',prompt:`Dime quién no ha pagado en ${en} y también los socios que no asistirán.`,scenario,event:en,oracle:languageLedger({action:'query',event:en})});
+        await add({group:'DIFÍCIL · MULTIOBJETIVO',label:'Operar segundo conjunto',prompt:'De los no asistentes, quita a la última persona de la tabla.',scenario,event:en,oracle:languageLedger({action:'local|reference'})});
+        await add({group:'DIFÍCIL · MULTIOBJETIVO',label:'Ordenar segundo conjunto',prompt:'Ordénalos ahora por Persona descendente.',scenario,event:en,oracle:languageLedger({action:'local|query',operations:['sort']})});
+        await add({group:'DIFÍCIL · MULTIOBJETIVO',label:'Filtro nuevo',prompt:'Ahora déjame solamente una persona de ese resultado.',scenario,event:en,oracle:languageLedger({action:'local|reference',operations:['filter']})});
+        await add({group:'DIFÍCIL · MULTIOBJETIVO',label:'Restauración',prompt:'Y vuelve a la tabla original de no asistentes.',scenario,event:en,oracle:languageLedger({action:'local|reference'})});
+      }else if(type===3){
+        await add({group:'DIFÍCIL · GRÁFICA',label:'Gráfica global libre',prompt:`Dame una gráficaquetecagasdabutiyolé a partir de TODOS los datos de ${en}; elige tú el tipo que tenga sentido.`,scenario,event:en,oracle:languageLedger({action:'query|local',event:en,chart:true})});
+        await add({group:'DIFÍCIL · GRÁFICA',label:'Preferencia flexible',prompt:'Preferiblemente de líneas, pero si por los datos procede barras, usa barras.',scenario,event:en,oracle:languageLedger({action:'reference|local|query',event:en,chart:true})});
+        await add({group:'DIFÍCIL · GRÁFICA',label:'Todo un poco',prompt:'Pinta de todo un poco, sin mezclar magnitudes que no sean comparables.',scenario,event:en,oracle:languageLedger({action:'reference|query|local',event:en,chart:true})});
+        await add({group:'DIFÍCIL · GRÁFICA',label:'Explicar selección',prompt:'Y dime en dos frases por qué has elegido esas gráficas.',scenario,event:en,oracle:languageLedger({action:'reference|inspect|local'})});
+        await add({group:'DIFÍCIL · GRÁFICA',label:'Volver a datos',prompt:'Ahora quita la gráfica y dame los datos en tabla.',scenario,event:en,oracle:languageLedger({action:'local|reference|query',event:en})});
+      }else if(type===4&&cmp){
+        await add({group:'DIFÍCIL · COMPARACIÓN',label:'Comparación general',prompt:`Pon frente a frente ${en} y ${en2}.`,scenario,events:[en,en2],oracle:{kind:'comparison',compare:cmp}});
+        await add({group:'DIFÍCIL · COMPARACIÓN',label:'Solo economía',prompt:'De esa comparación, quédate solo con ingresos, compras y saldo.',scenario,events:[en,en2],oracle:languageLedger({action:'local|reference|query',operations:['set_fields']})});
+        await add({group:'DIFÍCIL · COMPARACIÓN',label:'Ganador con diferencia',prompt:'¿Cuál salió mejor de saldo y por cuánto?',scenario,events:[en,en2],oracle:{kind:'compare-metric',compare:cmp,metric:'balance'}});
+        await add({group:'DIFÍCIL · COMPARACIÓN',label:'Ordenar comparación',prompt:'Ordénamelos del mejor al peor por saldo.',scenario,events:[en,en2],oracle:languageLedger({action:'local|query',operations:['sort']})});
+        await add({group:'DIFÍCIL · COMPARACIÓN',label:'Representar comparación',prompt:'Hazme una gráfica de esa comparación.',scenario,events:[en,en2],oracle:languageLedger({action:'local|reference|query',chart:true})});
+      }else if(type===5){
+        await add({group:'DIFÍCIL · LENGUAJE RUIDOSO',label:'Evento con ruido',prompt:`a ver zuzu, ${en}, dime como fue aquello sin enrrollarte`,scenario,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null});
+        await add({group:'DIFÍCIL · LENGUAJE RUIDOSO',label:'Compras coloquial',prompt:'y las compras? solo lo gordo, no me sueltes la biblia',scenario,event:en,oracle:po?{kind:'purchase-presence',event:en,productCount:po.productCount,total:po.total}:null});
+        await add({group:'DIFÍCIL · LENGUAJE RUIDOSO',label:'Máximo coloquial',prompt:'de eso cual fue la clavada mas gorda',scenario,event:en,oracle:po?{kind:'purchase-max',event:en,row:po.max}:null});
+        await add({group:'DIFÍCIL · LENGUAJE RUIDOSO',label:'Persona con cambio brusco',prompt:`vale pasa de eso, ${pn2}, que ha hecho este?`,scenario,person:pn2,oracle:languageLedger({action:'query',entity:pn2})});
+        await add({group:'DIFÍCIL · LENGUAJE RUIDOSO',label:'Resumen del hilo',prompt:'y ahora resumeme que coño hemos mirado en esta conversación',scenario,oracle:languageLedger({action:'inspect',responseKind:'conversation_summary'})});
+      }else{
+        await add({group:'DIFÍCIL · RELACIÓN',label:'Persona y evento',prompt:`¿Qué relación tiene ${pn} con ${en}?`,scenario,event:en,person:pn,oracle:languageLedger({action:'query',entity:pn,event:en})});
+        await add({group:'DIFÍCIL · RELACIÓN',label:'Compras de esa persona',prompt:'¿Y qué compras lleva esa persona?',scenario,person:pn,oracle:languageLedger({action:'query|reference',domain:'purchases',entity:pn})});
+        await add({group:'DIFÍCIL · RELACIÓN',label:'Otros eventos',prompt:'¿En qué otros eventos aparece?',scenario,person:pn,oracle:pp?{kind:'person-events',person:pn,data:pp}:null});
+        await add({group:'DIFÍCIL · RELACIÓN',label:'Cambiar persona conservando tarea',prompt:`Haz lo mismo con ${pn2}.`,scenario,person:pn2,oracle:languageLedger({action:'reference|query',entity:pn2})});
+        await add({group:'DIFÍCIL · RELACIÓN',label:'Comparar personas',prompt:'Compárame a los dos solo por lo que realmente conste en ControlEvent.',scenario,oracle:languageLedger({action:'local|reference|query',operations:['compare']})});
+      }
+    }
+  }
+
+  if(level==='EXTREME'){
+    // 16 bloques de 5 turnos = 80. Intencionadamente descubre huecos: que falle aquí es información.
+    for(let block=0;block<16&&out.length<profile.count;block++){
+      const en=eName(block),en2=eName(block+3),pn=pName(block),pn2=pName(block+3),scenario=`LANG EXTREMA ${String(block+1).padStart(2,'0')}`,type=block%8;
+      if(type===0){
+        await add({group:'EXTREMA · CRUCE',label:'Asistencia vs pagos',prompt:`De ${en}, sácame quién va a asistir pero todavía no ha pagado, en una sola tabla.`,scenario,event:en,oracle:languageLedger({action:'query',event:en,operations:['filter']})});
+        await add({group:'EXTREMA · CRUCE',label:'Añadir situación',prompt:'Añade la situación de ingreso y ordénalos por importe pendiente.',scenario,event:en,oracle:languageLedger({action:'local|query',operations:['add_field','sort']})});
+        await add({group:'EXTREMA · CRUCE',label:'Excluir pareja',prompt:'Si hay alguna pareja, quítala pero conserva individualmente a quien sí proceda.',scenario,event:en,oracle:languageLedger({action:'local|query',operations:['filter']})});
+        await add({group:'EXTREMA · CRUCE',label:'Resumen cuantificado',prompt:'¿Cuántas personas quedan y cuánto dinero falta por cobrar entre ellas?',scenario,event:en,oracle:languageLedger({action:'local|reference|query'})});
+        await add({group:'EXTREMA · CRUCE',label:'Gráfica del subconjunto',prompt:'Representa ese subconjunto de la forma más útil.',scenario,event:en,oracle:languageLedger({action:'local|reference|query',chart:true})});
+      }else if(type===1){
+        await add({group:'EXTREMA · DERIVACIÓN',label:'Coste por asistente',prompt:`Calcula el coste real de compras por asistente de ${en}.`,scenario,event:en,oracle:languageLedger({action:'query',event:en})});
+        await add({group:'EXTREMA · DERIVACIÓN',label:'Comparar coste por asistente',prompt:`Compáralo con ${en2} y dime cuál fue más eficiente por persona.`,scenario,events:[en,en2],oracle:languageLedger({action:'query|reference',operations:['compare']})});
+        await add({group:'EXTREMA · DERIVACIÓN',label:'Descomponer diferencia',prompt:'Explícame qué partidas explican principalmente esa diferencia.',scenario,events:[en,en2],oracle:languageLedger({action:'reference|query'})});
+        await add({group:'EXTREMA · DERIVACIÓN',label:'Sensibilidad',prompt:'Si al primero hubieran ido dos personas más, ¿cambiaría el ganador?',scenario,events:[en,en2],oracle:languageLedger({action:'local|reference|query'})});
+        await add({group:'EXTREMA · DERIVACIÓN',label:'Gráfico comparativo',prompt:'Haz una gráfica que deje clara esa conclusión.',scenario,events:[en,en2],oracle:languageLedger({action:'local|reference|query',chart:true})});
+      }else if(type===2){
+        await add({group:'EXTREMA · ANOMALÍAS',label:'Buscar anomalías',prompt:`Busca cosas raras en ${en}: importes, asistencia, documentos, compras o banco que merezcan que yo las revise.`,scenario,event:en,oracle:languageLedger({action:'query',event:en})});
+        await add({group:'EXTREMA · ANOMALÍAS',label:'Priorizar anomalías',prompt:'Ordénamelas por riesgo de que haya un error real.',scenario,event:en,oracle:languageLedger({action:'local|reference',operations:['sort']})});
+        await add({group:'EXTREMA · ANOMALÍAS',label:'Acreditar',prompt:'Para la primera, dime exactamente qué dato de CE te hace sospechar.',scenario,event:en,oracle:languageLedger({action:'reference|inspect|query'})});
+        await add({group:'EXTREMA · ANOMALÍAS',label:'Contrastar otro evento',prompt:`Mira si en ${en2} aparece el mismo patrón.`,scenario,event:en2,oracle:languageLedger({action:'query|reference',event:en2})});
+        await add({group:'EXTREMA · ANOMALÍAS',label:'Conclusión prudente',prompt:'Concluye sin inventarte causas que no estén en los datos.',scenario,oracle:languageLedger({action:'reference|inspect|query'})});
+      }else if(type===3){
+        await add({group:'EXTREMA · PLAN',label:'Plan de ahorro',prompt:`En ${en}, proponme cómo ahorrar un 10% de las compras pendientes sin tocar lo ya comprado.`,scenario,event:en,oracle:languageLedger({action:'query',domain:'purchases',event:en})});
+        await add({group:'EXTREMA · PLAN',label:'Conservar categorías',prompt:'Intenta que el recorte no elimine por completo ninguna categoría de producto.',scenario,event:en,oracle:languageLedger({action:'local|reference|query'})});
+        await add({group:'EXTREMA · PLAN',label:'Responsables',prompt:'Dime a qué responsables afectaría ese plan.',scenario,event:en,oracle:languageLedger({action:'reference|query',domain:'purchases'})});
+        await add({group:'EXTREMA · PLAN',label:'Escenario alternativo',prompt:'Haz ahora otro plan priorizando el menor número de cambios posibles.',scenario,event:en,oracle:languageLedger({action:'reference|query'})});
+        await add({group:'EXTREMA · PLAN',label:'Comparar planes',prompt:'Compara ambos planes y recomienda uno explicando el criterio.',scenario,event:en,oracle:languageLedger({action:'local|reference',operations:['compare']})});
+      }else if(type===4){
+        await add({group:'EXTREMA · MULTIENTIDAD',label:'Dos personas y dos eventos',prompt:`Compara la actividad de ${pn} y ${pn2} en ${en} y ${en2}; separa hechos directos de registros compartidos.`,scenario,events:[en,en2],oracle:languageLedger({action:'query',operations:['compare']})});
+        await add({group:'EXTREMA · MULTIENTIDAD',label:'Solo responsabilidades',prompt:'Ahora ignora ingresos compartidos y quédate solo con responsabilidades operativas reales.',scenario,oracle:languageLedger({action:'local|reference|query',operations:['filter']})});
+        await add({group:'EXTREMA · MULTIENTIDAD',label:'Ranking',prompt:'¿Quién de los dos carga con más responsabilidad económica?',scenario,oracle:languageLedger({action:'local|query',operations:['rank'],responseKind:'who'})});
+        await add({group:'EXTREMA · MULTIENTIDAD',label:'Explicar evidencia',prompt:'Justifica la respuesta con las filas que la sostienen.',scenario,oracle:languageLedger({action:'reference|inspect|query'})});
+        await add({group:'EXTREMA · MULTIENTIDAD',label:'Cambiar métrica',prompt:'Y si en vez de dinero miro número de tareas, ¿cambia la conclusión?',scenario,oracle:languageLedger({action:'local|reference|query'})});
+      }else if(type===5){
+        await add({group:'EXTREMA · LENGUAJE ABIERTO',label:'Petición libre',prompt:`Zuzu, méteme mano a ${en} y cuéntame lo que de verdad merezca la pena mirar, no me hagas un inventario.`,scenario,event:en,oracle:languageLedger({action:'query',event:en})});
+        await add({group:'EXTREMA · LENGUAJE ABIERTO',label:'Profundizar sin campo',prompt:'Eso primero que has dicho, destrípamelo un poco.',scenario,oracle:languageLedger({action:'reference|query|inspect'})});
+        await add({group:'EXTREMA · LENGUAJE ABIERTO',label:'Cambio implícito',prompt:`Ahora haz exactamente el mismo análisis con ${en2}.`,scenario,event:en2,oracle:languageLedger({action:'reference|query',event:en2})});
+        await add({group:'EXTREMA · LENGUAJE ABIERTO',label:'Diferencias relevantes',prompt:'No me enumeres todo: dime solo en qué cambian de verdad.',scenario,events:[en,en2],oracle:languageLedger({action:'local|reference|query',operations:['compare']})});
+        await add({group:'EXTREMA · LENGUAJE ABIERTO',label:'Resumen oral',prompt:'Y cuéntamelo como si estuviéramos hablando, en medio minuto.',scenario,oracle:languageLedger({action:'reference|inspect'})});
+      }else if(type===6){
+        await add({group:'EXTREMA · DOCUMENTAL',label:'Cruce evidencias',prompt:`En ${en}, localiza movimientos económicos que deberían tener evidencia documental y dime cuáles parecen peor cubiertos.`,scenario,event:en,oracle:languageLedger({action:'query',event:en})});
+        await add({group:'EXTREMA · DOCUMENTAL',label:'Separar tipos',prompt:'Sepáralos entre ingresos, compras y banco.',scenario,event:en,oracle:languageLedger({action:'local|reference|query'})});
+        await add({group:'EXTREMA · DOCUMENTAL',label:'Solo faltantes',prompt:'Déjame solo los que tengan algo pendiente de justificar.',scenario,event:en,oracle:languageLedger({action:'local|query',operations:['filter']})});
+        await add({group:'EXTREMA · DOCUMENTAL',label:'Ordenar cuantía',prompt:'Ordénalos por importe de mayor a menor.',scenario,event:en,oracle:languageLedger({action:'local|query',operations:['sort']})});
+        await add({group:'EXTREMA · DOCUMENTAL',label:'Preparar revisión',prompt:'Hazme una lista corta de revisión, sin modificar ningún dato.',scenario,event:en,oracle:languageLedger({action:'reference|inspect|query'})});
+      }else{
+        await add({group:'EXTREMA · META-CONTEXTO',label:'Cadena inicial',prompt:`Empieza con ${en}: compras, asistencia y banco, pero solo lo esencial.`,scenario,event:en,oracle:languageLedger({action:'query',event:en})});
+        await add({group:'EXTREMA · META-CONTEXTO',label:'Foco parcial',prompt:'Quédate con lo segundo que me has contado y olvida visualmente lo demás, no el contexto.',scenario,oracle:languageLedger({action:'reference|local|inspect'})});
+        await add({group:'EXTREMA · META-CONTEXTO',label:'Cambio persona',prompt:`Relaciona eso con ${pn}, si hay datos reales que lo permitan.`,scenario,person:pn,oracle:languageLedger({action:'query|reference',entity:pn})});
+        await add({group:'EXTREMA · META-CONTEXTO',label:'Retomar primer foco',prompt:'Vuelve al primer punto de los tres del inicio y amplíalo.',scenario,event:en,oracle:languageLedger({action:'reference|query'})});
+        await add({group:'EXTREMA · META-CONTEXTO',label:'Resumen de decisiones',prompt:'Resume qué decisiones de foco has ido tomando para responderme, sin enseñarme código interno.',scenario,oracle:languageLedger({action:'inspect',responseKind:'conversation_summary'})});
+      }
+    }
+  }
+
+  // El contrato exige el tamaño exacto. Si faltan entidades en una instalación pequeña,
+  // rellenamos con preguntas de resumen sobre los eventos disponibles; nunca inventamos datos.
+  while(out.length<profile.count){
+    const en=eName(out.length),eo=await eventData(en),n=out.length;
+    out.push(languageCase({level,index:n,group:`${profile.label} · COBERTURA`,label:'Cobertura de reserva',prompt:`Dame un resumen verificable de ${en} y no añadas nada que no conste en ControlEvent.`,scenario:`LANG ${profile.label} RESERVA ${n+1}`,event:en,oracle:eo?{kind:'event-summary',event:en,data:eo}:null}));
+  }
+  return out.slice(0,profile.count);
+}
+
+export async function previewZuzuLanguageBattery({level='BASIC',seed}={}){
+  const state=await getItvState(),normalizedSeed=normalizeSeed(seed),normalizedLevel=normalizeLanguageLevel(level),profile=LANGUAGE_REACH_PROFILES[normalizedLevel],cases=await buildLanguageReachCases(state,normalizedLevel,normalizedSeed);
+  return{ok:true,replayContractVersion:4,source:'language',batteryCode:`LANG-${normalizedLevel}-${profile.count}`,languageProfile:{...profile},generatedAt:nowIso(),seed:normalizedSeed,dataCounts:batteryDataCounts(state),tests:{FAST:0,'AI-SMOKE':0,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':[],'FULL-CERT':cases.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'FULL-CERT':{turns:cases.length,costEurRange:`hasta ~${(profile.count*0.025).toFixed(2).replace('.',',')} € según modelo/tokens`,hardCapSuggested:round(profile.count*0.025,2)}},notes:[`Batería de alcance ${profile.label}: ${profile.count} preguntas.`,`Expectativa de partida: ${profile.expectedBand}.`,profile.description,'NHC: estas frases viven exclusivamente en ITV; no añaden reglas lingüísticas al runtime de Zuzu.','FULL-CERT usa la misma tubería real de conversación y conserva el contexto dentro de cada escenario.','Los KO/WARN se guardan con PLAN Gemini, ejecución CE, respuesta y métricas para localizar la capa exacta del fallo.']};
+}
+
 async function buildAiSmokeCases(state,max=40,seed=1){
   const {events,withPurchases,sibling}=chooseEvents(state,seed),{sample:people}=choosePeople(state,seed),cases=[];
   const add=c=>{if(!trim(c?.expected))c.expected=expectedOracleText(c?.oracle)||(trim(c?.expectedEvent)?`Evento: ${trim(c.expectedEvent)}`:arr(c?.expectedEvents).length?`Eventos: ${arr(c.expectedEvents).join(' ↔ ')}`:trim(c?.expectedPerson)?`Persona: ${trim(c.expectedPerson)}`:'Regla/invariante satisfecha');if(cases.length<max)cases.push(c);};

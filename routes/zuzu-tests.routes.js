@@ -1,6 +1,6 @@
 import express from 'express';
 import { asyncHandler } from './_async.js';
-import { assertGdActor, previewZuzuBattery, runZuzuTestCase, runSavedZuzuTestCase, runZuzuTestStream } from '../services/zuzu-test-lab.service.js';
+import { assertGdActor, previewZuzuBattery, previewZuzuLanguageBattery, runZuzuTestCase, runSavedZuzuTestCase, runZuzuTestStream } from '../services/zuzu-test-lab.service.js';
 import { parseZuzuBatteryExcel } from '../services/zuzu-itv-excel.service.js';
 import { saveZuzuTestRun, listZuzuTestRuns, getZuzuTestRun, deleteZuzuTestRun } from '../services/zuzu-test-history.service.js';
 
@@ -54,6 +54,11 @@ router.post('/zuzu-tests/import-excel', asyncHandler(async (req,res)=>{
 router.get('/zuzu-tests/preview', asyncHandler(async (req,res)=>{
   await assertGdActor(actorFromRequest(req));
   res.json(await previewZuzuBattery({seed:req.query?.seed}));
+}));
+
+router.get('/zuzu-tests/language-battery', asyncHandler(async (req,res)=>{
+  await assertGdActor(actorFromRequest(req));
+  res.json(await previewZuzuLanguageBattery({level:req.query?.level,seed:req.query?.seed}));
 }));
 
 
