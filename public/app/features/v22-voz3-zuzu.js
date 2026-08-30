@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-BANK4_27-Z1H-VOICE-V56';
+  var BUILD='v4_0_exp-VNEXT-P16-DRAFT-GUARD-VOICE-V57';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -75,10 +75,10 @@
   function promptEl(){return $('ceAiPrompt');}
   function manualDraftStored(){try{return sessionStorage.getItem(STORAGE.manualDraft)||'';}catch(_){return state.manualDraftValue||'';}}
   function storeManualDraft(v){state.manualDraftValue=String(v==null?'':v);try{if(state.manualDraftValue)sessionStorage.setItem(STORAGE.manualDraft,state.manualDraftValue);else sessionStorage.removeItem(STORAGE.manualDraft);}catch(_){} }
-  function releaseManualDraft(keepText){state.manualDraftOwned=false;state.manualDraftValue='';try{sessionStorage.removeItem(STORAGE.manualDraft);}catch(_){}if(!keepText){var p=promptEl();if(p){state.programmaticPromptWrite++;try{p.value='';p.textContent='';p.dispatchEvent(new Event('input',{bubbles:true}));}finally{state.programmaticPromptWrite=Math.max(0,state.programmaticPromptWrite-1);}}}}
-  function setPrompt(v,force){var p=promptEl();if(!p)return false;if(state.manualDraftOwned&&!force)return false;state.programmaticPromptWrite++;try{p.value=clean(v);p.dispatchEvent(new Event('input',{bubbles:true}));p.setSelectionRange(p.value.length,p.value.length);return true;}catch(_){return false;}finally{state.programmaticPromptWrite=Math.max(0,state.programmaticPromptWrite-1);} }
+  function releaseManualDraft(keepText){var p=promptEl(),snapshot=p?String(p.value||''):state.manualDraftValue;state.manualDraftOwned=false;if(keepText){storeManualDraft(snapshot);}else{state.manualDraftValue='';try{sessionStorage.removeItem(STORAGE.manualDraft);}catch(_){}if(p){state.programmaticPromptWrite++;try{p.value='';p.textContent='';p.dispatchEvent(new Event('input',{bubbles:true}));}finally{state.programmaticPromptWrite=Math.max(0,state.programmaticPromptWrite-1);}}}}
+  function setPrompt(v,force){var p=promptEl();if(!p)return false;if(!force&&(state.manualDraftOwned||(document.activeElement===p&&manualDraftStored()&&String(p.value||'').trim())))return false;state.programmaticPromptWrite++;try{p.value=clean(v);p.dispatchEvent(new Event('input',{bubbles:true}));p.setSelectionRange(p.value.length,p.value.length);return true;}catch(_){return false;}finally{state.programmaticPromptWrite=Math.max(0,state.programmaticPromptWrite-1);} }
   function installManualDraftGuard(){var p=promptEl();if(!p||state.manualDraftBoundTo===p)return;state.manualDraftBoundTo=p;var saved=manualDraftStored();if(saved&&!p.value){state.manualDraftOwned=true;state.programmaticPromptWrite++;try{p.value=saved;p.dispatchEvent(new Event('input',{bubbles:true}));p.setSelectionRange(p.value.length,p.value.length);}catch(_){}finally{state.programmaticPromptWrite=Math.max(0,state.programmaticPromptWrite-1);}}
-    // BANK4_27 · El primer carácter escrito también es del usuario. beforeinput toma posesión
+    // P1.6 · El primer carácter escrito también es del usuario. beforeinput toma posesión
     // ANTES de que reconocimiento/TTS puedan tocar el prompt, corta la lectura anterior y evita
     // que se pierda la primera tecla al empezar una nueva pregunta mientras Zuzu habla.
     p.addEventListener('beforeinput',function(){if(state.programmaticPromptWrite)return;state.manualDraftOwned=true;if(state.speaking)stopSpeaking(true);stopEntertainment(true);if(state.cloudFallback)pauseCloudListening();else stopRecognition();stopBarge();clearTurnTimer();clearReplyWindow();state.turnPrefix='';state.turnSession='';state.turnLastAt=0;state.mode='manual';setVoicePhase('MANUAL_DRAFT','usuario empieza a escribir; lectura anterior cortada');},{capture:true});

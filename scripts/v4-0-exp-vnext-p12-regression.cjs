@@ -11,9 +11,9 @@ t('P1.2+ usa native function calling sin schema JSON final',/plainTextResponse:t
 t('P1.2 mantiene contratos de ingresos',/person_income_status/.test(svc)&&/event_income_status/.test(svc)&&/event_income_lines/.test(svc));
 t('adaptador servidor convierte filas objeto a arrays UI',/function vnextP12UiTable/.test(svc)&&/columns\.map\(c=>text\(row\?\.\[c\]\)\)/.test(svc));
 t('renderer cliente tolera filas objeto y arrays',/var cells=Array\.isArray\(r\)\?r:cols\.map/.test(ui));
-t('UI identifica P1.2 o sucesor P1.5',/VNext P1\.[2345]/.test(ui)&&/(paralelo|una sola IA)/i.test(ui));
-t('cache bust P1.2 o sucesor P1.5',/VNEXT-P1(?:2-SCREEN-PARALLEL|3-CONTEXT-ALIAS-WEATHER|4-PENA-FRIEND-COMPARE-CHARTS|5-CONVERSATION-REGISTERS-GROUNDED-BANTER)/.test(index));
+t('UI identifica P1.2 o sucesor P1.5',/VNext P1\.[23456]/.test(ui)&&/(paralelo|una sola IA)/i.test(ui));
+t('cache bust P1.2 o sucesor P1.5',/VNEXT-P1(?:2-SCREEN-PARALLEL|3-CONTEXT-ALIAS-WEATHER|4-PENA-FRIEND-COMPARE-CHARTS|5-CONVERSATION-REGISTERS-GROUNDED-BANTER|6-CONTINUITY-FILTERS-DRAFT-SAFE)/.test(index));
 t('latencia registra espera real de estado',/espera estado tras IA=\$\{stateWaitMs\} ms/.test(svc)&&/stateWaitAfterModelMs:stateWaitMs/.test(svc));
 t('sin Semantic Core ni Memory Gate en fast path P1.2+',/PARALLEL FAST PATH[\s\S]{0,1800}sin Semantic Core ni Memory Gate/.test(svc));
-t('soft failure P1.2+ conserva conversación',/provider:'zuzu-vnext-p1(?:2|3|4|5)-soft-failure'/.test(svc));
+t('soft failure P1.2+ conserva conversación',/provider:'zuzu-vnext-p1(?:2|3|4|5|6)-soft-failure'/.test(svc));
 console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exit(ko?1:0);

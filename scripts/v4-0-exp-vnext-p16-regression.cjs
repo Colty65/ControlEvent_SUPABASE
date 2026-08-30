@@ -1,0 +1,24 @@
+const fs=require('fs'),path=require('path');
+const root=path.join(__dirname,'..');
+const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'public/app/features/v11-3-zuzu-analitica-libre.js'),'utf8');
+const voice=fs.readFileSync(path.join(root,'public/app/features/v22-voz3-zuzu.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+let ok=0,ko=0;function t(n,c){if(c){console.log('OK ',n);ok++;}else{console.error('KO ',n);ko++;}}
+t('UI identifica P1.6',/VNext P1\.6/.test(ui));
+t('cache bust P1.6',/VNEXT-P16-CONTINUITY-FILTERS-DRAFT-SAFE/.test(html));
+t('schema publica purchase_status',/purchase_status:\{type:'string',enum:\['pending','realized','all'\]\}/.test(svc));
+t('schema publica exclusiones',/exclude_stores:\{type:'array'/.test(svc)&&/exclude_products:\{type:'array'/.test(svc));
+t('compras ejecutan status pedido',/const purchaseStatus=\['pending','realized','all'\]/.test(svc)&&/status:purchaseStatus/.test(svc));
+t('tool físico aplica exclusión de tienda y producto',/excludeStoreFilters\.length\)rows=rows\.filter/.test(svc)&&/excludeProductFilters\.length\)rows=rows\.filter/.test(svc));
+t('continuidad de compras conserva mine y orden',/prev\?\.operation\)==='event_purchases'[\s\S]{0,500}prev\?\.mine===true/.test(svc)&&/prev\?\.order_by/.test(svc));
+t('quita realizadas se convierte a pending',/quita\(\?:r\|me\)\?/.test(svc)&&/a\.purchase_status='pending'/.test(svc));
+t('quien falta por pagar repara contrato vacío',/a\.operation='event_income_status';a\.status='pending'/.test(svc));
+t('plan B tiene recorte mínimo y colchón',/gap_to_zero/.test(svc)&&/recommended_cut/.test(svc)&&/plan=true/.test(svc));
+t('escenario soporta gráficas locales',/vnextP16ScenarioCharts/.test(svc)&&/event_scenario'[\s\S]{0,120}args\?\.chart===true/.test(svc));
+t('prompt largo tiene recuperación explícita',/ceAiRestorePrompt/.test(ui)&&/saveLastPromptValue/.test(ui)&&/prompt_last_p16/.test(ui));
+t('borrador solo persiste input humano',/ev\.isTrusted===false/.test(ui));
+t('prompt shield está en textarea y no en window capture',/cePromptShieldP16/.test(ui)&&/p\.addEventListener\(type,block/.test(ui)&&!/function installPromptEventShield\(\)[\s\S]{0,800}window\.addEventListener/.test(ui));
+t('voz no pisa borrador manual activo',/document\.activeElement===p&&manualDraftStored\(\)/.test(voice));
+t('voz conserva snapshot al enviar',/if\(keepText\)\{storeManualDraft\(snapshot\)/.test(voice));
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;
