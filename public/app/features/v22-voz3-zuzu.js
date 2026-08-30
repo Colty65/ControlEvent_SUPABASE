@@ -10,12 +10,12 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-BANK4_26-Z1H-VOICE-V55';
+  var BUILD='v4_0_exp-BANK4_27-Z1H-VOICE-V56';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
     ambient:'ce_zuzu_voz4_ambient_wake', auto:'ce_zuzu_voz3_auto_read', rate:'ce_zuzu_voz3_rate',
-    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v55', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v55', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v55', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v55', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v55'
+    mode:'ce_zuzu_voz3_voice_mode', female:'ce_zuzu_voz3_female_voice', male:'ce_zuzu_voz3_male_voice', mic:'ce_zuzu_voz3_mic_device', manualDraft:'ce_zuzu_manual_draft_v4', entertainmentDeck:'ce_zuzu_voz3_entertainment_deck_v56', entertainmentLast:'ce_zuzu_voz3_entertainment_last_v56', entertainmentCycle:'ce_zuzu_voz3_entertainment_cycle_v56', entertainmentUsed:'ce_zuzu_voz3_entertainment_used_v56', entertainmentRequestCounter:'ce_zuzu_voz3_entertainment_request_counter_v56'
   };
   var state={
     mode:'idle', ambientEnabled:true, conversationMode:false, parked:false,
@@ -78,6 +78,10 @@
   function releaseManualDraft(keepText){state.manualDraftOwned=false;state.manualDraftValue='';try{sessionStorage.removeItem(STORAGE.manualDraft);}catch(_){}if(!keepText){var p=promptEl();if(p){state.programmaticPromptWrite++;try{p.value='';p.textContent='';p.dispatchEvent(new Event('input',{bubbles:true}));}finally{state.programmaticPromptWrite=Math.max(0,state.programmaticPromptWrite-1);}}}}
   function setPrompt(v,force){var p=promptEl();if(!p)return false;if(state.manualDraftOwned&&!force)return false;state.programmaticPromptWrite++;try{p.value=clean(v);p.dispatchEvent(new Event('input',{bubbles:true}));p.setSelectionRange(p.value.length,p.value.length);return true;}catch(_){return false;}finally{state.programmaticPromptWrite=Math.max(0,state.programmaticPromptWrite-1);} }
   function installManualDraftGuard(){var p=promptEl();if(!p||state.manualDraftBoundTo===p)return;state.manualDraftBoundTo=p;var saved=manualDraftStored();if(saved&&!p.value){state.manualDraftOwned=true;state.programmaticPromptWrite++;try{p.value=saved;p.dispatchEvent(new Event('input',{bubbles:true}));p.setSelectionRange(p.value.length,p.value.length);}catch(_){}finally{state.programmaticPromptWrite=Math.max(0,state.programmaticPromptWrite-1);}}
+    // BANK4_27 · El primer carácter escrito también es del usuario. beforeinput toma posesión
+    // ANTES de que reconocimiento/TTS puedan tocar el prompt, corta la lectura anterior y evita
+    // que se pierda la primera tecla al empezar una nueva pregunta mientras Zuzu habla.
+    p.addEventListener('beforeinput',function(){if(state.programmaticPromptWrite)return;state.manualDraftOwned=true;if(state.speaking)stopSpeaking(true);stopEntertainment(true);if(state.cloudFallback)pauseCloudListening();else stopRecognition();stopBarge();clearTurnTimer();clearReplyWindow();state.turnPrefix='';state.turnSession='';state.turnLastAt=0;state.mode='manual';setVoicePhase('MANUAL_DRAFT','usuario empieza a escribir; lectura anterior cortada');},{capture:true});
     p.addEventListener('input',function(ev){if(state.programmaticPromptWrite)return;var v=String(p.value||'');if(!v){releaseManualDraft(true);return;}state.manualDraftOwned=true;storeManualDraft(v);clearTurnTimer();clearPostClearDiscardTimer();clearReplyWindow();state.turnPrefix='';state.turnSession='';state.turnLastAt=0;if(state.cloudFallback)pauseCloudListening();else stopRecognition();stopBarge();setMic(false);state.mode='manual';setVoicePhase('MANUAL_DRAFT','texto humano protegido');setStatus('Escribiendo… conservaré este texto hasta que lo envíes o lo borres tú.','ok');},{passive:true});
   }
   function setStatus(msg,kind){var e=$('ceVoz3Status');if(!e)return;e.className='ce-voz3-status'+(kind?' '+kind:'');e.textContent=msg||'';}
@@ -379,14 +383,14 @@
     function digit(c){return /[0-9]/.test(c||'');}
     for(i=0;i<text.length;i++){
       var ch=text.charAt(i),prev=text.charAt(i-1),next=text.charAt(i+1);buf+=ch;
-      // No partir cifras, horas ni decimales: 5.882,22 / 18:30.
+      // BANK4_27 · La puntuación vive DENTRO de la locución. No creamos un utterance por
+      // cada coma/dos puntos: Chrome/Edge se descoordina en textos largos con cientos de
+      // utterances cortos. El sintetizador respira con la coma y CE solo corta por frase o tamaño.
       if((ch==='.'||ch===','||ch===':')&&digit(prev)&&digit(next))continue;
-      if(ch==='.'&&text.substr(i,3)==='...'){buf+='..';i+=2;push(320);continue;}
-      if(ch===',' ){push(135);continue;}
-      if(ch===';'||ch===':'){push(230);continue;}
-      if(ch==='.'||ch==='!'||ch==='?'){push(330);continue;}
-      // Salvaguarda de Chrome/Edge: una cláusula muy larga se trocea en un espacio, nunca a mitad de palabra.
-      if(buf.length>=205){var cut=buf.lastIndexOf(' ');if(cut>120){var tail=buf.slice(cut+1);buf=buf.slice(0,cut);push(80);buf=tail;}}
+      if(ch==='.'&&text.substr(i,3)==='...'){buf+='..';i+=2;continue;}
+      if(ch==='.'||ch==='!'||ch==='?'){push(95);continue;}
+      // Frases especialmente largas: preferir ; o : cercanos y, si no, un espacio. Nunca mitad de palabra.
+      if(buf.length>=330){var cut=Math.max(buf.lastIndexOf(';'),buf.lastIndexOf(':'));if(cut<185)cut=buf.lastIndexOf(' ');if(cut>185){var tail=buf.slice(cut+1);buf=buf.slice(0,cut+1);push(70);buf=tail;}}
     }
     push(0);return out;
   }
@@ -463,21 +467,23 @@
     var p=String(item&&item.display||item||'').trim();if(!p)return[];
     return p.replace(/…+/g,'...').split(/(?:\.{3,}|[;]+)/).map(function(x){return{text:clean(x).replace(/^[,.:!?\s]+|[,.:!?\s]+$/g,''),pauseMs:300};}).filter(function(x){return !!x.text;});
   }
+  function entertainmentVoiceText(item){
+    var t=String(item&&item.display||'').replace(/\.{3,}/g,', ').replace(/\s+,/g,',').replace(/,\s*,+/g,', ').replace(/\s+/g,' ').trim();
+    // La U inicial fuerza un murmullo, no una sucesión de nombres de letras «eme».
+    t=t.replace(/^Ummmmm+/i,'Uuuummmmmmmm').replace(/^Ufffff+/i,'Uffffff').replace(/^Ehhhh+/i,'Eeehhhh').replace(/^Aaaah+/i,'Aaaah');
+    return t;
+  }
   function speakEntertainmentPhrase(){
     if(!state.conversationMode||!state.requestInFlight||!supportsSpeech()||state.entertainmentSpeaking||state.entertainmentCount>=state.entertainmentMaxPerRequest)return;
-    var item=renderEntertainmentPhrase(contextualEntertainmentPhrase(state.requestPrompt,state.entertainmentCount)),phrase=item.display,parts=entertainmentSpeechParts(item);state.entertainmentCount++;setStatus(phrase,'ok');
-    if(!parts.length){entertainmentEnded();return;}
-    state.entertainmentSpeaking=true;var pos=0,v=chooseVoice();
-    function next(){
-      if(!state.entertainmentSpeaking)return;
-      if(pos>=parts.length){entertainmentEnded();return;}
-      try{var part=parts[pos++],u=new SpeechSynthesisUtterance(part.text);u.lang='es-ES';u.rate=part.rate>0?Math.max(0.35,Math.min(1.05,part.rate)):Math.min(0.94,speechRate());u.pitch=part.pitch>0?part.pitch:0.82;u.volume=1;if(v)u.voice=v;state.entertainmentUtterance=u;
-        u.onend=function(){state.entertainmentUtterance=null;setTimeout(next,Math.max(40,Number(part.pauseMs)||0));};
-        u.onerror=function(){state.entertainmentUtterance=null;setTimeout(next,80);};
-        window.speechSynthesis.speak(u);
-      }catch(_){setTimeout(next,80);}
-    }
-    next();
+    var item=renderEntertainmentPhrase(contextualEntertainmentPhrase(state.requestPrompt,state.entertainmentCount)),phrase=item.display,voiceText=entertainmentVoiceText(item);state.entertainmentCount++;setStatus(phrase,'ok');
+    if(!voiceText){entertainmentEnded();return;}
+    // BANK4_27 · Una frase de entretenimiento = UN utterance. Así no se pierde la segunda
+    // mitad cuando el navegador está ocupado y la respuesta nueva espera a que acabe completa.
+    state.entertainmentSpeaking=true;var v=chooseVoice(),done=false,watchdog=null;
+    function finish(){if(done)return;done=true;clearTimeout(watchdog);state.entertainmentUtterance=null;entertainmentEnded();}
+    try{var u=new SpeechSynthesisUtterance(voiceText);u.lang='es-ES';u.rate=Math.max(0.68,Math.min(0.82,speechRate()-0.10));u.pitch=0.82;u.volume=1;if(v)u.voice=v;state.entertainmentUtterance=u;u.onend=finish;u.onerror=finish;window.speechSynthesis.speak(u);
+      watchdog=setTimeout(function(){if(!done&&(!window.speechSynthesis||!window.speechSynthesis.speaking))finish();},Math.max(7000,voiceText.length*105));
+    }catch(_){finish();}
   }
 
   function startEntertainment(){stopEntertainment(true);state.entertainmentCount=0;state.entertainmentPersonalize=false;if(state.conversationMode&&state.requestInFlight)scheduleEntertainment(state.entertainmentInitialDelayMs||3300);}
@@ -522,7 +528,7 @@
   function endConversation(){forceReturnToAmbient(false,'fin conversación');state.parked=false;}
   function parkConversation(){if(!state.conversationMode)return;forceReturnToAmbient(false,'ventana Zuzu cerrada o réplica agotada');state.parked=true;}
 
-  document.addEventListener('ce:zuzu-request-started',function(ev){if(state.manualDraftOwned)releaseManualDraft(true);if(!state.conversationMode)return;clearReplyWindow();pauseCloudListening();state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=clean(ev&&ev.detail&&ev.detail.prompt||state.requestPrompt);stopRecognition();clearTurnTimer();setVoicePhase('PROCESSING','petición CE iniciada');setStatus('Consultando ControlEvent…','ok');startEntertainment();});
+  document.addEventListener('ce:zuzu-request-started',function(ev){if(state.manualDraftOwned)releaseManualDraft(true);if(!state.conversationMode)return;clearReplyWindow();/* BANK4_27: una pregunta nueva manda sobre la lectura vieja. */if(state.speaking)stopSpeaking(true);stopEntertainment(true);pauseCloudListening();state.requestInFlight=true;state.awaitingResponse=true;state.requestPrompt=clean(ev&&ev.detail&&ev.detail.prompt||state.requestPrompt);stopRecognition();clearTurnTimer();setVoicePhase('PROCESSING','petición CE iniciada; lectura anterior cancelada');setStatus('Consultando ControlEvent…','ok');startEntertainment();});
   document.addEventListener('ce:zuzu-request-error',function(){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(true);setVoicePhase('RECOVERY','error de petición CE');setStatus('No se pudo completar. Te escucho.','err');setTimeout(startUser,180);});
   document.addEventListener('ce:zuzu-response-rendered',function(ev){if(!state.conversationMode)return;state.requestInFlight=false;state.awaitingResponse=false;stopEntertainment(false);var screen=clean(ev&&ev.detail&&ev.detail.answer),spoken=clean(ev&&ev.detail&&ev.detail.spokenAnswer),raw=clean(safeVoiceAgainstScreen(screen,spoken||screen));var answer=stripVoiceAnswerLead(raw);window.__ceZuzuLastSpokenAnswer=answer||raw;var auto=$('ceVoz3AutoRead'),autoRead=!auto||auto.checked!==false;if(!answer){queueAnswerAfterEntertainment('',false);return;}queueAnswerAfterEntertainment(answer,autoRead);});
   window.addEventListener('controlevent:zuzu-opened',function(){state.overlayMissingSince=0;setTimeout(function(){injectPanel();installManualDraftGuard();},30);});
