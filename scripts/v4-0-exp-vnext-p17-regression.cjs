@@ -1,0 +1,20 @@
+const fs=require('fs');
+const svc=fs.readFileSync('services/event-ai.service.js','utf8');
+const voice=fs.readFileSync('public/app/features/v22-voz3-zuzu.js','utf8');
+const ui=fs.readFileSync('public/app/features/v11-3-zuzu-analitica-libre.js','utf8');
+const html=fs.readFileSync('public/index.html','utf8');
+let ok=0,ko=0;function t(n,c){if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}}
+t('UI P1.7',/VNext P1\.7/.test(ui));
+t('cache P1.7',/VNEXT-P17-FILTER-ENGINE-VOICE-EMPHASIS/.test(html));
+t('tool include_stores',/include_stores:\{type:'array'/.test(svc));
+t('context include_stores',/include_stores:arr\(args\?\.include_stores\)/.test(svc));
+t('purchase includes',/if\(includeStoreFilters\.length\)rows=rows\.filter/.test(svc));
+t('canonical truncated stores',/vnextP17ResolveStoreLabel/.test(svc)&&/\.\{2,\}/.test(svc));
+t('positive filters protected',/intent==='include'/.test(svc)&&/a\.include_stores=mentions\.slice/.test(svc));
+t('all views one filtered rows source',/for\(const r of rows\)/.test(svc)&&/by_store_segment_destination_product/.test(svc));
+t('logged user identity instruction',/IDENTIDAD DEL INTERLOCUTOR/.test(svc));
+t('emoji stripped before TTS',/stripDecorativeEmoji/.test(voice)&&/1F000/.test(voice));
+t('crack punch prosody',/voicePunchTailSegments/.test(voice)&&/crack\|maquina/.test(voice));
+t('per segment speech rate',/u\.rate=Number\(seg&&seg\.rate\)/.test(voice));
+t('provider p17',/zuzu-vnext-p17-filter-engine-voice-emphasis-fast/.test(svc));
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;
