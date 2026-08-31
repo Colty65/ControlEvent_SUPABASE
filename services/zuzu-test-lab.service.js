@@ -167,7 +167,7 @@ function vNextTableRowsAsObjects(result={},keyName=''){
 function vNextAuditOf(result={}){
   const ctx=(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:{};
   const tables=arr(result?.tables).map(t=>({key:trim(t?.key),title:trim(t?.title),columns:arr(t?.columns).map(trim).filter(Boolean),rowCount:arr(t?.rows).length}));
-  const visible=[...new Set(tables.flatMap(t=>t.columns))],capabilityCalls=arr(result?.meta?.capabilityCalls).map(x=>({tool:trim(x?.tool),rawArgs:x?.rawArgs&&typeof x.rawArgs==='object'?x.rawArgs:{},normalizedArgs:x?.normalizedArgs&&typeof x.normalizedArgs==='object'?x.normalizedArgs:{},audit:x?.audit&&typeof x.audit==='object'?x.audit:null,error:trim(x?.error)}));
+  const visible=[...new Set(tables.flatMap(t=>t.columns))],capabilityCalls=arr(result?.meta?.capabilityCalls).map(x=>({tool:trim(x?.tool),rawArgs:x?.rawArgs&&typeof x.rawArgs==='object'?x.rawArgs:{},normalizedArgs:x?.normalizedArgs&&typeof x.normalizedArgs==='object'?x.normalizedArgs:{},effectiveOperation:trim(x?.effectiveOperation),effectiveSubject:x?.effectiveSubject&&typeof x.effectiveSubject==='object'?x.effectiveSubject:{},audit:x?.audit&&typeof x.audit==='object'?x.audit:null,error:trim(x?.error)}));
   const attempted=[...capabilityCalls].reverse().find(x=>x.tool==='query_ce')||capabilityCalls[0]||null;
   return{
     resultContext:ctx,kind:trim(ctx?.kind),operation:trim(ctx?.operation)||trim(attempted?.normalizedArgs?.operation)||trim(attempted?.rawArgs?.operation),event:trim(ctx?.event),events:arr(ctx?.events).map(trim).filter(Boolean),person:trim(ctx?.person),
@@ -184,38 +184,56 @@ const ITV_DIAG={
   CE:'CE_DATA_CONTRACT', PRESENT:'DERIVATION_PRESENTATION', CASCADE:'CASCADE', TECH:'TECHNICAL', UNKNOWN:'INDETERMINATE'
 };
 function itvCapabilityExpectation(c={}){
-  const o=c?.oracle||{},kind=trim(o?.kind);
+  const o=c?.oracle||{},kind=trim(o?.kind),label=norm(o?.label);
   const direct={
-    'event-summary':['query_ce','event_summary'],'event-economy':['query_ce','event_summary'],'event-metric':['query_ce','event_summary'],
-    'purchase-set':['query_ce','event_purchases'],'purchase-max':['query_ce','derive'],'purchase-sum':['query_ce','derive'],
-    'attendance':['query_ce','event_attendance'],'donations':['query_ce','event_donations'],'bank-summary':['query_ce','event_bank'],
-    'person-summary':['query_ce','person_profile'],'person-events':['query_ce','person_events'],'person-income':['query_ce','person_profile'],
-    'catalog-count':['query_ce',trim(o?.entity)==='events'?'events_catalog':'people_catalog'],'canonical-socios':['query_ce','people_catalog'],
-    'comparison':['query_ce','compare_events'],'compare-metric':['query_ce','derive'],
-    'events-overview':['query_ce','events_overview'],'store-purchases':['query_ce','store_purchases'],
-    'documentation':['query_ce','event_documentation'],'management':['query_ce','event_management']
+    'event-summary':['query_ce',['event_summary']],'event-economy':['query_ce',['event_summary']],
+    'purchase-set':['query_ce',['event_purchases']],'purchase-max':['query_ce',['derive']],'purchase-sum':['query_ce',['derive']],
+    'attendance':['query_ce',['event_attendance']],'donations':['query_ce',['event_donations']],'bank-summary':['query_ce',['event_bank']],
+    'person-summary':['query_ce',['person_profile']],'person-events':['query_ce',['person_events']],'person-income':['query_ce',['person_profile']],
+    'catalog-count':['query_ce',[trim(o?.entity)==='events'?'events_catalog':'people_catalog']],'canonical-socios':['query_ce',['people_catalog']],
+    'comparison':['query_ce',['compare_events']],'compare-metric':['query_ce',['derive']],
+    'events-overview':['query_ce',['events_overview']],'store-purchases':['query_ce',['store_purchases']],
+    'documentation':['query_ce',['event_documentation']],'management':['query_ce',['event_management']]
   };
-  if(kind==='ledger-structural')return{available:true,tool:'query_ce',operation:trim(o?.domain)==='purchases'?'event_purchases':'',kind};
-  const pair=direct[kind];if(pair)return{available:true,tool:pair[0],operation:pair[1],kind};
-  return{available:null,tool:'',operation:'',kind,reason:'oráculo sin mapeo de capacidad'};
+  if(kind==='event-metric'){
+    const ops=label.includes('compras pendientes')?['event_summary','event_purchases']:label.includes('ingresos')?['event_summary','event_income_status']:['event_summary'];
+    return{available:true,tool:'query_ce',operation:ops[0],operations:ops,kind};
+  }
+  if(kind==='ledger-structural')return{available:true,tool:'query_ce',operation:trim(o?.domain)==='purchases'?'event_purchases':'',operations:trim(o?.domain)==='purchases'?['event_purchases']:[],kind};
+  const pair=direct[kind];if(pair)return{available:true,tool:pair[0],operation:pair[1][0],operations:pair[1],kind};
+  return{available:null,tool:'',operation:'',operations:[],kind,reason:'oráculo sin mapeo de capacidad'};
 }
 function itvObservedCapability(result={}){
   const a=vNextAuditOf(result),attempt=a?.attemptedCapability||{},tools=arr(a.tools),tool=trim(attempt?.tool)||(tools.includes('query_ce')?'query_ce':tools.includes('search_documents')?'search_documents':tools.includes('recall_memory')?'recall_memory':tools.includes('resolve_entity')?'resolve_entity':trim(tools[0]));
   const rawArgs=attempt?.rawArgs&&typeof attempt.rawArgs==='object'?attempt.rawArgs:{},normalizedArgs=attempt?.normalizedArgs&&typeof attempt.normalizedArgs==='object'?attempt.normalizedArgs:{};
-  return{tool,operation:trim(a.operation)||trim(normalizedArgs?.operation)||trim(rawArgs?.operation),event:trim(a.event),person:trim(a.person),warnings:arr(a.warnings),rawArgs,normalizedArgs,capabilityAudit:attempt?.audit||null,error:trim(attempt?.error),audit:a};
+  return{tool,operation:trim(attempt?.effectiveOperation)||trim(a.operation)||trim(normalizedArgs?.operation)||trim(rawArgs?.operation),attemptedOperation:trim(normalizedArgs?.operation)||trim(rawArgs?.operation),event:trim(a.event),person:trim(a.person),warnings:arr(a.warnings),rawArgs,normalizedArgs,capabilityAudit:attempt?.audit||null,error:trim(attempt?.error),audit:a};
 }
 function itvCapabilitySignature(x={}){return[trim(x.tool)||'—',trim(x.operation)||'—'].join(':');}
+function itvCapabilityCompatible(expected={},observed={}){
+  if(expected?.available!==true)return true;
+  if(trim(expected.tool)&&trim(observed.tool)!==trim(expected.tool))return false;
+  const ops=arr(expected.operations).map(trim).filter(Boolean);if(ops.length&&!ops.includes(trim(observed.operation)))return false;
+  return true;
+}
+function validateExpectedCapability(caseDef={},result={}){
+  if(trim(caseDef?.engine).toUpperCase()!=='VNEXT')return{status:'OK',reasons:[]};
+  const expected=itvCapabilityExpectation(caseDef);if(expected.available!==true)return{status:'OK',reasons:[]};
+  const observed=itvObservedCapability(result);if(itvCapabilityCompatible(expected,observed))return{status:'OK',reasons:[]};
+  const wanted=[trim(expected.tool),arr(expected.operations).map(trim).filter(Boolean).join('|')].filter(Boolean).join(':');
+  return{status:'KO',reasons:[`capacidad factual esperada ${wanted||itvCapabilitySignature(expected)}; observada ${itvCapabilitySignature(observed)}`]};
+}
 function itvDecisionDiagnosis(c={},result={},verdict={status:'KO',reasons:[]}){
   const expected=itvCapabilityExpectation(c),observed=itvObservedCapability(result),reasons=arr(verdict?.reasons),status=trim(verdict?.status),group=norm(c?.group),kind=trim(c?.oracle?.kind),capAudit=observed?.capabilityAudit||{};
   const base={category:ITV_DIAG.UNKNOWN,touch:'REVISAR',confidence:'media',expectedCapability:itvCapabilitySignature(expected),observedCapability:itvCapabilitySignature(observed),reason:'No hay evidencia suficiente para asignar una capa única.',rawArgs:observed.rawArgs||{},normalizedArgs:observed.normalizedArgs||{},capabilityAudit:capAudit||null,rootCause:true,cascade:false};
-  if(status==='OK')return{...base,category:ITV_DIAG.OK,touch:'NINGUNO',confidence:'alta',reason:arr(capAudit?.repairs).length?'Oráculo correcto; el registro saneó argumentos opcionales no declarados.':'Oráculo y ejecución compatibles.'};
+  if(status==='OK'&&itvCapabilityCompatible(expected,observed))return{...base,category:ITV_DIAG.OK,touch:'NINGUNO',confidence:'alta',reason:arr(capAudit?.repairs).length?'Oráculo correcto; el registro normalizó JSON sin cambiar la intención.':'Oráculo, contrato y ejecución compatibles.'};
+  if(status==='OK')return{...base,category:group.includes('continuidad')?ITV_DIAG.CONT:ITV_DIAG.GEMINI,touch:group.includes('continuidad')?'SOFTWARE CONTEXTO + AYUDA GEMINI':'AYUDA/SCHEMA GEMINI',confidence:'alta',reason:`Respuesta plausible con contrato incorrecto: esperado ${itvCapabilitySignature(expected)}, observado ${itvCapabilitySignature(observed)}.`};
   if(status==='WARN'&&reasons.length&&reasons.every(x=>/^ITV VNext:/i.test(trim(x))))return{...base,category:ITV_DIAG.ITV,touch:'ITV',confidence:'alta',reason:'La ejecución parece correcta pero ITV todavía no puede certificar estructuralmente el efecto.'};
   if(expected.available===false)return{...base,category:ITV_DIAG.GAP,touch:'SOFTWARE CE · NUEVA CAPACIDAD',confidence:'alta',reason:expected.reason};
   const technical=arr(result?.warnings).some(x=>/timeout|error t[eé]cnico|fallo t[eé]cnico/i.test(trim(x)))||reasons.some(x=>/fallo t[eé]cnico|timeout/i.test(trim(x)));
   if(technical)return{...base,category:ITV_DIAG.TECH,touch:'SOFTWARE CE/INFRA',confidence:'alta',reason:'Fallo técnico independiente de la elección semántica.'};
   if(arr(capAudit?.repairs).length&&trim(expected.operation)===trim(observed.operation))return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'alta',reason:`Gemini eligió el contrato correcto pero añadió restricciones no declaradas: ${arr(capAudit.repairs).join(' | ')}`};
   if(trim(capAudit?.classification)==='UNSUPPORTED_CAPABILITY')return{...base,category:ITV_DIAG.GAP,touch:'SOFTWARE CE · NUEVA CAPACIDAD',confidence:'alta',reason:'Gemini solicitó una operación fuera del registro canónico.'};
-  if(trim(capAudit?.classification)==='INVALID_CONTRACT')return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'alta',reason:`La operación existe pero el JSON no cumple el contrato: ${arr(capAudit?.issues).join(' | ')}`};
+  if(['INVALID_CONTRACT','MALFORMED_CALL'].includes(trim(capAudit?.classification)))return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'alta',reason:`La operación existe pero el JSON no cumple el contrato: ${arr(capAudit?.issues).join(' | ')}`};
   const opExpected=trim(expected.operation),opObserved=trim(observed.operation);
   if(expected.available===true&&opExpected&&opObserved!==opExpected){
     if(group.includes('continuidad')||group.includes('tabla'))return{...base,category:ITV_DIAG.CONT,touch:'SOFTWARE CONTEXTO + AYUDA GEMINI',confidence:'alta',reason:`La capacidad existe (${opExpected}) pero el turno no conserva/materializa ese contrato.`};
@@ -456,7 +474,7 @@ function validateOracle(caseDef,result){
       if(metric==='income'&&!hasMoney(blob,d.income))reasons.push(`objetivo múltiple: falta ingreso ${euro(d.income)}`);
       if(metric==='purchases'&&!hasMoney(blob,d.purchases))reasons.push(`objetivo múltiple: faltan compras ${euro(d.purchases)}`);
       if(metric==='balance'&&!hasMoney(blob,d.balance))reasons.push(`objetivo múltiple: falta saldo ${euro(d.balance)}`);
-      if(metric==='attendees'&&!new RegExp(`\b${Number(d.attendees)}\b[^.\n]{0,45}(?:asistent|person|gente)|(?:asistent|person|gente)[^.\n]{0,45}\b${Number(d.attendees)}\b`,'i').test(blob))reasons.push(`objetivo múltiple: falta asistencia ${Number(d.attendees)}`);
+      if(metric==='attendees'&&!new RegExp(`\\b${Number(d.attendees)}\\b[^.\n]{0,45}(?:asistent|person|gente)|(?:asistent|person|gente)[^.\n]{0,45}\\b${Number(d.attendees)}\\b`,'i').test(blob))reasons.push(`objetivo múltiple: falta asistencia ${Number(d.attendees)}`);
     }
   }else if(oracle.kind==='purchase-set'){
     if(oracle.productCount>0&&claimsNoProducts(result))reasons.push(`afirma que no hay productos, pero CE tiene ${oracle.productCount}`);
@@ -498,7 +516,11 @@ function validateOracle(caseDef,result){
     const d=oracle.data;if(d){const values=[d.balance,d.income,d.purchases].filter(v=>Number.isFinite(Number(v)));if(values.length&&!values.some(v=>hasMoney(blob,v)))reasons.push('no contiene ninguna magnitud económica canónica esperada');}
   }else if(oracle.kind==='person-summary'){
     if(!trim(result?.answer))reasons.push('resumen personal vacío');
-    if(oracle.data&&oracle.data.eventCount>0&&!hasNameInText(blob,oracle.person)&&!resultHasPerson(result,oracle.person))reasons.push('no mantiene la identidad personal');
+    const d=oracle.data||{},expectedEvents=arr(d.summaryRows).map(r=>trim(r?.Evento)).filter(Boolean);
+    if(d.eventCount>0&&!hasNameInText(blob,oracle.person)&&!resultHasPerson(result,oracle.person))reasons.push('no mantiene la identidad personal');
+    const countMatch=d.eventCount<=0||new RegExp(`\\b${Number(d.eventCount)}\\b[^.\n]{0,30}eventos?|eventos?[^.\n]{0,30}\\b${Number(d.eventCount)}\\b`,'i').test(blob)||expectedEvents.some(n=>hasNameInText(blob,n))||arr(result?.tables).length>0;
+    if(!countMatch)reasons.push(`dossier personal: no acredita sus ${Number(d.eventCount)} eventos`);
+    for(const [label,value] of [['ingresos',d.income],['compras',d.purchases],['donaciones',d.donations]])if(Math.abs(num(value))>0.004&&!hasMoney(blob,value))reasons.push(`dossier personal incompleto: faltan ${label} ${euro(value)}`);
   }else if(oracle.kind==='person-events'){
     const names=arr(oracle.data?.summaryRows).map(r=>trim(r?.Evento)).filter(Boolean),expectedCount=num(oracle.data?.eventCount);
     if(expectedCount>0&&/(?:aparece|figura|participa|est[aá])[^.\n]{0,45}\b0\s+eventos?\b|\b0\s+eventos?\b/i.test(blob))reasons.push(`afirma 0 eventos, pero CE acredita ${expectedCount}`);
@@ -533,7 +555,9 @@ function validateOracle(caseDef,result){
   }else if(oracle.kind==='attendance'){
     const d=oracle.data;if(d&&d.attendees>=0&&!new RegExp(`\\b${Number(d.attendees)}\\b`).test(blob))reasons.push(`asistencia: no acredita ${d.attendees} personas`);
   }else if(oracle.kind==='management'){
-    const d=oracle.data;if(d&&![d.hitos,d.lg,d.pending,d.completed].some(n=>new RegExp(`\\b${Number(n)}\\b`).test(blob)))reasons.push('gestión: no refleja ningún recuento canónico de Hitos/LG');
+    const d=oracle.data,hasMgmtLabel=/\bhitos?\b|\b(?:tareas?\s+)?LG\b/i.test(blob);
+    if(d&&!hasMgmtLabel)reasons.push('gestión: la respuesta no materializa Hitos/LG');
+    else if(d&&![d.hitos,d.lg,d.pending,d.completed].some(n=>new RegExp(`\\b${Number(n)}\\b`).test(blob)))reasons.push('gestión: no refleja ningún recuento canónico de Hitos/LG');
   }else if(oracle.kind==='donations'){
     const d=oracle.data;if(d){if(d.records>0&&claimsNoProducts(result))reasons.push('donaciones: afirma ausencia de producto pese a existir registros');if(d.total>0&&!hasMoney(blob,d.total)&&!new RegExp(`\\b${Number(d.records)}\\b`).test(blob))reasons.push(`donaciones: no acredita ${euro(d.total)} ni ${d.records} registros`);}
   }else if(oracle.kind==='donation-status'){
@@ -697,9 +721,9 @@ function validateVNextStructural(caseDef,result){
   return{status:'OK',reasons:[]};
 }
 function validatePaidCase(caseDef,result){
-  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result),structural=trim(caseDef?.engine).toUpperCase()==='VNEXT'?validateVNextStructural(caseDef,result):validateLedgerStructural(caseDef,result),health=vItvGenericHealth(result),perf=vItvPerformanceHealth(result);
-  const reasons=[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons,...structural.reasons,...health.reasons,...perf.reasons];
-  let status='OK';if(!base||!oracle.ok||structural.status==='KO'||health.status==='KO'||perf.status==='KO')status='KO';else if(structural.status==='WARN'||health.status==='WARN'||perf.status==='WARN')status='WARN';
+  const base=caseDef?.validate?!!caseDef.validate(result):true,oracle=validateOracle(caseDef,result),capability=validateExpectedCapability(caseDef,result),structural=trim(caseDef?.engine).toUpperCase()==='VNEXT'?validateVNextStructural(caseDef,result):validateLedgerStructural(caseDef,result),health=vItvGenericHealth(result),perf=vItvPerformanceHealth(result);
+  const reasons=[...(base?[]:['invariante de selección/contexto no satisfecha']),...oracle.reasons,...capability.reasons,...structural.reasons,...health.reasons,...perf.reasons];
+  let status='OK';if(!base||!oracle.ok||capability.status==='KO'||structural.status==='KO'||health.status==='KO'||perf.status==='KO')status='KO';else if(structural.status==='WARN'||health.status==='WARN'||perf.status==='WARN')status='WARN';
   return{ok:status==='OK',status,reasons};
 }
 
@@ -1655,3 +1679,4 @@ export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,ca
 // distingue resultado correcto, advertencia conversacional y fallo real.
 export function __validateZuzuItvCaseForRegression(caseDef={},result={}){return validatePaidCase(caseDef,result);}
 export function __itvP116ForRegression(){return{itvCapabilityExpectation,itvObservedCapability,itvDecisionDiagnosis,vNextAuditOf,vNextTableRowsAsObjects,markScenarioCascade};}
+export function __itvP117ForRegression(){return{itvCapabilityExpectation,itvObservedCapability,itvCapabilityCompatible,validateExpectedCapability,itvDecisionDiagnosis,vNextAuditOf,vNextTableRowsAsObjects,markScenarioCascade,validateOracle,validatePaidCase};}
