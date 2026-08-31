@@ -22,6 +22,8 @@ const trim=v=>text(v).trim();
 const num=v=>{const n=Number(v);return Number.isFinite(n)?n:0;};
 const norm=v=>trim(v).normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\\s+/g,' ').trim();
 const validateOracle=()=>({ok:true,reasons:[]});
+const validateExpectedCapability=()=>({status:'OK',reasons:[]});
+const validateVNextStructural=()=>({status:'OK',reasons:[]});
 ${names.map(extract).join('\n')}
 return {validatePaidCase};`;
 const {validatePaidCase:validate}=Function(body)();

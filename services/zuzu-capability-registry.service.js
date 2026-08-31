@@ -1,6 +1,6 @@
-/* ControlEvent v4_0_exp · VNext P1.17
-   Registro canónico de capacidades query_ce.
-   NHC: describe contratos JSON y semántica de ejecución; nunca palabras/frases del usuario. */
+/* ControlEvent v4_0_exp · VNext P1.18
+   Registro + canonizador estructural de capacidades query_ce.
+   NHC: describe JSON/semántica; nunca interpreta palabras o frases del usuario. */
 import crypto from 'node:crypto';
 import { getSupabaseAdmin } from '../lib/supabase.js';
 
@@ -8,7 +8,7 @@ const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
 const arr=v=>Array.isArray(v)?v:[];
 
-export const CAPABILITY_REGISTRY_VERSION='20260831-P117';
+export const CAPABILITY_REGISTRY_VERSION='20260831-P118';
 
 const P={
   operation:{type:'string'},
@@ -20,44 +20,50 @@ const P={
   mine:{type:'boolean'},order_by:{type:'string',enum:['store_product','product','store','amount_desc']},store_filter_mode:{type:'string',enum:['all','include','exclude']},include_stores:{type:'array',items:{type:'string'}},exclude_stores:{type:'array',items:{type:'string'}},exclude_products:{type:'array',items:{type:'string'}},
   visible_columns:{type:'array',items:{type:'string'}},hidden_columns:{type:'array',items:{type:'string'}},view_filters:{type:'array',items:{type:'object',properties:{field:{type:'string'},operator:{type:'string',enum:['eq','neq','contains','not_contains']},value:{type:'string'}},required:['field','operator','value']}},view_sort:{type:'array',items:{type:'object',properties:{field:{type:'string'},direction:{type:'string',enum:['asc','desc']}},required:['field']}},reset_table:{type:'boolean'},
   income_delta:{type:'number'},scenario_people:{type:'array',items:{type:'string'}},plan:{type:'boolean'},plan_detail:{type:'boolean'},plan_focus:{type:'array',items:{type:'string'}},plan_target:{type:'number'},include_empty:{type:'boolean'},
-  requested_fields:{type:'array',items:{type:'string',enum:['income','purchases','pending','donations','balance','valuation','attendees','status','event']}},
-  derive_operation:{type:'string',enum:['SUM','COUNT','DISTINCT_COUNT','MAX','MIN','AVG','RANK','DIFFERENCE']},field:{type:'string'},label_field:{type:'string'},table_key:{type:'string'},top_n:{type:'integer'}
+  // P1.18: proyección de salida; no filtra el dataset. Se deja abierta a nombres de campo canónicos.
+  requested_fields:{type:'array',items:{type:'string'}},
+  // P1.18: estado de foco estructurado. REPLACE sustituye el sujeto previo; ADD lo compone deliberadamente.
+  focus_mode:{type:'string',enum:['replace','add']},
+  derive_operation:{type:'string',enum:['SUM','COUNT','DISTINCT_COUNT','MAX','MIN','AVG','RANK','DIFFERENCE']},field:{type:'string'},label_field:{type:'string'},table_key:{type:'string'},top_n:{type:'integer'},
+  source_operation:{type:'string'},source_args:{type:'object'}
 };
 
 const PRESENT=['detail','tone','register','tease','narrate'];
-const def=(module,required=[],optional=[],result='',guarded=[],defaults={})=>({module,required,optional:[...new Set([...optional,...PRESENT])],result,guarded,defaults});
+const META=['requested_fields'];
+const def=(module,required=[],optional=[],result='',guarded=[],defaults={})=>({module,required,optional:[...new Set([...optional,...PRESENT,...META])],result,guarded,defaults});
 
 export const CAPABILITY_REGISTRY=Object.freeze({
   people_catalog:def('PERSONAS',[],['population'],'people_catalog'),
   events_catalog:def('EVENTOS',[],[],'events_catalog'),
-  person_profile:def('PERSONAS',['person'],['event'],'person_dossier'),
-  person_events:def('PERSONAS',['person'],[],'person_events'),
-  person_income_status:def('INGRESOS',['person','event'],[],'person_income_status'),
-  person_event_status:def('PERSONAS',['person','event'],[],'person_event_status'),
+  person_profile:def('PERSONAS',['person'],['event','focus_mode'],'person_dossier',[],{focus_mode:'replace'}),
+  person_events:def('PERSONAS',['person'],['focus_mode'],'person_events',[],{focus_mode:'replace'}),
+  person_income_status:def('INGRESOS',['person','event'],['focus_mode'],'person_income_status',[],{focus_mode:'replace'}),
+  person_event_status:def('PERSONAS',['person','event'],['focus_mode'],'person_event_status',[],{focus_mode:'replace'}),
   event_income_status:def('INGRESOS',['event'],['status','population'],'income_status',[],{status:'pending',population:'all'}),
   event_income_lines:def('INGRESOS',['event'],[],'income_lines'),
-  event_attendance:def('ASISTENCIA',['event'],['attendance_mode'],'attendance',[],{attendance_mode:'attendees'}),
-  event_summary:def('EVENTO',['event'],['requested_fields'],'event_dossier'),
+  event_attendance:def('ASISTENCIA',['event'],['attendance_mode','scope'],'attendance',[],{attendance_mode:'attendees'}),
+  event_summary:def('EVENTO',['event'],['scope'],'event_dossier'),
   event_scenario:def('ESCENARIOS',['event'],['income_delta','scenario_people','plan','plan_detail','plan_focus','plan_target','chart','chart_type'],'scenario'),
-  event_purchases:def('COMPRAS',['event'],['purchase_status','responsible','mine','order_by','store_filter_mode','include_stores','exclude_stores','exclude_products','visible_columns','hidden_columns','view_filters','view_sort','reset_table'],'purchase_dataset',[],{purchase_status:'all',store_filter_mode:'all'}),
-  event_donations:def('DONACIONES',['event'],[],'donation_dataset'),
-  event_bank:def('BANCO',['event'],[],'bank_summary'),
+  // status/top_n/derive_* son compatibilidad JSON; el canonizador puede transformarlos.
+  event_purchases:def('COMPRAS',['event'],['purchase_status','status','responsible','mine','order_by','store_filter_mode','include_stores','exclude_stores','exclude_products','visible_columns','hidden_columns','view_filters','view_sort','reset_table','top_n','derive_operation','field','label_field'],'purchase_dataset',[],{purchase_status:'all',store_filter_mode:'all'}),
+  event_donations:def('DONACIONES',['event'],['scope'],'donation_dataset'),
+  event_bank:def('BANCO',['event'],['scope'],'bank_summary'),
   event_weather:def('TIEMPO',['event'],['start_date','end_date','chart','chart_type'],'weather'),
   event_stores_used:def('TIENDAS',['event'],[],'event_stores'),
   event_products:def('PRODUCTOS',['event'],[],'event_products'),
   compare_events:def('COMPARACION',['events'],['metric','chart','chart_type'],'comparison',[],{metric:'all'}),
-  event_documentation:def('DOCUMENTOS',['event'],[],'event_documentation'),
-  event_management:def('GESTION',['event'],[],'event_management'),
+  event_documentation:def('DOCUMENTOS',['event'],['scope'],'event_documentation'),
+  event_management:def('GESTION',['event'],['scope'],'event_management'),
   store_purchases:def('TIENDAS',['store'],['event','scope','status','include_empty'],'store_purchases',[],{scope:'all_events',status:'realized'}),
-  events_overview:def('EVENTOS',[],['metric','chart','chart_type'],'events_overview',[],{metric:'all'}),
-  derive:def('DERIVACION',['derive_operation'],['field','label_field','table_key','top_n'],'derived_dataset')
+  events_overview:def('EVENTOS',[],['scope','metric','chart','chart_type'],'events_overview',[],{metric:'all'}),
+  derive:def('DERIVACION',['derive_operation'],['field','label_field','table_key','top_n','source_operation','source_args'],'derived_dataset')
 });
 
 export function capabilityOperations(){return Object.keys(CAPABILITY_REGISTRY);}
 export function capabilityDefinition(operation=''){return CAPABILITY_REGISTRY[trim(operation)]||null;}
 export function queryCeSchemaProperties(){
   const props={};for(const [k,v] of Object.entries(P))props[k]=v;
-  props.operation={type:'string',enum:capabilityOperations(),description:'Operación canónica de ControlEvent. Cada operación habilita solo sus propias claves.'};
+  props.operation={type:'string',enum:capabilityOperations(),description:'Operación canónica de ControlEvent. Cada operation publica sus claves válidas y compatibilidades estructurales.'};
   return props;
 }
 function capabilityBranchSchema(operation=''){
@@ -65,15 +71,16 @@ function capabilityBranchSchema(operation=''){
   const keys=[...new Set(['operation',...d.required,...d.optional])],properties={};
   for(const k of keys){if(k==='operation')properties.operation={type:'string',enum:[operation]};else if(P[k])properties[k]={...P[k]};}
   if(properties.mine)properties.mine={...properties.mine,description:'true solo cuando el objetivo estructurado sea limitar las compras al usuario actual.'};
-  if(properties.responsible)properties.responsible={...properties.responsible,description:'Persona responsable por la que debe filtrarse el dataset; omitir si no se solicita ese filtro.'};
-  if(properties.order_by)properties.order_by={...properties.order_by,description:'Orden solicitado para la vista; omitir si no hay una ordenación pedida.'};
-  if(properties.requested_fields)properties.requested_fields={...properties.requested_fields,description:'Magnitudes que deben materializarse en la respuesta. No filtra el dataset.'};
+  if(properties.responsible)properties.responsible={...properties.responsible,description:'Filtro de responsable; omitir si no se solicita ese filtro.'};
+  if(properties.order_by)properties.order_by={...properties.order_by,description:'Orden de vista. amount_desc + top_n se puede canonizar a DERIVE/RANK o MAX.'};
+  if(properties.requested_fields)properties.requested_fields={...properties.requested_fields,description:'Campos/magnitudes que deben materializarse en la respuesta. No filtra datos.'};
+  if(properties.focus_mode)properties.focus_mode={...properties.focus_mode,description:'replace sustituye el sujeto previo; add compone sujetos deliberadamente.'};
+  if(operation==='events_overview'&&properties.scope)properties.scope={...properties.scope,description:'Compatibilidad: all_events es redundante y se elimina al canonizar.'};
+  if(operation==='event_purchases'&&properties.top_n)properties.top_n={...properties.top_n,description:'Compatibilidad estructural: junto con amount_desc puede canonizarse a DERIVE.'};
   return{type:'object',properties,required:['operation',...d.required],additionalProperties:false};
 }
 export function queryCeToolParameters(){
   const branches=capabilityOperations().map(capabilityBranchSchema).filter(Boolean);
-  // P1.17: discriminador por operation. Se conserva properties en la raíz por compatibilidad
-  // con consumidores que inspeccionan el schema, pero anyOf expresa el contrato real de cada operación.
   return{type:'object',properties:queryCeSchemaProperties(),required:['operation'],anyOf:branches};
 }
 export function capabilityCatalogText(){
@@ -99,27 +106,68 @@ export function capabilitySignature(args={}){
 }
 export function capabilitySignatureHash(args={}){return crypto.createHash('sha256').update(capabilitySignature(args)).digest('hex');}
 
-export function auditCapabilityCall(rawArgs={}){
-  const raw={...(rawArgs||{})},operation=trim(raw.operation),d=capabilityDefinition(operation),issues=[],repairs=[],sanitized={...raw};
-  if(!d)return{ok:false,operation,classification:'UNSUPPORTED_CAPABILITY',issues:[`Operación no registrada: ${operation||'—'}`],repairs,rawArgs:raw,sanitizedArgs:sanitized,signature:capabilitySignature(raw),signatureHash:capabilitySignatureHash(raw),registryVersion:CAPABILITY_REGISTRY_VERSION};
+function cleanSourceArgs(input={}){
+  const out={...input};for(const k of ['derive_operation','field','label_field','table_key','top_n','source_operation','source_args','requested_fields','focus_mode'])delete out[k];return out;
+}
+function validateAgainstDefinition(args={},operation='',issues=[]){
+  const d=capabilityDefinition(operation);if(!d)return null;
   const allowed=new Set(['operation',...d.required,...d.optional]);
-  const unknown=Object.keys(raw).filter(k=>!k.startsWith('_')&&!allowed.has(k));
-  if(unknown.length){issues.push(`Claves no permitidas para ${operation}: ${unknown.join(', ')}`);for(const k of unknown)delete sanitized[k];}
-  for(const k of d.required){const v=raw[k];if(v==null||v===''||(Array.isArray(v)&&!v.length))issues.push(`Falta clave obligatoria ${k}`);}
-  for(const k of [...d.required,...d.optional]){
-    if(raw[k]===undefined)continue;
-    // Tolerancia JSON estructural: un único requested_field puede llegar como string.
-    if(k==='requested_fields'&&typeof raw[k]==='string'&&valueTypeOk([raw[k]],P[k]||{})){sanitized[k]=[raw[k]];repairs.push('requested_fields normalizado de string a array');continue;}
-    if(!valueTypeOk(raw[k],P[k]||{})){issues.push(`Tipo inválido en ${k}`);delete sanitized[k];}
+  const unknown=Object.keys(args).filter(k=>!k.startsWith('_')&&!allowed.has(k));if(unknown.length)issues.push(`Claves no permitidas para ${operation}: ${unknown.join(', ')}`);
+  for(const k of d.required){const v=args[k];if(v==null||v===''||(Array.isArray(v)&&!v.length))issues.push(`Falta clave obligatoria ${k}`);}
+  for(const k of [...d.required,...d.optional]){if(args[k]===undefined)continue;if(!valueTypeOk(args[k],P[k]||{}))issues.push(`Tipo inválido en ${k}`);}
+  return d;
+}
+
+export function auditCapabilityCall(rawArgs={}){
+  const raw={...(rawArgs||{})},originalOperation=trim(raw.operation),initialDef=capabilityDefinition(originalOperation),issues=[],repairs=[];
+  if(!initialDef)return{ok:false,operation:originalOperation,effectiveOperation:originalOperation,classification:'UNSUPPORTED_CAPABILITY',issues:[`Operación no registrada: ${originalOperation||'—'}`],repairs,rawArgs:raw,sanitizedArgs:{...raw},signature:capabilitySignature(raw),signatureHash:capabilitySignatureHash(raw),registryVersion:CAPABILITY_REGISTRY_VERSION};
+
+  let sanitized={...raw},effectiveOperation=originalOperation,classification='CANONICAL';
+  // Tolerancia de forma, sin interpretar lenguaje.
+  if(typeof sanitized.requested_fields==='string'){sanitized.requested_fields=[sanitized.requested_fields];repairs.push('requested_fields: string → array');classification='COMPATIBLE';}
+  if(typeof sanitized.focus_mode==='string')sanitized.focus_mode=trim(sanitized.focus_mode).toLowerCase();
+
+  // Ámbitos redundantes en contratos cuyo nombre ya fija el ámbito.
+  if(effectiveOperation==='events_overview'&&sanitized.scope!==undefined){
+    if(trim(sanitized.scope)==='all_events'){delete sanitized.scope;repairs.push('events_overview: scope=all_events redundante eliminado');classification='COMPATIBLE';}
+    else issues.push(`events_overview solo admite scope=all_events como compatibilidad; recibido ${trim(sanitized.scope)||'—'}`);
   }
-  for(const [k,v] of Object.entries(d.defaults||{})){if(sanitized[k]===undefined||sanitized[k]==='')sanitized[k]=v;}
-  // P1.17: una clave ajena a la operación o un tipo inválido es MALFORMED_CALL.
-  // No se intenta reinterpretar el castellano ni se "aprende" la combinación errónea.
-  const fatal=issues.length>0;
-  return{ok:!fatal,operation,classification:fatal?'MALFORMED_CALL':repairs.length?'NORMALIZED':'KNOWN',issues,repairs,rawArgs:raw,sanitizedArgs:sanitized,signature:capabilitySignature(raw),signatureHash:capabilitySignatureHash(raw),registryVersion:CAPABILITY_REGISTRY_VERSION,module:d.module,resultContract:d.result};
+  if(['event_management','event_documentation','event_donations','event_bank','event_attendance','event_summary'].includes(effectiveOperation)&&sanitized.scope!==undefined){
+    if(['named_event','active_event',''].includes(trim(sanitized.scope))){delete sanitized.scope;repairs.push(`${effectiveOperation}: scope redundante eliminado`);classification='COMPATIBLE';}
+    else issues.push(`${effectiveOperation} es de un evento y no admite scope=${trim(sanitized.scope)}`);
+  }
+
+  // Alias JSON estructural: status de compras equivale a purchase_status.
+  if(effectiveOperation==='event_purchases'&&sanitized.status!==undefined){
+    const s=trim(sanitized.status);if(!sanitized.purchase_status&&['pending','realized','all'].includes(s)){sanitized.purchase_status=s;delete sanitized.status;repairs.push('event_purchases: status → purchase_status');classification='NORMALIZED';}
+    else if(sanitized.purchase_status){delete sanitized.status;repairs.push('event_purchases: status redundante eliminado');classification='COMPATIBLE';}
+  }
+
+  // Validación del contrato de entrada antes de una posible canonización de operación.
+  validateAgainstDefinition(sanitized,effectiveOperation,issues);
+  if(issues.length)return{ok:false,operation:originalOperation,effectiveOperation,classification:'MALFORMED_CALL',issues,repairs,rawArgs:raw,sanitizedArgs:sanitized,signature:capabilitySignature(raw),signatureHash:capabilitySignatureHash(raw),registryVersion:CAPABILITY_REGISTRY_VERSION,module:initialDef.module,resultContract:initialDef.result};
+
+  // P1.18: una forma alternativa razonable de "top N / máximo" en compras se canoniza a DERIVE.
+  if(effectiveOperation==='event_purchases'){
+    const dop=trim(sanitized.derive_operation).toUpperCase(),top=Math.max(0,Number(sanitized.top_n)||0),order=trim(sanitized.order_by);
+    let targetDerive='';
+    if(dop)targetDerive=dop;
+    else if(top>0&&order==='amount_desc')targetDerive=top===1?'MAX':'RANK';
+    if(targetDerive){
+      const sourceArgs=cleanSourceArgs({...sanitized,operation:'event_purchases'});
+      const keep={detail:sanitized.detail,tone:sanitized.tone,register:sanitized.register,tease:sanitized.tease,narrate:sanitized.narrate,requested_fields:sanitized.requested_fields};
+      sanitized={operation:'derive',derive_operation:targetDerive,field:trim(sanitized.field)||'amount',label_field:trim(sanitized.label_field)||'product',top_n:top||undefined,source_operation:'event_purchases',source_args:sourceArgs,...Object.fromEntries(Object.entries(keep).filter(([,v])=>v!==undefined))};
+      effectiveOperation='derive';classification='NORMALIZED';repairs.push(`event_purchases → derive(${targetDerive}) sobre dataset de compras`);
+    }
+  }
+
+  const effectiveDef=capabilityDefinition(effectiveOperation),effectiveIssues=[];validateAgainstDefinition(sanitized,effectiveOperation,effectiveIssues);
+  if(effectiveIssues.length)return{ok:false,operation:originalOperation,effectiveOperation,classification:'MALFORMED_CALL',issues:effectiveIssues,repairs,rawArgs:raw,sanitizedArgs:sanitized,signature:capabilitySignature(raw),signatureHash:capabilitySignatureHash(raw),registryVersion:CAPABILITY_REGISTRY_VERSION,module:effectiveDef?.module||initialDef.module,resultContract:effectiveDef?.result||initialDef.result};
+  for(const [k,v] of Object.entries(effectiveDef?.defaults||{})){if(sanitized[k]===undefined||sanitized[k]==='')sanitized[k]=v;}
+  return{ok:true,operation:originalOperation,effectiveOperation,classification,issues:[],repairs,rawArgs:raw,sanitizedArgs:sanitized,signature:capabilitySignature(raw),signatureHash:capabilitySignatureHash(raw),registryVersion:CAPABILITY_REGISTRY_VERSION,module:effectiveDef?.module||initialDef.module,resultContract:effectiveDef?.result||initialDef.result};
 }
 
 export function queueCapabilityObservation(observation={}){
   const payload={registry_version:CAPABILITY_REGISTRY_VERSION,operation:trim(observation.operation),module:trim(observation.module),signature:trim(observation.signature),signature_hash:trim(observation.signatureHash),status:trim(observation.status)||'PENDING',classification:trim(observation.classification),prompt:trim(observation.prompt).slice(0,3000),raw_args:observation.rawArgs||{},sanitized_args:observation.sanitizedArgs||{},issues:arr(observation.issues),repairs:arr(observation.repairs),scenario:trim(observation.scenario),observed_at:new Date().toISOString()};
-  Promise.resolve().then(async()=>{try{const db=getSupabaseAdmin();if(!db)return;const {error}=await db.from('ce_zuzu_capability_observations').insert(payload);if(error&&!/does not exist|schema cache|relation .* does not exist/i.test(text(error?.message)))console.warn('[P1.17 CAPABILITY OBS]',error.message||error);}catch(_){}});
+  Promise.resolve().then(async()=>{try{const db=getSupabaseAdmin();if(!db)return;const {error}=await db.from('ce_zuzu_capability_observations').insert(payload);if(error&&!/does not exist|schema cache|relation .* does not exist/i.test(text(error?.message)))console.warn('[P1.18 CAPABILITY OBS]',error.message||error);}catch(_){}});
 }

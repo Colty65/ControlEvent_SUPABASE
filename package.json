@@ -62,7 +62,8 @@
     "test:vnext-p112": "node scripts/v4-0-exp-vnext-p112-itv-vnext-parity-regression.cjs",
     "test:vnext-p114": "node scripts/v4-0-exp-vnext-p114-itv-trusted-oracle-manifest-regression.cjs",
     "test:vnext-p116": "node scripts/v4-0-exp-vnext-p116-capability-registry-regression.cjs",
-    "test:vnext-p117": "node scripts/v4-0-exp-vnext-p117-strict-itv-discriminated-contracts-regression.cjs"
+    "test:vnext-p117": "node scripts/v4-0-exp-vnext-p117-strict-itv-discriminated-contracts-regression.cjs",
+    "test:vnext-p118": "node scripts/v4-0-exp-vnext-p118-canonicalizer-golden-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
