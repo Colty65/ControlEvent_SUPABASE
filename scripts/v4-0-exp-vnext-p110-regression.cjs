@@ -1,5 +1,6 @@
 const fs=require('fs');
 const svc=fs.readFileSync('services/event-ai.service.js','utf8');
+const reg=fs.readFileSync('services/zuzu-capability-registry.service.js','utf8');
 const ui=fs.readFileSync('public/app/features/v11-3-zuzu-analitica-libre.js','utf8');
 const html=fs.readFileSync('public/index.html','utf8');
 let ok=0,ko=0;const t=(n,c)=>{if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}};
@@ -7,8 +8,8 @@ t('UI P1.10',/VNext P1\.10/.test(ui));
 t('cache P1.10',/VNEXT-P110-GENERIC-TABLE-VIEW/.test(html));
 t('generic table engine',/function vnextP110ApplyTableView/.test(svc)&&/GENERIC TABLE VIEW/.test(svc));
 t('generic continuity',/function vnextP110IsTableContinuation/.test(svc)&&/vnextP110BaseArgsFromContext/.test(svc));
-t('generic view filters schema',/view_filters:\{type:'array'/.test(svc)&&/operator:\{type:'string',enum:\['eq','neq','contains','not_contains'\]/.test(svc));
-t('generic view sort schema',/view_sort:\{type:'array'/.test(svc)&&/direction:\{type:'string',enum:\['asc','desc'\]/.test(svc));
+t('generic view filters schema',/view_filters:\{type:'array'/.test(svc+reg)&&/operator:\{type:'string',enum:\['eq','neq','contains','not_contains'\]/.test(svc+reg));
+t('generic view sort schema',/view_sort:\{type:'array'/.test(svc+reg)&&/direction:\{type:'string',enum:\['asc','desc'\]/.test(svc+reg));
 t('column projection keeps internal rows',/const outRows=rows\.slice\(\),outSchema=\{\}/.test(svc));
 t('feedback guard',/function vnextP110FeedbackOnly/.test(svc)&&/INTERNAL CALL LEAK GUARD/.test(svc));
 t('pseudo tool leak blocked',/function vnextP110LooksLikeInternalCall/.test(svc)&&/default_api/.test(svc));
