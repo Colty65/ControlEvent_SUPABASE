@@ -1,0 +1,10 @@
+const fs=require('fs'),path=require('path');
+const root=path.resolve(__dirname,'..');let ok=0,ko=0;const t=(n,c,d='')=>{if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n,d)}};
+const ui=fs.readFileSync(path.join(root,'public/app/features/zuzu-test-console-gd.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+t('helper arr definido antes de uso',ui.includes('const arr=v=>Array.isArray(v)?v:[];'));
+t('dos usos P1.18 de arr siguen cubiertos',(ui.match(/\barr\(/g)||[]).length===2,String((ui.match(/\barr\(/g)||[]).length));
+t('build UI hotfix',ui.includes('20260831-P1181-GOLDEN110-ARR-HOTFIX-NHC'));
+t('cache-bust hotfix',html.includes('20260831-VNEXT-P1181-GOLDEN110-ARR-HOTFIX-NHC'));
+t('GOLDEN 110 se conserva',ui.includes('data-level="GOLDEN"')&&ui.includes('GOLDEN · 110'));
+console.log(`RESULTADO ${ok}/${ok+ko}`);process.exitCode=ko?1:0;

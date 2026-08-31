@@ -7,7 +7,7 @@
 
   const ITV_CONTRACT_VERSION=4;
   const ITV_BUILD='20260828-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE';
-  const ITV_LANGUAGE_BUILD='20260831-P118-CANONICALIZER-FACTUAL-COVERAGE-GOLDEN110-NHC';
+  const ITV_LANGUAGE_BUILD='20260831-P1181-GOLDEN110-ARR-HOTFIX-NHC';
   const ITV_OBSERVATION_MODE=false;
   window.__CE_ZUZU_ITV_BUILD__=ITV_BUILD;
   window.__CE_ZUZU_ITV_CONTRACT_VERSION__=ITV_CONTRACT_VERSION;
@@ -20,6 +20,7 @@
   const fmtN=n=>new Intl.NumberFormat('es-ES').format(num(n));
   const fmtE=n=>new Intl.NumberFormat('es-ES',{minimumFractionDigits:2,maximumFractionDigits:4}).format(num(n))+' €';
   const clone=v=>v==null?v:JSON.parse(JSON.stringify(v));
+  const arr=v=>Array.isArray(v)?v:[];
   function stableObject(v){if(Array.isArray(v))return v.map(stableObject);if(v&&typeof v==='object'){const o={};Object.keys(v).sort().forEach(k=>o[k]=stableObject(v[k]));return o;}return v;}
   function manifestHash(v){const raw=JSON.stringify(stableObject(v||{}));let h=2166136261>>>0;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(16).padStart(8,'0');}
   function percentile(values,p){const a=values.map(num).filter(v=>v>0).sort((x,y)=>x-y);if(!a.length)return 0;const i=(a.length-1)*p,lo=Math.floor(i),hi=Math.min(a.length-1,lo+1),f=i-lo;return Math.round(a[lo]*(1-f)+a[hi]*f);}

@@ -77,8 +77,8 @@ t('ITV P1.18 separa functional/performance',labFull.includes('functionalStatus')
 t('ITV GOLDEN disponible',labFull.includes("GOLDEN:{id:'GOLDEN'")&&labFull.includes('GOLDEN-P117-110'));
 t('UI ofrece GOLDEN 110',ui.includes('data-level="GOLDEN"')&&ui.includes('GOLDEN · 110'));
 t('UI separa rendimiento',ui.includes('performanceVerdicts')&&ui.includes('PERF_WARN')&&ui.includes('PERF_KO'));
-t('build UI P1.18',ui.includes('20260831-P118-CANONICALIZER-FACTUAL-COVERAGE-GOLDEN110-NHC'));
-t('cache P1.18',html.includes('20260831-VNEXT-P118-CANONICALIZER-FACTUAL-COVERAGE-GOLDEN110-LANG260-NHC'));
+t('build UI P1.18/P1.18.1',ui.includes('20260831-P118-CANONICALIZER-FACTUAL-COVERAGE-GOLDEN110-NHC')||ui.includes('20260831-P1181-GOLDEN110-ARR-HOTFIX-NHC'));
+t('cache P1.18/P1.18.1',html.includes('20260831-VNEXT-P118-CANONICALIZER-FACTUAL-COVERAGE-GOLDEN110-LANG260-NHC')||html.includes('20260831-VNEXT-P1181-GOLDEN110-ARR-HOTFIX-NHC'));
 t('SQL espejo P1.18',sql.includes('20260831-P118')&&sql.includes('ce_zuzu_capability_observations')&&sql.includes('requested_fields'));
 
 console.log(`RESULTADO ${ok}/${ok+ko}`);process.exitCode=ko?1:0;
