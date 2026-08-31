@@ -7,7 +7,7 @@
 
   const ITV_CONTRACT_VERSION=4;
   const ITV_BUILD='20260828-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE';
-  const ITV_LANGUAGE_BUILD='20260831-P115-ITV-DECISION-MAP-VNEXT-NHC';
+  const ITV_LANGUAGE_BUILD='20260831-P116-CAPABILITY-REGISTRY-DERIVE-ROOT-CAUSE-NHC';
   const ITV_OBSERVATION_MODE=false;
   window.__CE_ZUZU_ITV_BUILD__=ITV_BUILD;
   window.__CE_ZUZU_ITV_CONTRACT_VERSION__=ITV_CONTRACT_VERSION;
@@ -24,12 +24,20 @@
   function manifestHash(v){const raw=JSON.stringify(stableObject(v||{}));let h=2166136261>>>0;for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)>>>0;}return h.toString(16).padStart(8,'0');}
   function percentile(values,p){const a=values.map(num).filter(v=>v>0).sort((x,y)=>x-y);if(!a.length)return 0;const i=(a.length-1)*p,lo=Math.floor(i),hi=Math.min(a.length-1,lo+1),f=i-lo;return Math.round(a[lo]*(1-f)+a[hi]*f);}
 
-  function diagnosisSummary(list=[]){
-    const byCategory={},byTouch={};
-    for(const r of list){const d=r?.decisionDiagnosis;if(!d)continue;const c=trim(d.category)||'INDETERMINATE',t=trim(d.touch)||'REVISAR';byCategory[c]=(byCategory[c]||0)+1;byTouch[t]=(byTouch[t]||0)+1;}
-    return{byCategory,byTouch,total:Object.values(byCategory).reduce((a,b)=>a+b,0)};
+  function classifyCascades(list=[]){
+    const firstKo=new Map();
+    for(const r of list){const sc=trim(r?.scenario),bad=trim(r?.status)==='KO';if(!sc||!bad)continue;const root=firstKo.get(sc);
+      if(!root){firstKo.set(sc,r);if(r?.decisionDiagnosis)r.decisionDiagnosis={...r.decisionDiagnosis,rootCause:true,cascade:false,cascadeOf:''};continue;}
+      if(r?.decisionDiagnosis&&!r.decisionDiagnosis.cascade){const d=r.decisionDiagnosis;r.decisionDiagnosis={...d,underlyingCategory:d.category,category:'CASCADE',touch:'NO CONTAR COMO CAUSA RAÍZ',rootCause:false,cascade:true,cascadeOf:trim(root?.id),reason:`Fallo posterior al KO raíz ${trim(root?.id)} del mismo escenario; categoría original ${d.category||'INDETERMINATE'}.`};}
+    }
+    return list;
   }
-  function diagnosisText(ds={}){const e=Object.entries(ds?.byCategory||{}).filter(([,v])=>num(v)>0).sort((a,b)=>b[1]-a[1]);return e.map(([k,v])=>`${k} ${v}`).join(' · ');}
+  function diagnosisSummary(list=[]){
+    const byCategory={},byTouch={},rootByCategory={};let cascades=0,rootIssues=0;
+    for(const r of list){const d=r?.decisionDiagnosis;if(!d)continue;const c=trim(d.category)||'INDETERMINATE',t=trim(d.touch)||'REVISAR';byCategory[c]=(byCategory[c]||0)+1;byTouch[t]=(byTouch[t]||0)+1;if(d.cascade||c==='CASCADE'){cascades++;continue;}if(!['OK'].includes(c)&&trim(r?.status)!=='OK'){const rc=trim(d.underlyingCategory||c)||'INDETERMINATE';rootByCategory[rc]=(rootByCategory[rc]||0)+1;rootIssues++;}}
+    return{byCategory,byTouch,rootByCategory,cascades,rootIssues,total:Object.values(byCategory).reduce((a,b)=>a+b,0)};
+  }
+  function diagnosisText(ds={}){const roots=Object.entries(ds?.rootByCategory||{}).filter(([,v])=>num(v)>0).sort((a,b)=>b[1]-a[1]),fallback=Object.entries(ds?.byCategory||{}).filter(([k,v])=>k!=='OK'&&k!=='CASCADE'&&num(v)>0).sort((a,b)=>b[1]-a[1]);const e=roots.length?roots:fallback,tail=num(ds?.cascades)?` · CASCADE ${num(ds.cascades)}`:'';return `${e.map(([k,v])=>`${k} ${v}`).join(' · ')}${tail}`.replace(/^ · /,'');}
   function performanceSummary(list=[]){const a=list.filter(r=>num(r?.durationMs)>0),dur=a.map(r=>num(r.durationMs)),calls=a.map(r=>num(r?.usage?.calls)),tokens=a.map(r=>num(r?.usage?.tokens)),cost=a.map(r=>num(r?.usage?.costEur));const avg=x=>x.length?x.reduce((m,v)=>m+v,0)/x.length:0;return{cases:a.length,medianMs:percentile(dur,.5),p90Ms:percentile(dur,.9),p95Ms:percentile(dur,.95),maxMs:dur.length?Math.max(...dur):0,avgCalls:Number(avg(calls).toFixed(2)),avgTokens:Math.round(avg(tokens)),avgCostEur:Number(avg(cost).toFixed(6)),over12s:dur.filter(x=>x>12000).length,over18s:dur.filter(x=>x>18000).length};}
   const MODES=['FAST','AI-SMOKE','FULL-CERT'];
   const HISTORY_KEY='controlevent_v1_0_exp_zuzu_test_history';
@@ -454,6 +462,7 @@
         rows.push(r);appendRow(r);updateProgress({done,total,ok,warn,ko,percent:Math.round(done*100/total),costEur,calls,tokens});renderFilters();cacheCurrent();currentCase=null;setLive('');
       }
       const aborted=stopRequested||currentAbort.signal.aborted,incomplete=done<total;
+      classifyCascades(rows);const resultsBox=$('ztResults');if(resultsBox)resultsBox.innerHTML=rows.length?rows.map(rowHtml).join(''):'<div class="zt-empty">Sin resultados.</div>';renderFilters();applyFilter();
       const auditValidity=auditRunManifest(activeRunExpectedCases,rows,done);
       lastSummary={type:'summary',mode:lastMode,done,total,ok,warn,ko,costEur,calls,tokens,aborted,incomplete,budgetStopped,contextWarmups,contextWarmupFailures,finishedAt:new Date().toISOString(),certified:!aborted&&!incomplete&&ko===0&&auditValidity.valid,observationMode:'ORACLE_ACTIVE',oracleEnabled:true,performance:performanceSummary(rows),diagnosis:diagnosisSummary(rows),auditValidity};
       updateProgress(lastSummary);releaseControls();finish(lastSummary);
@@ -490,7 +499,7 @@
   function modelBadge(u={}){const models=Array.isArray(u.models)?u.models:[],attempted=Array.isArray(u.attemptedModels)?u.attemptedModels:[];const actual=models.length?models:attempted.slice(-1);if(!actual.length)return'';const short=m=>/flash-lite/i.test(m)?'LITE':/(?:^|-)flash(?:$|-)/i.test(m)?'FLASH':m;const label=[...new Set(actual.map(short))].join(' + ');const route=attempted.length>1?` · intentos ${attempted.map(short).join(' → ')}`:'';return`Modelo IA: ${label}${route}`;}
   function rowHtml(r){const mb=r.usage?modelBadge(r.usage):'',reasons=Array.isArray(r.validationReasons)&&r.validationReasons.length?`<span>
 Oráculo: ${esc(r.validationReasons.join(' | '))}</span>`:'',diag=r?.decisionDiagnosis?`<span>
-Diagnóstico: ${esc(r.decisionDiagnosis.category||'INDETERMINATE')} · tocar: ${esc(r.decisionDiagnosis.touch||'REVISAR')} · ${esc(r.decisionDiagnosis.reason||'')}</span><span>Contrato esperado/observado: ${esc(r.decisionDiagnosis.expectedCapability||'—')} → ${esc(r.decisionDiagnosis.observedCapability||'—')}</span>`:'',pf=r.performance||{},phase=(num(pf.compileMs)||num(pf.executeMs)||num(pf.presentMs))?`
+Diagnóstico: ${esc(r.decisionDiagnosis.category||'INDETERMINATE')} · tocar: ${esc(r.decisionDiagnosis.touch||'REVISAR')} · ${esc(r.decisionDiagnosis.reason||'')}</span><span>Contrato esperado/observado: ${esc(r.decisionDiagnosis.expectedCapability||'—')} → ${esc(r.decisionDiagnosis.observedCapability||'—')}${r.decisionDiagnosis.cascadeOf?` · raíz ${esc(r.decisionDiagnosis.cascadeOf)}`:''}</span>`:'',pf=r.performance||{},phase=(num(pf.compileMs)||num(pf.executeMs)||num(pf.presentMs))?`
 C/E/P ${fmtN(pf.compileMs||0)}/${fmtN(pf.executeMs||0)}/${fmtN(pf.presentMs||0)} ms${pf.fastLocal?' · cierre local':''}`:'';return `<div class="zt-row ${esc(r.status)}" data-status="${esc(r.status)}" data-group="${esc(r.group)}" data-diagnosis="${esc(r?.decisionDiagnosis?.category||'')}"><div class="zt-status">${esc(r.status)}</div><div class="zt-cell"><b>${esc(r.group)}</b><span>${esc(r.id)}</span></div><div class="zt-cell"><b>${esc(r.label)}</b><span>${esc(r.prompt||'')}</span></div><div class="zt-cell zt-expected"><b>Oráculo / referencia esperada</b><span>${esc(r.expected||'')}</span>${reasons}${diag}</div><div class="zt-cell zt-actual"><b>Obtenido</b><span>${esc(r.actual||'')}</span>${r.tools?.length?`<span>
 Herramientas: ${esc(r.tools.join(', '))}</span>`:''}${mb?`<span>
 ${esc(mb)}</span>`:''}${r.usage?.fallbackReason?`<span>

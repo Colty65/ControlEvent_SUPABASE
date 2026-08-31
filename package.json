@@ -60,7 +60,8 @@
     "test:vnext-p110": "node scripts/v4-0-exp-vnext-p110-regression.cjs && node scripts/v4-0-exp-vnext-p110-behavior-regression.cjs",
     "test:vnext-p111": "node scripts/v4-0-exp-vnext-p111-language-reach-regression.cjs",
     "test:vnext-p112": "node scripts/v4-0-exp-vnext-p112-itv-vnext-parity-regression.cjs",
-    "test:vnext-p114": "node scripts/v4-0-exp-vnext-p114-itv-trusted-oracle-manifest-regression.cjs"
+    "test:vnext-p114": "node scripts/v4-0-exp-vnext-p114-itv-trusted-oracle-manifest-regression.cjs",
+    "test:vnext-p116": "node scripts/v4-0-exp-vnext-p116-capability-registry-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

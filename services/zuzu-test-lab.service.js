@@ -159,15 +159,21 @@ function restoredHistoricalCase(raw={},mode=''){
 function makeCase({id,group,label,prompt='',expected='',meta={},run}){ return {id,group,label,prompt,expected,meta,run}; }
 function outcome(c,status,actual,extra={}){ return {id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:trim(actual),status,...extra}; }
 const ITV_ESCAPE_FREE=false;
+function vNextTableRowsAsObjects(result={},keyName=''){
+  const table=arr(result?.tables).find(t=>!keyName||trim(t?.key)===trim(keyName));if(!table)return[];
+  const cols=arr(table?.columns).map(trim);
+  return arr(table?.rows).map(row=>{if(!Array.isArray(row))return row&&typeof row==='object'?row:{};const o={};for(let i=0;i<cols.length;i++)o[cols[i]]=row[i];return o;});
+}
 function vNextAuditOf(result={}){
   const ctx=(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:{};
   const tables=arr(result?.tables).map(t=>({key:trim(t?.key),title:trim(t?.title),columns:arr(t?.columns).map(trim).filter(Boolean),rowCount:arr(t?.rows).length}));
-  const visible=[...new Set(tables.flatMap(t=>t.columns))];
+  const visible=[...new Set(tables.flatMap(t=>t.columns))],capabilityCalls=arr(result?.meta?.capabilityCalls).map(x=>({tool:trim(x?.tool),rawArgs:x?.rawArgs&&typeof x.rawArgs==='object'?x.rawArgs:{},normalizedArgs:x?.normalizedArgs&&typeof x.normalizedArgs==='object'?x.normalizedArgs:{},audit:x?.audit&&typeof x.audit==='object'?x.audit:null,error:trim(x?.error)}));
+  const attempted=[...capabilityCalls].reverse().find(x=>x.tool==='query_ce')||capabilityCalls[0]||null;
   return{
-    resultContext:ctx,kind:trim(ctx?.kind),operation:trim(ctx?.operation),event:trim(ctx?.event),events:arr(ctx?.events).map(trim).filter(Boolean),person:trim(ctx?.person),
+    resultContext:ctx,kind:trim(ctx?.kind),operation:trim(ctx?.operation)||trim(attempted?.normalizedArgs?.operation)||trim(attempted?.rawArgs?.operation),event:trim(ctx?.event),events:arr(ctx?.events).map(trim).filter(Boolean),person:trim(ctx?.person),
     orderBy:trim(ctx?.order_by),visibleColumns:arr(ctx?.visible_columns).map(trim).filter(Boolean),hiddenColumns:arr(ctx?.hidden_columns).map(trim).filter(Boolean),
     tableCount:tables.length,tables,renderedRows:tables.reduce((n,t)=>n+num(t.rowCount),0),renderedColumns:visible,chartCount:arr(result?.charts).length,
-    tools:arr(result?.meta?.tools).map(trim).filter(Boolean),warnings:arr(result?.warnings).map(trim).filter(Boolean)
+    tools:arr(result?.meta?.tools).map(trim).filter(Boolean),warnings:arr(result?.warnings).map(trim).filter(Boolean),capabilityRegistryVersion:trim(result?.meta?.capabilityRegistryVersion),capabilityCalls,attemptedCapability:attempted
   };
 }
 // P1.15 · MAPA DE DECISIÓN ITV -------------------------------------------------
@@ -175,51 +181,61 @@ function vNextAuditOf(result={}){
 // NHC: no interpreta palabras del usuario ni añade sinónimos al runtime de Zuzu.
 const ITV_DIAG={
   OK:'OK', ITV:'ITV', GAP:'CAPABILITY_GAP', CONT:'CONTINUITY', GEMINI:'GEMINI_GUIDANCE',
-  CE:'CE_DATA_CONTRACT', PRESENT:'DERIVATION_PRESENTATION', TECH:'TECHNICAL', UNKNOWN:'INDETERMINATE'
+  CE:'CE_DATA_CONTRACT', PRESENT:'DERIVATION_PRESENTATION', CASCADE:'CASCADE', TECH:'TECHNICAL', UNKNOWN:'INDETERMINATE'
 };
 function itvCapabilityExpectation(c={}){
-  const o=c?.oracle||{},kind=trim(o?.kind),group=norm(c?.group);
+  const o=c?.oracle||{},kind=trim(o?.kind);
   const direct={
     'event-summary':['query_ce','event_summary'],'event-economy':['query_ce','event_summary'],'event-metric':['query_ce','event_summary'],
-    'purchase-set':['query_ce','event_purchases'],'purchase-max':['query_ce','event_purchases'],'purchase-sum':['query_ce','event_purchases'],
+    'purchase-set':['query_ce','event_purchases'],'purchase-max':['query_ce','derive'],'purchase-sum':['query_ce','derive'],
     'attendance':['query_ce','event_attendance'],'donations':['query_ce','event_donations'],'bank-summary':['query_ce','event_bank'],
     'person-summary':['query_ce','person_profile'],'person-events':['query_ce','person_events'],'person-income':['query_ce','person_profile'],
     'catalog-count':['query_ce',trim(o?.entity)==='events'?'events_catalog':'people_catalog'],'canonical-socios':['query_ce','people_catalog'],
-    'comparison':['query_ce','compare_events'],'compare-metric':['query_ce','compare_events']
+    'comparison':['query_ce','compare_events'],'compare-metric':['query_ce','derive'],
+    'events-overview':['query_ce','events_overview'],'store-purchases':['query_ce','store_purchases'],
+    'documentation':['query_ce','event_documentation'],'management':['query_ce','event_management']
   };
   if(kind==='ledger-structural')return{available:true,tool:'query_ce',operation:trim(o?.domain)==='purchases'?'event_purchases':'',kind};
-  // Estas familias tienen datos/oráculo en ITV, pero VNext no dispone hoy de un contrato
-  // estructurado equivalente que entregue exactamente esa visión global.
-  if(['events-overview','store-purchases','documentation','management'].includes(kind))return{available:false,tool:'',operation:'',kind,reason:`falta contrato general para ${kind}`};
   const pair=direct[kind];if(pair)return{available:true,tool:pair[0],operation:pair[1],kind};
   return{available:null,tool:'',operation:'',kind,reason:'oráculo sin mapeo de capacidad'};
 }
 function itvObservedCapability(result={}){
-  const a=vNextAuditOf(result),tools=arr(a.tools),tool=tools.includes('query_ce')?'query_ce':tools.includes('search_documents')?'search_documents':tools.includes('recall_memory')?'recall_memory':tools.includes('resolve_entity')?'resolve_entity':trim(tools[0]);
-  return{tool,operation:trim(a.operation),event:trim(a.event),person:trim(a.person),warnings:arr(a.warnings),audit:a};
+  const a=vNextAuditOf(result),attempt=a?.attemptedCapability||{},tools=arr(a.tools),tool=trim(attempt?.tool)||(tools.includes('query_ce')?'query_ce':tools.includes('search_documents')?'search_documents':tools.includes('recall_memory')?'recall_memory':tools.includes('resolve_entity')?'resolve_entity':trim(tools[0]));
+  const rawArgs=attempt?.rawArgs&&typeof attempt.rawArgs==='object'?attempt.rawArgs:{},normalizedArgs=attempt?.normalizedArgs&&typeof attempt.normalizedArgs==='object'?attempt.normalizedArgs:{};
+  return{tool,operation:trim(a.operation)||trim(normalizedArgs?.operation)||trim(rawArgs?.operation),event:trim(a.event),person:trim(a.person),warnings:arr(a.warnings),rawArgs,normalizedArgs,capabilityAudit:attempt?.audit||null,error:trim(attempt?.error),audit:a};
 }
 function itvCapabilitySignature(x={}){return[trim(x.tool)||'—',trim(x.operation)||'—'].join(':');}
 function itvDecisionDiagnosis(c={},result={},verdict={status:'KO',reasons:[]}){
-  const expected=itvCapabilityExpectation(c),observed=itvObservedCapability(result),reasons=arr(verdict?.reasons),status=trim(verdict?.status),group=norm(c?.group),kind=trim(c?.oracle?.kind);
-  const base={category:ITV_DIAG.UNKNOWN,touch:'REVISAR',confidence:'media',expectedCapability:itvCapabilitySignature(expected),observedCapability:itvCapabilitySignature(observed),reason:'No hay evidencia suficiente para asignar una capa única.'};
-  if(status==='OK')return{...base,category:ITV_DIAG.OK,touch:'NINGUNO',confidence:'alta',reason:'Oráculo y ejecución compatibles.'};
+  const expected=itvCapabilityExpectation(c),observed=itvObservedCapability(result),reasons=arr(verdict?.reasons),status=trim(verdict?.status),group=norm(c?.group),kind=trim(c?.oracle?.kind),capAudit=observed?.capabilityAudit||{};
+  const base={category:ITV_DIAG.UNKNOWN,touch:'REVISAR',confidence:'media',expectedCapability:itvCapabilitySignature(expected),observedCapability:itvCapabilitySignature(observed),reason:'No hay evidencia suficiente para asignar una capa única.',rawArgs:observed.rawArgs||{},normalizedArgs:observed.normalizedArgs||{},capabilityAudit:capAudit||null,rootCause:true,cascade:false};
+  if(status==='OK')return{...base,category:ITV_DIAG.OK,touch:'NINGUNO',confidence:'alta',reason:arr(capAudit?.repairs).length?'Oráculo correcto; el registro saneó argumentos opcionales no declarados.':'Oráculo y ejecución compatibles.'};
   if(status==='WARN'&&reasons.length&&reasons.every(x=>/^ITV VNext:/i.test(trim(x))))return{...base,category:ITV_DIAG.ITV,touch:'ITV',confidence:'alta',reason:'La ejecución parece correcta pero ITV todavía no puede certificar estructuralmente el efecto.'};
   if(expected.available===false)return{...base,category:ITV_DIAG.GAP,touch:'SOFTWARE CE · NUEVA CAPACIDAD',confidence:'alta',reason:expected.reason};
   const technical=arr(result?.warnings).some(x=>/timeout|error t[eé]cnico|fallo t[eé]cnico/i.test(trim(x)))||reasons.some(x=>/fallo t[eé]cnico|timeout/i.test(trim(x)));
   if(technical)return{...base,category:ITV_DIAG.TECH,touch:'SOFTWARE CE/INFRA',confidence:'alta',reason:'Fallo técnico independiente de la elección semántica.'};
+  if(arr(capAudit?.repairs).length&&trim(expected.operation)===trim(observed.operation))return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'alta',reason:`Gemini eligió el contrato correcto pero añadió restricciones no declaradas: ${arr(capAudit.repairs).join(' | ')}`};
+  if(trim(capAudit?.classification)==='UNSUPPORTED_CAPABILITY')return{...base,category:ITV_DIAG.GAP,touch:'SOFTWARE CE · NUEVA CAPACIDAD',confidence:'alta',reason:'Gemini solicitó una operación fuera del registro canónico.'};
+  if(trim(capAudit?.classification)==='INVALID_CONTRACT')return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'alta',reason:`La operación existe pero el JSON no cumple el contrato: ${arr(capAudit?.issues).join(' | ')}`};
   const opExpected=trim(expected.operation),opObserved=trim(observed.operation);
   if(expected.available===true&&opExpected&&opObserved!==opExpected){
     if(group.includes('continuidad')||group.includes('tabla'))return{...base,category:ITV_DIAG.CONT,touch:'SOFTWARE CONTEXTO + AYUDA GEMINI',confidence:'alta',reason:`La capacidad existe (${opExpected}) pero el turno no conserva/materializa ese contrato.`};
     return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'alta',reason:`La capacidad existe (${opExpected}) pero se eligió/materializó ${opObserved||'ninguna'}.`};
   }
-  // Operación correcta pero el cierre no responde una derivación solicitada.
   if(['compare-metric','purchase-max','purchase-sum'].includes(kind)||arr(c?.oracle?.requiredMetrics).length>1)return{...base,category:ITV_DIAG.PRESENT,touch:'SOFTWARE CE · DERIVACIÓN/PRESENTACIÓN',confidence:'alta',reason:'El contrato de datos es correcto; falta transformar o expresar el resultado pedido.'};
   if(kind==='ledger-structural'&&status==='WARN')return{...base,category:ITV_DIAG.ITV,touch:'ITV',confidence:'alta',reason:'El efecto de vista no está suficientemente expuesto al laboratorio.'};
   if(expected.available===true&&opExpected&&opObserved===opExpected)return{...base,category:ITV_DIAG.CE,touch:'SOFTWARE CE / CONTRATO / DATOS',confidence:'media-alta',reason:'Gemini llegó al contrato esperado; el desacuerdo aparece en ejecución, semántica del contrato o datos devueltos.'};
   if(expected.available===true&&!opExpected&&observed.tool!==expected.tool)return{...base,category:ITV_DIAG.GEMINI,touch:'AYUDA/SCHEMA GEMINI',confidence:'media',reason:'Existe herramienta adecuada pero no se materializó.'};
   return base;
 }
-function observedOutcome(c,result,usage={},extra={}){const verdict=validatePaidCase(c,result);const vnext=trim(c?.engine).toUpperCase()==='VNEXT';const diagnosis=vnext?itvDecisionDiagnosis(c,result,verdict):null;return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:verdict.status,validationReasons:verdict.reasons,usage,performance:result?.meta?.performance||{},tools:arr(result?.meta?.tools),engine:vnext?'VNEXT':'LEDGER',provider:text(result?.provider),architecture:text(result?.meta?.architecture),oracleEnabled:true,observationMode:'ORACLE_ACTIVE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),resultContext:(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:null,vnextAudit:vnext?vNextAuditOf(result):null,decisionDiagnosis:diagnosis,debugTrace:arr(result?.meta?.debugTrace).slice(0,60),...ledgerAuditOf(result),...extra};}
+function markScenarioCascade(rows=[]){
+  const rootByScenario=new Map();
+  for(const r of rows){const scenario=trim(r?.scenario);if(!scenario)continue;const bad=!['OK','OBSERVED'].includes(trim(r?.status));if(!bad)continue;const first=rootByScenario.get(scenario);
+    if(!first){rootByScenario.set(scenario,r);if(r?.decisionDiagnosis)r.decisionDiagnosis={...r.decisionDiagnosis,rootCause:true,cascade:false,cascadeOf:''};continue;}
+    if(r?.decisionDiagnosis){const d=r.decisionDiagnosis;r.decisionDiagnosis={...d,underlyingCategory:d.category,category:ITV_DIAG.CASCADE,touch:'NO CONTAR COMO CAUSA RAÍZ',confidence:'media-alta',rootCause:false,cascade:true,cascadeOf:trim(first?.id),reason:`Fallo posterior al primer KO/WARN del escenario (${trim(first?.id)}). Se conserva la categoría original como underlyingCategory=${d.category}.`};}
+  }
+  return rows;
+}
+function observedOutcome(c,result,usage={},extra={}){const verdict=validatePaidCase(c,result);const vnext=trim(c?.engine).toUpperCase()==='VNEXT';const diagnosis=vnext?itvDecisionDiagnosis(c,result,verdict):null;return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:verdict.status,validationReasons:verdict.reasons,usage,performance:result?.meta?.performance||{},tools:arr(result?.meta?.tools),engine:vnext?'VNEXT':'LEDGER',provider:text(result?.provider),architecture:text(result?.meta?.architecture),oracleEnabled:true,observationMode:'ORACLE_ACTIVE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),resultContext:(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:null,vnextAudit:vnext?vNextAuditOf(result):null,capabilityCalls:vnext?arr(result?.meta?.capabilityCalls):[],decisionDiagnosis:diagnosis,debugTrace:arr(result?.meta?.debugTrace).slice(0,60),...ledgerAuditOf(result),...extra};}
 function technicalErrorOutcome(c,message,usage={},extra={}){return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(message),status:'KO',validationReasons:['fallo técnico/timeout'],usage,oracleEnabled:true,observationMode:'ORACLE_ACTIVE',decisionDiagnosis:{category:ITV_DIAG.TECH,touch:'SOFTWARE CE/INFRA',confidence:'alta',expectedCapability:itvCapabilitySignature(itvCapabilityExpectation(c)),observedCapability:'—:—',reason:'Fallo técnico/timeout antes de disponer de una ejecución certificable.'},...extra};}
 
 // FIX2.10 · ORÁCULO FUERTE -----------------------------------------------------
@@ -449,10 +465,12 @@ function validateOracle(caseDef,result){
       if(num(ev.productCount||ev.distinctCount)!==num(oracle.productCount))reasons.push(`conteo de productos ${num(ev.productCount||ev.distinctCount)} != ${oracle.productCount}`);
       if(!moneyEq(ev.totalAmount,oracle.total))reasons.push(`total del result-set ${euro(ev.totalAmount)} != ${euro(oracle.total)}`);
     }else{
-      const rows=arr(result?.tables).flatMap(t=>arr(t?.rows)).filter(r=>trim(r?.Producto||r?.label)),payload=result?.meta?.ledgerAudit?.execution?.answer_payload||{},payloadItems=arr(payload?.item_values).map(trim).filter(Boolean);
-      const labels=new Set([...rows.map(r=>norm(r?.Producto||r?.label)).filter(Boolean),...payloadItems.map(norm)]);
+      const byProduct=vNextTableRowsAsObjects(result,'by_product'),anyRows=arr(result?.tables).flatMap(t=>vNextTableRowsAsObjects({tables:[t]})).filter(r=>trim(r?.Producto||r?.label)),payload=result?.meta?.ledgerAudit?.execution?.answer_payload||{},payloadItems=arr(payload?.item_values).map(trim).filter(Boolean);
+      const productRows=byProduct.length?byProduct:anyRows,labels=new Set([...productRows.map(r=>norm(r?.Producto||r?.label)).filter(Boolean),...payloadItems.map(norm)]);
       if(oracle.productCount>0&&labels.size===0)reasons.push('no entrega un result-set de productos verificable');
+      if(byProduct.length&&num(labels.size)!==num(oracle.productCount))reasons.push(`conteo by_product ${labels.size} != ${oracle.productCount}`);
       if(payloadItems.length&&num(payloadItems.length)!==num(oracle.productCount))reasons.push(`conteo del result-set estructurado ${payloadItems.length} != ${oracle.productCount}`);
+      const amountField=byProduct.length?['Importe','Total','Valor'].find(k=>byProduct.some(r=>Number.isFinite(Number(r?.[k])))):'';if(amountField){const total=byProduct.reduce((sum,r)=>sum+num(r?.[amountField]),0);if(!moneyEq(total,oracle.total))reasons.push(`total by_product ${euro(total)} != ${euro(oracle.total)}`);}
       if(payload?.amount_value!=null&&!moneyEq(payload.amount_value,oracle.total))reasons.push(`total del result-set estructurado ${euro(payload.amount_value)} != ${euro(oracle.total)}`);
     }
   }else if(oracle.kind==='purchase-presence'){
@@ -669,7 +687,7 @@ function validateVNextStructural(caseDef,result){
   for(const op of ops){const parts=op.split(':').map(trim),kind=norm(parts[0]),field=parts[1]||'';
     if(kind==='remove field'){if(!arr(a.hiddenColumns).some(x=>norm(x)===norm(field))&&vNextTableHasColumn(a,field))reasons.push(`VNext no ocultó el campo «${field}»`);}
     else if(kind==='add field'){if(!vNextTableHasColumn(a,field))reasons.push(`VNext no restauró el campo «${field}»`);}
-    else if(kind==='sort'&&field){const requested=norm(`${field} ${parts[2]||''}`);if(!norm(a.orderBy).includes(norm(field)))uncertified.push(`orden ${requested} no queda acreditado en resultContext`);}
+    else if(kind==='sort'&&field){const requested=norm(`${field} ${parts[2]||''}`),dir=norm(parts[2]||'');const ctxSort=arr(a?.resultContext?.table_view_sort||a?.resultContext?.view_sort);const structured=ctxSort.some(x=>norm(x?.field)===norm(field)&&(!dir||norm(x?.direction)===dir)),flat=norm(a.orderBy);if(!structured&&!(flat.includes(norm(field))&&(!dir||flat.includes(dir))))uncertified.push(`orden ${requested} no queda acreditado en resultContext`);}
     else if(['filter','rank','compare','set fields','add fields','remove fields'].includes(kind))uncertified.push(`operación ${op} no dispone todavía de evidencia estructural suficiente en VNext`);
   }
   if(o.chart===true&&a.chartCount<1)reasons.push('se esperaba gráfica y VNext no generó ninguna');
@@ -1636,3 +1654,4 @@ export async function runZuzuTestStream({mode='FAST',maxCostEur=0.25,maxCases,ca
 // Solo para regresión automatizada del propio ITV: permite verificar que el semáforo
 // distingue resultado correcto, advertencia conversacional y fallo real.
 export function __validateZuzuItvCaseForRegression(caseDef={},result={}){return validatePaidCase(caseDef,result);}
+export function __itvP116ForRegression(){return{itvCapabilityExpectation,itvObservedCapability,itvDecisionDiagnosis,vNextAuditOf,vNextTableRowsAsObjects,markScenarioCascade};}
