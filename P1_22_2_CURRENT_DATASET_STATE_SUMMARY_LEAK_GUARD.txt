@@ -1,0 +1,4 @@
+ControlEvent v4_0_exp · VNext P1.22.2
+CURRENT DATASET STATE + SUMMARIZE CURRENT + TABLE PERSISTENCE + LEAK GUARD + MEMORY READ RETRY
+NHC: las incorporaciones P1.22.2 son estructurales; no añaden reglas específicas para nombres/preguntas de las pruebas.
+Ver docs/V4_0_EXP_VNEXT_P1_22_2_CURRENT_DATASET_STATE_SUMMARY_LEAK_GUARD_NHC.md

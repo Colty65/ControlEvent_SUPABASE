@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · VNext P1.22.1 · ENTITY QUERY + GENERIC CURRENT VIEW + SUMMARY FALLBACK
+/* ControlEvent v4_0_exp · VNext P1.22.2 · PERSISTENT CURRENT DATASET + VIEW STATE + SUMMARY + LEAK GUARD
    Registro + canonizador estructural de capacidades query_ce.
    NHC: describe/normaliza JSON y semántica de contratos; nunca interpreta frases del usuario. */
 import crypto from 'node:crypto';
@@ -8,7 +8,7 @@ const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
 const arr=v=>Array.isArray(v)?v:[];
 
-export const CAPABILITY_REGISTRY_VERSION='20260901-P1221';
+export const CAPABILITY_REGISTRY_VERSION='20260901-P1222';
 
 const P={
   operation:{type:'string'},
@@ -74,6 +74,7 @@ export const CAPABILITY_REGISTRY=Object.freeze({
   events_overview:def('EVENTOS',[],['scope','metric','chart','chart_type'],'events_overview',[],{metric:'all'}),
   // Vista genérica sobre el dataset/tablas del turno anterior. No reabre módulos de negocio.
   view_current:def('VISTA',[],['visible_columns','hidden_columns','view_filters','view_sort','reset_table'],'view_dataset'),
+  summarize_current:def('VISTA',[],['requested_fields'],'current_dataset_summary'),
   derive:def('DERIVACION',['derive_operation'],['field','derive_field','label_field','table_key','top_n','source_operation','source_args'],'derived_dataset')
 });
 
@@ -87,7 +88,8 @@ const OP_DESCRIPTIONS={
   person_profile:'Dossier global de una identidad personal. Para ingreso global de una persona usa esta capacidad con requested_fields=[income].',
   person_income_status:'Estado de ingreso de una persona DENTRO de un evento concreto; requiere person + event.',
   events_overview:'Panorama homogéneo del conjunto de eventos; no necesita enumerar events.',
-  view_current:'Transforma únicamente la vista del dataset actual (columnas, filtros u orden) sin reconsultar ni cambiar el dominio factual.'
+  view_current:'Transforma o vuelve a mostrar únicamente la vista del dataset actual (columnas, filtros u orden) sin reconsultar ni cambiar el dominio factual.',
+  summarize_current:'Resume el contenido factual visible del dataset actual sin reabrir el módulo de origen. Usa la vista actual, incluidas columnas ocultas/visibles y orden.'
 };
 
 export function capabilityOperations(){return Object.keys(CAPABILITY_REGISTRY);}
