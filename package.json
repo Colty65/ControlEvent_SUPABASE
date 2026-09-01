@@ -68,7 +68,8 @@
     "test:vnext-p119": "node scripts/v4-0-exp-vnext-p119-atomic-focus-derive-regression.cjs",
     "test:vnext-p120": "node scripts/v4-0-exp-vnext-p120-envelope-store-derive-jsonlight-regression.cjs",
     "test:vnext-p1201": "node scripts/v4-0-exp-vnext-p1201-schema-latency-hotfix-regression.cjs",
-    "test:vnext-p121": "node scripts/v4-0-exp-vnext-p121-derive-label-limit-docs-fields-retry-regression.cjs"
+    "test:vnext-p121": "node scripts/v4-0-exp-vnext-p121-derive-label-limit-docs-fields-retry-regression.cjs",
+    "test:vnext-p122": "node scripts/v4-0-exp-vnext-p122-subject-memory-summary-retry-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · VNext P1.21 · DERIVE LABEL + LIMIT + DOCS + FIELD CATALOG + RETRY
+/* ControlEvent v4_0_exp · VNext P1.22 · SUBJECT PRESERVATION + MEMORY CONTEXT + CURRENT SUMMARY
    Registro + canonizador estructural de capacidades query_ce.
    NHC: describe/normaliza JSON y semántica de contratos; nunca interpreta frases del usuario. */
 import crypto from 'node:crypto';
@@ -8,7 +8,7 @@ const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
 const arr=v=>Array.isArray(v)?v:[];
 
-export const CAPABILITY_REGISTRY_VERSION='20260901-P121';
+export const CAPABILITY_REGISTRY_VERSION='20260901-P122';
 
 const P={
   operation:{type:'string'},
@@ -229,6 +229,16 @@ export function auditCapabilityCall(rawArgs={}){
   if(typeof sanitized.focus_entities==='string'){sanitized.focus_entities=[sanitized.focus_entities];classification=mark(repairs,'focus_entities: string → array',classification,'COMPATIBLE');}
   if(sanitized.derive_field!==undefined&&!trim(sanitized.field)){sanitized.field=canonicalDeriveField(sanitized.derive_field);delete sanitized.derive_field;classification=mark(repairs,'derive_field → field',classification);}
   else if(sanitized.field!==undefined){const cf=canonicalDeriveField(sanitized.field);if(cf!==trim(sanitized.field)){sanitized.field=cf;classification=mark(repairs,`field canonicalizado → ${cf}`,classification);}}
+
+  // P1.22 · un catálogo global no puede tirar un sujeto personal estructurado.
+  // Si Gemini materializa events_catalog + person, la intención JSON ya contiene un sujeto
+  // y se canoniza a person_events sin releer ni interpretar el texto del usuario.
+  if(effectiveOperation==='events_catalog'&&trim(sanitized.person)){
+    const keep={requested_fields:sanitized.requested_fields,focus_mode:sanitized.focus_mode,focus_type:sanitized.focus_type,focus_entities:sanitized.focus_entities,detail:sanitized.detail,tone:sanitized.tone,register:sanitized.register,tease:sanitized.tease,narrate:sanitized.narrate};
+    const person=trim(sanitized.person);
+    sanitized={operation:'person_events',person,...Object.fromEntries(Object.entries(keep).filter(([,v])=>v!==undefined))};
+    effectiveOperation='person_events';classification=mark(repairs,'events_catalog + person → person_events; el sujeto estructurado se conserva',classification);
+  }
 
   // Catálogo + sujeto de evento explícito/foco de evento = dossier del evento, no listado global.
   if(effectiveOperation==='events_catalog'){
