@@ -1,0 +1,9 @@
+ControlEvent v4_0_exp · VNext P1.22.1
+
+1. events_catalog + query: query se resuelve contra catálogos canónicos antes de validar. Solo coincidencia exacta e inequívoca de persona/evento cambia el contrato a person_events/event_summary.
+2. events_catalog no puede borrar una persona canónica explícita del turno.
+3. Nueva capacidad genérica view_current: columnas, filtros y orden se aplican sobre el dataset actual sin exigir evento ni reabrir un módulo de negocio.
+4. Resultados auxiliares de memoria/documentos conservan snapshot compacto de la tabla actual para continuar la vista.
+5. recall_memory(current) siempre entrega resumen: narración IA o fallback local factual si la narración falla/sale vacía.
+6. NHC: no se añaden reglas por nombres, frases GOLDEN ni vocabulario concreto del usuario.
+7. SQL P1.22.1 es espejo idempotente; el runtime puede probarse sin ejecutarlo.

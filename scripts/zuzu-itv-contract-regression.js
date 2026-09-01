@@ -15,7 +15,7 @@ c('Replay exacto rechaza contrato histórico distinto',/savedContract!==ITV_CONT
 c('Index captura click nativo antes de hardlocks legacy',/__CE_NATIVE_ANCHOR_CLICK__=HTMLAnchorElement\.prototype\.click/.test(index));
 c('Descarga ITV usa click nativo y evita wrappers legacy',/nativeClick=window\.__CE_NATIVE_ANCHOR_CLICK__/.test(ui)&&/nativeClick\.call\(a\)/.test(ui));
 c('JSON declara contrato real de la batería ejecutada',/batteryReplayContractVersion:num\(executed\?\.replayContractVersion\)\|\|0/.test(ui)&&/generatedBattery:executed/.test(ui));
-c('Index conserva build funcional y fuerza cache-bust ITV actual',/zuzu-test-console-gd\.js\?v=20260901-VNEXT-P122-SUBJECT-MEMORY-SUMMARY-RETRY-ITV-GOLDEN110-NHC/.test(index)&&/controlevent-itv-build" content="20260901-VNEXT-P122-SUBJECT-MEMORY-SUMMARY-RETRY-ITV-GOLDEN110-NHC/.test(index));
+c('Index conserva build funcional y fuerza cache-bust ITV actual',/zuzu-test-console-gd\.js\?v=20260901-VNEXT-P1221-ENTITY-QUERY-CURRENT-VIEW-SUMMARY-FALLBACK-GOLDEN110-NHC/.test(index)&&/controlevent-itv-build" content="20260901-VNEXT-P1221-ENTITY-QUERY-CURRENT-VIEW-SUMMARY-FALLBACK-GOLDEN110-NHC/.test(index));
 c('named_events conserva event singleton como events[]',/kind==='named_events'[\s\S]{0,220}else if\(event\)out\.events=\[event\]/.test(svc));
 c('Gemini recibe candidatos como ayuda no activadores',/Los candidatos son ayuda, no activadores/.test(svc));
 c('Gemini recibe regla de response_kind por intención actual',/TIPO DE RESPUESTA: decide response_kind por lo que CURRENT_USER pide obtener ahora/.test(svc));
