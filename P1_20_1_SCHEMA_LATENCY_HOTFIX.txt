@@ -1,0 +1,22 @@
+ControlEvent v4_0_exp · VNext P1.20.1 · Schema Latency Hotfix · NHC
+
+Motivo:
+- En P1.20 el ENVELOPE (context + view + presentation) se publicó como opcional en las 23 ramas del schema query_ce.
+- Eso elevó el schema serializado aprox. de 35.884 chars (P1.19) a 57.762 chars (P1.20), y las propiedades repetidas en ramas de 312 a 607.
+- El primer LIGHT real de P1.20 mostró 24.122 ms y 24.885 ms, concentrados casi enteramente en decisionModelMs (23.630 y 24.745 ms). CE/data fueron 328 ms y 15 ms.
+
+Cambio:
+- El ENVELOPE sigue completo dentro de CE y el canonizador.
+- Gemini solo ve por operation las claves empresariales necesarias + PRESENT/META mínimos.
+- Las claves contextuales siguen siendo toleradas internamente por runtime y conservadas en el envelope.
+- No se cambia SQL ni se añaden reglas lingüísticas.
+
+Medidas locales del schema:
+- P1.19: 35.884 chars; 312 propiedades acumuladas en ramas.
+- P1.20: 57.762 chars; 607 propiedades acumuladas en ramas.
+- P1.20.1: 36.338 chars; 317 propiedades acumuladas en ramas.
+
+Prueba recomendada:
+- Ejecutar SOLO 2 casos GOLDEN primero.
+- Si vuelven al entorno ~1–3 s/caso, continuar GOLDEN 110.
+- Si siguen en ~20–25 s, detener y revisar latencia del proveedor Gemini antes de tocar CE.

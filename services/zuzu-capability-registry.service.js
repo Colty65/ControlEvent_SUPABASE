@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · VNext P1.20
+/* ControlEvent v4_0_exp · VNext P1.20.1 · SCHEMA LATENCY HOTFIX
    Registro + canonizador estructural de capacidades query_ce.
    NHC: describe/normaliza JSON y semántica de contratos; nunca interpreta frases del usuario. */
 import crypto from 'node:crypto';
@@ -35,12 +35,17 @@ const P={
 
 const PRESENT=['detail','tone','register','tease','narrate'];
 const META=['requested_fields','focus_mode','focus_type','focus_entities'];
-// P1.20 · ENVELOPE: contexto y presentación son ortogonales al contrato empresarial.
-// Pueden viajar con cualquier operation y nunca deben invalidarla por sí solos.
+// P1.20.1 · HOTFIX LATENCIA: el ENVELOPE sigue siendo interno, pero NO se publica
+// completo dentro de las 23 ramas del schema que ve Gemini. Repetir context/view en
+// cada operation duplicaba casi el número de propiedades del function schema.
+// Cada operación expone solo sus claves empresariales + presentación/foco mínimos.
 const CONTEXT=['source_operation','source_args','source_dataset_id','dataset_id','table_key','focus_mode','focus_type','focus_entities','title','record_count'];
 const VIEW=['view_filters','view_sort','visible_columns','hidden_columns','reset_table','order_by'];
-const UNIVERSAL=[...new Set([...PRESENT,...META,...CONTEXT,...VIEW])];
-const def=(module,required=[],optional=[],result='',guarded=[],defaults={})=>({module,required,optional:[...new Set([...optional,...UNIVERSAL])],result,guarded,defaults});
+const RUNTIME_UNIVERSAL=[...new Set([...PRESENT,...META,...CONTEXT,...VIEW])];
+const GEMINI_COMMON=[...new Set([...PRESENT,...META])];
+// optional = lo que el canonizador/runtime tolera dentro del envelope.
+// schemaOptional = lo que realmente se publica a Gemini en cada rama.
+const def=(module,required=[],optional=[],result='',guarded=[],defaults={})=>({module,required,optional:[...new Set([...optional,...RUNTIME_UNIVERSAL])],schemaOptional:[...new Set([...optional,...GEMINI_COMMON])],result,guarded,defaults});
 
 export const CAPABILITY_REGISTRY=Object.freeze({
   people_catalog:def('PERSONAS',[],['population'],'people_catalog'),
@@ -91,7 +96,7 @@ export function queryCeSchemaProperties(){
 }
 function capabilityBranchSchema(operation=''){
   const d=capabilityDefinition(operation);if(!d)return null;
-  const keys=[...new Set(['operation',...d.required,...d.optional])],properties={};
+  const keys=[...new Set(['operation',...d.required,...(d.schemaOptional||d.optional)])],properties={};
   for(const k of keys){if(k==='operation')properties.operation={type:'string',enum:[operation]};else if(P[k])properties[k]={...P[k]};}
   if(properties.mine)properties.mine={...properties.mine,description:'true solo cuando el objetivo estructurado sea limitar las compras al usuario actual.'};
   if(properties.responsible)properties.responsible={...properties.responsible,description:'Filtro de responsable; omitir si no se solicita ese filtro.'};
@@ -109,7 +114,7 @@ export function queryCeToolParameters(){
   return{type:'object',properties:queryCeSchemaProperties(),required:['operation'],anyOf:branches};
 }
 export function capabilityCatalogText(){
-  return capabilityOperations().map(op=>{const d=CAPABILITY_REGISTRY[op],req=d.required.length?`req=${d.required.join(',')}`:'req=—',opt=d.optional.filter(x=>!PRESENT.includes(x)).length?`opt=${d.optional.filter(x=>!PRESENT.includes(x)).join(',')}`:'opt=—',desc=OP_DESCRIPTIONS[op]?` · ${OP_DESCRIPTIONS[op]}`:'';return`- ${op} [${d.module}] ${req}; ${opt}; resultado=${d.result}${desc}`;}).join('\n');
+  return capabilityOperations().map(op=>{const d=CAPABILITY_REGISTRY[op],req=d.required.length?`req=${d.required.join(',')}`:'req=—',shown=d.schemaOptional||d.optional,opt=shown.filter(x=>!PRESENT.includes(x)).length?`opt=${shown.filter(x=>!PRESENT.includes(x)).join(',')}`:'opt=—',desc=OP_DESCRIPTIONS[op]?` · ${OP_DESCRIPTIONS[op]}`:'';return`- ${op} [${d.module}] ${req}; ${opt}; resultado=${d.result}${desc}`;}).join('\n');
 }
 
 const SUBJECT_KEYS=['event','events','person','store','product','ticket','responsible'];
