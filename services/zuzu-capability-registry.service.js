@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · VNext P1.20.1 · SCHEMA LATENCY HOTFIX
+/* ControlEvent v4_0_exp · VNext P1.21 · DERIVE LABEL + LIMIT + DOCS + FIELD CATALOG + RETRY
    Registro + canonizador estructural de capacidades query_ce.
    NHC: describe/normaliza JSON y semántica de contratos; nunca interpreta frases del usuario. */
 import crypto from 'node:crypto';
@@ -8,7 +8,7 @@ const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
 const arr=v=>Array.isArray(v)?v:[];
 
-export const CAPABILITY_REGISTRY_VERSION='20260831-P120';
+export const CAPABILITY_REGISTRY_VERSION='20260901-P121';
 
 const P={
   operation:{type:'string'},
@@ -94,6 +94,17 @@ export function queryCeSchemaProperties(){
   props.operation={type:'string',enum:capabilityOperations(),description:'Operación canónica de ControlEvent. Cada operation publica sus claves válidas y compatibilidades estructurales.'};
   return props;
 }
+const REQUESTED_FIELDS_BY_OPERATION=Object.freeze({
+  event_summary:['income','purchases','pending','donations','balance','attendees','valuation','status'],
+  person_profile:['income','purchases','donations','events','hitos','lg'],
+  event_purchases:['product','amount','units','store','responsible']
+});
+function requestedFieldSchemaForOperation(operation=''){
+  const values=REQUESTED_FIELDS_BY_OPERATION[trim(operation)];
+  if(!values)return null;
+  return{type:'array',items:{type:'string',enum:values}};
+}
+
 function capabilityBranchSchema(operation=''){
   const d=capabilityDefinition(operation);if(!d)return null;
   const keys=[...new Set(['operation',...d.required,...(d.schemaOptional||d.optional)])],properties={};
@@ -101,7 +112,10 @@ function capabilityBranchSchema(operation=''){
   if(properties.mine)properties.mine={...properties.mine,description:'true solo cuando el objetivo estructurado sea limitar las compras al usuario actual.'};
   if(properties.responsible)properties.responsible={...properties.responsible,description:'Filtro de responsable; omitir si no se solicita ese filtro.'};
   if(properties.order_by)properties.order_by={...properties.order_by,description:'Orden de vista. amount_desc + top_n se puede canonizar a DERIVE/RANK o MAX.'};
-  if(properties.requested_fields)properties.requested_fields={...properties.requested_fields,description:'Campos/magnitudes que deben materializarse. Usa nombres conceptuales simples; CE canonicaliza aliases JSON como total_income→income y total_attendance→attendees.'};
+  if(properties.requested_fields){
+    const strong=requestedFieldSchemaForOperation(operation);
+    properties.requested_fields={...(strong||properties.requested_fields),description:operation==='event_summary'?'Proyección factual canónica. Para saldo operativo usa balance. Valores válidos: income, purchases, pending, donations, balance, attendees, valuation, status.':operation==='person_profile'?'Proyección del dossier global de persona. income significa ingresos totales vinculados en todos sus eventos.':operation==='event_purchases'?'Proyección de compras: product, amount, units, store, responsible.': 'Campos/magnitudes que deben materializarse; CE canonicaliza aliases JSON.'};
+  }
   if(properties.focus_mode)properties.focus_mode={...properties.focus_mode,description:'Metadato de contexto: replace sustituye el foco previo; add compone focos deliberadamente.'};
   if(properties.focus_entities)properties.focus_entities={...properties.focus_entities,description:'Entidades canónicas que forman el foco actual. Si una pareja/grupo existe como entidad canónica, conservarla como un único elemento.'};
   if(properties.focus_type)properties.focus_type={...properties.focus_type,description:'Tipo del foco estructurado actual.'};
@@ -277,12 +291,12 @@ export function auditCapabilityCall(rawArgs={}){
 
   // Formas algebraicas de compras → DERIVE, antes de validar para que aliases compatibles no fallen.
   if(effectiveOperation==='event_purchases'){
-    const dop=trim(sanitized.derive_operation).toUpperCase(),top=Math.max(0,Number(sanitized.top_n)||0),order=trim(sanitized.order_by);let targetDerive='';
+    const dop=trim(sanitized.derive_operation).toUpperCase(),explicitTop=Math.max(0,Number(sanitized.top_n)||0),recordTop=(Number(sanitized.record_count)===1?1:0),top=explicitTop||recordTop,order=trim(sanitized.order_by);let targetDerive='';
     if(dop)targetDerive=dop;else if(top>0&&order==='amount_desc')targetDerive=top===1?'MAX':'RANK';
     if(targetDerive){
       const sourceArgs=cleanSourceArgs({...sanitized,operation:'event_purchases'}),keep={detail:sanitized.detail,tone:sanitized.tone,register:sanitized.register,tease:sanitized.tease,narrate:sanitized.narrate,requested_fields:sanitized.requested_fields,focus_mode:sanitized.focus_mode,focus_type:sanitized.focus_type,focus_entities:sanitized.focus_entities};
       sanitized={operation:'derive',derive_operation:targetDerive,field:canonicalDeriveField(sanitized.field)||'amount',label_field:trim(sanitized.label_field)||'product',top_n:top||undefined,source_operation:'event_purchases',source_args:sourceArgs,...Object.fromEntries(Object.entries(keep).filter(([,v])=>v!==undefined))};
-      effectiveOperation='derive';classification=mark(repairs,`event_purchases → derive(${targetDerive}) sobre dataset de compras`,classification);
+      effectiveOperation='derive';classification=mark(repairs,`event_purchases + ${explicitTop?'top_n':recordTop?'record_count=1':'derive'} → derive(${targetDerive}) sobre dataset de compras`,classification);
     }
   }
 
