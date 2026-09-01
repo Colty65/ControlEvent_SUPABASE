@@ -71,7 +71,8 @@
     "test:vnext-p121": "node scripts/v4-0-exp-vnext-p121-derive-label-limit-docs-fields-retry-regression.cjs",
     "test:vnext-p122": "node scripts/v4-0-exp-vnext-p122-subject-memory-summary-retry-regression.cjs",
     "test:vnext-p1221": "node scripts/v4-0-exp-vnext-p1221-entity-query-current-view-summary-regression.cjs",
-    "test:vnext-p1222": "node scripts/v4-0-exp-vnext-p1222-current-dataset-state-regression.cjs"
+    "test:vnext-p1222": "node scripts/v4-0-exp-vnext-p1222-current-dataset-state-regression.cjs",
+    "test:vnext-p1223": "node scripts/v4-0-exp-vnext-p1223-canonical-columns-summary-sources-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
