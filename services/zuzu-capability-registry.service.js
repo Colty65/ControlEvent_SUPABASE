@@ -134,8 +134,21 @@ export function queryCeToolParameters(){
   const branches=capabilityOperations().map(capabilityBranchSchema).filter(Boolean);
   return{type:'object',properties:queryCeSchemaProperties(),required:['operation'],anyOf:branches};
 }
+// VNext P2 · schema compacto para la decisión IA.
+// Gemini solo necesita saber qué campos puede emitir y qué operaciones existen. La validación
+// estricta por operación sigue viviendo en auditCapabilityCall/CAPABILITY_REGISTRY después de
+// la llamada. Evitamos repetir 25 ramas anyOf completas en cada turno.
+export function queryCeCompactToolParameters(){
+  return{type:'object',properties:queryCeSchemaProperties(),required:['operation'],additionalProperties:false};
+}
 export function capabilityCatalogText(){
   return capabilityOperations().map(op=>{const d=CAPABILITY_REGISTRY[op],req=d.required.length?`req=${d.required.join(',')}`:'req=—',shown=d.schemaOptional||d.optional,opt=shown.filter(x=>!PRESENT.includes(x)).length?`opt=${shown.filter(x=>!PRESENT.includes(x)).join(',')}`:'opt=—',desc=OP_DESCRIPTIONS[op]?` · ${OP_DESCRIPTIONS[op]}`:'';return`- ${op} [${d.module}] ${req}; ${opt}; resultado=${d.result}${desc}`;}).join('\n');
+}
+// P2 · catálogo breve: los campos universales de presentación/foco ya están en el schema
+// común y en las reglas del system prompt; repetirlos 25 veces solo consume contexto.
+export function capabilityCatalogTextCompact(){
+  const common=new Set([...PRESENT,...META]);
+  return capabilityOperations().map(op=>{const d=CAPABILITY_REGISTRY[op],req=d.required.length?`req=${d.required.join(',')}`:'req=—',shown=d.schemaOptional||d.optional,business=shown.filter(x=>!common.has(x)),opt=business.length?`opt=${business.join(',')}`:'opt=—',desc=OP_DESCRIPTIONS[op]?` · ${OP_DESCRIPTIONS[op]}`:'';return`- ${op} ${req}; ${opt}${desc}`;}).join('\n');
 }
 
 const SUBJECT_KEYS=['event','events','person','store','product','ticket','responsible'];

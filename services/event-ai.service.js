@@ -10,7 +10,7 @@ import { listAllHitosState } from './hitos.service.js';
 import { exportBankData } from './bank-reconciliation.service.js';
 import { ensureZuzuConversation, getZuzuConversationSession, getZuzuTurnBundle, appendZuzuTurn, searchZuzuHistoryCandidates, listZuzuMemoryEpisodes, searchZuzuProactiveMemory, searchZuzuSocialMemoryHints, readZuzuMemoryEpisode, isRecallPrompt, newDatasetId, newViewId, turnIdFor } from './zuzu-conversation-ledger.service.js';
 import { humanizeSpokenEntities, humanizeSpokenEventNames, resolveFamiliarPersonAlias, familiarPersonAliasCandidates, familiarAliasCanonicalCandidates } from './zuzu-human-language.service.js';
-import { CAPABILITY_REGISTRY_VERSION, capabilityOperations, queryCeToolParameters, capabilityCatalogText, auditCapabilityCall, queueCapabilityObservation } from './zuzu-capability-registry.service.js';
+import { CAPABILITY_REGISTRY_VERSION, capabilityOperations, queryCeToolParameters, queryCeCompactToolParameters, capabilityCatalogText, capabilityCatalogTextCompact, auditCapabilityCall, queueCapabilityObservation } from './zuzu-capability-registry.service.js';
 
 function text(value) { return value == null ? '' : String(value); }
 function trim(value) { return text(value).trim(); }
@@ -18160,6 +18160,148 @@ function vnextP124PresentationEvidence(tables=[],charts=[]){
   const ts=arr(tables).filter(Boolean).slice(0,8).map(t=>{const rows=arr(t?.rows),columns=arr(t?.columns).length?arr(t.columns).map(trim).filter(Boolean):Object.keys(rows[0]||{}).map(trim).filter(Boolean);return{key:trim(t?.key),title:trim(t?.title),rowCount:rows.length,columns:columns.slice(0,20)};});
   return{tableCount:ts.length,tables:ts,chartCount:arr(charts).filter(Boolean).length,materialized:ts.length>0||arr(charts).filter(Boolean).length>0};
 }
+// ============================================================================
+// v4_0_exp · ZUZU VNEXT P2 · ONE DECISION / CE EXECUTES / STATE REMEMBERS
+// P2 deliberately removes semantic retries and post-Gemini intent reinterpretation.
+// Normal turn: 1 Gemini decision. Optional second call only to narrate freshly executed facts.
+// ============================================================================
+function vnextP2Tools(){
+  return [
+    {type:'function',name:'query_ce',description:'Datos estructurados canónicos de ControlEvent. Elige operation y los argumentos que correspondan. CE valida el contrato estrictamente después de la decisión.',parameters:queryCeCompactToolParameters()},
+    {type:'function',name:'resolve_entity',description:'Resuelve una identidad solo cuando el tipo o nombre sea realmente ambiguo.',parameters:{type:'object',properties:{text:{type:'string'},kind:{type:'string',enum:['auto','person','event','store','product']},limit:{type:'integer'}},required:['text'],additionalProperties:false}},
+    {type:'function',name:'search_documents',description:'Busca contenido textual concreto en documentos/evidencias. No sustituye los datos estructurados de query_ce.',parameters:{type:'object',properties:{event:{type:'string'},scope:{type:'string',enum:['screen_event','named_event','all_events']},query:{type:'string'},detail:{type:'string',enum:['brief','standard','full']},register:{type:'string',enum:['normal','close','banter']}},required:['scope'],additionalProperties:false}},
+    {type:'function',name:'recall_memory',description:'Memoria conversacional. search/list buscan; read abre un resultado; summarize resume un episodio; current reúne esta conversación. Usa result_index para seleccionar resultados visibles.',parameters:{type:'object',properties:{action:{type:'string',enum:['current','search','list','read','summarize']},query:{type:'string'},conversation_id:{type:'string'},matched_turn_id:{type:'string'},result_index:{type:'integer'},limit:{type:'integer'},inspect:{type:'boolean'},inspect_term:{type:'string'},register:{type:'string',enum:['normal','close','banter']}},required:['action'],additionalProperties:false}}
+  ];
+}
+function vnextP2Workspace(history=[],screenEventName=''){
+  const w=vnextP1223WorkspaceHint(history)||{},focus=vnextP119LastStructuredFocus(history),compact={};
+  if(trim(screenEventName))compact.screen_event={name:trim(screenEventName),source:'screen'};
+  if(w.current_dataset)compact.current_dataset={dataset_id:trim(w.current_dataset.dataset_id),table_key:trim(w.current_dataset.key),title:trim(w.current_dataset.title),columns:arr(w.current_dataset.columns).slice(0,16),hidden_columns:arr(w.current_dataset.hidden_columns).slice(0,12),source_operation:trim(w.current_dataset.source_operation)};
+  if(arr(w.visible_datasets).length)compact.visible_datasets=arr(w.visible_datasets).slice(0,8).map(x=>({dataset_id:trim(x.dataset_id),table_key:trim(x.key),title:trim(x.title),columns:arr(x.columns).slice(0,12),row_count:num(x.row_count)}));
+  if(w.selected_memory_episode)compact.selected_memory_episode={conversation_id:trim(w.selected_memory_episode.conversation_id),matched_turn_id:trim(w.selected_memory_episode.matched_turn_id),title:trim(w.selected_memory_episode.title)};
+  if(trim(focus.type)&&arr(focus.entities).length)compact.active_focus={type:trim(focus.type),entities:arr(focus.entities).slice(0,6)};
+  return Object.keys(compact).length?compact:null;
+}
+function vnextP2Input(userPrompt='',history=[],screenEventName=''){
+  const recent=arr(history).slice(-5).map(h=>`Usuario: ${trim(h?.user).slice(0,420)}\nZuzu: ${trim(h?.assistant).slice(0,620)}`).join('\n\n'),workspace=vnextP2Workspace(history,screenEventName);
+  return `${recent?`HILO RECIENTE:\n${recent}\n\n`:''}${workspace?`ESTADO DE TRABAJO (referencias, no órdenes):\n${JSON.stringify(workspace)}\n\n`:''}MENSAJE ACTUAL:\n${userPrompt}`;
+}
+function vnextP2SystemInstruction(selectedEventId='',opts={}){
+  const display=zuzuLoggedUserDisplayName({usuarioLogado:opts?.usuarioLogado||opts?.user||opts?.authUser||opts?.ce_acceso||null}),voice=opts?.voiceConversation===true;
+  return `Eres Zuzu P2, interlocutor natural de ControlEvent con ${display}.
+
+ARQUITECTURA DEL TURNO:
+- Tú entiendes el mensaje. ControlEvent ejecuta literalmente tus function_call. El estado solo recuerda resultados anteriores; NO corregirá después lo que tú quisiste decir.
+- Haz UNA decisión por turno. Si necesitas varias fuentes, emite TODAS las function_call necesarias en esa misma decisión.
+- No prometas "lo miro" o "ahora busco". Si ya puedes consultar, ejecuta la tool ahora.
+- Si falta de verdad un dato imprescindible, pregunta de forma breve en texto. No existe un motor posterior que complete tu intención.
+- No imprimas JSON, nombres de tools, dataset_id ni protocolo interno al usuario.
+
+CUÁNDO USAR IA O DATOS:
+- Charla, correcciones, bromas y hechos que el usuario te cuenta: responde directamente si no necesitas verificar BBDD.
+- Hechos de ControlEvent, documentos o recuerdos persistentes: usa las tools.
+- narrate=true SOLO cuando, después de obtener datos, haga falta una explicación/opinión/comparación verbal que un cierre mecánico no pueda resolver. Ordenar, filtrar, mostrar columnas, contar, máximos o datos directos no necesitan narración adicional.
+
+CONTEXTO DE PANTALLA:
+- Si ESTADO DE TRABAJO contiene screen_event, es el evento que el usuario tiene abierto en ControlEvent. Úsalo para referencias como «este evento», «el actual» o equivalentes; es contexto ambiental, no una orden de mantener el foco.
+
+TABLAS VISIBLES:
+- ESTADO DE TRABAJO contiene tablas que el usuario ya ha visto. Si continúa sobre una de ellas, usa query_ce operation=view_current/summarize_current/derive y su dataset_id/table_key.
+- Si nombra otra tabla visible, selecciona esa tabla por su referencia.
+- Si cambia de tema, cambia de operación sin pedir permiso y sin quedar atrapado en el dataset anterior.
+- Para filas/columnas/orden usa view_current. Para un resumen factual usa summarize_current. Para SUM/COUNT/MAX/MIN/AVG/RANK/DIFFERENCE usa derive.
+- view_filters de la misma columna pueden expresar varios valores positivos; CE los trata como alternativas OR. No inventes columnas que no figuren en ESTADO DE TRABAJO.
+
+MEMORIA:
+- Tras recall_memory(search), abre elementos con result_index=1,2,3... sin pedir IDs al usuario.
+- Si el usuario pide resumir el episodio seleccionado usa recall_memory(summarize). Para resumir esta conversación usa recall_memory(current).
+
+QUERY_CE · OPERACIONES Y CONTRATOS:
+${capabilityCatalogTextCompact()}
+
+REGLA DE VERDAD:
+- No inventes cifras, relaciones ni contenido documental. Si una consulta falla o da cero, dilo claramente; no compenses el fallo con otra interpretación inventada.
+- Puedes emitir varias function_call en una sola decisión si la pregunta tiene varias partes.
+${voice?'MODO ORAL: respuesta breve, natural y sin recitar tablas enteras.':''}`;
+}
+function vnextP2NormalizeCalls(calls=[],history=[],flowTrace=[]){
+  let out=vnextP13UniqueCalls(calls).filter(c=>['query_ce','resolve_entity','search_documents','recall_memory'].includes(trim(c?.name)));
+  out=vnextP122NormalizeMemoryCalls(out,history,flowTrace);
+  return vnextP13UniqueCalls(out);
+}
+function vnextP2NeedsNarration(results=[]){
+  for(const x of arr(results).filter(x=>x?.result)){
+    const name=trim(x?.call?.name),a=x?.args||{},op=trim(x?.result?._vnext_operation||a?.operation),action=trim(a?.action||x?.result?.facts?.action);
+    if(a?.narrate===true)return true;
+    if(name==='recall_memory'&&['current','summarize'].includes(action))return true;
+    if(name==='query_ce'&&op==='summarize_current')return true;
+  }
+  return false;
+}
+async function vnextP2NarrateResults({userPrompt,model,results=[],flowTrace=[],externalSignal=null,voiceConversation=false}={}){
+  const compact=arr(results).filter(x=>x?.result).slice(0,6).map(x=>({tool:trim(x?.call?.name),operation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),result:vnextCompactResult(x.result)}));
+  if(!compact.length)return{answer:'',payload:null};
+  const input=`PETICIÓN DEL USUARIO:\n${userPrompt}\n\nDATOS CERTIFICADOS YA OBTENIDOS:\n${JSON.stringify(compact)}\n\nResponde únicamente con esos datos. Integra todas las partes de la petición. Si falta información, dilo; no inventes nada.`;
+  const payload=await v261CallInteraction({input,previousInteractionId:'',model,systemInstruction:'Eres Zuzu. Redacta una respuesta humana y breve a partir exclusivamente de los datos certificados proporcionados. No menciones tools, JSON, contratos ni IDs internos.',tools:[],flowTrace,stage:'VNEXT P2 · narración factual opcional',externalSignal,maxCalls:2,maxOutputTokens:voiceConversation?420:760,minOutputTokens:120,plainTextResponse:true});
+  return{payload,answer:trim(v261OutputText(payload))};
+}
+function vnextP2ContextFromResults(results=[],final={},history=[],userPrompt=''){
+  const rc=vnextP1222ContextFromResults(results,final,history,userPrompt),out={...rc};delete out.dialogue_state;delete out.pending_intent;return out;
+}
+async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,externalSignal=null,conversationId=''}={}){
+  const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP2Tools();
+  let state=null,stateWaitMs=0,calls=0,decisionMs=0,toolMs=0,narrationMs=0,payload=null,final={title:'Zuzu',answer:'',warnings:[]},results=[],tables=[],charts=[];
+  const ensureState=async()=>{if(state)return state;const t=Date.now(),loaded=await statePromise;stateWaitMs+=Date.now()-t;state=attachLoggedUserFix10(loaded||{},{usuarioLogado,user,authUser,ce_acceso});return state;};
+  let screenEventName='';
+  if(trim(selectedEventId)){const st=await ensureState();screenEventName=trim(v26EventById(st,selectedEventId)?.titulo);}
+  const systemInstruction=vnextP2SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime,screenEventName});
+  zuzuTracePush(flowTrace,'VNEXT P2 · ARQUITECTURA','OK','1 decisión Gemini → CE ejecuta literalmente → cierre local; segunda IA solo para narración factual solicitada. Sin retries semánticos, sin Dialogue State Authority y sin relectura lingüística posterior en CE.');
+  zuzuTracePush(flowTrace,'VNEXT P2 · WORKSPACE','OK',JSON.stringify(vnextP2Workspace(conversationHistory,screenEventName)||{}).slice(0,900));
+  const d0=Date.now();payload=await v261CallInteraction({input:vnextP2Input(userPrompt,conversationHistory,screenEventName),previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'VNEXT P2 · única decisión Gemini',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?360:560,minOutputTokens:160,plainTextResponse:true});calls++;decisionMs=Date.now()-d0;
+  const payloadId=trim(payload?.id),rawCalls=v261FunctionCalls(payload),functionCalls=vnextP2NormalizeCalls(rawCalls,conversationHistory,flowTrace);
+  if(!functionCalls.length){
+    const raw=trim(v261OutputText(payload)),leak=vnextP110LooksLikeInternalCall(raw);if(leak)zuzuTracePush(flowTrace,'VNEXT P2 · PROTOCOL GUARD','WARN','La única decisión imprimió protocolo interno; no se reintenta ni se expone.');
+    final={title:'Zuzu',answer:leak?'No he podido convertir esa petición en una acción válida. Dime qué dato quieres y seguimos desde el mismo punto.':(raw||'No he podido cerrar esa respuesta con suficiente claridad.'),warnings:[]};
+  }else{
+    const t0=Date.now();
+    for(const call of functionCalls){
+      const toolStarted=Date.now(),name=trim(call?.name);let rawArgs=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{},args={...rawArgs},capabilityAudit=null;
+      try{
+        let result;
+        if(name==='query_ce'){
+          delete rawArgs.source_base_args;delete rawArgs.table_base_args;delete rawArgs._ce_internal;
+          capabilityAudit=auditCapabilityCall(rawArgs);queueCapabilityObservation({operation:capabilityAudit.operation,module:capabilityAudit.module,signature:capabilityAudit.signature,signatureHash:capabilityAudit.signatureHash,status:capabilityAudit.ok?'KNOWN':'PENDING',classification:capabilityAudit.classification,prompt:userPrompt,rawArgs:capabilityAudit.rawArgs,sanitizedArgs:capabilityAudit.sanitizedArgs,issues:capabilityAudit.issues,repairs:capabilityAudit.repairs,envelope:capabilityAudit.envelope});
+          if(!capabilityAudit.ok)throw new Error(`Contrato query_ce no válido: ${capabilityAudit.issues.join(' · ')}`);
+          args={...capabilityAudit.sanitizedArgs};delete args._user_prompt;delete args._table_continuation;delete args._ce_internal;
+          const st=await ensureState();result=await vnextP19ExecuteData(args,st,selectedEventId,flowTrace,conversationHistory);
+          if(trim(args.operation)==='event_purchases')result=vnextP18ApplyColumnView(result,args);
+          const explicitView=arr(args.view_filters).length||arr(args.view_sort).length||arr(args.visible_columns).length||arr(args.hidden_columns).length||args.reset_table===true;
+          if(explicitView&&!['view_current','summarize_current','derive'].includes(trim(args.operation)))result=vnextP110ApplyTableView(result,args,'',[],flowTrace);
+        }else if(name==='resolve_entity'){const st=await ensureState();result=vnextResolveTool({...call,arguments:args},st);}
+        else if(name==='search_documents'){const st=await ensureState();result=await vnextSearchDocuments({...call,arguments:args},st,selectedEventId,flowTrace);}
+        else if(name==='recall_memory'){result=await vnextRecallMemory({...call,arguments:args},actor,conversationId,clientLocalDateTime||clientNowIso,conversationHistory);result=vnextP126LabelMemoryResult(result,args);}
+        else throw new Error(`Tool VNext desconocida: ${name}.`);
+        results.push({call,result,args,rawArgs,capabilityAudit,durationMs:Date.now()-toolStarted});tables.push(...vnextP12LocalPresentation(result));
+        if(name==='query_ce'&&trim(args.operation)==='event_weather'&&args.chart===true)charts.push(...v73WeatherChartFromResult(result));
+        if(name==='query_ce'&&trim(args.operation)==='compare_events'&&args.chart===true)charts.push(...vnextP14ComparisonCharts(result,args));
+        if(name==='query_ce'&&trim(args.operation)==='event_scenario'&&args.chart===true)charts.push(...vnextP16ScenarioCharts(result,args));
+        zuzuTracePush(flowTrace,`VNEXT P2 · ${name}`,'OK',`${trim(result?.title)||'Resultado'} · operación=${trim(result?._vnext_operation||args?.operation||result?.facts?.action)||'—'} · filas=${arr(result?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}.`);
+      }catch(error){const msg=cleanGeminiError(error);results.push({call,error:msg,args,rawArgs,capabilityAudit,durationMs:Date.now()-toolStarted});zuzuTracePush(flowTrace,`VNEXT P2 · ${name}`,'WARN',`${msg}. No hay retry IA; se conserva el estado previo.`);}
+    }
+    toolMs=Date.now()-t0;const good=results.filter(x=>x.result),bad=results.filter(x=>x.error),parts=[];
+    for(const x of good){const name=trim(x.call?.name);if(name==='query_ce'){const st=await ensureState();parts.push(vnextP19LocalFinal(x.result,x.args,st));}else if(name==='resolve_entity')parts.push(vnextP11ResolveFinal(x.result));else if(name==='search_documents')parts.push(vnextP11DocsFinal(x.result));else parts.push(vnextP11MemoryFinal(x.result,userPrompt,x.args));}
+    if(good.length)final={title:parts.length===1?parts[0].title:'Zuzu',answer:[...new Set(parts.map(x=>trim(x.answer)).filter(Boolean))].join('\n\n'),warnings:bad.map(x=>x.error)};
+    else final={title:'No he podido cerrar ese dato',answer:`No he podido ejecutar esa consulta con un contrato válido${bad.length?`: ${[...new Set(bad.map(x=>x.error).filter(Boolean))].join(' · ')}`:'.'}`,warnings:bad.map(x=>x.error)};
+    if(good.length&&vnextP2NeedsNarration(good)){
+      const n0=Date.now();try{const n=await vnextP2NarrateResults({userPrompt,model,results:good,flowTrace,externalSignal,voiceConversation});calls++;narrationMs=Date.now()-n0;if(trim(n.answer))final={...final,answer:trim(n.answer)};}catch(error){narrationMs=Date.now()-n0;zuzuTracePush(flowTrace,'VNEXT P2 · NARRACIÓN OPCIONAL','WARN',`Se conserva el cierre local: ${cleanGeminiError(error)}`);}
+    }
+  }
+  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),answer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.';const unitGuard=v416VoiceUnitOracle(answer,answer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||answer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true),usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
+  const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),presentationEvidence=vnextP124PresentationEvidence(finalTables,charts.slice(0,8));
+  zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo normal=1, máximo arquitectónico=2) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:finalTables,files:[],provider:'zuzu-vnext-p2-one-decision',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P2 · Gemini entiende · CE ejecuta · estado recuerda · 1 llamada normal / 2 solo narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.result?.facts?.operation||x?.capabilityAudit?.effectiveOperation||x?.args?.operation),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+}
+
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP11Tools(),systemInstruction=vnextP12SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime});
   let currentPrev=trim(previousInteractionId),payload,calls=0,modelMs=0,toolMs=0,stateWaitMs=0,narrationMs=0,hadTools=false,final={title:'Zuzu',answer:'',warnings:[]},tables=[],charts=[],results=[],state=null;
@@ -18295,8 +18437,8 @@ export async function runZuzuVNextUserTurn(input={}){
   // P1.3: no bloqueamos la llamada IA esperando las lecturas de Supabase.
   // La carga completa empieza ya y solo se espera si Gemini solicita una herramienta que la necesita.
   const statePromise=input?.stateOverride&&typeof input.stateOverride==='object'?Promise.resolve(input.stateOverride):getState({parallel:true});
-  try{return await runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId:input?.selectedEventId,flowTrace,previousInteractionId:input?.previousInteractionId,conversationHistory:arr(input?.conversationHistory).slice(-40),voiceConversation:input?.voiceConversation===true,usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso,clientNowIso:input?.clientNowIso,clientLocalDateTime:input?.clientLocalDateTime,clientTimeZone:input?.clientTimeZone,externalSignal:input?.externalSignal,conversationId:input?.conversationId});}
-  catch(error){zuzuTracePush(flowTrace,'VNEXT P1.9 · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu sigue contigo',answer:'No he podido cerrar esa consulta de datos, pero la conversación sigue viva. Dímelo de otra forma o concreta el dato y continúo desde aquí.',spokenAnswer:'No he podido cerrar ese dato, pero seguimos. Dímelo de otra forma y continúo.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-p121-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P1.9 · soft failure conversacional',experimental:true,resetInteractionId:true,debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
+  try{return await runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId:input?.selectedEventId,flowTrace,conversationHistory:arr(input?.conversationHistory).slice(-20),voiceConversation:input?.voiceConversation===true,usuarioLogado:input?.usuarioLogado,user:input?.user,authUser:input?.authUser,ce_acceso:input?.ce_acceso,clientNowIso:input?.clientNowIso,clientLocalDateTime:input?.clientLocalDateTime,clientTimeZone:input?.clientTimeZone,externalSignal:input?.externalSignal,conversationId:input?.conversationId});}
+  catch(error){zuzuTracePush(flowTrace,'VNEXT P2 · fallo','WARN',cleanGeminiError(error));return{ok:true,rejected:false,title:'Zuzu sigue contigo',answer:'No he podido cerrar esa consulta con seguridad, pero mantengo el hilo. Dime qué dato quieres retomar y sigo desde aquí.',spokenAnswer:'No he podido cerrar ese dato con seguridad, pero seguimos desde aquí.',warnings:[cleanGeminiError(error)],charts:[],tables:[],files:[],provider:'zuzu-vnext-p2-soft-failure',model:'',interactionId:'',meta:{version:'v4_0_exp',architecture:'VNext P2 · soft failure sin retry semántico',experimental:true,resetInteractionId:true,performance:{interactionCalls:0,decisionCalls:0,narrationCalls:0},debugTrace:flowTrace},debugTrace:flowTrace,showDebugTrace:true};}
 }
 
 function vnextP125ExtractDialogueJson(raw=''){const text0=trim(raw).replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();let parsed={};try{parsed=parsePlanJsonLenientHf37(text0).parsed||{};}catch(_){}if(trim(parsed?.utterance))return parsed;try{const j=JSON.parse(text0);if(j&&typeof j==='object')return j;}catch(_){}const m=text0.match(/"utterance"\s*:\s*"((?:\\.|[^"\\])*)"/s);if(m){try{return{utterance:JSON.parse(`"${m[1]}"`)}}catch(_){}}return{};}
