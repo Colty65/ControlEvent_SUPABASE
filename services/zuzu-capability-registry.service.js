@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · VNext P1.22.3 · CANONICAL COLUMN IDS + SUMMARY SOURCE HIERARCHY + PERSISTENT ARTIFACT
+/* ControlEvent v4_0_exp · VNext P1.23 · DIALOGUE STATE AUTHORITY + ADAPTIVE CONVERSATION ITV
    Registro + canonizador estructural de capacidades query_ce.
    NHC: describe/normaliza JSON y semántica de contratos; nunca interpreta frases del usuario. */
 import crypto from 'node:crypto';
@@ -8,7 +8,7 @@ const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
 const arr=v=>Array.isArray(v)?v:[];
 
-export const CAPABILITY_REGISTRY_VERSION='20260902-P1223';
+export const CAPABILITY_REGISTRY_VERSION='20260902-P123';
 
 const P={
   operation:{type:'string'},
@@ -18,7 +18,7 @@ const P={
   detail:{type:'string',enum:['brief','standard','full']},start_date:{type:'string'},end_date:{type:'string'},chart:{type:'boolean'},chart_type:{type:'string',enum:['line','bar','horizontalBar']},metric:{type:'string',enum:['all','purchases','income','donations','attendance']},
   tone:{type:'string',enum:['friendly','banter','neutral']},register:{type:'string',enum:['normal','close','banter']},tease:{type:'boolean'},narrate:{type:'boolean'},
   mine:{type:'boolean'},order_by:{type:'string',enum:['store_product','product','store','amount_desc']},store_filter_mode:{type:'string',enum:['all','include','exclude']},include_stores:{type:'array',items:{type:'string'}},exclude_stores:{type:'array',items:{type:'string'}},exclude_products:{type:'array',items:{type:'string'}},
-  visible_columns:{type:'array',items:{type:'string'}},hidden_columns:{type:'array',items:{type:'string'}},view_filters:{type:'array',items:{type:'object',properties:{field:{type:'string'},operator:{type:'string',enum:['eq','neq','contains','not_contains']},value:{type:'string'}},required:['field','operator','value']}},view_sort:{type:'array',items:{type:'object',properties:{field:{type:'string'},direction:{type:'string',enum:['asc','desc']}},required:['field']}},reset_table:{type:'boolean'},
+  visible_columns:{type:'array',items:{type:'string'}},hidden_columns:{type:'array',items:{type:'string'}},view_filters:{type:'array',items:{type:'object',properties:{field:{type:'string'},operator:{type:'string',enum:['eq','neq','contains','not_contains']},value:{type:'string'}},required:['field','operator','value']}},remove_view_filters:{type:'array',items:{type:'object',properties:{field:{type:'string'},operator:{type:'string',enum:['eq','neq','contains','not_contains']},value:{type:'string'}},required:['field']}},reset_filters:{type:'boolean'},view_sort:{type:'array',items:{type:'object',properties:{field:{type:'string'},direction:{type:'string',enum:['asc','desc']}},required:['field']}},reset_table:{type:'boolean'},
   income_delta:{type:'number'},scenario_people:{type:'array',items:{type:'string'}},plan:{type:'boolean'},plan_detail:{type:'boolean'},plan_focus:{type:'array',items:{type:'string'}},plan_target:{type:'number'},include_empty:{type:'boolean'},
   // Proyección de salida. No filtra el dataset.
   requested_fields:{type:'array',items:{type:'string'}},
@@ -26,6 +26,7 @@ const P={
   focus_mode:{type:'string',enum:['replace','add']},
   focus_type:{type:'string',enum:['event','person','multi_person','dataset']},
   focus_entities:{type:'array',items:{type:'string'}},
+  change_focus:{type:'boolean'},
   // Lenguaje algebraico sobre datasets CE.
   derive_operation:{type:'string',enum:['SUM','COUNT','DISTINCT_COUNT','MAX','MIN','AVG','RANK','DIFFERENCE']},field:{type:'string'},derive_field:{type:'string'},label_field:{type:'string'},table_key:{type:'string'},top_n:{type:'integer'},
   source_operation:{type:'string'},source_args:{type:'object'},source_dataset_id:{type:'string'},dataset_id:{type:'string'},
@@ -34,13 +35,13 @@ const P={
 };
 
 const PRESENT=['detail','tone','register','tease','narrate'];
-const META=['requested_fields','focus_mode','focus_type','focus_entities'];
+const META=['requested_fields','focus_mode','focus_type','focus_entities','change_focus'];
 // P1.20.1 · HOTFIX LATENCIA: el ENVELOPE sigue siendo interno, pero NO se publica
 // completo dentro de las 23 ramas del schema que ve Gemini. Repetir context/view en
 // cada operation duplicaba casi el número de propiedades del function schema.
 // Cada operación expone solo sus claves empresariales + presentación/foco mínimos.
 const CONTEXT=['source_operation','source_args','source_dataset_id','dataset_id','table_key','focus_mode','focus_type','focus_entities','title','record_count'];
-const VIEW=['view_filters','view_sort','visible_columns','hidden_columns','reset_table','order_by'];
+const VIEW=['view_filters','remove_view_filters','reset_filters','view_sort','visible_columns','hidden_columns','reset_table','order_by'];
 const RUNTIME_UNIVERSAL=[...new Set([...PRESENT,...META,...CONTEXT,...VIEW])];
 const GEMINI_COMMON=[...new Set([...PRESENT,...META])];
 // optional = lo que el canonizador/runtime tolera dentro del envelope.
@@ -73,7 +74,7 @@ export const CAPABILITY_REGISTRY=Object.freeze({
   store_purchases:def('TIENDAS',['store'],['event','scope','status','include_empty'],'store_purchases',[],{scope:'all_events',status:'realized'}),
   events_overview:def('EVENTOS',[],['scope','metric','chart','chart_type'],'events_overview',[],{metric:'all'}),
   // Vista genérica sobre el dataset/tablas del turno anterior. No reabre módulos de negocio.
-  view_current:def('VISTA',[],['visible_columns','hidden_columns','view_filters','view_sort','reset_table'],'view_dataset'),
+  view_current:def('VISTA',[],['visible_columns','hidden_columns','view_filters','remove_view_filters','reset_filters','view_sort','reset_table'],'view_dataset'),
   summarize_current:def('VISTA',[],['requested_fields'],'current_dataset_summary'),
   derive:def('DERIVACION',['derive_operation'],['field','derive_field','label_field','table_key','top_n','source_operation','source_args'],'derived_dataset')
 });
@@ -88,7 +89,7 @@ const OP_DESCRIPTIONS={
   person_profile:'Dossier global de una identidad personal. Para ingreso global de una persona usa esta capacidad con requested_fields=[income].',
   person_income_status:'Estado de ingreso de una persona DENTRO de un evento concreto; requiere person + event.',
   events_overview:'Panorama homogéneo del conjunto de eventos; no necesita enumerar events.',
-  view_current:'Transforma o vuelve a mostrar únicamente la vista del dataset actual. Las referencias de columna se resuelven contra el catálogo real de columnas y la vista persiste entre turnos.',
+  view_current:'Transforma o vuelve a mostrar únicamente la vista del dataset actual. Las referencias de columna se resuelven contra el catálogo real y la vista persiste. view_filters añade/reemplaza filtros; remove_view_filters retira filtros concretos para reincorporar filas; reset_filters recupera todas las filas sin tocar columnas/orden.',
   summarize_current:'Resume el contenido factual visible del dataset actual. requested_fields puede seleccionar columnas visibles concretas y nunca recupera columnas ocultas.'
 };
 
@@ -124,6 +125,7 @@ function capabilityBranchSchema(operation=''){
   if(properties.focus_mode)properties.focus_mode={...properties.focus_mode,description:'Metadato de contexto: replace sustituye el foco previo; add compone focos deliberadamente.'};
   if(properties.focus_entities)properties.focus_entities={...properties.focus_entities,description:'Entidades canónicas que forman el foco actual. Si una pareja/grupo existe como entidad canónica, conservarla como un único elemento.'};
   if(properties.focus_type)properties.focus_type={...properties.focus_type,description:'Tipo del foco estructurado actual.'};
+  if(properties.change_focus)properties.change_focus={...properties.change_focus,description:'true solo cuando este turno abandona deliberadamente el objeto/foco activo para abrir otro asunto factual.'};
   if(operation==='events_overview'&&properties.scope)properties.scope={...properties.scope,description:'Compatibilidad: all_events es redundante y se elimina al canonizar.'};
   if(operation==='event_purchases'&&properties.top_n)properties.top_n={...properties.top_n,description:'Compatibilidad estructural: con amount_desc o derive_operation se canoniza a DERIVE.'};
   return{type:'object',description:OP_DESCRIPTIONS[operation]||'',properties,required:['operation',...d.required],additionalProperties:false};
@@ -137,7 +139,7 @@ export function capabilityCatalogText(){
 }
 
 const SUBJECT_KEYS=['event','events','person','store','product','ticket','responsible'];
-const CONTEXT_KEYS=['scope','source_operation','source_args','source_dataset_id','dataset_id','table_key','focus_mode','focus_type','focus_entities','title','record_count'];
+const CONTEXT_KEYS=['scope','source_operation','source_args','source_dataset_id','dataset_id','table_key','focus_mode','focus_type','focus_entities','change_focus','title','record_count'];
 const PRESENTATION_KEYS=[...new Set(['requested_fields','social_register',...PRESENT,...VIEW])];
 export function capabilityEnvelopeFromArgs(args={}){
   const a={...(args||{})},operation=trim(a.operation),subject={},query={},context={},presentation={};

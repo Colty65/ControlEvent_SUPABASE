@@ -3,7 +3,7 @@
    FAST no llama a Gemini. AI-SMOKE y FULL-CERT tienen presupuesto duro configurable. */
 import { getState } from './state.service.js';
 import { listUsers } from './auth.service.js';
-import { runZuzuUserTurn, runZuzuVNextUserTurn, __zuzuStructuralTesting as Z } from './event-ai.service.js';
+import { runZuzuUserTurn, runZuzuVNextUserTurn, generateZuzuItvDialogueUserTurn, __zuzuStructuralTesting as Z } from './event-ai.service.js';
 import { exportBankData } from './bank-reconciliation.service.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -139,7 +139,8 @@ function publicBatteryCase(c,mode=''){
     event:trim(c?.event),events:arr(c?.events).map(trim).filter(Boolean),person:trim(c?.person),
     expectedEvent:trim(c?.expectedEvent),expectedEvents:arr(c?.expectedEvents).map(trim).filter(Boolean),expectedPerson:trim(c?.expectedPerson),
     oracle:c?.oracle&&typeof c.oracle==='object'?c.oracle:null,requireAnswer:c?.requireAnswer!==false,validationRule,
-    engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':''
+    engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':'',
+    dialogue:c?.dialogue&&typeof c.dialogue==='object'?c.dialogue:null
   };
 }
 
@@ -149,7 +150,7 @@ function restoredHistoricalCase(raw={},mode=''){
     scenario:trim(raw?.scenario),mode:trim(mode||raw?.mode).toUpperCase(),event:trim(raw?.event||raw?.expectedEvent),
     events:arr(raw?.events).length?arr(raw.events).map(trim).filter(Boolean):arr(raw?.expectedEvents).map(trim).filter(Boolean),
     person:trim(raw?.person||raw?.expectedPerson),oracle:raw?.oracle&&typeof raw.oracle==='object'?raw.oracle:null,requireAnswer:raw?.requireAnswer!==false,
-    engine:trim(raw?.engine).toUpperCase()==='VNEXT'?'VNEXT':''
+    engine:trim(raw?.engine).toUpperCase()==='VNEXT'?'VNEXT':'',dialogue:raw?.dialogue&&typeof raw.dialogue==='object'?raw.dialogue:null
   };
   const rule=trim(raw?.validationRule);
   if(rule==='nonexistent-event') c.validate=r=>{
@@ -1089,6 +1090,7 @@ const TPL={
 // real de Zuzu y observar PLAN -> CE -> respuesta con oráculo/ledger.
 const LANGUAGE_REACH_PROFILES={
   GOLDEN:{id:'GOLDEN',label:'GOLDEN · 110',count:110,expectedBand:'regresión fija',description:'Las mismas 110 preguntas de la referencia P1.17; los oráculos se refrescan con los datos actuales.'},
+  DIALOGUE:{id:'DIALOGUE',label:'DIÁLOGO · 24',count:24,expectedBand:'continuidad adaptativa',description:'Una conversación sintética continua: cada turno nace de la respuesta real de Zuzu y del foco que haya quedado activo.'},
   BASIC:{id:'BASIC',label:'BÁSICA',count:50,expectedBand:'95–100%',description:'Preguntas simples, explícitas y de un solo objetivo.'},
   MEDIUM:{id:'MEDIUM',label:'MEDIA',count:60,expectedBand:'≈90%',description:'Continuidad corta, comparaciones, varias acciones y referencias naturales.'},
   HARD:{id:'HARD',label:'DIFÍCIL',count:70,expectedBand:'<50% de partida',description:'Composición, cambios de foco, tablas, gráficas, elipsis y lenguaje ruidoso.'},
@@ -1097,6 +1099,7 @@ const LANGUAGE_REACH_PROFILES={
 function normalizeLanguageLevel(raw='BASIC'){
   const n=norm(raw).replace(/\s+/g,'');
   if(['golden','golden110','110','fija','regresion'].includes(n))return'GOLDEN';
+  if(['dialogue','dialogo','diálogo','conversation','conversacion','conversación','24'].includes(n))return'DIALOGUE';
   if(['basic','basica','facil','50'].includes(n))return'BASIC';
   if(['medium','media','intermedia','60'].includes(n))return'MEDIUM';
   if(['hard','dificil','dificil70','70'].includes(n))return'HARD';
@@ -1142,9 +1145,16 @@ async function refreshGoldenCase(caseDef,state,cache=new Map()){
 }
 async function buildGoldenLanguageCases(state){const f=goldenFixture(),out=[],cache=new Map();for(const c of arr(f.cases))out.push(await refreshGoldenCase(c,state,cache));return out.slice(0,110);}
 
+function buildAdaptiveDialogueCases(state={},seed=1){
+  const people=shuffled(arr(state?.personas).map(personName).filter(Boolean),seed,'dialogue-people'),events=shuffled(arr(state?.eventos).map(eventName).filter(Boolean),seed,'dialogue-events'),p1=people[0]||'una persona conocida',p2=people[1]||p1,e1=events[0]||'el evento activo',e2=events[1]||e1;
+  const mission=`Mantén UNA sola conversación larga y humana con Zuzu. El único arranque fijado será una búsqueda histórica alrededor de ${p1}; desde ahí NO sigas un guion de preguntas. Cada siguiente turno debe decidirse después de leer la respuesta real de Zuzu y continuar, corregir, aclarar, bromear o cambiar de rumbo como haría una persona. Durante la charla intenta, solo cuando el hilo lo permita, trabajar varios turnos sobre un mismo objeto/tabla (incluye alguna exclusión/filtro de filas y su recuperación, columnas, orden o resumen), resolver alguna aclaración, hacer al menos un cambio deliberado de foco hacia algo como ${e1} o ${p2}, y volver a un asunto anterior si resulta natural. No hay orden obligatorio ni frase preparada para esas acciones. Si Zuzu abre un foco inesperado, síguelo antes de decidir el turno siguiente. Si se equivoca, corrígelo dentro de la misma conversación; nunca reinicies para que el test salga bien. Usa a veces elipsis, referencias como “ese/lo de antes/y ahora”, coloquialismos o pequeñas erratas. Al acercarte al final, pide un resumen solo si encaja con lo que realmente se haya hablado.`;
+  const out=[];for(let i=1;i<=24;i++)out.push({id:`dialogue-${String(i).padStart(3,'0')}`,group:'DIÁLOGO ADAPTATIVO',label:`Turno conversacional ${i}`,prompt:i===1?`Sácame algo histórico que recuerdes de ${p1}; quiero ir tirando del hilo contigo.`:'[turno generado dinámicamente desde la respuesta anterior]',expected:'Mantener hilo, foco, intención pendiente y objeto activo; ejecutar acciones sin promesas vacías.',scenario:'ITV DIALOGUE P1.23',mode:'FULL-CERT',engine:'VNEXT',dialogue:{adaptive:true,turn:i,total:24,mission,seed:String(seed),anchors:{people:[p1,p2],events:[e1,e2]}}});return out;
+}
+
 async function buildLanguageReachCases(state,rawLevel='BASIC',seed=1){
   const level=normalizeLanguageLevel(rawLevel),profile=LANGUAGE_REACH_PROFILES[level];
   if(level==='GOLDEN')return buildGoldenLanguageCases(state);
+  if(level==='DIALOGUE')return buildAdaptiveDialogueCases(state,seed);
   const chosen=chooseEvents(state,seed),events=arr(chosen.events),people=choosePeople(state,seed).people,stores=shuffled(arr(state?.tiendas).filter(x=>trim(x?.nombre)),seed,'lang-stores');
   const active=languageActiveEvent(events),activeName=eventName(active),catalogs=['events','people','products','stores'];
   const eventCache=new Map(),docsCache=new Map(),bankCache=new Map(),mgmtCache=new Map(),donCache=new Map(),personCache=new Map(),compareCache=new Map(),storeCache=new Map();
@@ -1343,8 +1353,8 @@ async function buildLanguageReachCases(state,rawLevel='BASIC',seed=1){
 }
 
 export async function previewZuzuLanguageBattery({level='BASIC',seed}={}){
-  const state=await getItvState(),normalizedLevel=normalizeLanguageLevel(level),normalizedSeed=normalizedLevel==='GOLDEN'?0x117110:normalizeSeed(seed),profile=LANGUAGE_REACH_PROFILES[normalizedLevel],cases=await buildLanguageReachCases(state,normalizedLevel,normalizedSeed),golden=normalizedLevel==='GOLDEN';
-  return{ok:true,replayContractVersion:4,source:'language',batteryCode:golden?'GOLDEN-P117-110':`LANG-${normalizedLevel}-${profile.count}`,languageProfile:{...profile,goldenFixed:golden},generatedAt:nowIso(),seed:normalizedSeed,dataCounts:batteryDataCounts(state),tests:{FAST:0,'AI-SMOKE':0,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':[],'FULL-CERT':cases.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'FULL-CERT':{turns:cases.length,costEurRange:`hasta ~${(profile.count*0.025).toFixed(2).replace('.',',')} € según modelo/tokens`,hardCapSuggested:round(profile.count*0.025,2)}},notes:[golden?'GOLDEN 110: prompts y escenarios congelados desde P1.17; los oráculos se recalculan con el estado actual de CE.':`Batería de alcance ${profile.label}: ${profile.count} preguntas.`,`Expectativa de partida: ${profile.expectedBand}.`,profile.description,'NHC: estas frases viven exclusivamente en ITV; no añaden reglas lingüísticas al runtime de Zuzu.','FULL-CERT ejecuta expresamente el motor VNext y conserva el historial visible dentro de cada escenario.','P1.19 mantiene separados FUNCIONAL y RENDIMIENTO, exige materializar ceros y alinea el mapa de decisión con el veredicto funcional.']};
+  const state=await getItvState(),normalizedLevel=normalizeLanguageLevel(level),normalizedSeed=normalizedLevel==='GOLDEN'?0x117110:normalizeSeed(seed),profile=LANGUAGE_REACH_PROFILES[normalizedLevel],cases=await buildLanguageReachCases(state,normalizedLevel,normalizedSeed),golden=normalizedLevel==='GOLDEN',dialogue=normalizedLevel==='DIALOGUE';
+  return{ok:true,replayContractVersion:4,source:'language',batteryCode:golden?'GOLDEN-P117-110':dialogue?'DIALOGUE-P123-24':`LANG-${normalizedLevel}-${profile.count}`,languageProfile:{...profile,goldenFixed:golden},generatedAt:nowIso(),seed:normalizedSeed,dataCounts:batteryDataCounts(state),tests:{FAST:0,'AI-SMOKE':0,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':[],'FULL-CERT':cases.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'FULL-CERT':{turns:cases.length,costEurRange:`hasta ~${(profile.count*(dialogue?0.05:0.025)).toFixed(2).replace('.',',')} € según modelo/tokens`,hardCapSuggested:round(profile.count*(dialogue?0.05:0.025),2)}},notes:[golden?'GOLDEN 110: prompts y escenarios congelados desde P1.17; los oráculos se recalculan con el estado actual de CE.':dialogue?'DIÁLOGO P1.23: solo el primer mensaje es semilla; los siguientes los genera un usuario sintético leyendo la respuesta real, el foco y el estado estructurado de Zuzu.':`Batería de alcance ${profile.label}: ${profile.count} preguntas.`,`Expectativa de partida: ${profile.expectedBand}.`,profile.description,'NHC: estas frases viven exclusivamente en ITV; no añaden reglas lingüísticas al runtime de Zuzu.',dialogue?'Cada turno de DIÁLOGO usa dos papeles IA separados: Zuzu responde y un usuario sintético evalúa esa respuesta para decidir el siguiente movimiento real del hilo.':'FULL-CERT ejecuta expresamente el motor VNext y conserva el historial visible dentro de cada escenario.','P1.19 mantiene separados FUNCIONAL y RENDIMIENTO, exige materializar ceros y alinea el mapa de decisión con el veredicto funcional.']};
 }
 
 async function buildAiSmokeCases(state,max=40,seed=1){
@@ -1636,7 +1646,7 @@ async function runFull({state,turns,send,signal,actor={},maxCostEur=0.50,maxCase
 
 
 function safeConversationState(raw={}){
-  return {conversationId:trim(raw?.conversationId).slice(0,160),previousInteractionId:trim(raw?.previousInteractionId).slice(0,500),scenario:trim(raw?.scenario).slice(0,160),history:arr(raw?.history).slice(-8).map(h=>({user:trim(h?.user).slice(0,1600),assistant:trim(h?.assistant).slice(0,1200),assistantTail:trim(h?.assistantTail).slice(0,900),title:trim(h?.title).slice(0,240),provider:trim(h?.provider).slice(0,80),selectedEventId:trim(h?.selectedEventId).slice(0,160),pendingAction:h?.pendingAction||null,resultContext:h?.resultContext||null}))};
+  return {conversationId:trim(raw?.conversationId).slice(0,160),previousInteractionId:trim(raw?.previousInteractionId).slice(0,500),scenario:trim(raw?.scenario).slice(0,160),history:arr(raw?.history).slice(-30).map(h=>({user:trim(h?.user).slice(0,1600),assistant:trim(h?.assistant).slice(0,1200),assistantTail:trim(h?.assistantTail).slice(0,900),title:trim(h?.title).slice(0,240),provider:trim(h?.provider).slice(0,120),selectedEventId:trim(h?.selectedEventId).slice(0,160),pendingAction:h?.pendingAction||null,resultContext:h?.resultContext||null})),dialogueNext:raw?.dialogueNext&&typeof raw.dialogueNext==='object'?raw.dialogueNext:null,dialogueMission:trim(raw?.dialogueMission).slice(0,3000),dialogueTurn:num(raw?.dialogueTurn)};
 }
 
 export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationState={},seed,signal,actor={}}={}){
@@ -1686,7 +1696,7 @@ async function runItvPaidTurn({caseDef,state,actor,conversationState,signal,full
 export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},conversationState={},signal,actor={}}={}){
   const m=trim(mode||savedCase?.mode).toUpperCase();
   if(!['AI-SMOKE','FULL-CERT'].includes(m)){const e=new Error('La repetición histórica solo admite AI-SMOKE o FULL-CERT.');e.status=400;throw e;}
-  const c=restoredHistoricalCase(savedCase,m);if(!c.id||!c.prompt){const e=new Error('La batería histórica no contiene una pregunta ejecutable.');e.status=422;throw e;}
+  let c=restoredHistoricalCase(savedCase,m);if(!c.id||!c.prompt){const e=new Error('La batería histórica no contiene una pregunta ejecutable.');e.status=422;throw e;}
   const state=await getItvState();if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
   const started=Date.now(),reserve=m==='AI-SMOKE'?0.012:0.015,timeoutMs=m==='AI-SMOKE'?Math.max(20000,Math.min(45000,Number(process.env.CONTROLEVENT_ZUZU_TEST_SMOKE_TIMEOUT_MS)||38000)):Math.max(25000,Math.min(48000,Number(process.env.CONTROLEVENT_ZUZU_TEST_FULL_TIMEOUT_MS)||42000));
   let r,nextConversationState=null;
@@ -1697,12 +1707,18 @@ export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},convers
     else if(timed.error)r=technicalErrorOutcome(c,timed.error?.message||String(timed.error),{calls:1,tokens:0,costEur:reserve},{historicalExact:true});
     else{const result=timed.value,u=usageOf(result);r=observedOutcome(c,result,u,{historicalExact:true});}
   }else{
-    let cs=safeConversationState(conversationState);if(cs.scenario!==trim(c.scenario))cs={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};
+    let cs=safeConversationState(conversationState);if(cs.scenario!==trim(c.scenario))cs={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario),dialogueNext:null,dialogueMission:'',dialogueTurn:0};
+    const adaptive=c?.dialogue?.adaptive===true,mission=trim(c?.dialogue?.mission)||trim(cs.dialogueMission),turnNo=num(c?.dialogue?.turn)||cs.history.length+1;let userMove={utterance:c.prompt,requiresTool:turnNo===1,changeFocus:turnNo===1,move:'memory_action',target:'inicio de misión'};
+    if(adaptive&&turnNo>1){if(cs.dialogueNext&&trim(cs.dialogueNext.utterance))userMove=cs.dialogueNext;else userMove=await generateZuzuItvDialogueUserTurn({mission,conversationHistory:cs.history,turnNumber:turnNo,seed:c?.dialogue?.seed||'',externalSignal:signal});c={...c,prompt:trim(userMove.utterance)||c.prompt};}
     const timed=await runTimedAiCase({caseDef:c,send:()=>{},parentSignal:signal,index:1,total:1,timeoutMs,task:externalSignal=>runItvPaidTurn({caseDef:c,state,actor,conversationState:cs,signal:externalSignal,fullCert:true})});
     if(signal?.aborted){const e=new Error('Prueba cancelada.');e.name='AbortError';e.status=499;throw e;}
-    if(timed.timedOut){r=technicalErrorOutcome(c,`TIEMPO MÁXIMO: este turno histórico superó ${Math.round(timeoutMs/1000)} s.`,{calls:1,tokens:0,costEur:reserve},{scenario:c.scenario,timeout:true,historicalExact:true});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
-    else if(timed.error){r=technicalErrorOutcome(c,timed.error?.message||String(timed.error),{calls:1,tokens:0,costEur:reserve},{scenario:c.scenario});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario)};}
-    else{const result=timed.value,u=usageOf(result);r=observedOutcome(c,result,u,{scenario:c.scenario,historicalExact:true});const hist=cs.history.slice(-7);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});nextConversationState={conversationId:trim(result?.conversationId||result?.meta?.conversationId||cs.conversationId).slice(0,160),previousInteractionId:(result?.meta?.resetInteractionId===true?'':trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500)),history:hist,scenario:trim(c.scenario)};}
+    if(timed.timedOut){r=technicalErrorOutcome(c,`TIEMPO MÁXIMO: este turno histórico superó ${Math.round(timeoutMs/1000)} s.`,{calls:1,tokens:0,costEur:reserve},{scenario:c.scenario,timeout:true,historicalExact:true});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario),dialogueNext:null,dialogueMission:mission,dialogueTurn:turnNo};}
+    else if(timed.error){r=technicalErrorOutcome(c,timed.error?.message||String(timed.error),{calls:1,tokens:0,costEur:reserve},{scenario:c.scenario});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario),dialogueNext:null,dialogueMission:mission,dialogueTurn:turnNo};}
+    else{
+      const result=timed.value,u=usageOf(result);r=observedOutcome(c,result,u,{scenario:c.scenario,historicalExact:true});const hist=cs.history.slice(-29);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null});let next=null;
+      if(adaptive){next=await generateZuzuItvDialogueUserTurn({mission,conversationHistory:hist,turnNumber:turnNo+1,seed:c?.dialogue?.seed||'',externalSignal:signal});const assess=next?.assessment||{},reasons=[];if(assess.empty_promise===true)reasons.push('promesa vacía: Zuzu anunció acción pero no la ejecutó');if(assess.previous_coherent===false)reasons.push(trim(assess.note)||'el usuario sintético detecta respuesta incoherente con el hilo');if(assess.focus_preserved===false&&userMove?.changeFocus!==true)reasons.push('pérdida de foco/objeto activo');if(userMove?.requiresTool===true&&!arr(result?.meta?.tools).length)reasons.push('el movimiento requería acción factual y no hubo tool');if(reasons.length){r.status='KO';r.functionalStatus='KO';r.functionalReasons=[...arr(r.functionalReasons),...reasons];r.validationReasons=[...arr(r.validationReasons),...reasons];}r.dialogue={turn:turnNo,userMove:{move:userMove?.move,requiresTool:userMove?.requiresTool===true,changeFocus:userMove?.changeFocus===true,target:trim(userMove?.target)},assessment:assess,nextUtterance:trim(next?.utterance),mission};const su=next?.usage||{};r.usage={...r.usage,calls:num(r?.usage?.calls)+num(su.calls),tokens:num(r?.usage?.tokens)+num(su.totalTokens||su.tokens),costEur:round(num(r?.usage?.costEur)+num(su.costEurApprox||su.costEur),6)};}
+      nextConversationState={conversationId:trim(result?.conversationId||result?.meta?.conversationId||cs.conversationId).slice(0,160),previousInteractionId:(result?.meta?.resetInteractionId===true?'':trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500)),history:hist,scenario:trim(c.scenario),dialogueNext:next,dialogueMission:mission,dialogueTurn:turnNo};
+    }
   }
   r.durationMs=Date.now()-started;return{ok:true,mode:m,case:r,conversationState:nextConversationState,timeoutMs,historicalExact:true};
 }

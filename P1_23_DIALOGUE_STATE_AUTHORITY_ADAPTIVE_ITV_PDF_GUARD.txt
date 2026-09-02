@@ -1,0 +1,11 @@
+P1.23 · DIALOGUE STATE AUTHORITY + ITV CONVERSACIONAL ADAPTATIVA + PDF GUARD · NHC
+
+- DIALOGUE_STATE autoritativo: foco, objeto activo, intención pendiente, última acción/objetivo y artefacto.
+- PENDING_INTENT atraviesa aclaraciones sin reiniciar la petición.
+- ACTIVE_OBJECT tiene inercia; cambio factual de foco debe declararse estructuralmente.
+- NO EMPTY PROMISE: una intención pendiente accionable sin tool provoca un único retry de decisión.
+- Filas reversibles: remove_view_filters + reset_filters.
+- DIÁLOGO 24: solo el turno inicial está fijado; cada siguiente turno lo genera un usuario sintético DESPUÉS de la respuesta real de Zuzu.
+- Métricas: coherencia, foco, promesas vacías, acciones sin tool y continuidad del hilo.
+- PDF: unión servidor/local + snapshot; una sincronización parcial no puede reducir una conversación larga a 1 turno.
+- NHC: P1.23 añade lógica estructural JSON/estado, no reglas por frase/nombre. Permanecen heurísticas heredadas anteriores.

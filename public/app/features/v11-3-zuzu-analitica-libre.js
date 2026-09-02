@@ -391,8 +391,11 @@
   }
   async function openZuzuPdfPicker(){
     closeZuzuPdfPicker();
+    var before=loadZuzuConversation().slice();
     await syncZuzuConversationFromServer(ZUZU_LOCAL_HISTORY_LIMIT);
     var hist=loadZuzuConversation();
+    // P1.23 · guardia adicional: una sincronización parcial nunca puede reducir el PDF.
+    if(before.length>hist.length){window.__ceZuzuConversationV26=before.slice(-ZUZU_LOCAL_HISTORY_LIMIT);saveZuzuConversation();hist=loadZuzuConversation();}
     if(!hist.length){setStatus('Haz una consulta para generar un PDF de respuesta.','err');return;}
     var rows=hist.map(function(turn,idx){
       var q=conversationTrailExcerpt(turn&&turn.user||''),a=conversationTrailExcerpt(turn&&turn.assistant||'');
@@ -454,7 +457,7 @@
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
   function isZuzuVNextMode(){ try{return sessionStorage.getItem(zuzuVNextKey())==='1';}catch(_){return false;} }
-  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.10</span><span class="ce-ai-mode-help">Open-world + contratos tipados. Estado de tabla genérico: quitar/poner filas y columnas, filtrar y ordenar en cualquier tabla; pagos negativos/compuestos y Plan B siguen blindados. Conserva borrador y fast path.</span>';}}
+  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.23</span><span class="ce-ai-mode-help">Dialogue State Authority: foco/objeto activo y pending_intent persistentes; tablas con filas/columnas reversibles; NO EMPTY PROMISE; memoria y PDF conversacional protegidos. NHC.</span>';}}
   function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} var on=!isZuzuVNextMode(); try{sessionStorage.setItem(zuzuVNextKey(),on?'1':'0');}catch(_){} saveZuzuInteractionId(''); renderZuzuVNextMode(); setStatus(on?'VNext experimental activado.':'BANK4_27 activo.',''); }
 
   function openModal(){
@@ -547,8 +550,13 @@
     try{
       var res=await fetch('/api/event-ai/conversations/read',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({conversationId:cid,usuarioLogado:loggedUserPayload(),limit:Math.max(1,Math.min(1000,Number(limit)||ZUZU_LOCAL_HISTORY_LIMIT))})});
       var obj=await res.json(); var turns=obj&&obj.data&&Array.isArray(obj.data.turns)?obj.data.turns:[]; if(!res.ok||!turns.length)return loadZuzuConversation();
-      var old=loadZuzuConversation(),by={}; old.forEach(function(t){if(t&&t.turnId)by[String(t.turnId)]=t;});
-      var merged=turns.map(function(t){var prior=by[String(t.turnId||'')]||{};var answer=String(t.answer||prior.assistant||'');return Object.assign({},prior,{turnId:String(t.turnId||prior.turnId||''),turnSeq:Number(t.seq)||Number(prior.turnSeq)||0,user:String(t.userPrompt||prior.user||'').slice(0,700),assistant:answer.slice(0,420),assistantTail:answer.slice(-300),title:String(t.title||prior.title||'').slice(0,160),archiveHtml:prior.archiveHtml||'',archiveTraceHtml:prior.archiveTraceHtml||'',archiveMeta:prior.archiveMeta||{}});});
+      var old=loadZuzuConversation().slice(),by={}; old.forEach(function(t){if(t&&t.turnId)by[String(t.turnId)]=t;});
+      // P1.23 · el servidor puede devolver solo el fragmento de la conversación asociado al
+      // conversationId actual. Nunca sustituimos por ese fragmento el historial local ya visible:
+      // hacemos UNION por turnId. Esto evita PDFs de 1 turno cuando cambió/reanudó el id servidor.
+      var merged=old.slice(),pos={};merged.forEach(function(t,i){if(t&&t.turnId)pos[String(t.turnId)]=i;});
+      turns.forEach(function(t){var key=String(t.turnId||''),prior=by[key]||{},answer=String(t.answer||prior.assistant||''),row=Object.assign({},prior,{turnId:key||String(prior.turnId||''),turnSeq:Number(t.seq)||Number(prior.turnSeq)||0,user:String(t.userPrompt||prior.user||'').slice(0,700),assistant:answer.slice(0,420),assistantTail:answer.slice(-300),title:String(t.title||prior.title||'').slice(0,160),archiveHtml:prior.archiveHtml||'',archiveTraceHtml:prior.archiveTraceHtml||'',archiveMeta:prior.archiveMeta||{}});if(key&&pos[key]!=null)merged[pos[key]]=row;else{pos[key]=merged.length;merged.push(row);}});
+      merged.sort(function(a,b){var x=Number(a&&a.turnSeq)||0,y=Number(b&&b.turnSeq)||0;if(x&&y&&x!==y)return x-y;return 0;});
       window.__ceZuzuConversationV26=merged.slice(-ZUZU_LOCAL_HISTORY_LIMIT); saveZuzuConversation(); return window.__ceZuzuConversationV26;
     }catch(_){return loadZuzuConversation();}
   }
