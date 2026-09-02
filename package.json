@@ -83,7 +83,9 @@
     "test:vnext-p21": "node scripts/v4-0-exp-vnext-p21-grammar-referents-regression.cjs",
     "test:v4-bank472-balance-resize": "node scripts/v4-0-exp-bank472-balance-resize-regression.cjs",
     "test:vnext-p22": "node scripts/v4-0-exp-vnext-p22-split-tools-regression.cjs",
-    "test:v4-bank474": "node scripts/v4-0-exp-bank474-intraday-cluster-spread-regression.cjs"
+    "test:v4-bank474": "node scripts/v4-0-exp-bank474-intraday-cluster-spread-regression.cjs",
+    "test:vnext-p23": "node scripts/v4-0-exp-vnext-p23-forced-plan-regression.cjs",
+    "test:v4-bank475": "node scripts/v4-0-exp-bank475-local-intraday-fan-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

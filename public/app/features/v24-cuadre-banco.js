@@ -707,7 +707,7 @@
     const span=Math.max(1,max-min);
     return {min:min-span*padding,max:max+span*padding};
   }
-  // BANK4.7.4 · frontera Excel + expansión local intradía del grupo tocado. No modifica datos ni orden:
+  // BANK4.7.5 · abanico local intradía: el eje global NO se deforma; solo se abre el grupo tocado. No modifica datos ni orden:
   // el punto donde se pulsa actúa como separador. Al arrastrarlo, un lado se comprime y
   // el otro se expande proporcionalmente. Se conserva hasta pulsar Restaurar gráfica.
   function balanceSpreadContextKey(){
@@ -726,9 +726,9 @@
   }
   function setBalancePaneSpread(id,value){
     const state=ensureBalanceSpreadState();
-    const anchorTime=num(value?.anchorTime),anchorRatio=num(value?.anchorRatio),originRatio=num(value?.originRatio),clusterStart=num(value?.clusterStart),clusterEnd=num(value?.clusterEnd);
-    state.panes[id]=value&&Number.isFinite(anchorTime)&&Number.isFinite(anchorRatio)
-      ?{anchorTime,anchorRatio:Math.max(.02,Math.min(.98,anchorRatio)),originRatio:Number.isFinite(originRatio)?Math.max(.02,Math.min(.98,originRatio)):anchorRatio,clusterStart:Number.isFinite(clusterStart)?clusterStart:0,clusterEnd:Number.isFinite(clusterEnd)?clusterEnd:0}
+    const anchorTime=num(value?.anchorTime),anchorRatio=num(value?.anchorRatio),originRatio=num(value?.originRatio),clusterStart=num(value?.clusterStart),clusterEnd=num(value?.clusterEnd),spreadPx=Math.max(0,num(value?.spreadPx)),dragDirection=Math.sign(num(value?.dragDirection));
+    state.panes[id]=value&&Number.isFinite(anchorTime)
+      ?{anchorTime,anchorRatio:Number.isFinite(anchorRatio)?Math.max(.02,Math.min(.98,anchorRatio)):.5,originRatio:Number.isFinite(originRatio)?Math.max(.02,Math.min(.98,originRatio)):.5,clusterStart:Number.isFinite(clusterStart)?clusterStart:0,clusterEnd:Number.isFinite(clusterEnd)?clusterEnd:0,spreadPx,dragDirection}
       :null;
     return state.panes[id];
   }
@@ -741,68 +741,43 @@
   }
   function balanceSpreadX(meta,time,spread){
     const min=meta.safeMinTime,max=meta.safeMaxTime,span=Math.max(1,max-min);
-    const baseX=meta.left+(time-min)/span*meta.plotW;
-    if(!spread||!Number.isFinite(num(spread.anchorTime))||!Number.isFinite(num(spread.anchorRatio)))return baseX;
-    const anchorTime=Math.max(min,Math.min(max,num(spread.anchorTime)));
-    const splitRatio=Math.max(.035,Math.min(.965,num(spread.anchorRatio)));
-    const splitX=meta.left+splitRatio*meta.plotW;
-    if(time<=anchorTime){
-      const leftTimeSpan=anchorTime-min;
-      if(leftTimeSpan<=0)return meta.left;
-      const u=Math.max(0,Math.min(1,(time-min)/leftTimeSpan));
-      return meta.left+u*(splitX-meta.left);
-    }
-    const rightTimeSpan=max-anchorTime;
-    if(rightTimeSpan<=0)return meta.left+meta.plotW;
-    const u=Math.max(0,Math.min(1,(time-anchorTime)/rightTimeSpan));
-    return splitX+u*((meta.left+meta.plotW)-splitX);
+    return meta.left+(time-min)/span*meta.plotW;
   }
   function balanceTimeAtSvgX(meta,svgX,spread){
-    const min=meta.safeMinTime,max=meta.safeMaxTime;
-    const clampedX=Math.max(meta.left,Math.min(meta.left+meta.plotW,svgX));
-    if(!spread||!Number.isFinite(num(spread.anchorTime))||!Number.isFinite(num(spread.anchorRatio))){
-      const ratio=Math.max(0,Math.min(1,(clampedX-meta.left)/Math.max(1,meta.plotW)));
-      return min+ratio*(max-min);
-    }
-    const anchorTime=Math.max(min,Math.min(max,num(spread.anchorTime)));
-    const splitRatio=Math.max(.035,Math.min(.965,num(spread.anchorRatio)));
-    const splitX=meta.left+splitRatio*meta.plotW;
-    if(clampedX<=splitX){
-      const pxSpan=Math.max(.001,splitX-meta.left),u=Math.max(0,Math.min(1,(clampedX-meta.left)/pxSpan));
-      return min+u*(anchorTime-min);
-    }
-    const pxSpan=Math.max(.001,(meta.left+meta.plotW)-splitX),u=Math.max(0,Math.min(1,(clampedX-splitX)/pxSpan));
-    return anchorTime+u*(max-anchorTime);
+    const min=meta.safeMinTime,max=meta.safeMaxTime,clampedX=Math.max(meta.left,Math.min(meta.left+meta.plotW,svgX));
+    const ratio=Math.max(0,Math.min(1,(clampedX-meta.left)/Math.max(1,meta.plotW)));
+    return min+ratio*(max-min);
   }
   function balanceIntradayWindow(time){
     const d=new Date(num(time));if(!Number.isFinite(d.getTime()))return{start:0,end:0};
     const start=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();return{start,end:start+86400000};
   }
   function balanceResolvedPointPositions(meta,spread){
-    const active=spread&&Number.isFinite(num(spread.anchorTime))&&Number.isFinite(num(spread.anchorRatio)),base=time=>balanceSpreadX(meta,time,active?spread:null),out=new Map();
+    const active=spread&&Number.isFinite(num(spread.anchorTime)),base=time=>balanceSpreadX(meta,time,null),out=new Map();
     for(const item of arr(meta?.points))out.set(String(item?.point?.movement?.id||''),base(item.point.time));
     if(!active||!arr(meta?.points).length)return out;
     const clusterStart=num(spread.clusterStart),clusterEnd=num(spread.clusterEnd);if(!(clusterEnd>clusterStart))return out;
     const group=arr(meta.points).map((item,index)=>({item,index,id:String(item?.point?.movement?.id||index),time:num(item?.point?.time)})).filter(x=>x.time>=clusterStart&&x.time<clusterEnd).sort((a,b)=>a.time-b.time||String(a.id).localeCompare(String(b.id)));
     if(group.length<2)return out;
-    const leftBound=meta.left+8,rightBound=meta.left+meta.plotW-8,minGap=meta.id==='zoom'?20:15,splitX=meta.left+Math.max(.02,Math.min(.98,num(spread.anchorRatio)))*meta.plotW,origin=Math.max(.02,Math.min(.98,num(spread.originRatio))),delta=num(spread.anchorRatio)-origin,strength=Math.min(.75,Math.abs(delta)*2.6),naturalSpan=Math.max(minGap*(group.length-1),meta.plotW*(.10+strength)),desiredSpan=Math.min(meta.plotW*.72,naturalSpan);
-    let leftEdge,rightEdge;if(delta>=0){rightEdge=Math.min(rightBound,splitX);leftEdge=Math.max(leftBound,rightEdge-desiredSpan);if(rightEdge-leftEdge<desiredSpan&&leftEdge<=leftBound+1)rightEdge=Math.min(rightBound,leftEdge+desiredSpan);}else{leftEdge=Math.max(leftBound,splitX);rightEdge=Math.min(rightBound,leftEdge+desiredSpan);if(rightEdge-leftEdge<desiredSpan&&rightEdge>=rightBound-1)leftEdge=Math.max(leftBound,rightEdge-desiredSpan);}
-    const span=Math.max(1,rightEdge-leftEdge),minT=group[0].time,maxT=group[group.length-1].time,slots=[];
-    for(let i=0;i<group.length;i++){const u=maxT>minT?(group[i].time-minT)/(maxT-minT):(group.length===1?0:i/(group.length-1));slots[i]=leftEdge+u*span;if(i>0&&slots[i]-slots[i-1]<minGap)slots[i]=slots[i-1]+minGap;}
-    if(slots.length&&slots[slots.length-1]>rightEdge){slots[slots.length-1]=rightEdge;for(let i=slots.length-2;i>=0;i--)slots[i]=Math.min(slots[i],slots[i+1]-minGap);}
-    if(slots.length&&slots[0]<leftEdge){slots[0]=leftEdge;for(let i=1;i<slots.length;i++)slots[i]=Math.max(slots[i],slots[i-1]+minGap);}
+    const leftBound=meta.left+8,rightBound=meta.left+meta.plotW-8,anchorX=base(num(spread.anchorTime)),rawSpread=Math.max(24,num(spread.spreadPx)),maxSpan=meta.plotW*.72,minGap=meta.id==='zoom'?20:15,desiredSpan=Math.min(maxSpan,Math.max(minGap*(group.length-1),70+rawSpread*3.1));
+    const edgeBand=meta.plotW*.20;let side;if(anchorX>=rightBound-edgeBand)side='left';else if(anchorX<=leftBound+edgeBand)side='right';else side=num(spread.dragDirection)>=0?'left':'right';
+    let leftEdge,rightEdge;if(side==='left'){rightEdge=Math.min(rightBound,anchorX+10);leftEdge=Math.max(leftBound,rightEdge-desiredSpan);if(rightEdge-leftEdge<desiredSpan)rightEdge=Math.min(rightBound,leftEdge+desiredSpan);}else{leftEdge=Math.max(leftBound,anchorX-10);rightEdge=Math.min(rightBound,leftEdge+desiredSpan);if(rightEdge-leftEdge<desiredSpan)leftEdge=Math.max(leftBound,rightEdge-desiredSpan);}
+    const span=Math.max(1,rightEdge-leftEdge),minT=group[0].time,maxT=group[group.length-1].time,effectiveGap=group.length>1?Math.min(minGap,span/(group.length-1)):0,slots=[];
+    for(let i=0;i<group.length;i++){const u=maxT>minT?(group[i].time-minT)/(maxT-minT):(group.length===1?0:i/(group.length-1));slots[i]=leftEdge+u*span;if(i>0&&slots[i]-slots[i-1]<effectiveGap)slots[i]=slots[i-1]+effectiveGap;}
+    if(slots.length&&slots[slots.length-1]>rightEdge){slots[slots.length-1]=rightEdge;for(let i=slots.length-2;i>=0;i--)slots[i]=Math.min(slots[i],slots[i+1]-effectiveGap);}
+    if(slots.length&&slots[0]<leftEdge){slots[0]=leftEdge;for(let i=1;i<slots.length;i++)slots[i]=Math.max(slots[i],slots[i-1]+effectiveGap);}
     group.forEach((entry,index)=>out.set(entry.id,Math.max(leftBound,Math.min(rightBound,slots[index]))));
     return out;
   }
   function applyBalancePaneSpread(pane,meta,spread){
     const svg=pane?.querySelector('svg');
     if(!svg||!meta)return;
-    const active=spread&&Number.isFinite(num(spread.anchorTime))&&Number.isFinite(num(spread.anchorRatio));
+    const active=spread&&Number.isFinite(num(spread.anchorTime));
     pane.classList.toggle('is-spread',Boolean(active));
     meta.currentSpread=active?spread:null;
     const x=time=>balanceSpreadX(meta,time,meta.currentSpread);
     const pointX=balanceResolvedPointPositions(meta,meta.currentSpread);
-    const pointPos=point=>point?.movement?num(pointX.get(String(point.movement.id))):x(point.time);
+    const pointPos=point=>{if(!point?.movement)return x(point.time);const resolved=pointX.get(String(point.movement.id));return Number.isFinite(Number(resolved))?Number(resolved):x(point.time);};
     const line=pane.querySelector('[data-ce-bank-balance-line="1"]');
     if(line){
       line.setAttribute('d',meta.series.map((point,index)=>`${index?'L':'M'} ${pointPos(point).toFixed(2)} ${meta.y(point.balance).toFixed(2)}`).join(' '));
@@ -862,7 +837,7 @@
     }).join('');
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
     const actionBlock=(actionsHtml||statusHtml)?`<div class="ce-bank-balance-pane-actions">${actionsHtml||''}${statusHtml}</div>`:'';
-    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}" title="Mantén pulsado y arrastra a izquierda o derecha: mueves esa frontera como al ensanchar una columna en Excel; un lado se comprime y el otro se expande. Si varios movimientos comparten fecha, al abrir el grupo se aprovecha también la hora para separarlos mejor. Restaurar gráfica vuelve al eje normal."><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" data-ce-bank-balance-line="1" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
+    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}" title="Mantén pulsado sobre un grupo y arrastra: solo ese día se abre usando fecha y hora; el resto del histórico no se deforma. Si el grupo está pegado a un borde, se despliega hacia el lado con espacio. Restaurar gráfica cierra todos los grupos."><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" data-ce-bank-balance-line="1" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
     const meta={id,width,height,left,right,top,bottom,plotW,plotH,safeMinTime,safeMaxTime,series,y,shadeStart,shadeEnd,pointByMovementId,points:interactivePoints.map(point=>({cx:x(point.time),cy:y(point.balance),point})),currentSpread:null};
     return {html,meta};
   }
@@ -1014,7 +989,7 @@
       if(event.cancelable)event.preventDefault();
       const rect=svg.getBoundingClientRect(),dxSvg=dx/Math.max(1,rect.width)*meta.width;
       const targetRatio=Math.max(.02,Math.min(.98,gesture.startRatio+dxSvg/Math.max(1,meta.plotW)));
-      const spread=setBalancePaneSpread(meta.id,{anchorTime:gesture.anchorTime,anchorRatio:targetRatio,originRatio:gesture.startRatio,clusterStart:gesture.clusterStart,clusterEnd:gesture.clusterEnd});
+      const spread=setBalancePaneSpread(meta.id,{anchorTime:gesture.anchorTime,anchorRatio:targetRatio,originRatio:gesture.startRatio,clusterStart:gesture.clusterStart,clusterEnd:gesture.clusterEnd,spreadPx:Math.abs(dxSvg),dragDirection:dxSvg});
       applyBalancePaneSpread(pane,meta,spread);
       return true;
     };
@@ -1197,9 +1172,9 @@
       :(finalSnapshot?'Hay filas almacenadas del Cuadre, pero ninguna quedó incluida En saldo.':'Todavía no hay movimientos En saldo para construir el zoom del evento.');
     const restoreButton='<button type="button" class="ce-bank-chart-restore" data-ce-bank-restore-balance-chart="1">↺ Restaurar gráfica</button>';
     const zoomPane=includedRows.length
-      ?chartPane({id:'zoom',title:eventData.title,subtitle:finalSnapshot?`${includedRows.length} movimiento(s) En saldo almacenado(s) al cierre · foto definitiva · Arrastra desde una frontera a izquierda o derecha para abrir grupos; si comparten fecha, el grupo tocado se abre usando también la hora`:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom del periodo de trabajo · Arrastra desde una frontera a izquierda o derecha para abrir grupos; si comparten fecha, el grupo tocado se abre usando también la hora`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,pointScope:'event',actionsHtml:restoreButton})
+      ?chartPane({id:'zoom',title:eventData.title,subtitle:finalSnapshot?`${includedRows.length} movimiento(s) En saldo almacenado(s) al cierre · foto definitiva · Arrastra sobre un grupo para abrir SOLO ese día; el resto de la gráfica permanece fijo. Si está junto a un borde, se abre automáticamente hacia el lado con espacio`:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom del periodo de trabajo · Arrastra sobre un grupo para abrir SOLO ese día; el resto de la gráfica permanece fijo. Si está junto a un borde, se abre automáticamente hacia el lado con espacio`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,pointScope:'event',actionsHtml:restoreButton})
       :{html:`<section class="ce-bank-balance-pane zoom" data-pane-id="zoom"><div class="ce-bank-balance-pane-head"><div><strong>${esc(eventData.title)}</strong><span>${finalSnapshot?'Foto definitiva del Cuadre Banco al cierre':'Cuadre Banco del evento'}</span></div><div class="ce-bank-balance-pane-actions">${restoreButton}<span class="ce-bank-balance-pane-status ${esc(eventData.statusClass)}">${esc(eventData.status)}</span></div></div><div class="ce-bank-balance-chart-empty"><strong>${finalSnapshot&&storedCount<=0?'SIN CUADRE BANCARIO AL CIERRE':'SIN MOVIMIENTOS EN SALDO'}</strong><span>${esc(emptyZoomMessage)}</span></div></section>`,meta:{id:'zoom',width:chartWidth,height:zoomHeight,points:[]}};
-    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'} · Cada cargo rojo / cada abono verde · Arrastra desde una frontera a izquierda o derecha para abrir grupos; si comparten fecha, el grupo tocado se abre usando también la hora`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,pointScope:'all',actionsHtml:`<button type="button" class="ce-bank-history-open" data-ce-bank-open-history-list="1">☰ Ver movimientos</button>${restoreButton}`});
+    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'} · Cada cargo rojo / cada abono verde · Arrastra sobre un grupo para abrir SOLO ese día; el resto de la gráfica permanece fijo. Si está junto a un borde, se abre automáticamente hacia el lado con espacio`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,pointScope:'all',actionsHtml:`<button type="button" class="ce-bank-history-open" data-ce-bank-open-history-list="1">☰ Ver movimientos</button>${restoreButton}`});
     const eventCountLabel=finalSnapshot?'Filas almacenadas del Cuadre':'Movimientos En saldo señalados';
     const eventCountValue=finalSnapshot?storedCount:includedRows.length;
     const accountIban=chartAccountIban();
