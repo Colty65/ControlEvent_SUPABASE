@@ -33,6 +33,7 @@
     "test:bank2": "node scripts/v4-0-exp-bank2-multi-ticket-regression.cjs",
     "test:bank3": "node scripts/v4-0-exp-bank3-history-responsables-regression.cjs",
     "test:v4-bank4": "node scripts/v4-0-exp-bank4-estetica-responsables-regression.cjs",
+    "test:v4-bank471-balance-spread": "node scripts/v4-0-exp-bank471-balance-spread-regression.cjs",
     "test:v4-bank41": "node scripts/v4-0-exp-bank41-entertainment-unfinished-regression.cjs",
     "test:v4-bank42": "node scripts/v4-0-exp-bank42-donaciones-situacion-responsables-regression.cjs",
     "test:v4-bank43": "node scripts/v4-0-exp-bank43-donaciones-rural-regression.cjs",

@@ -2173,3 +2173,54 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
     margin-left:auto!important;
   }
 }
+
+/* BANK4.8 · histórico con puntos + separación horizontal persistente por arrastre */
+#ceBankOverlay .ce-bank-balance-pane .ce-bank-balance-plot{
+  cursor:crosshair!important;
+  touch-action:none!important;
+  overscroll-behavior:none!important;
+  user-select:none!important;
+  -webkit-user-select:none!important;
+}
+#ceBankOverlay .ce-bank-balance-pane .ce-bank-balance-plot svg{
+  touch-action:none!important;
+  user-select:none!important;
+  -webkit-user-select:none!important;
+}
+#ceBankOverlay .ce-bank-balance-pane.is-spreading .ce-bank-balance-plot{cursor:ew-resize!important}
+#ceBankOverlay .ce-bank-balance-event-point.history-point{
+  stroke-width:2.2!important;
+  opacity:.92;
+}
+#ceBankOverlay .ce-bank-balance-event-point.history-point:hover,
+#ceBankOverlay .ce-bank-balance-event-point.history-point:focus,
+#ceBankOverlay .ce-bank-balance-event-point.history-point.active{
+  opacity:1;
+  stroke-width:4.5!important;
+}
+#ceBankOverlay .ce-bank-chart-restore{
+  border:1px solid #c8d8e3;
+  border-radius:999px;
+  background:#fff;
+  color:#365b72;
+  padding:6px 11px;
+  font-size:10px;
+  font-weight:950;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:background .15s ease,border-color .15s ease,transform .15s ease;
+}
+#ceBankOverlay .ce-bank-chart-restore:hover{
+  background:#eef7fc;
+  border-color:#8abbd5;
+}
+#ceBankOverlay .ce-bank-chart-restore.active{
+  background:#fff7d8;
+  border-color:#e7c764;
+  color:#6f5815;
+}
+#ceBankOverlay .ce-bank-chart-restore:active{transform:translateY(1px)}
+@media(max-width:760px){
+  #ceBankOverlay .ce-bank-balance-pane-actions{gap:5px!important;flex-wrap:wrap!important;justify-content:flex-end!important}
+  #ceBankOverlay .ce-bank-chart-restore,#ceBankOverlay .ce-bank-history-open{padding:5px 8px!important;font-size:9px!important}
+}
