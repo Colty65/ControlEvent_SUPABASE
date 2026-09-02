@@ -40,5 +40,5 @@ t('Vista aérea recibe botón combinado',/btnVistaAereaResponsables/.test(map)&&
 t('Vista aérea abre informe combinado pese a su captura modal',/ceOpenResponsablesReport/.test(map)&&/ceOpenResponsablesReport=openReport/.test(rep));
 t('informe combinado queda por encima de Vista aérea',/z-index:1000100/.test(rep));
 t('donaciones del PDF se marcan estimadas',/valor estimado/i.test(rep));
-t('cache bust BANK4 aplicado',/(?:BANK43-RURAL-ICON|BANK44-HIST-X-INFOEVENTO|BANK47-PERSIST-INCLUDED|BANK472-BALANCE-RESIZE-PIVOT|BANK475-LOCAL-INTRADAY-FAN|BANK474-BOUNDARY-INTRADAY-CLUSTER-SPREAD)/.test(html)&&/BANK4-RESP-COMB/.test(html));
+t('cache bust BANK4 aplicado',/(?:BANK43-RURAL-ICON|BANK44-HIST-X-INFOEVENTO|BANK47-PERSIST-INCLUDED)/.test(html)&&/BANK4-RESP-COMB/.test(html));
 console.log(`\nV4.0_exp BANK4 · ${ok}/${ok+ko} comprobaciones OK`);if(ko)process.exit(1);

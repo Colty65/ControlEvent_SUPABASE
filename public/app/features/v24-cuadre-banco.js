@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp BANK4.7.1 · puntos históricos + separación persistente de gráficas. */
+/* ControlEvent v4_0_exp BANK4.8 · puntos históricos + lupa temporal independiente sin deformar la gráfica. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -44,7 +44,7 @@
     lastBodyScroll:0, pendingFocusId:'', noticeLocked:false, sort:'DESC', dateFrom:'', dateTo:'',
     page:1, pageSize:60, dataRevision:0, filteredCacheKey:'', filteredCacheRows:[], searchTimer:0, renderFrame:0,
     loadSeq:0, loadController:null, totalPages:1, balanceChartOpen:false, bankHistoryOpen:false, bankHistorySortField:'executedAt', bankHistorySortDirection:'desc',
-    balanceChartSpread:{key:'',panes:{history:null,zoom:null}}
+    balanceChartMagnifier:{key:'',panes:{history:null,zoom:null}}
   };
   const TIP_ATTRS = ['title','data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','data-ce-tip-layout-v21','data-tip-bg-v21'];
 
@@ -707,103 +707,84 @@
     const span=Math.max(1,max-min);
     return {min:min-span*padding,max:max+span*padding};
   }
-  // BANK4.7.5 · abanico local intradía: el eje global NO se deforma; solo se abre el grupo tocado. No modifica datos ni orden:
-  // el punto donde se pulsa actúa como separador. Al arrastrarlo, un lado se comprime y
-  // el otro se expande proporcionalmente. Se conserva hasta pulsar Restaurar gráfica.
-  function balanceSpreadContextKey(){
+  // BANK4.8 · lupa temporal independiente. La gráfica principal NO se deforma.
+  // El usuario arrastra sobre un grupo y se abre una banda auxiliar del día tocado,
+  // ordenada por fecha+hora, donde los puntos quedan suficientemente separados.
+  function balanceMagnifierContextKey(){
     return `${text(store.eventId||activeEventId())}|${text(store.accountId||'TODOS')}`;
   }
-  function ensureBalanceSpreadState(){
-    const key=balanceSpreadContextKey();
-    if(!store.balanceChartSpread||store.balanceChartSpread.key!==key){
-      store.balanceChartSpread={key,panes:{history:null,zoom:null}};
+  function ensureBalanceMagnifierState(){
+    const key=balanceMagnifierContextKey();
+    if(!store.balanceChartMagnifier||store.balanceChartMagnifier.key!==key){
+      store.balanceChartMagnifier={key,panes:{history:null,zoom:null}};
     }
-    if(!store.balanceChartSpread.panes)store.balanceChartSpread.panes={history:null,zoom:null};
-    return store.balanceChartSpread;
+    if(!store.balanceChartMagnifier.panes)store.balanceChartMagnifier.panes={history:null,zoom:null};
+    return store.balanceChartMagnifier;
   }
-  function balancePaneSpread(id){
-    return ensureBalanceSpreadState().panes?.[id]||null;
+  function setBalanceMagnifierState(id,value){
+    const state=ensureBalanceMagnifierState();state.panes[id]=value||null;return state.panes[id];
   }
-  function setBalancePaneSpread(id,value){
-    const state=ensureBalanceSpreadState();
-    const anchorTime=num(value?.anchorTime),anchorRatio=num(value?.anchorRatio),originRatio=num(value?.originRatio),clusterStart=num(value?.clusterStart),clusterEnd=num(value?.clusterEnd),spreadPx=Math.max(0,num(value?.spreadPx)),dragDirection=Math.sign(num(value?.dragDirection));
-    state.panes[id]=value&&Number.isFinite(anchorTime)
-      ?{anchorTime,anchorRatio:Number.isFinite(anchorRatio)?Math.max(.02,Math.min(.98,anchorRatio)):.5,originRatio:Number.isFinite(originRatio)?Math.max(.02,Math.min(.98,originRatio)):.5,clusterStart:Number.isFinite(clusterStart)?clusterStart:0,clusterEnd:Number.isFinite(clusterEnd)?clusterEnd:0,spreadPx,dragDirection}
-      :null;
-    return state.panes[id];
-  }
-  function restoreBalanceChartSpread(event){
-    stopEvent(event);
-    const state=ensureBalanceSpreadState();
-    state.panes={history:null,zoom:null};
+  function restoreBalanceChartMagnifier(event){
+    stopEvent(event);const state=ensureBalanceMagnifierState();state.panes={history:null,zoom:null};
+    document.querySelectorAll('#ceBankBalanceChartOverlay .ce-bank-balance-magnifier').forEach(node=>node.remove());
+    document.querySelectorAll('#ceBankBalanceChartOverlay .ce-bank-chart-restore').forEach(button=>button.classList.remove('active'));
     resetBalanceInspector();
-    renderBalanceChart();
   }
-  function balanceSpreadX(meta,time,spread){
-    const min=meta.safeMinTime,max=meta.safeMaxTime,span=Math.max(1,max-min);
-    return meta.left+(time-min)/span*meta.plotW;
+  function balancePointDayKey(point){
+    const raw=text(point?.movement?.executedAt);if(/^\d{4}-\d{2}-\d{2}/.test(raw))return raw.slice(0,10);
+    const d=new Date(num(point?.time));if(Number.isNaN(d.getTime()))return'';
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   }
-  function balanceTimeAtSvgX(meta,svgX,spread){
-    const min=meta.safeMinTime,max=meta.safeMaxTime,clampedX=Math.max(meta.left,Math.min(meta.left+meta.plotW,svgX));
-    const ratio=Math.max(0,Math.min(1,(clampedX-meta.left)/Math.max(1,meta.plotW)));
-    return min+ratio*(max-min);
+  function balanceClockLabel(point){
+    const d=new Date(num(point?.time));if(Number.isNaN(d.getTime()))return'';
+    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
   }
-  function balanceIntradayWindow(time){
-    const d=new Date(num(time));if(!Number.isFinite(d.getTime()))return{start:0,end:0};
-    const start=new Date(d.getFullYear(),d.getMonth(),d.getDate()).getTime();return{start,end:start+86400000};
-  }
-  function balanceResolvedPointPositions(meta,spread){
-    const active=spread&&Number.isFinite(num(spread.anchorTime)),base=time=>balanceSpreadX(meta,time,null),out=new Map();
-    for(const item of arr(meta?.points))out.set(String(item?.point?.movement?.id||''),base(item.point.time));
-    if(!active||!arr(meta?.points).length)return out;
-    const clusterStart=num(spread.clusterStart),clusterEnd=num(spread.clusterEnd);if(!(clusterEnd>clusterStart))return out;
-    const group=arr(meta.points).map((item,index)=>({item,index,id:String(item?.point?.movement?.id||index),time:num(item?.point?.time)})).filter(x=>x.time>=clusterStart&&x.time<clusterEnd).sort((a,b)=>a.time-b.time||String(a.id).localeCompare(String(b.id)));
-    if(group.length<2)return out;
-    const leftBound=meta.left+8,rightBound=meta.left+meta.plotW-8,anchorX=base(num(spread.anchorTime)),rawSpread=Math.max(24,num(spread.spreadPx)),maxSpan=meta.plotW*.72,minGap=meta.id==='zoom'?20:15,desiredSpan=Math.min(maxSpan,Math.max(minGap*(group.length-1),70+rawSpread*3.1));
-    const edgeBand=meta.plotW*.20;let side;if(anchorX>=rightBound-edgeBand)side='left';else if(anchorX<=leftBound+edgeBand)side='right';else side=num(spread.dragDirection)>=0?'left':'right';
-    let leftEdge,rightEdge;if(side==='left'){rightEdge=Math.min(rightBound,anchorX+10);leftEdge=Math.max(leftBound,rightEdge-desiredSpan);if(rightEdge-leftEdge<desiredSpan)rightEdge=Math.min(rightBound,leftEdge+desiredSpan);}else{leftEdge=Math.max(leftBound,anchorX-10);rightEdge=Math.min(rightBound,leftEdge+desiredSpan);if(rightEdge-leftEdge<desiredSpan)leftEdge=Math.max(leftBound,rightEdge-desiredSpan);}
-    const span=Math.max(1,rightEdge-leftEdge),minT=group[0].time,maxT=group[group.length-1].time,effectiveGap=group.length>1?Math.min(minGap,span/(group.length-1)):0,slots=[];
-    for(let i=0;i<group.length;i++){const u=maxT>minT?(group[i].time-minT)/(maxT-minT):(group.length===1?0:i/(group.length-1));slots[i]=leftEdge+u*span;if(i>0&&slots[i]-slots[i-1]<effectiveGap)slots[i]=slots[i-1]+effectiveGap;}
-    if(slots.length&&slots[slots.length-1]>rightEdge){slots[slots.length-1]=rightEdge;for(let i=slots.length-2;i>=0;i--)slots[i]=Math.min(slots[i],slots[i+1]-effectiveGap);}
-    if(slots.length&&slots[0]<leftEdge){slots[0]=leftEdge;for(let i=1;i<slots.length;i++)slots[i]=Math.max(slots[i],slots[i-1]+effectiveGap);}
-    group.forEach((entry,index)=>out.set(entry.id,Math.max(leftBound,Math.min(rightBound,slots[index]))));
-    return out;
-  }
-  function applyBalancePaneSpread(pane,meta,spread){
-    const svg=pane?.querySelector('svg');
-    if(!svg||!meta)return;
-    const active=spread&&Number.isFinite(num(spread.anchorTime));
-    pane.classList.toggle('is-spread',Boolean(active));
-    meta.currentSpread=active?spread:null;
-    const x=time=>balanceSpreadX(meta,time,meta.currentSpread);
-    const pointX=balanceResolvedPointPositions(meta,meta.currentSpread);
-    const pointPos=point=>{if(!point?.movement)return x(point.time);const resolved=pointX.get(String(point.movement.id));return Number.isFinite(Number(resolved))?Number(resolved):x(point.time);};
-    const line=pane.querySelector('[data-ce-bank-balance-line="1"]');
-    if(line){
-      line.setAttribute('d',meta.series.map((point,index)=>`${index?'L':'M'} ${pointPos(point).toFixed(2)} ${meta.y(point.balance).toFixed(2)}`).join(' '));
+  function balanceMagnifierGroup(meta,seedPoint){
+    const key=balancePointDayKey(seedPoint);let list=arr(meta?.points).map(x=>x.point).filter(p=>balancePointDayKey(p)===key);
+    if(list.length<2){
+      const seed=num(seedPoint?.time),windowMs=12*60*60*1000;
+      list=arr(meta?.points).map(x=>x.point).filter(p=>Math.abs(num(p.time)-seed)<=windowMs);
     }
-    pane.querySelectorAll('[data-ce-bank-time-tick]').forEach(group=>{
-      const time=num(group.dataset.ceBankTimeTick),px=x(time);
-      const gridLine=group.querySelector('line'),label=group.querySelector('text');
-      gridLine?.setAttribute('x1',px.toFixed(2));gridLine?.setAttribute('x2',px.toFixed(2));label?.setAttribute('x',px.toFixed(2));
+    return list.sort((a,b)=>num(a.time)-num(b.time)||String(a?.movement?.id||'').localeCompare(String(b?.movement?.id||'')));
+  }
+  function balanceMagnifierXs(points,width,left,right){
+    const n=points.length,plotW=Math.max(1,width-left-right);if(!n)return[];
+    if(n===1)return[left+plotW/2];
+    const times=points.map(p=>num(p.time)),min=Math.min(...times),max=Math.max(...times),span=Math.max(1,max-min);
+    let xs=times.map(t=>left+(t-min)/span*plotW),minGap=Math.min(48,Math.max(20,plotW/Math.max(8,n+1)));
+    for(let i=1;i<n;i++)xs[i]=Math.max(xs[i],xs[i-1]+minGap);
+    if(xs[n-1]>left+plotW){const shift=xs[n-1]-(left+plotW);xs=xs.map(x=>x-shift);}
+    for(let i=n-2;i>=0;i--)xs[i]=Math.min(xs[i],xs[i+1]-minGap);
+    if(xs[0]<left){const shift=left-xs[0];xs=xs.map(x=>x+shift);}
+    // Si el día tiene demasiados movimientos para respetar minGap, reparto uniforme:
+    // la lupa puede estar llena, pero nunca vuelve a montar puntos uno encima de otro.
+    if(xs[n-1]>left+plotW+0.01||xs[0]<left-0.01){xs=points.map((_,i)=>left+(i/(n-1))*plotW);}
+    return xs;
+  }
+  function renderBalanceMagnifier(pane,meta,seedPoint,widthRatio=.78){
+    if(!pane||!meta||!seedPoint)return false;
+    const group=balanceMagnifierGroup(meta,seedPoint);if(group.length<2)return false;
+    const dayKey=balancePointDayKey(seedPoint),ratio=Math.max(.46,Math.min(.96,num(widthRatio)||.78));
+    let host=pane.querySelector('.ce-bank-balance-magnifier');if(!host){host=document.createElement('div');host.className='ce-bank-balance-magnifier';pane.appendChild(host);}
+    host.style.setProperty('--ce-bank-magnifier-width',`${Math.round(ratio*100)}%`);
+    const width=1000,height=176,left=48,right=24,top=20,bottom=42,plotH=height-top-bottom;
+    const ys=group.map(p=>num(p.balance)),domain=chartDomain(ys,.10),y=v=>top+(domain.max-v)/(domain.max-domain.min)*plotH,xs=balanceMagnifierXs(group,width,left,right);
+    const path=group.map((p,i)=>`${i?'L':'M'} ${xs[i].toFixed(2)} ${y(p.balance).toFixed(2)}`).join(' ');
+    const pointsHtml=group.map((p,i)=>{const amount=meta.id==='history'?num(p.movement?.amount):num(p.movement?.eventAppliedAmount??p.movement?.amount),label=`${formatDate(p.movement?.executedAt)} ${balanceClockLabel(p)} · ${money(amount)}`;return `<g class="ce-bank-magnifier-point-wrap"><circle class="ce-bank-magnifier-point ${amount<0?'negative':'positive'}" cx="${xs[i].toFixed(2)}" cy="${y(p.balance).toFixed(2)}" r="9" tabindex="0" role="button" data-ce-bank-magnifier-point="1" data-movement-id="${esc(p.movement?.id)}"><title>${esc(label)}</title></circle><text x="${xs[i].toFixed(2)}" y="${height-16}" text-anchor="middle">${esc(balanceClockLabel(p))}</text></g>`}).join('');
+    host.innerHTML=`<div class="ce-bank-magnifier-head"><div><strong>Lupa temporal · ${esc(formatDate(seedPoint.movement?.executedAt))}</strong><span>${group.length} movimiento(s) · la gráfica original permanece intacta</span></div><button type="button" data-ce-bank-close-magnifier="1" aria-label="Cerrar lupa">×</button></div><svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="Lupa temporal del ${esc(dayKey)}"><path class="ce-bank-magnifier-line" d="${path}"></path>${pointsHtml}</svg>`;
+    host.querySelector('[data-ce-bank-close-magnifier]')?.addEventListener('click',event=>{stopEvent(event);host.remove();setBalanceMagnifierState(meta.id,null);pane.querySelector('[data-ce-bank-restore-balance-chart]')?.classList.remove('active');});
+    host.querySelectorAll('[data-ce-bank-magnifier-point]').forEach(circle=>{
+      const id=String(circle.dataset.movementId||''),found=group.find(p=>String(p?.movement?.id||'')===id);
+      const select=()=>{if(found)updateBalanceInspector(found,meta.id);};
+      circle.addEventListener('pointerenter',select);circle.addEventListener('focus',select);
+      circle.addEventListener('click',event=>openBalanceMovementMedia(id,event,meta.id));
     });
-    const highlight=pane.querySelector('[data-ce-bank-balance-highlight="1"]');
-    if(highlight&&Number.isFinite(meta.shadeStart)&&Number.isFinite(meta.shadeEnd)){
-      const a=Math.max(meta.left,x(Math.min(meta.shadeStart,meta.shadeEnd)));
-      const b=Math.min(meta.left+meta.plotW,x(Math.max(meta.shadeStart,meta.shadeEnd)));
-      highlight.setAttribute('x',a.toFixed(2));highlight.setAttribute('width',Math.max(6,b-a).toFixed(2));
-    }
-    pane.querySelectorAll('[data-ce-bank-balance-point="1"]').forEach(circle=>{
-      const id=String(circle.dataset.movementId||'');
-      const point=meta.pointByMovementId.get(id);
-      if(point)circle.setAttribute('cx',num(pointX.get(id)||x(point.time)).toFixed(2));
-    });
-    for(const item of meta.points){
-      const id=String(item?.point?.movement?.id||'');
-      item.cx=num(pointX.get(id)||x(item.point.time));
-    }
-    pane.querySelector('.ce-bank-balance-hover-marker')?.classList.add('hidden');
-    pane.querySelectorAll('[data-ce-bank-restore-balance-chart]').forEach(button=>button.classList.toggle('active',Boolean(active)));
+    setBalanceMagnifierState(meta.id,{movementId:String(seedPoint?.movement?.id||''),widthRatio:ratio});
+    pane.querySelector('[data-ce-bank-restore-balance-chart]')?.classList.add('active');return true;
+  }
+  function restoreBalanceMagnifierPane(pane,meta){
+    const saved=ensureBalanceMagnifierState().panes?.[meta?.id];if(!saved?.movementId)return;
+    const item=arr(meta?.points).find(x=>String(x?.point?.movement?.id||'')===String(saved.movementId));if(item)renderBalanceMagnifier(pane,meta,item.point,saved.widthRatio);
   }
   let balanceInspectorMediaToken=0,balanceInspectorMovementId='';
   function chartPane(config){
@@ -837,7 +818,7 @@
     }).join('');
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
     const actionBlock=(actionsHtml||statusHtml)?`<div class="ce-bank-balance-pane-actions">${actionsHtml||''}${statusHtml}</div>`:'';
-    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}" title="Mantén pulsado sobre un grupo y arrastra: solo ese día se abre usando fecha y hora; el resto del histórico no se deforma. Si el grupo está pegado a un borde, se despliega hacia el lado con espacio. Restaurar gráfica cierra todos los grupos."><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" data-ce-bank-balance-line="1" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
+    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}" title="Arrastra horizontalmente sobre un grupo de puntos para abrir una lupa temporal independiente"><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" data-ce-bank-balance-line="1" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
     const meta={id,width,height,left,right,top,bottom,plotW,plotH,safeMinTime,safeMaxTime,series,y,shadeStart,shadeEnd,pointByMovementId,points:interactivePoints.map(point=>({cx:x(point.time),cy:y(point.balance),point})),currentSpread:null};
     return {html,meta};
   }
@@ -915,118 +896,25 @@
     if(balanceInspectorMovementId!==inspectorKey){balanceInspectorMovementId=inspectorKey;renderBalanceInspectorMedia(movement,paneId);}
   }
   function wireBalancePane(pane,meta){
-    const svg=pane?.querySelector('svg');
-    const marker=pane?.querySelector('.ce-bank-balance-hover-marker');
-    if(!svg||!meta?.points?.length) return;
-    const points=meta.points;
-    let activePointerId=null,lastSelection=null,gesture=null,suppressClickUntil=0;
+    const svg=pane?.querySelector('svg'),marker=pane?.querySelector('.ce-bank-balance-hover-marker');if(!svg||!meta?.points?.length)return;
+    const points=meta.points;let activePointerId=null,lastSelection=null,gesture=null,suppressClickUntil=0;
     const clearActive=()=>pane.querySelectorAll('[data-ce-bank-balance-point="1"].active').forEach(node=>node.classList.remove('active'));
-    const svgPoint=(clientX,clientY)=>{
-      const ctm=svg.getScreenCTM?.();
-      if(ctm&&svg.createSVGPoint){
-        try{const p=svg.createSVGPoint();p.x=clientX;p.y=clientY;const q=p.matrixTransform(ctm.inverse());return {x:q.x,y:q.y};}catch(_){}
-      }
-      const rect=svg.getBoundingClientRect();
-      return {x:(clientX-rect.left)/Math.max(1,rect.width)*meta.width,y:(clientY-rect.top)/Math.max(1,rect.height)*meta.height};
-    };
-    const clearTransient=()=>{lastSelection=null;marker?.classList.add('hidden');clearActive();resetBalanceInspector();};
     const locate=(clientX,clientY,pointerType='mouse')=>{
-      const rect=svg.getBoundingClientRect();if(!rect.width||!rect.height)return null;
-      const yOffset=pointerType==='touch'?72:pointerType==='pen'?42:0;
-      const tx=clientX,ty=clientY-yOffset;
-      const ctm=svg.getScreenCTM?.();
-      let best=null,bestDistance=Infinity;
-      for(const item of points){
-        let px,py;
-        if(ctm){
-          px=item.cx*ctm.a+item.cy*ctm.c+ctm.e;
-          py=item.cx*ctm.b+item.cy*ctm.d+ctm.f;
-        }else{
-          px=rect.left+(item.cx/meta.width)*rect.width;
-          py=rect.top+(item.cy/meta.height)*rect.height;
-        }
-        const distance=Math.hypot(px-tx,py-ty);
-        if(distance<bestDistance){bestDistance=distance;best=item;}
-      }
-      const threshold=pointerType==='touch'?82:pointerType==='pen'?58:44;
-      return best&&bestDistance<=threshold?{item:best,cursorX:best.cx,curveY:best.cy,distance:bestDistance}:null;
+      const rect=svg.getBoundingClientRect();if(!rect.width||!rect.height)return null;const yOffset=pointerType==='touch'?72:pointerType==='pen'?42:0,tx=clientX,ty=clientY-yOffset,ctm=svg.getScreenCTM?.();let best=null,bestDistance=Infinity;
+      for(const item of points){let px,py;if(ctm){px=item.cx*ctm.a+item.cy*ctm.c+ctm.e;py=item.cx*ctm.b+item.cy*ctm.d+ctm.f;}else{px=rect.left+(item.cx/meta.width)*rect.width;py=rect.top+(item.cy/meta.height)*rect.height;}const distance=Math.hypot(px-tx,py-ty);if(distance<bestDistance){bestDistance=distance;best=item;}}
+      const threshold=pointerType==='touch'?88:pointerType==='pen'?62:48;return best&&bestDistance<=threshold?{item:best,cursorX:best.cx,curveY:best.cy,distance:bestDistance}:null;
     };
-    const show=selection=>{
-      if(!selection?.item)return false;
-      lastSelection=selection;updateBalanceInspector(selection.item.point,meta.id);clearActive();
-      const movementId=String(selection.item.point.movement?.id||'');
-      [...pane.querySelectorAll('[data-ce-bank-balance-point="1"]')].find(node=>String(node.dataset.movementId)===movementId)?.classList.add('active');
-      if(marker){
-        marker.classList.remove('hidden');
-        const line=marker.querySelector('line'),dot=marker.querySelector('circle');
-        line?.setAttribute('x1',selection.cursorX.toFixed(2));line?.setAttribute('x2',selection.cursorX.toFixed(2));
-        dot?.setAttribute('cx',selection.cursorX.toFixed(2));dot?.setAttribute('cy',selection.curveY.toFixed(2));
-      }
-      return true;
-    };
-    const track=event=>{
-      if((event.pointerType==='touch'||event.pointerType==='pen')&&event.cancelable)event.preventDefault();
-      const selection=locate(event.clientX,event.clientY,event.pointerType||'mouse');
-      if(selection)show(selection);
-      else if((event.pointerType||'mouse')==='mouse')clearTransient();
-    };
-    const beginGesture=event=>{
-      const p=svgPoint(event.clientX,event.clientY),current=balancePaneSpread(meta.id),selection=locate(event.clientX,event.clientY,event.pointerType||'mouse');
-      const startRatio=Math.max(.02,Math.min(.98,(p.x-meta.left)/Math.max(1,meta.plotW))),anchorTime=selection?.item?.point?.time||balanceTimeAtSvgX(meta,p.x,current),day=balanceIntradayWindow(anchorTime);
-      gesture={startClientX:event.clientX,startClientY:event.clientY,anchorTime,startRatio,clusterStart:day.start,clusterEnd:day.end,spreading:false};
-      activePointerId=event.pointerId;
-      try{svg.setPointerCapture(event.pointerId);}catch(_){}
-      if(event.pointerType==='touch'||event.pointerType==='pen'){if(event.cancelable)event.preventDefault();}
-      track(event);
-    };
-    const moveGesture=event=>{
-      if(activePointerId==null||event.pointerId!==activePointerId)return false;
-      const dx=event.clientX-gesture.startClientX,dy=event.clientY-gesture.startClientY;
-      if(!gesture.spreading&&Math.abs(dx)>18&&Math.abs(dx)>Math.abs(dy)*1.05){
-        gesture.spreading=true;clearTransient();pane.classList.add('is-spreading');
-      }
-      if(!gesture.spreading)return false;
-      if(event.cancelable)event.preventDefault();
-      const rect=svg.getBoundingClientRect(),dxSvg=dx/Math.max(1,rect.width)*meta.width;
-      const targetRatio=Math.max(.02,Math.min(.98,gesture.startRatio+dxSvg/Math.max(1,meta.plotW)));
-      const spread=setBalancePaneSpread(meta.id,{anchorTime:gesture.anchorTime,anchorRatio:targetRatio,originRatio:gesture.startRatio,clusterStart:gesture.clusterStart,clusterEnd:gesture.clusterEnd,spreadPx:Math.abs(dxSvg),dragDirection:dxSvg});
-      applyBalancePaneSpread(pane,meta,spread);
-      return true;
-    };
-    const endGesture=event=>{
-      if(activePointerId!==event.pointerId)return;
-      if(gesture?.spreading){
-        suppressClickUntil=Date.now()+420;
-        if(event.cancelable)event.preventDefault();
-      }
-      pane.classList.remove('is-spreading');
-      try{svg.releasePointerCapture(event.pointerId);}catch(_){}
-      activePointerId=null;gesture=null;
-    };
-    svg.addEventListener('pointerdown',beginGesture,{passive:false});
+    const show=selection=>{if(!selection?.item)return false;lastSelection=selection;updateBalanceInspector(selection.item.point,meta.id);clearActive();const id=String(selection.item.point.movement?.id||'');[...pane.querySelectorAll('[data-ce-bank-balance-point="1"]')].find(node=>String(node.dataset.movementId)===id)?.classList.add('active');if(marker){marker.classList.remove('hidden');const line=marker.querySelector('line'),dot=marker.querySelector('circle');line?.setAttribute('x1',selection.cursorX.toFixed(2));line?.setAttribute('x2',selection.cursorX.toFixed(2));dot?.setAttribute('cx',selection.cursorX.toFixed(2));dot?.setAttribute('cy',selection.curveY.toFixed(2));}return true;};
+    const clearTransient=()=>{lastSelection=null;marker?.classList.add('hidden');clearActive();resetBalanceInspector();};
+    svg.addEventListener('pointerdown',event=>{activePointerId=event.pointerId;gesture={startX:event.clientX,startY:event.clientY,seed:locate(event.clientX,event.clientY,event.pointerType||'mouse'),opened:false};try{svg.setPointerCapture(event.pointerId);}catch(_){}if((event.pointerType==='touch'||event.pointerType==='pen')&&event.cancelable)event.preventDefault();if(gesture.seed)show(gesture.seed);},{passive:false});
     svg.addEventListener('pointermove',event=>{
-      if(moveGesture(event))return;
-      if(activePointerId!=null&&event.pointerId!==activePointerId)return;
-      track(event);
+      if(activePointerId!=null&&event.pointerId===activePointerId&&gesture){const dx=event.clientX-gesture.startX,dy=event.clientY-gesture.startY;if(gesture.seed&&Math.abs(dx)>30&&Math.abs(dx)>Math.abs(dy)*1.05){if(event.cancelable)event.preventDefault();const rect=svg.getBoundingClientRect(),ratio=.48+Math.min(.48,Math.abs(dx)/Math.max(1,rect.width)*1.25);renderBalanceMagnifier(pane,meta,gesture.seed.item.point,ratio);gesture.opened=true;suppressClickUntil=Date.now()+450;return;}}
+      if(activePointerId==null){const sel=locate(event.clientX,event.clientY,event.pointerType||'mouse');if(sel)show(sel);else if((event.pointerType||'mouse')==='mouse')clearTransient();}
     },{passive:false});
-    svg.addEventListener('pointerup',endGesture,{passive:false});
-    svg.addEventListener('pointercancel',event=>{if(activePointerId===event.pointerId){pane.classList.remove('is-spreading');activePointerId=null;gesture=null;}});
-    svg.addEventListener('pointerleave',event=>{
-      if((event.pointerType||'mouse')!=='mouse'||activePointerId!=null)return;
-      clearTransient();
-    });
-    pane.querySelectorAll('[data-ce-bank-balance-point="1"]').forEach(circle=>{
-      circle.addEventListener('click',event=>{
-        if(Date.now()<suppressClickUntil){stopEvent(event);return;}
-        openBalanceMovementMedia(circle.dataset.movementId,event,meta.id);
-      });
-      circle.addEventListener('focus',()=>{
-        const found=points.find(item=>String(item.point.movement?.id)===String(circle.dataset.movementId));
-        if(found)show({item:found,cursorX:found.cx,curveY:found.cy});
-      });
-      circle.addEventListener('blur',()=>{if(activePointerId==null){marker?.classList.add('hidden');clearActive();resetBalanceInspector();}});
-    });
-    applyBalancePaneSpread(pane,meta,balancePaneSpread(meta.id));
+    const end=event=>{if(activePointerId!==event.pointerId)return;if(gesture?.opened&&event.cancelable)event.preventDefault();try{svg.releasePointerCapture(event.pointerId);}catch(_){}activePointerId=null;gesture=null;};
+    svg.addEventListener('pointerup',end,{passive:false});svg.addEventListener('pointercancel',end,{passive:false});svg.addEventListener('pointerleave',event=>{if(activePointerId==null&&(event.pointerType||'mouse')==='mouse')clearTransient();});
+    pane.querySelectorAll('[data-ce-bank-balance-point="1"]').forEach(circle=>{circle.addEventListener('click',event=>{if(Date.now()<suppressClickUntil){stopEvent(event);return;}openBalanceMovementMedia(circle.dataset.movementId,event,meta.id);});circle.addEventListener('focus',()=>{const found=points.find(item=>String(item.point.movement?.id)===String(circle.dataset.movementId));if(found)show({item:found,cursorX:found.cx,curveY:found.cy});});circle.addEventListener('blur',()=>{if(activePointerId==null){marker?.classList.add('hidden');clearActive();resetBalanceInspector();}});});
+    restoreBalanceMagnifierPane(pane,meta);
   }
   function wireBalanceChartClose(overlay){
     const closeButton=overlay?.querySelector('[data-ce-bank-close-balance-chart]');
@@ -1172,9 +1060,9 @@
       :(finalSnapshot?'Hay filas almacenadas del Cuadre, pero ninguna quedó incluida En saldo.':'Todavía no hay movimientos En saldo para construir el zoom del evento.');
     const restoreButton='<button type="button" class="ce-bank-chart-restore" data-ce-bank-restore-balance-chart="1">↺ Restaurar gráfica</button>';
     const zoomPane=includedRows.length
-      ?chartPane({id:'zoom',title:eventData.title,subtitle:finalSnapshot?`${includedRows.length} movimiento(s) En saldo almacenado(s) al cierre · foto definitiva · Arrastra sobre un grupo para abrir SOLO ese día; el resto de la gráfica permanece fijo. Si está junto a un borde, se abre automáticamente hacia el lado con espacio`:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom del periodo de trabajo · Arrastra sobre un grupo para abrir SOLO ese día; el resto de la gráfica permanece fijo. Si está junto a un borde, se abre automáticamente hacia el lado con espacio`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,pointScope:'event',actionsHtml:restoreButton})
+      ?chartPane({id:'zoom',title:eventData.title,subtitle:finalSnapshot?`${includedRows.length} movimiento(s) En saldo almacenado(s) al cierre · foto definitiva · Arrastra sobre un grupo para abrir la lupa temporal`:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom del periodo de trabajo · Arrastra sobre un grupo para abrir la lupa temporal`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,pointScope:'event',actionsHtml:restoreButton})
       :{html:`<section class="ce-bank-balance-pane zoom" data-pane-id="zoom"><div class="ce-bank-balance-pane-head"><div><strong>${esc(eventData.title)}</strong><span>${finalSnapshot?'Foto definitiva del Cuadre Banco al cierre':'Cuadre Banco del evento'}</span></div><div class="ce-bank-balance-pane-actions">${restoreButton}<span class="ce-bank-balance-pane-status ${esc(eventData.statusClass)}">${esc(eventData.status)}</span></div></div><div class="ce-bank-balance-chart-empty"><strong>${finalSnapshot&&storedCount<=0?'SIN CUADRE BANCARIO AL CIERRE':'SIN MOVIMIENTOS EN SALDO'}</strong><span>${esc(emptyZoomMessage)}</span></div></section>`,meta:{id:'zoom',width:chartWidth,height:zoomHeight,points:[]}};
-    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'} · Cada cargo rojo / cada abono verde · Arrastra sobre un grupo para abrir SOLO ese día; el resto de la gráfica permanece fijo. Si está junto a un borde, se abre automáticamente hacia el lado con espacio`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,pointScope:'all',actionsHtml:`<button type="button" class="ce-bank-history-open" data-ce-bank-open-history-list="1">☰ Ver movimientos</button>${restoreButton}`});
+    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'} · Cada cargo rojo / cada abono verde · Arrastra sobre un grupo para abrir la lupa temporal`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,pointScope:'all',actionsHtml:`<button type="button" class="ce-bank-history-open" data-ce-bank-open-history-list="1">☰ Ver movimientos</button>${restoreButton}`});
     const eventCountLabel=finalSnapshot?'Filas almacenadas del Cuadre':'Movimientos En saldo señalados';
     const eventCountValue=finalSnapshot?storedCount:includedRows.length;
     const accountIban=chartAccountIban();
@@ -1808,7 +1696,7 @@
     const historyIncome=event.target?.closest?.('[data-ce-bank-history-income="1"]');
     if(historyIncome){openBankIncomePhoto(historyIncome,event);return;}
     const restoreChart=event.target?.closest?.('[data-ce-bank-restore-balance-chart="1"]');
-    if(restoreChart){restoreBalanceChartSpread(event);return;}
+    if(restoreChart){restoreBalanceChartMagnifier(event);return;}
     const chartClose=event.target?.closest?.('[data-ce-bank-close-balance-chart]');
     if(chartClose||event.target?.id==='ceBankBalanceChartOverlay'){stopEvent(event);closeBalanceChart();return;}
     const add=event.target?.closest?.('[data-ce-bank-add-ticket]');

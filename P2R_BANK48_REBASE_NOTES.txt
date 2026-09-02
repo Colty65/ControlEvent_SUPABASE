@@ -1,0 +1,35 @@
+ControlEvent v4_0_exp · P2-R + BANK4.8
+
+OBJETIVO
+Rebase limpio tras P2.1/P2.2/P2.3 y BANK4.7.2–4.7.5. Se recupera la base P2 de una decisión y la base BANK4.7.1 estable, conservando solo las mejoras válidas.
+
+ZUZU P2-R
+- Una única tool mínima para Gemini: plan_turn.
+- Seis intenciones: DATA, VIEW, CALCULATE, MEMORY, PERSON, CHAT.
+- Gemini entiende lenguaje; CE traduce el plan mínimo a contratos canónicos.
+- Una llamada IA normal; segunda solo para narración factual cuando proceda.
+- Sin Dialogue State Authority, sin retries semánticos, sin schema de contratos CE gigantesco.
+- args se expresa como key=value separado por ;, no como JSON anidado.
+- Se conservan current_dataset, visible_datasets, selected_memory_episode, active_focus y ledger compacto como referencias.
+- El traductor local conserva OR de filtros, orden, columnas, personas múltiples, dataset por título visible y memoria.
+
+BANK4.8
+- La gráfica principal NO se deforma nunca.
+- Histórico: todos los movimientos con cargo rojo / abono verde y miniaturas.
+- Zoom de evento: movimientos del evento con el mismo inspector y miniaturas.
+- Arrastrar sobre un grupo abre una lupa temporal independiente del día tocado.
+- La lupa usa fecha+hora y separación visual local para poder seleccionar puntos.
+- Cerrar/restaurar elimina la lupa sin modificar la línea principal.
+- Misma implementación para histórico y zoom.
+
+PRUEBAS LOCALES
+- P2-R minimal planner: 36 OK · 0 KO.
+- BANK4.8 magnifier: 18 OK · 0 KO.
+- BANK3: 25/25.
+- BANK4: 33/34; único KO = cache-bust antiguo esperado por el script BANK4, no funcionalidad.
+- Multievento: 31/31.
+- P2 original: 52 comprobaciones heredadas siguen pasando; 10 KO son expectativas antiguas incompatibles con el rebase (provider/build/battery y también assertions de la antigua ruta schema/normalizer). No representan 10 fallos funcionales nuevos.
+- Sintaxis JS modificada: OK.
+
+IMPORTANTE
+Las regresiones anteriores prueban código, contratos y geometría. NO sustituyen la prueba real con Gemini. El siguiente test conversacional debe ser GOLDEN DIÁLOGO 14 sobre esta versión. Si vuelve a fallar de forma amplia, no continuar con otra capa de parches: revisar el planificador mínimo/modelo con las trazas de esa ejecución.

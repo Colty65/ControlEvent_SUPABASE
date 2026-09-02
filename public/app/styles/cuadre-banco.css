@@ -2174,53 +2174,27 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
   }
 }
 
-/* BANK4.8 · histórico con puntos + separación horizontal persistente por arrastre */
-#ceBankOverlay .ce-bank-balance-pane .ce-bank-balance-plot{
-  cursor:crosshair!important;
-  touch-action:none!important;
-  overscroll-behavior:none!important;
-  user-select:none!important;
-  -webkit-user-select:none!important;
-}
-#ceBankOverlay .ce-bank-balance-pane .ce-bank-balance-plot svg{
-  touch-action:none!important;
-  user-select:none!important;
-  -webkit-user-select:none!important;
-}
-#ceBankOverlay .ce-bank-balance-pane.is-spreading .ce-bank-balance-plot{cursor:ew-resize!important}
-#ceBankOverlay .ce-bank-balance-event-point.history-point{
-  stroke-width:2.2!important;
-  opacity:.92;
-}
-#ceBankOverlay .ce-bank-balance-event-point.history-point:hover,
-#ceBankOverlay .ce-bank-balance-event-point.history-point:focus,
-#ceBankOverlay .ce-bank-balance-event-point.history-point.active{
-  opacity:1;
-  stroke-width:4.5!important;
-}
-#ceBankOverlay .ce-bank-chart-restore{
-  border:1px solid #c8d8e3;
-  border-radius:999px;
-  background:#fff;
-  color:#365b72;
-  padding:6px 11px;
-  font-size:10px;
-  font-weight:950;
-  cursor:pointer;
-  white-space:nowrap;
-  transition:background .15s ease,border-color .15s ease,transform .15s ease;
-}
-#ceBankOverlay .ce-bank-chart-restore:hover{
-  background:#eef7fc;
-  border-color:#8abbd5;
-}
-#ceBankOverlay .ce-bank-chart-restore.active{
-  background:#fff7d8;
-  border-color:#e7c764;
-  color:#6f5815;
-}
+/* BANK4.8 · puntos históricos + lupa temporal independiente (sin deformar la gráfica) */
+#ceBankOverlay .ce-bank-balance-pane{position:relative!important}
+#ceBankOverlay .ce-bank-balance-pane .ce-bank-balance-plot{cursor:crosshair!important;touch-action:none!important;overscroll-behavior:none!important;user-select:none!important;-webkit-user-select:none!important}
+#ceBankOverlay .ce-bank-balance-pane .ce-bank-balance-plot svg{touch-action:none!important;user-select:none!important;-webkit-user-select:none!important}
+#ceBankOverlay .ce-bank-balance-event-point.history-point{stroke-width:2.2!important;opacity:.92}
+#ceBankOverlay .ce-bank-balance-event-point.history-point:hover,#ceBankOverlay .ce-bank-balance-event-point.history-point:focus,#ceBankOverlay .ce-bank-balance-event-point.history-point.active{opacity:1;stroke-width:4.5!important}
+#ceBankOverlay .ce-bank-chart-restore{border:1px solid #c8d8e3;border-radius:999px;background:#fff;color:#365b72;padding:6px 11px;font-size:10px;font-weight:950;cursor:pointer;white-space:nowrap;transition:background .15s ease,border-color .15s ease,transform .15s ease}
+#ceBankOverlay .ce-bank-chart-restore:hover{background:#eef7fc;border-color:#8abbd5}
+#ceBankOverlay .ce-bank-chart-restore.active{background:#fff7d8;border-color:#e7c764;color:#6f5815}
 #ceBankOverlay .ce-bank-chart-restore:active{transform:translateY(1px)}
-@media(max-width:760px){
-  #ceBankOverlay .ce-bank-balance-pane-actions{gap:5px!important;flex-wrap:wrap!important;justify-content:flex-end!important}
-  #ceBankOverlay .ce-bank-chart-restore,#ceBankOverlay .ce-bank-history-open{padding:5px 8px!important;font-size:9px!important}
-}
+#ceBankOverlay .ce-bank-balance-magnifier{position:absolute;z-index:14;left:50%;bottom:12px;width:var(--ce-bank-magnifier-width,78%);transform:translateX(-50%);border:2px solid #82abc3;border-radius:15px;background:rgba(255,255,255,.985);box-shadow:0 14px 34px rgba(15,52,75,.24);overflow:hidden;backdrop-filter:blur(4px)}
+#ceBankOverlay .ce-bank-magnifier-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 11px;background:#eef7fc;border-bottom:1px solid #c9dce7;color:#173f59}
+#ceBankOverlay .ce-bank-magnifier-head>div{min-width:0;display:flex;flex-direction:column;gap:1px}
+#ceBankOverlay .ce-bank-magnifier-head strong{font-size:11px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#ceBankOverlay .ce-bank-magnifier-head span{font-size:9px;font-weight:800;color:#5b7485}
+#ceBankOverlay .ce-bank-magnifier-head button{flex:0 0 28px;width:28px;height:28px;border-radius:50%;border:1px solid #a8c5d5;background:#fff;color:#315c73;font-size:19px;font-weight:900;cursor:pointer;line-height:1}
+#ceBankOverlay .ce-bank-balance-magnifier svg{display:block;width:100%;height:150px;background:linear-gradient(180deg,#fff,#f7fbfd)}
+#ceBankOverlay .ce-bank-magnifier-line{fill:none;stroke:#2386be;stroke-width:2.6;vector-effect:non-scaling-stroke;opacity:.82}
+#ceBankOverlay .ce-bank-magnifier-point{stroke:#fff;stroke-width:4;cursor:pointer;vector-effect:non-scaling-stroke;filter:drop-shadow(0 2px 4px rgba(20,55,75,.25))}
+#ceBankOverlay .ce-bank-magnifier-point.positive{fill:#21a56f}
+#ceBankOverlay .ce-bank-magnifier-point.negative{fill:#d44752}
+#ceBankOverlay .ce-bank-magnifier-point:hover,#ceBankOverlay .ce-bank-magnifier-point:focus{r:12;outline:none}
+#ceBankOverlay .ce-bank-magnifier-point-wrap text{font-size:13px;font-weight:900;fill:#496a7e;pointer-events:none}
+@media(max-width:760px){#ceBankOverlay .ce-bank-balance-pane-actions{gap:5px!important;flex-wrap:wrap!important;justify-content:flex-end!important}#ceBankOverlay .ce-bank-chart-restore,#ceBankOverlay .ce-bank-history-open{padding:5px 8px!important;font-size:9px!important}#ceBankOverlay .ce-bank-balance-magnifier{width:96%!important;bottom:6px}#ceBankOverlay .ce-bank-balance-magnifier svg{height:132px}}
