@@ -1,0 +1,26 @@
+ControlEvent v4_0_exp · VNext P1.25
+NATURAL VISIBLE DATASET DIALOGUE · NHC
+Fecha: 2026-09-02
+
+Objetivo
+--------
+Corregir los fallos observados en DIALOG-24 P1.24 sin rehacer la arquitectura ni introducir hard-code lingüístico o de entidades.
+
+Cambios principales
+-------------------
+1. Todas las tablas materializadas del turno se conservan como datasets visibles reutilizables; no solo la primera.
+2. Si el usuario nombra una tabla visible (por ejemplo, la tabla de Economía), CE opera sobre ese snapshot mediante view_current / summarize_current / derive y evita reinterpretar el título como otro dominio empresarial.
+3. Una tabla visible es el objeto conversacional activo. Salir a otro dominio factual requiere change_focus=true; focus_mode=replace no basta para escapar silenciosamente del objeto.
+4. derive separa correctamente campo métrico y campo etiqueta. derive_field es la magnitud; field puede actuar como etiqueta cuando ambos llegan juntos. MAX/MIN respetan top_n.
+5. Filtros positivos múltiples sobre la misma columna se interpretan como OR; filtros negativos siguen acumulándose como AND.
+6. recall_memory tolera el result_index zero-based observado en Gemini y hace soberana la referencia materializada de la búsqueda previa.
+7. source_base_args/table_base_args permanecen como metadatos internos y no cruzan el contrato empresarial query_ce.
+8. Los retries de protocolo/autoridad/intención disponen de llamadas reales y ya no chocan con maxCalls=1.
+9. La ITV DIALOG-24 bloquea el JSON bruto del simulador: solo utterance llega como mensaje del usuario.
+10. El oráculo adaptativo penaliza cuando el usuario nombra una tabla y Zuzu materializa otra distinta.
+
+Regresión específica
+--------------------
+npm run test:vnext-p125
+
+La suite P1.25 cubre: datasets visibles, Economía vs ingresos, derive Valor/Indicador, OR de filas, referencias de memoria, retry, procedencia interna, parser del usuario sintético y autoridad de cambio de foco.
