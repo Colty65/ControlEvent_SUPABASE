@@ -41,7 +41,7 @@ const META=['requested_fields','focus_mode','focus_type','focus_entities','chang
 // cada operation duplicaba casi el número de propiedades del function schema.
 // Cada operación expone solo sus claves empresariales + presentación/foco mínimos.
 const CONTEXT=['source_operation','source_args','source_dataset_id','dataset_id','table_key','focus_mode','focus_type','focus_entities','title','record_count'];
-const VIEW=['view_filters','remove_view_filters','reset_filters','view_sort','visible_columns','hidden_columns','reset_table','order_by'];
+const VIEW=['view_filters','remove_view_filters','reset_filters','view_sort','visible_columns','hidden_columns','reset_table'];
 const RUNTIME_UNIVERSAL=[...new Set([...PRESENT,...META,...CONTEXT,...VIEW])];
 const GEMINI_COMMON=[...new Set([...PRESENT,...META])];
 // optional = lo que el canonizador/runtime tolera dentro del envelope.
