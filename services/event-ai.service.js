@@ -17853,7 +17853,7 @@ function vnextP110ApplyTableView(result={},args={},prompt='',history=[],flowTrac
   if(!isColumn&&(filterCmd||remove||add)&&mentioned.length){const field=mentioned[0],value=vnextP110FindRowValue(prompt,target,field);if(value){const fn=vnextP17LooseNorm(field),vn=vnextP17LooseNorm(value);if(filterCmd){filters=filters.filter(f=>vnextP17LooseNorm(f.field)!==fn);filters.push({field,operator:'eq',value});}else if(remove){filters=filters.filter(f=>!(vnextP17LooseNorm(f.field)===fn&&vnextP17LooseNorm(f.value)===vn&&f.operator==='eq'));if(!filters.some(f=>vnextP17LooseNorm(f.field)===fn&&vnextP17LooseNorm(f.value)===vn&&f.operator==='neq'))filters.push({field,operator:'neq',value});}else if(add){filters=filters.filter(f=>!(vnextP17LooseNorm(f.field)===fn&&vnextP17LooseNorm(f.value)===vn&&f.operator==='neq'));}}}
   filters=vnextP110NormalizeViewFilters(filters);sort=vnextP110NormalizeViewSort(sort);args.view_filters=filters;args.view_sort=sort;args.visible_columns=visible;args.hidden_columns=hidden;if(reset)args.reset_table=true;
   const outTables=tables.map((t,i)=>{if(i!==targetIndex)return t;let rows=vnextP110FilterRows(t.rows,filters);rows=vnextP110SortRows(rows,sort);const keys=vnextP110TableColumns(t),canon=list=>vnextP16MergeUniqueText([],arr(list).map(x=>vnextP110ResolveColumn(keys,x)||trim(x)).filter(Boolean)),vcols=canon(visible),hcols=canon(hidden);let keep=vcols.length?keys.filter(k=>vcols.some(v=>vnextP17LooseNorm(k)===vnextP17LooseNorm(v))):keys.filter(k=>!hcols.some(h=>vnextP17LooseNorm(k)===vnextP17LooseNorm(h)));if(!keep.length)keep=keys.slice(0,1);return{...t,rows,columns:keep,logicalCount:rows.length,displayCount:rows.length};});const targetOut=outTables[targetIndex],facts={...(result?.facts||{}),table_view_active:filters.length>0||sort.length>0||visible.length>0||hidden.length>0,table_view_filters:filters,table_view_sort:sort,visible_columns:visible,hidden_columns:hidden,view_table_key:trim(targetOut?.key),view_record_count:arr(targetOut?.rows).length};if(Object.prototype.hasOwnProperty.call(facts,'record_count'))facts.record_count=arr(targetOut?.rows).length;zuzuTracePush(flowTrace,'VNEXT P1.10 · GENERIC TABLE VIEW','OK',`tabla=${trim(targetOut?.key)||'—'} · filtros=${filters.map(f=>`${f.field} ${f.operator} ${f.value}`).join(' | ')||'—'} · orden=${sort.map(x=>`${x.field} ${x.direction}`).join(' | ')||'base'} · visibles=${visible.join(' | ')||'todas'} · ocultas=${hidden.join(' | ')||'—'}${reset?' · ORIGINAL':''}.`);return{...result,facts,tables:outTables};}
-function vnextP110LooksLikeInternalCall(raw=''){return /(?:^|\n)\s*call\s*:|default_api\s*\.\s*query_ce|print\s*\(\s*default_api|\b(?:query_ce|recall_memory|resolve_entity|search_documents)\s*\(/i.test(String(raw||''));}
+function vnextP110LooksLikeInternalCall(raw=''){return /(?:^|\n)\s*call\s*:|default_api\s*\.\s*query_ce|print\s*\(\s*default_api|\b(?:query_ce|recall_memory|resolve_entity|search_documents|view_dataset|derive_dataset|summarize_dataset|person_data)\s*\(/i.test(String(raw||''));}
 function vnextP110FeedbackReply(){return 'Sí, aquí he fallado yo: me estabas pidiendo operaciones básicas sobre la tabla y no las estaba aplicando. Lo corrijo sin enseñarte llamadas internas ni hacerte pelear con la sintaxis.';}
 
 function vnextP16ScenarioCharts(result={},decision={}){
@@ -18165,12 +18165,21 @@ function vnextP124PresentationEvidence(tables=[],charts=[]){
 // P2 deliberately removes semantic retries and post-Gemini intent reinterpretation.
 // Normal turn: 1 Gemini decision. Optional second call only to narrate freshly executed facts.
 // ============================================================================
+function vnextP22BusinessQueryParameters(){
+  const base=queryCeCompactToolParameters(),props={...(base?.properties||{})},blocked=new Set(['view_current','summarize_current','derive']);
+  if(props.operation)props.operation={...props.operation,enum:capabilityOperations().filter(op=>!blocked.has(op)),description:'Consulta una FUENTE empresarial de ControlEvent. No sirve para manipular una tabla ya visible ni para calcular sobre ella.'};
+  for(const k of ['dataset_id','table_key','visible_columns','hidden_columns','view_filters','remove_view_filters','reset_filters','view_sort','reset_table','derive_operation','field','derive_field','label_field','top_n','source_operation','source_args','source_dataset_id'])delete props[k];
+  return{type:'object',properties:props,required:['operation'],additionalProperties:false};
+}
 function vnextP2Tools(){
   return [
-    {type:'function',name:'query_ce',description:'Datos estructurados canónicos de ControlEvent. Elige operation y los argumentos que correspondan. CE valida el contrato estrictamente después de la decisión.',parameters:queryCeCompactToolParameters()},
-    {type:'function',name:'resolve_entity',description:'Resuelve una identidad solo cuando el tipo o nombre sea realmente ambiguo.',parameters:{type:'object',properties:{text:{type:'string'},kind:{type:'string',enum:['auto','person','event','store','product']},limit:{type:'integer'}},required:['text'],additionalProperties:false}},
+    {type:'function',name:'view_dataset',description:'Manipula o vuelve a mostrar UNA tabla ya visible. Úsala para elegir una tabla mostrada antes, filtrar filas, recuperar/ocultar columnas, ordenar o restaurar la vista. No reabre la fuente empresarial.',parameters:{type:'object',properties:{dataset_id:{type:'string',description:'ID de visible_datasets/current_dataset. Si se omite, se usa la tabla actual.'},table_key:{type:'string'},show_columns:{type:'array',items:{type:'string'},description:'Columnas que deben volver a verse. Recuperar una columna significa ponerla aquí.'},hide_columns:{type:'array',items:{type:'string'}},filters:{type:'array',description:'Filtros de vista. Positivos sobre la misma columna son OR.',items:{type:'object',properties:{field:{type:'string'},operator:{type:'string',enum:['eq','neq','contains','not_contains']},value:{type:'string'}},required:['field','operator','value']}},remove_filters:{type:'array',items:{type:'object',properties:{field:{type:'string'},operator:{type:'string',enum:['eq','neq','contains','not_contains']},value:{type:'string'}},required:['field']}},clear_filters:{type:'boolean',description:'true solo si el usuario pide quitar TODOS los filtros.'},sort:{type:'array',items:{type:'object',properties:{field:{type:'string'},direction:{type:'string',enum:['asc','desc']}},required:['field']}},reset_view:{type:'boolean',description:'Restaura toda la vista original solo si se pide expresamente.'},narrate:{type:'boolean'}},additionalProperties:false}},
+    {type:'function',name:'derive_dataset',description:'Calcula sobre una tabla ya visible sin reabrir módulos: máximo, mínimo, suma, promedio, conteo, ranking o diferencia.',parameters:{type:'object',properties:{dataset_id:{type:'string'},table_key:{type:'string'},operation:{type:'string',enum:['SUM','COUNT','DISTINCT_COUNT','MAX','MIN','AVG','RANK','DIFFERENCE']},field:{type:'string',description:'Columna métrica, por ejemplo Valor.'},label_field:{type:'string',description:'Columna descriptiva que identifica la fila, por ejemplo Indicador.'},top_n:{type:'integer'},narrate:{type:'boolean'}},required:['operation'],additionalProperties:false}},
+    {type:'function',name:'summarize_dataset',description:'Resume humanamente el contenido de una tabla ya visible. No reabre memoria ni módulos empresariales.',parameters:{type:'object',properties:{dataset_id:{type:'string'},table_key:{type:'string'},requested_fields:{type:'array',items:{type:'string'}},narrate:{type:'boolean'}},additionalProperties:false}},
+    {type:'function',name:'person_data',description:'Consulta una o varias personas nombradas o recordadas en una sola decisión. Para varias personas pasa todas en people; CE ejecutará una consulta canónica por persona sin otra llamada IA.',parameters:{type:'object',properties:{mode:{type:'string',enum:['profile','events','income_status','event_status']},people:{type:'array',items:{type:'string'},minItems:1},event:{type:'string'},narrate:{type:'boolean'}},required:['mode','people'],additionalProperties:false}},
+    {type:'function',name:'query_ce',description:'Consulta una FUENTE empresarial nueva de ControlEvent. Si el usuario continúa sobre una tabla ya mostrada usa view_dataset, derive_dataset o summarize_dataset.',parameters:vnextP22BusinessQueryParameters()},
     {type:'function',name:'search_documents',description:'Busca contenido textual concreto en documentos/evidencias. No sustituye los datos estructurados de query_ce.',parameters:{type:'object',properties:{event:{type:'string'},scope:{type:'string',enum:['screen_event','named_event','all_events']},query:{type:'string'},detail:{type:'string',enum:['brief','standard','full']},register:{type:'string',enum:['normal','close','banter']}},required:['scope'],additionalProperties:false}},
-    {type:'function',name:'recall_memory',description:'Memoria HISTÓRICA persistente. search/list buscan; read abre un resultado; summarize resume un episodio. La conversación ACTUAL ya está en session_ledger y no necesita esta tool. Usa result_index para seleccionar resultados visibles.',parameters:{type:'object',properties:{action:{type:'string',enum:['search','list','read','summarize']},query:{type:'string'},conversation_id:{type:'string'},matched_turn_id:{type:'string'},result_index:{type:'integer'},limit:{type:'integer'},inspect:{type:'boolean'},inspect_term:{type:'string'},register:{type:'string',enum:['normal','close','banter']}},required:['action'],additionalProperties:false}}
+    {type:'function',name:'recall_memory',description:'Memoria HISTÓRICA persistente. search/list buscan; read abre un resultado; summarize resume un episodio. La conversación ACTUAL ya está en session_ledger.',parameters:{type:'object',properties:{action:{type:'string',enum:['search','list','read','summarize']},query:{type:'string'},conversation_id:{type:'string'},matched_turn_id:{type:'string'},result_index:{type:'integer'},limit:{type:'integer'},inspect:{type:'boolean'},inspect_term:{type:'string'},register:{type:'string',enum:['normal','close','banter']}},required:['action'],additionalProperties:false}}
   ];
 }
 function vnextP21LastReferents(history=[]){
@@ -18198,7 +18207,7 @@ function vnextP2Input(userPrompt='',history=[],screenEventName=''){
 }
 function vnextP2SystemInstruction(selectedEventId='',opts={}){
   const display=zuzuLoggedUserDisplayName({usuarioLogado:opts?.usuarioLogado||opts?.user||opts?.authUser||opts?.ce_acceso||null}),voice=opts?.voiceConversation===true;
-  return `Eres Zuzu P2.1, interlocutor natural de ControlEvent con ${display}.
+  return `Eres Zuzu P2.2, interlocutor natural de ControlEvent con ${display}.
 
 ARQUITECTURA DEL TURNO:
 - Tú entiendes el mensaje. ControlEvent ejecuta literalmente tus function_call. El estado solo recuerda resultados anteriores; NO corregirá después lo que tú quisiste decir.
@@ -18216,43 +18225,79 @@ CONTEXTO DE PANTALLA:
 - Si ESTADO DE TRABAJO contiene screen_event, es el evento que el usuario tiene abierto en ControlEvent. Úsalo para referencias como «este evento», «el actual» o equivalentes; es contexto ambiental, no una orden de mantener el foco.
 
 TABLAS VISIBLES:
-- ESTADO DE TRABAJO contiene tablas que el usuario ya ha visto. Si continúa sobre una de ellas, usa query_ce operation=view_current/summarize_current/derive y su dataset_id/table_key.
-- Si nombra otra tabla visible, selecciona esa tabla por su referencia.
-- Si cambia de tema, cambia de operación sin pedir permiso y sin quedar atrapado en el dataset anterior.
-- Para filas/columnas/orden usa view_current. Para un resumen factual usa summarize_current. Para SUM/COUNT/MAX/MIN/AVG/RANK/DIFFERENCE usa derive.
-- Una pregunta como «¿cuál tiene el Valor más alto y cuánto es?» es derive(MAX), field=Valor y label_field=la columna descriptiva; NO la conviertas en view_current+sort.
-- view_filters positivos de la misma columna expresan alternativas OR. Cambiar columnas u orden conserva los filtros actuales: NO emitas reset_filters salvo que el usuario pida explícitamente quitar/restaurar filtros o todas las filas. No inventes columnas que no figuren en ESTADO DE TRABAJO.
+- ESTADO DE TRABAJO contiene tablas que el usuario ya ha visto. Una tabla visible NO se vuelve a consultar en query_ce.
+- Si el usuario dice «enséñame Economía», «volvamos a aquella tabla», filtra, ordena, oculta o recupera columnas: usa view_dataset con el dataset_id de visible_datasets/current_dataset.
+- Recuperar una columna = show_columns. Ocultar = hide_columns. Ordenar = sort. Cambiar columnas u orden CONSERVA filtros: clear_filters solo si el usuario pide quitar todos los filtros.
+- Para un resumen de la tabla visible usa summarize_dataset. Para SUM/COUNT/MAX/MIN/AVG/RANK/DIFFERENCE usa derive_dataset.
+- Una pregunta como «¿cuál tiene el Valor más alto y cuánto es?» = derive_dataset(operation=MAX, field=Valor, label_field=Indicador); NO la conviertas en ordenar + volver a mostrar.
+- filters positivos de la misma columna expresan alternativas OR. No inventes columnas ni vuelvas a abrir event_summary para seleccionar una tabla ya materializada.
+- Si cambia de tema, usa query_ce/person_data para el asunto nuevo sin quedar atrapado en el dataset anterior.
 
 MEMORIA Y REFERENTES:
 - Tras recall_memory(search), abre elementos con result_index=1,2,3... sin pedir IDs al usuario.
 - Si el usuario pide resumir el episodio histórico seleccionado usa recall_memory(summarize).
 - session_ledger representa ESTA conversación actual. Para «qué hemos hecho», «qué queda abierto» o un resumen de la charla, responde DIRECTAMENTE desde session_ledger; NO uses recall_memory ni imprimas pseudo-llamadas.
-- recent_entities son los últimos referentes personales explícitos/resueltos. Si el siguiente turno usa pronombres o elipsis («ellos», «aparecen», «los dos») y no nombra otros sujetos, conserva esos referentes. Si son varias personas y la consulta es factual, puedes emitir una query_ce por persona en la MISMA decisión.
+- recent_entities son los últimos referentes personales explícitos/resueltos. Si el siguiente turno usa pronombres o elipsis («ellos», «aparecen», «los dos») y no nombra otros sujetos, conserva esos referentes. Para una o varias personas usa person_data y pasa TODAS en people; no uses una resolución separada si los nombres ya son explícitos.
 - current_event y current_dataset son contexto recordado, no órdenes: una corrección o cambio de asunto del usuario manda.
 
-QUERY_CE · OPERACIONES Y CONTRATOS:
-${capabilityCatalogTextCompact()}
+QUERY_CE · SOLO FUENTES EMPRESARIALES NUEVAS:
+${capabilityCatalogTextCompact().split('\n').filter(line=>!/(?:view_current|summarize_current|derive)\b/.test(line)).join('\n')}
 
 REGLA DE VERDAD:
 - No inventes cifras, relaciones ni contenido documental. Si una consulta falla o da cero, dilo claramente; no compenses el fallo con otra interpretación inventada.
 - Puedes emitir varias function_call en una sola decisión si la pregunta tiene varias partes.
 ${voice?'MODO ORAL: respuesta breve, natural y sin recitar tablas enteras.':''}`;
 }
+function vnextP22ExpandSpecializedCalls(calls=[],history=[],flowTrace=[]){
+  const out=[],refs=vnextP21LastReferents(history),modeMap={profile:'person_profile',events:'person_events',income_status:'person_income_status',event_status:'person_event_status'};
+  for(const call of arr(calls)){
+    const name=trim(call?.name),a=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{};
+    if(name==='view_dataset'){
+      const args={operation:'view_current'};
+      for(const k of ['dataset_id','table_key','narrate'])if(a[k]!==undefined)args[k]=a[k];
+      if(arr(a.show_columns).length)args.visible_columns=arr(a.show_columns);
+      if(arr(a.hide_columns).length)args.hidden_columns=arr(a.hide_columns);
+      if(arr(a.filters).length)args.view_filters=arr(a.filters);
+      if(arr(a.remove_filters).length)args.remove_view_filters=arr(a.remove_filters);
+      if(a.clear_filters===true)args.reset_filters=true;
+      if(arr(a.sort).length)args.view_sort=arr(a.sort);
+      if(a.reset_view===true)args.reset_table=true;
+      out.push({...call,name:'query_ce',arguments:args});continue;
+    }
+    if(name==='derive_dataset'){
+      const args={operation:'derive',derive_operation:trim(a.operation)};
+      for(const k of ['dataset_id','table_key','field','label_field','top_n','narrate'])if(a[k]!==undefined&&a[k]!==null&&a[k]!=='')args[k]=a[k];
+      out.push({...call,name:'query_ce',arguments:args});continue;
+    }
+    if(name==='summarize_dataset'){
+      const args={operation:'summarize_current',narrate:a.narrate!==false};for(const k of ['dataset_id','table_key','requested_fields'])if(a[k]!==undefined&&a[k]!==null)args[k]=a[k];
+      out.push({...call,name:'query_ce',arguments:args});continue;
+    }
+    if(name==='person_data'){
+      const people=vnextP16MergeUniqueText(arr(a.people).map(trim).filter(Boolean),[]).slice(0,8),wanted=people.length?people:refs,op=modeMap[trim(a.mode)]||'person_profile';
+      for(const person of wanted){const args={operation:op,person,focus_mode:'add',focus_type:'person',focus_entities:[person]};if(trim(a.event))args.event=trim(a.event);if(a.narrate===true)args.narrate=true;out.push({id:`${trim(call?.id)||'p22_people'}_${out.length}`,name:'query_ce',arguments:args});}
+      continue;
+    }
+    if(['query_ce','search_documents','recall_memory'].includes(name))out.push(call);
+  }
+  return out;
+}
+function vnextP22PreserveEquivalentFilters(calls=[],history=[],flowTrace=[]){
+  let repairs=0;return arr(calls).map(call=>{if(trim(call?.name)!=='query_ce'||trim(call?.arguments?.operation)!=='view_current'||!arr(call?.arguments?.view_filters).length)return call;const a={...call.arguments},ws=vnextP125ResolveWorkingSet(history,a,'')||vnextP1222LastWorkingSet(history),prev=arr(ws?.view_state?.filters);if(!prev.length)return call;const incoming=vnextP110NormalizeViewFilters(a.view_filters).map(f=>{const same=prev.find(p=>vnextP17LooseNorm(p.field)===vnextP17LooseNorm(f.field)&&vnextP17LooseNorm(p.value)===vnextP17LooseNorm(f.value));if(same&&same.operator!==f.operator){repairs++;return{...f,operator:same.operator};}return f;});a.view_filters=incoming;return{...call,arguments:a};});
+}
 function vnextP2NormalizeCalls(calls=[],history=[],flowTrace=[],userPrompt=''){
-  let out=vnextP13UniqueCalls(calls).filter(c=>['query_ce','resolve_entity','search_documents','recall_memory'].includes(trim(c?.name)));
+  let out=vnextP22ExpandSpecializedCalls(vnextP13UniqueCalls(calls),history,flowTrace);
   out=vnextP122NormalizeMemoryCalls(out,history,flowTrace);
-  const ws=vnextP1222LastWorkingSet(history),explicitReset=vnextP21ExplicitFilterReset(userPrompt);let repairs=0;
+  const explicitReset=vnextP21ExplicitFilterReset(userPrompt);let repairs=0;
   out=out.map(call=>{if(trim(call?.name)!=='query_ce')return call;const a=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{};
     if(Array.isArray(a.sort)){if(!arr(a.view_sort).length)a.view_sort=a.sort;delete a.sort;repairs++;}
     if(a.reset_filters===true&&a.reset_table!==true&&!explicitReset){delete a.reset_filters;repairs++;}
     return{...call,arguments:a};});
+  out=vnextP22PreserveEquivalentFilters(out,history,flowTrace);
   out=vnextP125NormalizeVisibleDatasetCalls(out,history,userPrompt,flowTrace);
   out=vnextP1222NormalizeCurrentDatasetCalls(out,history,flowTrace);
-  out=out.map(call=>{if(trim(call?.name)!=='query_ce')return call;const a=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{};const op=trim(a.operation);
-    if(ws&&['view_current','summarize_current','derive'].includes(op)){if(!trim(a.dataset_id))a.dataset_id=ws.dataset_id;if(!trim(a.table_key))a.table_key=ws.key;}
-    return{...call,arguments:a};});
-  if(repairs)zuzuTracePush(flowTrace,'VNEXT P2.1 · NORMALIZACIÓN ESTRUCTURAL','OK',`${repairs} reparación(es) estructurales (sort/view_sort o reset no solicitado); sin reinterpretar el dominio.`);
-  return vnextP119ApplyStructuredFocusCalls(vnextP13UniqueCalls(out),flowTrace);
+  if(repairs)zuzuTracePush(flowTrace,'VNEXT P2.2 · NORMALIZACIÓN ESTRUCTURAL','OK',`${repairs} reparación(es) estructurales; no se reinterpreta el dominio.`);
+  return vnextP13UniqueCalls(out);
 }
 function vnextP2NeedsNarration(results=[]){
   for(const x of arr(results).filter(x=>x?.result)){
@@ -18281,10 +18326,12 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
   let screenEventName='';
   if(trim(selectedEventId)){const st=await ensureState();screenEventName=trim(v26EventById(st,selectedEventId)?.titulo);}
   const systemInstruction=vnextP2SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime,screenEventName});
-  zuzuTracePush(flowTrace,'VNEXT P2.1 · ARQUITECTURA','OK','1 decisión Gemini → CE ejecuta literalmente → cierre local; segunda IA solo para narración factual solicitada. Sin retries semánticos, sin Dialogue State Authority y sin relectura lingüística posterior en CE.');
+  zuzuTracePush(flowTrace,'VNEXT P2.2 · ARQUITECTURA','OK','1 decisión Gemini → CE ejecuta literalmente → cierre local; segunda IA solo para narración factual solicitada. Sin retries semánticos, sin Dialogue State Authority y sin relectura lingüística posterior en CE.');
   zuzuTracePush(flowTrace,'VNEXT P2 · WORKSPACE','OK',JSON.stringify(vnextP2Workspace(conversationHistory,screenEventName)||{}).slice(0,900));
-  const d0=Date.now();payload=await v261CallInteraction({input:vnextP2Input(userPrompt,conversationHistory,screenEventName),previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'VNEXT P2.1 · única decisión Gemini',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?360:560,minOutputTokens:160,plainTextResponse:true});calls++;decisionMs=Date.now()-d0;
-  const payloadId=trim(payload?.id),rawCalls=v261FunctionCalls(payload),functionCalls=vnextP2NormalizeCalls(rawCalls,conversationHistory,flowTrace,userPrompt);
+  const d0=Date.now();payload=await v261CallInteraction({input:vnextP2Input(userPrompt,conversationHistory,screenEventName),previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'VNEXT P2.2 · única decisión Gemini',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?360:560,minOutputTokens:160,plainTextResponse:true});calls++;decisionMs=Date.now()-d0;
+  const payloadId=trim(payload?.id),rawCalls=v261FunctionCalls(payload);let functionCalls=vnextP2NormalizeCalls(rawCalls,conversationHistory,flowTrace,userPrompt);
+  if(functionCalls.some(c=>trim(c?.name)==='query_ce'&&!['view_current','summarize_current','derive'].includes(trim(c?.arguments?.operation)))){const stForAnchoring=await ensureState();functionCalls=vnextP119AnchorCanonicalEntities(functionCalls,stForAnchoring,userPrompt,selectedEventId,flowTrace,conversationHistory);}
+  functionCalls=vnextP119ApplyStructuredFocusCalls(vnextP13UniqueCalls(functionCalls),flowTrace);
   if(!functionCalls.length){
     const raw=trim(v261OutputText(payload)),leak=vnextP110LooksLikeInternalCall(raw);if(leak)zuzuTracePush(flowTrace,'VNEXT P2 · PROTOCOL GUARD','WARN','La única decisión imprimió protocolo interno; no se reintenta ni se expone.');
     final={title:'Zuzu',answer:leak?'No he podido convertir esa petición en una acción válida. Dime qué dato quieres y seguimos desde el mismo punto.':(raw||'No he podido cerrar esa respuesta con suficiente claridad.'),warnings:[]};
@@ -18311,21 +18358,21 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
         if(name==='query_ce'&&trim(args.operation)==='event_weather'&&args.chart===true)charts.push(...v73WeatherChartFromResult(result));
         if(name==='query_ce'&&trim(args.operation)==='compare_events'&&args.chart===true)charts.push(...vnextP14ComparisonCharts(result,args));
         if(name==='query_ce'&&trim(args.operation)==='event_scenario'&&args.chart===true)charts.push(...vnextP16ScenarioCharts(result,args));
-        zuzuTracePush(flowTrace,`VNEXT P2.1 · ${name}`,'OK',`${trim(result?.title)||'Resultado'} · operación=${trim(result?._vnext_operation||args?.operation||result?.facts?.action)||'—'} · filas=${arr(result?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}.`);
-      }catch(error){const msg=cleanGeminiError(error);results.push({call,error:msg,args,rawArgs,capabilityAudit,durationMs:Date.now()-toolStarted});zuzuTracePush(flowTrace,`VNEXT P2.1 · ${name}`,'WARN',`${msg}. No hay retry IA; se conserva el estado previo.`);}
+        zuzuTracePush(flowTrace,`VNEXT P2.2 · ${name}`,'OK',`${trim(result?.title)||'Resultado'} · operación=${trim(result?._vnext_operation||args?.operation||result?.facts?.action)||'—'} · filas=${arr(result?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}.`);
+      }catch(error){const msg=cleanGeminiError(error);results.push({call,error:msg,args,rawArgs,capabilityAudit,durationMs:Date.now()-toolStarted});zuzuTracePush(flowTrace,`VNEXT P2.2 · ${name}`,'WARN',`${msg}. No hay retry IA; se conserva el estado previo.`);}
     }
     toolMs=Date.now()-t0;const good=results.filter(x=>x.result),bad=results.filter(x=>x.error),parts=[];
     for(const x of good){const name=trim(x.call?.name);if(name==='query_ce'){const st=await ensureState();parts.push(vnextP19LocalFinal(x.result,x.args,st));}else if(name==='resolve_entity')parts.push(vnextP11ResolveFinal(x.result));else if(name==='search_documents')parts.push(vnextP11DocsFinal(x.result));else parts.push(vnextP11MemoryFinal(x.result,userPrompt,x.args));}
     if(good.length)final={title:parts.length===1?parts[0].title:'Zuzu',answer:[...new Set(parts.map(x=>trim(x.answer)).filter(Boolean))].join('\n\n'),warnings:bad.map(x=>x.error)};
     else final={title:'No he podido cerrar ese dato',answer:`No he podido ejecutar esa consulta con un contrato válido${bad.length?`: ${[...new Set(bad.map(x=>x.error).filter(Boolean))].join(' · ')}`:'.'}`,warnings:bad.map(x=>x.error)};
     if(good.length&&vnextP2NeedsNarration(good)){
-      const n0=Date.now();try{const n=await vnextP2NarrateResults({userPrompt,model,results:good,flowTrace,externalSignal,voiceConversation});calls++;narrationMs=Date.now()-n0;if(trim(n.answer))final={...final,answer:trim(n.answer)};}catch(error){narrationMs=Date.now()-n0;zuzuTracePush(flowTrace,'VNEXT P2.1 · NARRACIÓN OPCIONAL','WARN',`Se conserva el cierre local: ${cleanGeminiError(error)}`);}
+      const n0=Date.now();try{const n=await vnextP2NarrateResults({userPrompt,model,results:good,flowTrace,externalSignal,voiceConversation});calls++;narrationMs=Date.now()-n0;if(trim(n.answer))final={...final,answer:trim(n.answer)};}catch(error){narrationMs=Date.now()-n0;zuzuTracePush(flowTrace,'VNEXT P2.2 · NARRACIÓN OPCIONAL','WARN',`Se conserva el cierre local: ${cleanGeminiError(error)}`);}
     }
   }
   const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),answer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.';const unitGuard=v416VoiceUnitOracle(answer,answer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||answer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true),usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),presentationEvidence=vnextP124PresentationEvidence(finalTables,charts.slice(0,8));
-  zuzuTracePush(flowTrace,'VNEXT P2.1 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo normal=1, máximo arquitectónico=2) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:finalTables,files:[],provider:'zuzu-vnext-p21-one-decision-referents',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P2.1 · gramática de vistas + referentes + ledger de sesión · 1 llamada normal / 2 solo narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.result?.facts?.operation||x?.capabilityAudit?.effectiveOperation||x?.args?.operation),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  zuzuTracePush(flowTrace,'VNEXT P2.2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo normal=1, máximo arquitectónico=2) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:finalTables,files:[],provider:'zuzu-vnext-p22-split-tools-one-decision',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P2.2 · tools separadas para fuente / tabla / derivación / personas · 1 llamada normal / 2 solo narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.result?.facts?.operation||x?.capabilityAudit?.effectiveOperation||x?.args?.operation),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){

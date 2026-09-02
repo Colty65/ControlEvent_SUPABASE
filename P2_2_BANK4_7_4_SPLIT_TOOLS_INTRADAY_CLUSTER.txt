@@ -1,0 +1,25 @@
+ControlEvent v4_0_exp · P2.2 + BANK4.7.4
+
+ZUZU P2.2
+- Se mantiene 1 decisión Gemini normal / 2 solo para narración factual excepcional.
+- Se separa el lenguaje de tools:
+  * query_ce: abrir FUENTES empresariales nuevas.
+  * view_dataset: seleccionar/manipular una tabla ya visible.
+  * derive_dataset: MAX/MIN/SUM/AVG/COUNT/RANK/DIFFERENCE sobre tabla visible.
+  * summarize_dataset: resumir tabla visible.
+  * person_data: una o varias personas en la misma decisión.
+- CE traduce estas tools especializadas a contratos query_ce canónicos, sin una segunda llamada IA.
+- Recuperar columna usa show_columns; ocultar hide_columns; ordenar sort; quitar filtros clear_filters.
+- person_data expande varias personas a varias consultas CE dentro de la misma decisión Gemini.
+- query_ce ya no publica view_current/summarize_current/derive a Gemini en P2.2.
+- La GOLDEN acepta resumen histórico desde el episodio ya abierto (summarize_dataset/summarize_current) como equivalente semántico a recall_memory(summarize).
+- GOLDEN: los KO son checkpoints independientes; no se etiquetan como cascada del primer KO.
+
+BANK4.7.4
+- Mismo motor de interacción en histórico y zoom.
+- El arrastre sigue siendo una frontera tipo Excel.
+- Al tocar un grupo denso, solo se expande localmente el día tocado.
+- Los puntos de ese día usan timestamp real, incluida la hora, y separación mínima visual.
+- Arrastrar hacia la derecha abre el grupo hacia la izquierda; arrastrar hacia la izquierda lo abre hacia la derecha.
+- El resto de la cronología se comprime y el grupo puede ocupar hasta ~72% del ancho disponible.
+- Restaurar gráfica devuelve ambas vistas a su escala normal.

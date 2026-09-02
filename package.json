@@ -79,9 +79,11 @@
     "test:vnext-p125": "node scripts/v4-0-exp-vnext-p125-natural-visible-dataset-dialogue-regression.cjs",
     "test:vnext-p126": "node scripts/v4-0-exp-vnext-p126-natural-compound-dialogue-regression.cjs",
     "test:vnext-p127": "node scripts/v4-0-exp-vnext-p127-natural-visible-content-dialogue-regression.cjs",
-    "test:vnext-p2": "node scripts/v4-0-exp-vnext-p21-grammar-referents-regression.cjs",
+    "test:vnext-p2": "node scripts/v4-0-exp-vnext-p22-split-tools-regression.cjs",
     "test:vnext-p21": "node scripts/v4-0-exp-vnext-p21-grammar-referents-regression.cjs",
-    "test:v4-bank472-balance-resize": "node scripts/v4-0-exp-bank472-balance-resize-regression.cjs"
+    "test:v4-bank472-balance-resize": "node scripts/v4-0-exp-bank472-balance-resize-regression.cjs",
+    "test:vnext-p22": "node scripts/v4-0-exp-vnext-p22-split-tools-regression.cjs",
+    "test:v4-bank474": "node scripts/v4-0-exp-bank474-intraday-cluster-spread-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
