@@ -76,7 +76,8 @@
     "test:vnext-p123": "node scripts/v4-0-exp-vnext-p123-dialogue-state-adaptive-itv-regression.cjs",
     "test:vnext-p124": "node scripts/v4-0-exp-vnext-p124-dialogue-latency-presentation-regression.cjs",
     "test:vnext-p125": "node scripts/v4-0-exp-vnext-p125-natural-visible-dataset-dialogue-regression.cjs",
-    "test:vnext-p126": "node scripts/v4-0-exp-vnext-p126-natural-compound-dialogue-regression.cjs"
+    "test:vnext-p126": "node scripts/v4-0-exp-vnext-p126-natural-compound-dialogue-regression.cjs",
+    "test:vnext-p127": "node scripts/v4-0-exp-vnext-p127-natural-visible-content-dialogue-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

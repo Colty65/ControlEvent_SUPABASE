@@ -1,0 +1,13 @@
+P1.27 · NATURAL VISIBLE CONTENT + ITV BATTERY NAMES
+
+- El nombre de exportación de ITV prioriza la identidad de la batería sobre el bucket técnico de ejecución.
+  DIALOGUE 24 -> dialog-24
+  FULL-CERT normal -> full-cert
+  AI-SMOKE -> ai-smoke
+  FAST -> fast-ce
+  Baterías Excel -> excel-<codigo>
+- La regla se aplica tanto al JSON descargado como al título usado por la impresión/PDF.
+- Las preguntas de contenido sobre una tabla ya filtrada (p.ej. “qué pone exactamente en el resumen”) narran las filas visibles y no se reducen a una comprobación sí/no de presencia.
+- requested_fields='*' significa todas las columnas y no se convierte en un filtro artificial.
+- “tabla completa / empezar de cero / olvida el filtro” restaura columnas reales y limpia filtros heredados.
+- Se preservan los comportamientos funcionales introducidos en P1.25/P1.26.
