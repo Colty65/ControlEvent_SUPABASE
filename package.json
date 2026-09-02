@@ -33,7 +33,7 @@
     "test:bank2": "node scripts/v4-0-exp-bank2-multi-ticket-regression.cjs",
     "test:bank3": "node scripts/v4-0-exp-bank3-history-responsables-regression.cjs",
     "test:v4-bank4": "node scripts/v4-0-exp-bank4-estetica-responsables-regression.cjs",
-    "test:v4-bank471-balance-spread": "node scripts/v4-0-exp-bank471-balance-spread-regression.cjs",
+    "test:v4-bank471-balance-spread": "node scripts/v4-0-exp-bank472-balance-resize-regression.cjs",
     "test:v4-bank41": "node scripts/v4-0-exp-bank41-entertainment-unfinished-regression.cjs",
     "test:v4-bank42": "node scripts/v4-0-exp-bank42-donaciones-situacion-responsables-regression.cjs",
     "test:v4-bank43": "node scripts/v4-0-exp-bank43-donaciones-rural-regression.cjs",
@@ -79,7 +79,9 @@
     "test:vnext-p125": "node scripts/v4-0-exp-vnext-p125-natural-visible-dataset-dialogue-regression.cjs",
     "test:vnext-p126": "node scripts/v4-0-exp-vnext-p126-natural-compound-dialogue-regression.cjs",
     "test:vnext-p127": "node scripts/v4-0-exp-vnext-p127-natural-visible-content-dialogue-regression.cjs",
-    "test:vnext-p2": "node scripts/v4-0-exp-vnext-p2-one-decision-regression.cjs"
+    "test:vnext-p2": "node scripts/v4-0-exp-vnext-p21-grammar-referents-regression.cjs",
+    "test:vnext-p21": "node scripts/v4-0-exp-vnext-p21-grammar-referents-regression.cjs",
+    "test:v4-bank472-balance-resize": "node scripts/v4-0-exp-bank472-balance-resize-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

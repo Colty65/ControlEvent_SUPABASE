@@ -707,9 +707,9 @@
     const span=Math.max(1,max-min);
     return {min:min-span*padding,max:max+span*padding};
   }
-  // BANK4.8 · “pellizco” horizontal persistente. No modifica los datos ni el orden:
-  // únicamente deforma el eje X desde el punto elegido para separar visualmente los
-  // movimientos amontonados. Se conserva durante toda la consulta hasta Restaurar gráfica.
+  // BANK4.8.2 · frontera horizontal redimensionable tipo Excel. No modifica datos ni orden:
+  // el punto donde se pulsa actúa como separador. Al arrastrarlo, un lado se comprime y
+  // el otro se expande proporcionalmente. Se conserva hasta pulsar Restaurar gráfica.
   function balanceSpreadContextKey(){
     return `${text(store.eventId||activeEventId())}|${text(store.accountId||'TODOS')}`;
   }
@@ -726,7 +726,10 @@
   }
   function setBalancePaneSpread(id,value){
     const state=ensureBalanceSpreadState();
-    state.panes[id]=value&&num(value.factor)>1.001?{anchorTime:num(value.anchorTime),factor:Math.max(1,Math.min(12,num(value.factor)))}:null;
+    const anchorTime=num(value?.anchorTime),anchorRatio=num(value?.anchorRatio);
+    state.panes[id]=value&&Number.isFinite(anchorTime)&&Number.isFinite(anchorRatio)
+      ?{anchorTime,anchorRatio:Math.max(.035,Math.min(.965,anchorRatio))}
+      :null;
     return state.panes[id];
   }
   function restoreBalanceChartSpread(event){
@@ -737,39 +740,44 @@
     renderBalanceChart();
   }
   function balanceSpreadX(meta,time,spread){
-    const baseX=meta.left+(time-meta.safeMinTime)/(meta.safeMaxTime-meta.safeMinTime)*meta.plotW;
-    if(!spread||num(spread.factor)<=1.001||!Number.isFinite(num(spread.anchorTime)))return baseX;
-    const anchorTime=Math.max(meta.safeMinTime,Math.min(meta.safeMaxTime,num(spread.anchorTime)));
-    const anchorX=meta.left+(anchorTime-meta.safeMinTime)/(meta.safeMaxTime-meta.safeMinTime)*meta.plotW;
-    if(baseX<=anchorX)return baseX;
-    const endX=meta.left+meta.plotW;
-    const span=Math.max(1,endX-anchorX);
-    const u=Math.max(0,Math.min(1,(baseX-anchorX)/span));
-    // Curva “lupa”: derivative >1 junto al ancla y final fijo. Así la zona
-    // elegida se abre sin crear una gráfica infinita ni perder el extremo derecho.
-    const warped=1-Math.pow(1-u,Math.max(1,num(spread.factor)));
-    return anchorX+warped*span;
+    const min=meta.safeMinTime,max=meta.safeMaxTime,span=Math.max(1,max-min);
+    const baseX=meta.left+(time-min)/span*meta.plotW;
+    if(!spread||!Number.isFinite(num(spread.anchorTime))||!Number.isFinite(num(spread.anchorRatio)))return baseX;
+    const anchorTime=Math.max(min,Math.min(max,num(spread.anchorTime)));
+    const splitRatio=Math.max(.035,Math.min(.965,num(spread.anchorRatio)));
+    const splitX=meta.left+splitRatio*meta.plotW;
+    if(time<=anchorTime){
+      const leftTimeSpan=anchorTime-min;
+      if(leftTimeSpan<=0)return meta.left;
+      const u=Math.max(0,Math.min(1,(time-min)/leftTimeSpan));
+      return meta.left+u*(splitX-meta.left);
+    }
+    const rightTimeSpan=max-anchorTime;
+    if(rightTimeSpan<=0)return meta.left+meta.plotW;
+    const u=Math.max(0,Math.min(1,(time-anchorTime)/rightTimeSpan));
+    return splitX+u*((meta.left+meta.plotW)-splitX);
   }
   function balanceTimeAtSvgX(meta,svgX,spread){
-    let baseX=svgX;
-    if(spread&&num(spread.factor)>1.001&&Number.isFinite(num(spread.anchorTime))){
-      const anchorTime=Math.max(meta.safeMinTime,Math.min(meta.safeMaxTime,num(spread.anchorTime)));
-      const anchorX=meta.left+(anchorTime-meta.safeMinTime)/(meta.safeMaxTime-meta.safeMinTime)*meta.plotW;
-      if(svgX>anchorX){
-        const endX=meta.left+meta.plotW;
-        const span=Math.max(1,endX-anchorX);
-        const g=Math.max(0,Math.min(1,(svgX-anchorX)/span));
-        const u=1-Math.pow(1-g,1/Math.max(1,num(spread.factor)));
-        baseX=anchorX+u*span;
-      }
+    const min=meta.safeMinTime,max=meta.safeMaxTime;
+    const clampedX=Math.max(meta.left,Math.min(meta.left+meta.plotW,svgX));
+    if(!spread||!Number.isFinite(num(spread.anchorTime))||!Number.isFinite(num(spread.anchorRatio))){
+      const ratio=Math.max(0,Math.min(1,(clampedX-meta.left)/Math.max(1,meta.plotW)));
+      return min+ratio*(max-min);
     }
-    const ratio=Math.max(0,Math.min(1,(baseX-meta.left)/Math.max(1,meta.plotW)));
-    return meta.safeMinTime+ratio*(meta.safeMaxTime-meta.safeMinTime);
+    const anchorTime=Math.max(min,Math.min(max,num(spread.anchorTime)));
+    const splitRatio=Math.max(.035,Math.min(.965,num(spread.anchorRatio)));
+    const splitX=meta.left+splitRatio*meta.plotW;
+    if(clampedX<=splitX){
+      const pxSpan=Math.max(.001,splitX-meta.left),u=Math.max(0,Math.min(1,(clampedX-meta.left)/pxSpan));
+      return min+u*(anchorTime-min);
+    }
+    const pxSpan=Math.max(.001,(meta.left+meta.plotW)-splitX),u=Math.max(0,Math.min(1,(clampedX-splitX)/pxSpan));
+    return anchorTime+u*(max-anchorTime);
   }
   function applyBalancePaneSpread(pane,meta,spread){
     const svg=pane?.querySelector('svg');
     if(!svg||!meta)return;
-    const active=spread&&num(spread.factor)>1.001;
+    const active=spread&&Number.isFinite(num(spread.anchorTime))&&Number.isFinite(num(spread.anchorRatio));
     pane.classList.toggle('is-spread',Boolean(active));
     meta.currentSpread=active?spread:null;
     const x=time=>balanceSpreadX(meta,time,meta.currentSpread);
@@ -828,7 +836,7 @@
     }).join('');
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
     const actionBlock=(actionsHtml||statusHtml)?`<div class="ce-bank-balance-pane-actions">${actionsHtml||''}${statusHtml}</div>`:'';
-    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}" title="Arrastra hacia la izquierda desde una zona con muchos movimientos para separarlos"><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" data-ce-bank-balance-line="1" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
+    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}" title="Mantén pulsado y arrastra a izquierda o derecha: mueves esa frontera como al ensanchar una columna en Excel; un lado se comprime y el otro se expande. Restaurar gráfica vuelve al eje normal."><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" data-ce-bank-balance-line="1" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
     const meta={id,width,height,left,right,top,bottom,plotW,plotH,safeMinTime,safeMaxTime,series,y,shadeStart,shadeEnd,pointByMovementId,points:interactivePoints.map(point=>({cx:x(point.time),cy:y(point.balance),point})),currentSpread:null};
     return {html,meta};
   }
@@ -962,9 +970,9 @@
       else if((event.pointerType||'mouse')==='mouse')clearTransient();
     };
     const beginGesture=event=>{
-      const p=svgPoint(event.clientX,event.clientY);
-      const current=balancePaneSpread(meta.id);
-      gesture={startClientX:event.clientX,startClientY:event.clientY,anchorTime:balanceTimeAtSvgX(meta,p.x,current),baseFactor:1,spreading:false};
+      const p=svgPoint(event.clientX,event.clientY),current=balancePaneSpread(meta.id);
+      const startRatio=Math.max(.035,Math.min(.965,(p.x-meta.left)/Math.max(1,meta.plotW)));
+      gesture={startClientX:event.clientX,startClientY:event.clientY,anchorTime:balanceTimeAtSvgX(meta,p.x,current),startRatio,spreading:false};
       activePointerId=event.pointerId;
       try{svg.setPointerCapture(event.pointerId);}catch(_){}
       if(event.pointerType==='touch'||event.pointerType==='pen'){if(event.cancelable)event.preventDefault();}
@@ -973,13 +981,14 @@
     const moveGesture=event=>{
       if(activePointerId==null||event.pointerId!==activePointerId)return false;
       const dx=event.clientX-gesture.startClientX,dy=event.clientY-gesture.startClientY;
-      if(!gesture.spreading&&dx<-28&&Math.abs(dx)>Math.abs(dy)*1.15){
+      if(!gesture.spreading&&Math.abs(dx)>18&&Math.abs(dx)>Math.abs(dy)*1.05){
         gesture.spreading=true;clearTransient();pane.classList.add('is-spreading');
       }
       if(!gesture.spreading)return false;
       if(event.cancelable)event.preventDefault();
-      const factor=Math.max(1,Math.min(12,1+(-dx)/72));
-      const spread=setBalancePaneSpread(meta.id,{anchorTime:gesture.anchorTime,factor});
+      const rect=svg.getBoundingClientRect(),dxSvg=dx/Math.max(1,rect.width)*meta.width;
+      const targetRatio=Math.max(.035,Math.min(.965,gesture.startRatio+dxSvg/Math.max(1,meta.plotW)));
+      const spread=setBalancePaneSpread(meta.id,{anchorTime:gesture.anchorTime,anchorRatio:targetRatio});
       applyBalancePaneSpread(pane,meta,spread);
       return true;
     };

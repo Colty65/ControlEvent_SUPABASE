@@ -1,0 +1,12 @@
+ControlEvent v4_0_exp · VNext P2.1
+
+- P2 se mantiene: 1 decisión Gemini normal; 2ª llamada solo para narración factual real.
+- Filtros positivos sobre una misma columna son OR.
+- Cambiar columnas/orden no resetea filtros salvo petición explícita.
+- Alias estructural sort -> view_sort, sin reinterpretar lenguaje.
+- Gramática derive reforzada para MAX/MIN/RANK/SUM/AVG/COUNT.
+- Referentes personales recientes (current_entities / recent_entities).
+- Ledger compacto de la conversación actual separado de memoria histórica.
+- recall_memory ya no publica action=current a Gemini.
+- GOLDEN DIÁLOGO 14 valida efectos semánticos (filas, columnas, orden, referentes, protocolo), no solo tool.
+- GOLDEN usa indicadores reales de Economía SySA 2026: Ingresos OR Compras realizadas.
