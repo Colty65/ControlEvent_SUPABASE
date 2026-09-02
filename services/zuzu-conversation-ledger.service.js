@@ -476,8 +476,10 @@ export async function searchZuzuHistoryCandidates({actor={},prompt='',conversati
   // una búsqueda temática: ordena episodios sustanciales persistentes por su fecha real.
   // Así «nuestra primera conversación» no queda secuestrada por los 8 recuerdos más recientes.
   if(ordinalIntent){
-    const ordered=memoryOrdinalConversationItems(pool,conversationId,ordinalIntent),max=Math.max(Math.max(1,Math.min(12,Number(limit)||8)),Number(ordinalIntent.index)||1),out=[];
-    for(const x of ordered.slice(0,max)){const episode=await memoryEpisodeMeta(x.conversationId);out.push({...x,score:10-(out.length*0.01),episode});}
+    const ordered=memoryOrdinalConversationItems(pool,conversationId,ordinalIntent),max=Math.max(Math.max(1,Math.min(12,Number(limit)||8)),Number(ordinalIntent.index)||1),picked=ordered.slice(0,max);
+    // P1.24 · LATENCIA MEMORIA: los metadatos de episodios independientes se leen en paralelo.
+    // Antes se esperaban uno a uno y 8 candidatos podían sumar varios segundos de BBDD.
+    const out=await Promise.all(picked.map(async(x,i)=>({...x,score:10-(i*0.01),episode:await memoryEpisodeMeta(x.conversationId)})));
     return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,semantic_tags:x.semanticTags||{},row_count:x.rowCount,summary:x.summary,memory_quality:Number(x.memoryQuality)||0,memory_kind:trim(x.memoryKind),memory_visibility:trim(x.memoryVisibility)||'private',memory_source:'db',experience_signature:x.experienceSignature||{},plan_signature:x.planSignature||{},episode_summary:trim(x.episode?.conversation_summary),episode_started_at:trim(x.episode?.started_at),episode_updated_at:trim(x.episode?.updated_at),episode_topics:arr(x.episode?.main_topics),score:Number(x.score.toFixed(3)),ordinal_rank:i+1,ordinal_order:ordinalIntent.order,ordinal_label:ordinalIntent.label,time_window:window?{start:window.start,end:window.end,label:window.label}:null,conversation_status:trim(x.conversationStatus||x.episode?.conversation_status)||'active',unfinished_hint:unfinishedHint,same_conversation:false}));
   }
   // «La conversación que dejamos a medias» es una pista de estado, no una palabra temática.
@@ -488,7 +490,9 @@ export async function searchZuzuHistoryCandidates({actor={},prompt='',conversati
   if(explicit&&window)scored=scored.map(x=>({...x,score:Math.max(x.score,0.28+Math.min(0.3,(Number(x.memoryQuality)||2)*0.08))+(broadRecent?Math.max(0,0.95-daysAgo(x.createdAt,nowIso)*0.11):0)}));
   if(explicit&&!scored.some(x=>x.score>0)&&!window)scored=items.slice(0,120).map(x=>({...x,score:0.15+Math.min(0.2,(Number(x.memoryQuality)||2)*0.05)}));
   scored=scored.filter(x=>x.score>0).sort((a,b)=>compareMemoryCandidates(a,b,broadRecent||topicTerms.length===0));
-  const out=[],seen=new Set();for(const x of scored){const k=trim(x.conversationId)||x.turnId;if(seen.has(k))continue;seen.add(k);const episode=await memoryEpisodeMeta(x.conversationId);out.push({...x,episode});if(out.length>=Math.max(1,Math.min(12,Number(limit)||8)))break;}
+  const picked=[],seen=new Set(),wanted=Math.max(1,Math.min(12,Number(limit)||8));for(const x of scored){const k=trim(x.conversationId)||x.turnId;if(seen.has(k))continue;seen.add(k);picked.push(x);if(picked.length>=wanted)break;}
+  // P1.24 · LATENCIA MEMORIA: enriquecimiento de candidatos en paralelo; ranking/semántica no cambian.
+  const out=await Promise.all(picked.map(async x=>({...x,episode:await memoryEpisodeMeta(x.conversationId)})));
   return out.map((x,i)=>({ref:`H${i+1}`,conversation_id:x.conversationId,turn_id:x.turnId,seq:x.seq,created_at:x.createdAt,prompt:x.userPrompt,title:x.title,domain:x.domain,scope:x.scope,focus:x.focus,semantic_tags:x.semanticTags||{},row_count:x.rowCount,summary:x.summary,memory_quality:Number(x.memoryQuality)||0,memory_kind:trim(x.memoryKind),memory_visibility:trim(x.memoryVisibility)||'private',memory_source:'db',experience_signature:x.experienceSignature||{},plan_signature:x.planSignature||{},episode_summary:trim(x.episode?.conversation_summary),episode_started_at:trim(x.episode?.started_at),episode_updated_at:trim(x.episode?.updated_at),episode_topics:arr(x.episode?.main_topics),score:Number(x.score.toFixed(3)),time_window:window?{start:window.start,end:window.end,label:window.label}:null,conversation_status:trim(x.conversationStatus||x.episode?.conversation_status)||'active',unfinished_hint:unfinishedHint,same_conversation:trim(x.conversationId)===trim(conversationId)}));
 }
 function planSimilarityScore(plan={},item={}){

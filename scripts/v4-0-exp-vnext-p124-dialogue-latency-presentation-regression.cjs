@@ -1,0 +1,25 @@
+const fs=require('fs'),path=require('path');
+const root=path.resolve(__dirname,'..');
+const ai=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const ledger=fs.readFileSync(path.join(root,'services/zuzu-conversation-ledger.service.js'),'utf8');
+const lab=fs.readFileSync(path.join(root,'services/zuzu-test-lab.service.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'public/app/features/zuzu-test-console-gd.js'),'utf8');
+const html=fs.readFileSync(path.join(root,'public/index.html'),'utf8');
+let ok=0,bad=0;function t(n,c,d=''){if(c){ok++;console.log('OK ',n);}else{bad++;console.error('KO ',n,d);}}
+t('provider P1.24',ai.includes('zuzu-vnext-p124-dialogue-latency-presentation-aware'));
+t('presentación estructurada sale del runtime',ai.includes('function vnextP124PresentationEvidence')&&ai.includes('presentationEvidence'));
+t('duración individual de tools',ai.includes('const toolStarted=Date.now()')&&ai.includes('durationMs:Date.now()-toolStarted'));
+t('simulador ve presentación real',ai.includes('PRESENTACIÓN REAL')&&ai.includes('Presentación materializada:'));
+t('simulador no confunde tabla zero-copy con promesa',ai.includes('NO marques empty_promise')&&ai.includes('texto + tablas/gráficas materializadas + tools'));
+t('simulador compactado',ai.includes('maxOutputTokens:220')&&ai.includes('minOutputTokens:64')&&ai.includes("stage:'ITV P1.24"));
+t('ITV separa Zuzu/simulador/wall',lab.includes('dialogueRuntime={zuzuMs')&&lab.includes('simulatorMs')&&lab.includes('wallMs'));
+t('ITV conserva usage separados',lab.includes('r.zuzuUsage')&&lab.includes('r.simulatorUsage'));
+t('normalizador usa evidencia materializada',lab.includes('p124NormalizeDialogueAssessment')&&lab.includes('p124PresentationEvidence'));
+t('búsqueda memoria paraleliza metadatos',ledger.includes('LATENCIA MEMORIA')&&ledger.includes('Promise.all(picked.map'));
+t('UI resume latencia real Zuzu',ui.includes('LATENCIA REAL ZUZU')&&ui.includes('simulatorMedianMs')&&ui.includes('wallMedianMs'));
+t('fila UI muestra tres relojes',ui.includes('Zuzu ${fmtN(r.dialogueRuntime.zuzuMs)} ms')&&ui.includes('Lab ${fmtN(r.dialogueRuntime.wallMs'));
+t('JSON LIGHT P1.24 lleva runtime/presentation',ui.includes("reportFormat:'LIGHT-P124'")&&ui.includes('dialogueRuntime:r.dialogueRuntime')&&ui.includes('presentationEvidence:r.presentationEvidence'));
+t('cache bust P1.24',html.includes('20260902-VNEXT-P124-DIALOGUE-LATENCY-PRESENTATION-AWARE-MEMORY-PARALLEL-NHC'));
+const chunk=ai.slice(ai.indexOf('function vnextP124PresentationEvidence'),ai.indexOf('async function runZuzuV62NativeToolAgent'));
+t('NHC P1.24 sin entidades del caso',!/CIEN CLASICOS|Semana Santa 2026|Javier \(Uba\)|550 euros/i.test(chunk));
+console.log(`P1.24 DIALOGUE LATENCY + PRESENTATION AWARE: ${ok} OK · ${bad} KO`);process.exitCode=bad?1:0;

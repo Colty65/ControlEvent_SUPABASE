@@ -73,7 +73,8 @@
     "test:vnext-p1221": "node scripts/v4-0-exp-vnext-p1221-entity-query-current-view-summary-regression.cjs",
     "test:vnext-p1222": "node scripts/v4-0-exp-vnext-p1222-current-dataset-state-regression.cjs",
     "test:vnext-p1223": "node scripts/v4-0-exp-vnext-p1223-canonical-columns-summary-sources-regression.cjs",
-    "test:vnext-p123": "node scripts/v4-0-exp-vnext-p123-dialogue-state-adaptive-itv-regression.cjs"
+    "test:vnext-p123": "node scripts/v4-0-exp-vnext-p123-dialogue-state-adaptive-itv-regression.cjs",
+    "test:vnext-p124": "node scripts/v4-0-exp-vnext-p124-dialogue-latency-presentation-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

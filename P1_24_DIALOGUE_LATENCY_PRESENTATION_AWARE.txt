@@ -1,0 +1,18 @@
+ControlEvent v4_0_exp · VNext P1.24
+
+Objetivo
+- Separar latencia real de Zuzu de la latencia del usuario sintético ITV.
+- Evitar falsos KO cuando Zuzu materializa una tabla zero-copy pero el texto no recita sus filas.
+- Medir duración de cada tool y reducir la latencia real de búsqueda histórica paralelizando metadatos de episodios.
+
+Cambios
+1. dialogueRuntime: zuzuMs / simulatorMs / wallMs + decisionModelMs / dataMs.
+2. JSON LIGHT conserva presentación materializada y usage separado Zuzu/simulador.
+3. ITV sintética recibe evidencia de tablas/gráficas/columnas/filas y tools realmente ejecutadas.
+4. empty_promise no puede declararse si hubo ejecución o artefacto; un contenido incorrecto sigue siendo incoherencia.
+5. memoryEpisodeMeta de candidatos se resuelve en paralelo (máx. 12), sin cambiar ranking ni resultados.
+6. UI muestra ZUZU, SIM y LAB por separado. El semáforo de rendimiento sigue basado en meta.performance de Zuzu.
+
+NHC
+No se añaden frases, personas, eventos ni preguntas de la batería al runtime.
+No cambia el Registro Canónico ni requiere SQL.

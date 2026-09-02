@@ -18133,6 +18133,10 @@ function vnextP13ContextFromResults(results=[],final={}){
 }
 
 async function vnextP13NarrateToolResult({userPrompt,payloadId,model,systemInstruction,call,result,flowTrace,externalSignal,voiceConversation=false}={}){const compact=vnextCompactResult(result),input=[{type:'function_result',name:trim(call?.name),call_id:trim(call?.id),result:compact}];const payload=await v261CallInteraction({input,previousInteractionId:payloadId,model,systemInstruction,tools:[],flowTrace,stage:'VNEXT P1.9 · narración excepcional',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?520:900,minOutputTokens:128,plainTextResponse:true});const raw=trim(v261OutputText(payload));return{payload,answer:raw};}
+function vnextP124PresentationEvidence(tables=[],charts=[]){
+  const ts=arr(tables).filter(Boolean).slice(0,8).map(t=>{const rows=arr(t?.rows),columns=arr(t?.columns).length?arr(t.columns).map(trim).filter(Boolean):Object.keys(rows[0]||{}).map(trim).filter(Boolean);return{key:trim(t?.key),title:trim(t?.title),rowCount:rows.length,columns:columns.slice(0,20)};});
+  return{tableCount:ts.length,tables:ts,chartCount:arr(charts).filter(Boolean).length,materialized:ts.length>0||arr(charts).filter(Boolean).length>0};
+}
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP11Tools(),systemInstruction=vnextP12SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime});
   let currentPrev=trim(previousInteractionId),payload,calls=0,modelMs=0,toolMs=0,stateWaitMs=0,narrationMs=0,hadTools=false,final={title:'Zuzu',answer:'',warnings:[]},tables=[],charts=[],results=[],state=null;
@@ -18181,7 +18185,7 @@ async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flo
   }else{
     const ts=Date.now();
     for(const call of functionCalls){
-      let rawArgs=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{},capabilityAudit=null,args={...rawArgs};
+      const toolStarted=Date.now();let rawArgs=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{},capabilityAudit=null,args={...rawArgs};
       try{
         let result,name=trim(call?.name);
         if(name==='query_ce'){
@@ -18198,12 +18202,12 @@ async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flo
         else if(name==='recall_memory')result=await vnextRecallMemory(call,actor,conversationId,clientLocalDateTime||clientNowIso,conversationHistory);
         else if(name==='dialogue_state')result=vnextP123DialogueToolResult(call,conversationHistory);
         else throw new Error(`Contrato VNext desconocido: ${name}.`);
-        results.push({call,result,args,rawArgs,capabilityAudit});tables.push(...vnextP12LocalPresentation(result));
+        results.push({call,result,args,rawArgs,capabilityAudit,durationMs:Date.now()-toolStarted});tables.push(...vnextP12LocalPresentation(result));
         if(name==='query_ce'&&trim(args?.operation)==='event_weather'&&args?.chart===true)charts.push(...v73WeatherChartFromResult(result));
         if(name==='query_ce'&&trim(args?.operation)==='compare_events'&&args?.chart===true)charts.push(...vnextP14ComparisonCharts(result,args));
         if(name==='query_ce'&&trim(args?.operation)==='event_scenario'&&args?.chart===true)charts.push(...vnextP16ScenarioCharts(result,args));
         zuzuTracePush(flowTrace,`VNEXT P1.9 · ${name}`,'OK',`${trim(result?.title)||'Resultado'} · operación=${trim(result?._vnext_operation||args?.operation||result?.facts?.action)||'—'} · filas=${arr(result?.tables).reduce((n,t)=>n+arr(t?.rows).length,0)}.`);
-      }catch(error){let recovered=null;if(trim(call?.name)==='recall_memory'&&trim(args?.action)==='read'){try{recovered=await vnextRecallMemory(call,actor,conversationId,clientLocalDateTime||clientNowIso,conversationHistory);zuzuTracePush(flowTrace,'VNEXT P1.22.2 · MEMORY READ RETRY','OK','La primera lectura del episodio falló; el mismo identificador estructurado se reintentó una sola vez y respondió.');}catch(_){} }if(recovered){results.push({call,result:recovered,args,rawArgs,capabilityAudit});tables.push(...vnextP12LocalPresentation(recovered));}else{const msg=cleanGeminiError(error);results.push({call,error:msg,args,rawArgs,capabilityAudit});zuzuTracePush(flowTrace,`VNEXT P1.5 · ${trim(call?.name)}`,'WARN',msg);}}
+      }catch(error){let recovered=null;if(trim(call?.name)==='recall_memory'&&trim(args?.action)==='read'){try{recovered=await vnextRecallMemory(call,actor,conversationId,clientLocalDateTime||clientNowIso,conversationHistory);zuzuTracePush(flowTrace,'VNEXT P1.22.2 · MEMORY READ RETRY','OK','La primera lectura del episodio falló; el mismo identificador estructurado se reintentó una sola vez y respondió.');}catch(_){} }if(recovered){results.push({call,result:recovered,args,rawArgs,capabilityAudit,durationMs:Date.now()-toolStarted});tables.push(...vnextP12LocalPresentation(recovered));}else{const msg=cleanGeminiError(error);results.push({call,error:msg,args,rawArgs,capabilityAudit,durationMs:Date.now()-toolStarted});zuzuTracePush(flowTrace,`VNEXT P1.5 · ${trim(call?.name)}`,'WARN',msg);}}
     }
     toolMs=Date.now()-ts;const good=results.filter(x=>x.result),bad=results.filter(x=>x.error);
     if(good.length){
@@ -18221,7 +18225,9 @@ async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flo
   zuzuTracePush(flowTrace,'VNEXT P1.10 · REGISTRO ORAL','OK',`nivel=${socialRegister} · tease=${socialDecision?.tease===true?'sí':'no'} · pantalla=factual · voz=${socialSpeech?'social':'directa'}.`);
   const nextInteractionId=hadTools?'':(payloadId||currentPrev),resetInteractionId=hadTools,resultContext=vnextP1222ContextFromResults(results,final,conversationHistory,userPrompt);
   zuzuTracePush(flowTrace,'VNEXT P1.10 · LATENCIA','OK',`total=${totalMs} ms · IA=${modelMs} ms · espera estado tras IA=${stateWaitMs} ms · datos=${toolMs} ms · narración excepcional=${narrationMs} ms · llamadas IA=${calls} · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace);return{ok:true,rejected:false,title:trim(final.title)||'Zuzu VNext',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:persistentTables.filter(Boolean).slice(0,8),files:[],provider:'zuzu-vnext-p123-dialogue-state-authority-adaptive-itv-jsonlight',model,interactionId:nextInteractionId,conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P1.23 · Dialogue State Authority · pending_intent · active_object · NO EMPTY PROMISE retry · canonical workspace/artifact · adaptive conversational ITV · PDF conversation snapshot guard · NHC · parallel factual close',experimental:true,voiceConversation:!!voiceConversation,interactionId:nextInteractionId,resetInteractionId,spokenAnswer,resultContext,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.result?.facts?.operation||x?.capabilityAudit?.effectiveOperation||x?.args?.operation),effectiveSubject:{event:trim(x?.result?.facts?.event||x?.args?.event),person:trim(x?.result?.facts?.person||x?.args?.person)},audit:x?.capabilityAudit||null,envelope:x?.capabilityAudit?.envelope||null,error:trim(x?.error)})),tools:[...new Set(results.map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:modelMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),presentationEvidence=vnextP124PresentationEvidence(finalTables,charts.slice(0,8));
+  zuzuTracePush(flowTrace,'VNEXT P1.24 · PRESENTACIÓN MATERIALIZADA','OK',`tablas=${presentationEvidence.tableCount} · gráficas=${presentationEvidence.chartCount} · filas=${presentationEvidence.tables.reduce((n,t)=>n+num(t.rowCount),0)}.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu VNext',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:finalTables,files:[],provider:'zuzu-vnext-p124-dialogue-latency-presentation-aware',model,interactionId:nextInteractionId,conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_0_exp',architecture:'VNext P1.24 · P1.23 Dialogue State Authority + presentación materializada visible para ITV + latencia Zuzu/simulador separada + memoria histórica paralela · NHC',experimental:true,voiceConversation:!!voiceConversation,interactionId:nextInteractionId,resetInteractionId,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.result?.facts?.operation||x?.capabilityAudit?.effectiveOperation||x?.args?.operation),effectiveSubject:{event:trim(x?.result?.facts?.event||x?.args?.event),person:trim(x?.result?.facts?.person||x?.args?.person)},durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,envelope:x?.capabilityAudit?.envelope||null,error:trim(x?.error)})),tools:[...new Set(results.map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:modelMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP11Agent({userPrompt,state,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
@@ -18271,26 +18277,34 @@ export async function runZuzuVNextUserTurn(input={}){
 }
 
 export async function generateZuzuItvDialogueUserTurn({mission='',conversationHistory=[],turnNumber=1,seed='',externalSignal=null}={}){
-  const flowTrace=[],model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),hist=arr(conversationHistory).slice(-24),last=hist[hist.length-1]||{},state=vnextP123DialogueState(hist),transcript=hist.slice(-12).map((h,i)=>`T${Math.max(1,turnNumber-hist.slice(-12).length+i)} Usuario: ${trim(h?.user)}
-Zuzu: ${trim(h?.assistant)}`).join('\n\n');
-  const input=`Eres el USUARIO SINTÉTICO de una ITV conversacional de Zuzu. No eres Zuzu. Mantén una conversación real e imprevisible, pero coherente, siguiendo el foco al que haya llegado la charla. No recites un guion ni una lista de preguntas. Cada turno debe nacer de lo que Zuzu acaba de contestar y de lo que sigue pendiente. Puedes corregir, bromear, abreviar, cometer alguna errata, pedir una continuación, manipular una tabla, volver a algo anterior o cambiar deliberadamente de foco cuando sea natural.
+  const flowTrace=[],model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),hist=arr(conversationHistory).slice(-18),last=hist[hist.length-1]||{},state=vnextP123DialogueState(hist);
+  const presentLine=h=>{const p=h?.presentationEvidence||{},tabs=arr(p?.tables);if(!num(p?.tableCount)&&!num(p?.chartCount))return'Presentación materializada: ninguna.';const tt=tabs.slice(0,3).map(t=>`${trim(t?.title||t?.key)||'tabla'} [${num(t?.rowCount)} filas; ${arr(t?.columns).slice(0,8).map(trim).filter(Boolean).join(', ')||'columnas no detalladas'}]`).join(' | ');return`Presentación materializada: ${num(p?.tableCount)} tabla(s)${tt?` → ${tt}`:''}${num(p?.chartCount)?` · ${num(p.chartCount)} gráfica(s)`:''}.`;};
+  const recent=hist.slice(-8),transcript=recent.map((h,i)=>`T${Math.max(1,turnNumber-recent.length+i)} Usuario: ${trim(h?.user)}\nZuzu: ${trim(h?.assistant)}\n${presentLine(h)}\nTools ejecutadas: ${arr(h?.tools).map(trim).filter(Boolean).join(', ')||'ninguna'}.`).join('\n\n');
+  const input=`Eres el USUARIO SINTÉTICO de una ITV conversacional de Zuzu. No eres Zuzu. Continúa una conversación real e imprevisible siguiendo lo que acaba de ocurrir, no un guion. Puedes seguir, corregir, aclarar, bromear, manipular el objeto activo, volver atrás o cambiar de foco cuando sea natural.
 
-MISIÓN GENERAL (no es un guion):
-${mission}
+MISIÓN GENERAL:
+${trim(mission).slice(0,1800)}
 
 ESTADO ESTRUCTURADO ACTUAL:
 ${JSON.stringify(state)}
 
-TRANSCRIPT RECIENTE:
+TRANSCRIPT RECIENTE (incluye la PRESENTACIÓN REAL que el usuario habría visto):
 ${transcript||'(inicio)'}
 
-ÚLTIMA RESPUESTA DE ZUZU:
+ÚLTIMA RESPUESTA:
 ${trim(last?.assistant)||'(ninguna)'}
+${presentLine(last)}
 
-Devuelve SOLO JSON con esta forma:
-{"utterance":"mensaje del usuario de este turno","move":"follow_current|clarify|correct|change_focus|casual|return_previous|table_action|memory_action","requires_tool":true|false,"change_focus":true|false,"target":"descripción breve del objeto/foco que intentas seguir","assessment":{"previous_coherent":true|false,"focus_preserved":true|false,"empty_promise":true|false,"note":"máximo 180 caracteres"}}
-Si es el primer turno, inicia la misión de forma natural. Si Zuzu acaba de fallar o pedir algo innecesario, reacciona como un usuario real y trata de seguir, no reinicies la conversación. Semilla de variedad: ${trim(seed)||'—'}.`;
-  const started=Date.now(),payload=await v261CallInteraction({input,previousInteractionId:'',model,systemInstruction:'Eres un simulador de usuario para pruebas de conversación. Genera el siguiente mensaje adaptándote al diálogo real y devuelve únicamente el JSON solicitado.',tools:[],flowTrace,stage:'ITV P1.23 · usuario sintético adaptativo',externalSignal,maxCalls:1,maxOutputTokens:320,minOutputTokens:100,plainTextResponse:true});
+REGLAS DE EVALUACIÓN:
+- Juzga lo que el usuario REAL habría visto: texto + tablas/gráficas materializadas + tools, no solo la frase de Zuzu.
+- Si hay una tabla materializada, NO marques empty_promise solo porque el texto diga «te dejo la tabla» sin recitar sus filas. Si la tabla es incorrecta, marca previous_coherent=false y explica el contenido que falla.
+- empty_promise=true solo cuando Zuzu anuncia una acción y no existe ejecución ni artefacto que la materialice.
+- No reinicies la conversación para facilitar la prueba; sigue el foco actual o corrígelo como una persona.
+
+Devuelve SOLO JSON:
+{"utterance":"siguiente mensaje","move":"follow_current|clarify|correct|change_focus|casual|return_previous|table_action|memory_action","requires_tool":true|false,"change_focus":true|false,"target":"objeto/foco breve","assessment":{"previous_coherent":true|false,"focus_preserved":true|false,"empty_promise":true|false,"note":"máximo 180 caracteres"}}
+Semilla: ${trim(seed)||'—'}.`;
+  const started=Date.now(),payload=await v261CallInteraction({input,previousInteractionId:'',model,systemInstruction:'Simula un usuario humano para una prueba de continuidad. Evalúa también los artefactos estructurados materializados. Devuelve solo el JSON solicitado.',tools:[],flowTrace,stage:'ITV P1.24 · usuario sintético adaptativo · presentation-aware',externalSignal,maxCalls:1,maxOutputTokens:220,minOutputTokens:64,plainTextResponse:true});
   let parsed={};try{parsed=parsePlanJsonLenientHf37(trim(v261OutputText(payload))).parsed||{};}catch(_){parsed={};}
   const utterance=trim(parsed?.utterance)||trim(v261OutputText(payload)).replace(/^```(?:json)?|```$/g,'').trim();
   return{utterance:utterance.slice(0,900),move:trim(parsed?.move)||'follow_current',requiresTool:parsed?.requires_tool===true,changeFocus:parsed?.change_focus===true,target:trim(parsed?.target).slice(0,220),assessment:parsed?.assessment&&typeof parsed.assessment==='object'?parsed.assessment:{},model,durationMs:Date.now()-started,usage:summarizeGeminiUsageFromTrace(flowTrace)};

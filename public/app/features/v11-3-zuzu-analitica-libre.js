@@ -457,7 +457,7 @@
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
   function isZuzuVNextMode(){ try{return sessionStorage.getItem(zuzuVNextKey())==='1';}catch(_){return false;} }
-  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.23</span><span class="ce-ai-mode-help">Dialogue State Authority: foco/objeto activo y pending_intent persistentes; tablas con filas/columnas reversibles; NO EMPTY PROMISE; memoria y PDF conversacional protegidos. NHC.</span>';}}
+  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.24</span><span class="ce-ai-mode-help">Dialogue State Authority + instrumentación de latencia real Zuzu/simulador, presentación materializada visible para ITV y búsqueda histórica paralelizada. NHC.</span>';}}
   function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} var on=!isZuzuVNextMode(); try{sessionStorage.setItem(zuzuVNextKey(),on?'1':'0');}catch(_){} saveZuzuInteractionId(''); renderZuzuVNextMode(); setStatus(on?'VNext experimental activado.':'BANK4_27 activo.',''); }
 
   function openModal(){
