@@ -2,7 +2,6 @@
    Registro + canonizador estructural de capacidades query_ce.
    NHC: describe/normaliza JSON y semántica de contratos; nunca interpreta frases del usuario. */
 import crypto from 'node:crypto';
-import { getSupabaseAdmin } from '../lib/supabase.js';
 
 const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
@@ -341,5 +340,5 @@ export function auditCapabilityCall(rawArgs={}){
 
 export function queueCapabilityObservation(observation={}){
   const payload={registry_version:CAPABILITY_REGISTRY_VERSION,operation:trim(observation.operation),module:trim(observation.module),signature:trim(observation.signature),signature_hash:trim(observation.signatureHash),status:trim(observation.status)||'PENDING',classification:trim(observation.classification),prompt:trim(observation.prompt).slice(0,3000),raw_args:observation.rawArgs||{},sanitized_args:observation.sanitizedArgs||{},envelope:observation.envelope||capabilityEnvelopeFromArgs(observation.sanitizedArgs||{}),issues:arr(observation.issues),repairs:arr(observation.repairs),scenario:trim(observation.scenario),observed_at:new Date().toISOString()};
-  Promise.resolve().then(async()=>{try{const db=getSupabaseAdmin();if(!db)return;const {error}=await db.from('ce_zuzu_capability_observations').insert(payload);if(error&&!/does not exist|schema cache|relation .* does not exist/i.test(text(error?.message)))console.warn('[P1.20 CAPABILITY OBS]',error.message||error);}catch(_){}});
+  Promise.resolve().then(async()=>{try{const { getSupabaseAdmin }=await import('../lib/supabase.js');const db=getSupabaseAdmin();if(!db)return;const {error}=await db.from('ce_zuzu_capability_observations').insert(payload);if(error&&!/does not exist|schema cache|relation .* does not exist/i.test(text(error?.message)))console.warn('[P1.20 CAPABILITY OBS]',error.message||error);}catch(_){}});
 }
