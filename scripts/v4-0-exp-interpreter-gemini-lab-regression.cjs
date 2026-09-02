@@ -4,7 +4,7 @@ let ok=0,ko=0;function t(name,pass){if(pass){ok++;console.log('OK',name);}else{k
 (async()=>{
   const service=read('services/zuzu-interpreter-lab.service.js'),routes=read('routes/zuzu-tests.routes.js'),ui=read('public/app/features/zuzu-interpreter-lab-gd.js'),consoleJs=read('public/app/features/zuzu-test-console-gd.js'),index=read('public/index.html'),eventAi=read('services/event-ai.service.js'),bank=read('public/app/features/v24-cuadre-banco.js'),pkg=JSON.parse(read('package.json'));
   const mod=await import(pathToFileURL(path.join(root,'services/zuzu-interpreter-lab.service.js')).href+'?t='+Date.now()),h=mod.__interpreterLabForRegression();
-  t('V2 conceptual aislado',/INTÉRPRETE GEMINI V2/.test(service)&&/TRADUCTOR determinista/.test(service));
+  t('V2.1 conceptual aislado',/INTÉRPRETE GEMINI V2\.1/.test(service)&&/TRADUCTOR determinista/.test(service));
   t('30 escenarios',h.BASE_CASES.length===30);
   t('8 tipos conceptuales',/DATA\|TABLE\|CALCULATE\|MEMORY\|PERSON\|CHAT\|CLARIFY\|UNSUPPORTED/.test(service));
   t('sin function calling',!/tool_choice/.test(service)&&!/functionDeclarations/.test(service)&&/responseMimeType:'application\/json'/.test(service));
@@ -16,7 +16,8 @@ let ok=0,ko=0;function t(name,pass){if(pass){ok++;console.log('OK',name);}else{k
   t('traductor conceptual CE',/function translateConcept/.test(service)&&/translatorAudit/.test(service));
   t('Gemini no escribe view_sort contractual',/No construyas visible_columns\/view_sort/.test(service));
   t('Gemini no escribe view_filters contractual',/No construyas view_filters/.test(service));
-  t('métrica estabilidad 3 de 3',/stable3of3/.test(service)&&/stability3of3Pct/.test(service));
+  t('métrica estabilidad intención 3 de 3',/stable3of3/.test(service)&&/stability3of3Pct/.test(service));
+  t('métrica estabilidad CE 3 de 3',/stableCE/.test(service)&&/stabilityCEPct/.test(service)&&/executionSignature/.test(service));
   t('métricas V2 separadas',/intentCorrect/.test(service)&&/translationCE/.test(service)&&/transportClean/.test(service)&&/analysisPolicy/.test(service));
   let translationsOk=0;
   for(const base of h.BASE_CASES){const state=h.enrichState(base),tr=h.translateConcept(base.expected,state),audit=h.translatorAudit(tr);if(audit.ok)translationsOk++;else console.error('TRANSLATOR KO',base.id,tr.issues,audit.issues);}
@@ -27,15 +28,21 @@ let ok=0,ko=0;function t(name,pass){if(pass){ok++;console.log('OK',name);}else{k
   const tr17=h.translateConcept(h.BASE_CASES[16].expected,p17);t('PERSON multi traduce 2 person_profile',tr17.actions.length===2&&tr17.actions.every(a=>a.capability==='person_profile'));
   const tr18=h.translateConcept(h.BASE_CASES[17].expected,h.enrichState(h.BASE_CASES[17]));t('referente multi traduce 2 person_events',tr18.actions.length===2&&tr18.actions.every(a=>a.capability==='person_events'));
   const tr12=h.translateConcept(h.BASE_CASES[11].expected,h.enrichState(h.BASE_CASES[11]));t('show_sort compila visible_columns + view_sort array',Array.isArray(tr12.actions[0]?.arguments?.view_sort)&&Array.isArray(tr12.actions[0]?.arguments?.visible_columns));
-  const tr6=h.translateConcept(h.BASE_CASES[5].expected,h.enrichState(h.BASE_CASES[5]));t('MEMORY search compila action=search',tr6.actions[0]?.arguments?.action==='search');
+  const tr6=h.translateConcept(h.BASE_CASES[5].expected,h.enrichState(h.BASE_CASES[5]));t('MEMORY search compila sujeto a action=search',tr6.actions[0]?.arguments?.action==='search'&&tr6.actions[0]?.arguments?.query==='Pocholo');
+  const tr2=h.translateConcept(h.BASE_CASES[1].expected,h.enrichState(h.BASE_CASES[1]));t('compras realizadas default determinista',tr2.actions[0]?.arguments?.purchase_status==='realized');
+  const tr3=h.translateConcept(h.BASE_CASES[2].expected,h.enrichState(h.BASE_CASES[2]));t('ingresos pendientes default determinista',tr3.actions[0]?.arguments?.status==='pending');
+  const tr13=h.translateConcept(h.BASE_CASES[12].expected,h.enrichState(h.BASE_CASES[12]));t('MAX deduce label descriptivo único',tr13.actions[0]?.arguments?.label_field==='Indicador');
+  const amb=h.translateConcept({type:'PERSON',request:'profile',people:['Pocholo']},h.enrichState(h.BASE_CASES[26]));t('ambigüedad bloquea ejecución aunque Gemini elija',amb.guard?.blocked===true&&amb.actions.length===0&&h.translatorAudit(amb).ok);
+  t('prompt distingue event_status de profile',/PERSON\/event_status describe la situación\/estado/.test(service));
+  t('prompt distingue memoria histórica de sesión',/MEMORY se refiere EXCLUSIVAMENTE/.test(service)&&/CHAT\/session_summary/.test(service));
   const recovered=h.parseConceptPlan('{"type":"CHAT"}\n"basura"');t('JSON recuperable no se confunde con transporte limpio',recovered.parsed&&recovered.recovered&&!recovered.transportClean);
   t('rutas conservadas',/interpreter-preview/.test(routes)&&/interpreter-run-stream/.test(routes));
-  t('UI V2',/INTÉRPRETE GEMINI V2/.test(ui)&&/INTENCIÓN GEMINI/.test(ui)&&/ESTABILIDAD 3\/3/.test(ui)&&/TRADUCCIÓN A CE/.test(ui));
-  t('descarga V2 identificable',/INTERPRETER-LAB-V2/.test(ui)&&/interpreter-gemini-v2-90/.test(ui));
+  t('UI V2.1',/INTÉRPRETE GEMINI V2\.1/.test(ui)&&/INTENCIÓN GEMINI/.test(ui)&&/ESTABILIDAD INTENCIÓN 3\/3/.test(ui)&&/ESTABILIDAD CE 3\/3/.test(ui)&&/TRADUCCIÓN A CE/.test(ui));
+  t('descarga V2.1 identificable',/INTERPRETER-LAB-V2\.1/.test(ui)&&/interpreter-gemini-v2-1-90/.test(ui));
   t('botón intérprete conservado',/id="ztInterpreter"/.test(consoleJs)&&/ceOpenZuzuInterpreterLab/.test(consoleJs));
-  t('cache bust V2',/zuzu-interpreter-lab-gd\.js\?v=20260903-INTERPRETER-LAB-V2/.test(index));
+  t('cache bust V2.1',/zuzu-interpreter-lab-gd\.js\?v=20260903-INTERPRETER-LAB-V2-1/.test(index));
   t('runtime Zuzu no importado por lab',!/event-ai\.service/.test(service));
   t('BANK4.8 no importado por lab',!/v24-cuadre-banco/.test(service));
   t('package registra test',pkg.scripts?.['test:interpreter-lab']==='node scripts/v4-0-exp-interpreter-gemini-lab-regression.cjs');
-  console.log(`\nINTERPRETER GEMINI LAB V2: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;
+  console.log(`\nINTERPRETER GEMINI LAB V2.1: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;
 })().catch(e=>{console.error(e);process.exitCode=1;});
