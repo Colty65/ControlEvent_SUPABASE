@@ -18242,13 +18242,17 @@ function vnextP2NormalizeCalls(calls=[],history=[],flowTrace=[],userPrompt=''){
   let out=vnextP13UniqueCalls(calls).filter(c=>['query_ce','resolve_entity','search_documents','recall_memory'].includes(trim(c?.name)));
   out=vnextP122NormalizeMemoryCalls(out,history,flowTrace);
   const ws=vnextP1222LastWorkingSet(history),explicitReset=vnextP21ExplicitFilterReset(userPrompt);let repairs=0;
-  out=out.map(call=>{if(trim(call?.name)!=='query_ce')return call;const a=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{};const op=trim(a.operation);
+  out=out.map(call=>{if(trim(call?.name)!=='query_ce')return call;const a=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{};
     if(Array.isArray(a.sort)){if(!arr(a.view_sort).length)a.view_sort=a.sort;delete a.sort;repairs++;}
     if(a.reset_filters===true&&a.reset_table!==true&&!explicitReset){delete a.reset_filters;repairs++;}
+    return{...call,arguments:a};});
+  out=vnextP125NormalizeVisibleDatasetCalls(out,history,userPrompt,flowTrace);
+  out=vnextP1222NormalizeCurrentDatasetCalls(out,history,flowTrace);
+  out=out.map(call=>{if(trim(call?.name)!=='query_ce')return call;const a=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{};const op=trim(a.operation);
     if(ws&&['view_current','summarize_current','derive'].includes(op)){if(!trim(a.dataset_id))a.dataset_id=ws.dataset_id;if(!trim(a.table_key))a.table_key=ws.key;}
     return{...call,arguments:a};});
   if(repairs)zuzuTracePush(flowTrace,'VNEXT P2.1 · NORMALIZACIÓN ESTRUCTURAL','OK',`${repairs} reparación(es) estructurales (sort/view_sort o reset no solicitado); sin reinterpretar el dominio.`);
-  return vnextP13UniqueCalls(out);
+  return vnextP119ApplyStructuredFocusCalls(vnextP13UniqueCalls(out),flowTrace);
 }
 function vnextP2NeedsNarration(results=[]){
   for(const x of arr(results).filter(x=>x?.result)){

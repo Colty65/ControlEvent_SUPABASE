@@ -774,6 +774,34 @@
     const pxSpan=Math.max(.001,(meta.left+meta.plotW)-splitX),u=Math.max(0,Math.min(1,(clampedX-splitX)/pxSpan));
     return anchorTime+u*(max-anchorTime);
   }
+  function balanceResolvedPointPositions(meta,spread){
+    const active=spread&&Number.isFinite(num(spread.anchorTime))&&Number.isFinite(num(spread.anchorRatio));
+    const base=time=>balanceSpreadX(meta,time,active?spread:null);
+    const out=new Map();
+    for(const item of arr(meta?.points))out.set(String(item?.point?.movement?.id||''),base(item.point.time));
+    if(!active||!arr(meta?.points).length)return out;
+    const leftBound=meta.left+6,rightBound=meta.left+meta.plotW-6,minGap=meta.id==='zoom'?18:12;
+    const items=arr(meta.points).map((item,index)=>({item,index,id:String(item?.point?.movement?.id||index),time:num(item?.point?.time),rawX:base(item.point.time)}))
+      .sort((a,b)=>a.rawX-b.rawX||a.time-b.time||String(a.id).localeCompare(String(b.id)));
+    const xs=items.map(entry=>Math.max(leftBound,Math.min(rightBound,entry.rawX)));
+    for(let i=1;i<xs.length;i++)if(xs[i]-xs[i-1]<minGap)xs[i]=xs[i-1]+minGap;
+    if(xs.length&&xs[xs.length-1]>rightBound){
+      let shift=xs[xs.length-1]-rightBound;
+      for(let i=xs.length-1;i>=0;i--)xs[i]-=shift;
+    }
+    if(xs.length&&xs[0]<leftBound){
+      let shift=leftBound-xs[0];
+      for(let i=0;i<xs.length;i++)xs[i]+=shift;
+    }
+    for(let i=xs.length-2;i>=0;i--)if(xs[i+1]-xs[i]<minGap)xs[i]=xs[i+1]-minGap;
+    if(xs.length&&xs[0]<leftBound){
+      let shift=leftBound-xs[0];
+      for(let i=0;i<xs.length;i++)xs[i]=Math.min(rightBound,xs[i]+shift);
+    }
+    for(let i=1;i<xs.length;i++)if(xs[i]-xs[i-1]<minGap)xs[i]=Math.min(rightBound,xs[i-1]+minGap);
+    items.forEach((entry,index)=>out.set(entry.id,Math.max(leftBound,Math.min(rightBound,xs[index]))));
+    return out;
+  }
   function applyBalancePaneSpread(pane,meta,spread){
     const svg=pane?.querySelector('svg');
     if(!svg||!meta)return;
@@ -781,9 +809,11 @@
     pane.classList.toggle('is-spread',Boolean(active));
     meta.currentSpread=active?spread:null;
     const x=time=>balanceSpreadX(meta,time,meta.currentSpread);
+    const pointX=balanceResolvedPointPositions(meta,meta.currentSpread);
+    const pointPos=point=>point?.movement?num(pointX.get(String(point.movement.id))):x(point.time);
     const line=pane.querySelector('[data-ce-bank-balance-line="1"]');
     if(line){
-      line.setAttribute('d',meta.series.map((point,index)=>`${index?'L':'M'} ${x(point.time).toFixed(2)} ${meta.y(point.balance).toFixed(2)}`).join(' '));
+      line.setAttribute('d',meta.series.map((point,index)=>`${index?'L':'M'} ${pointPos(point).toFixed(2)} ${meta.y(point.balance).toFixed(2)}`).join(' '));
     }
     pane.querySelectorAll('[data-ce-bank-time-tick]').forEach(group=>{
       const time=num(group.dataset.ceBankTimeTick),px=x(time);
@@ -797,10 +827,14 @@
       highlight.setAttribute('x',a.toFixed(2));highlight.setAttribute('width',Math.max(6,b-a).toFixed(2));
     }
     pane.querySelectorAll('[data-ce-bank-balance-point="1"]').forEach(circle=>{
-      const point=meta.pointByMovementId.get(String(circle.dataset.movementId||''));
-      if(point)circle.setAttribute('cx',x(point.time).toFixed(2));
+      const id=String(circle.dataset.movementId||'');
+      const point=meta.pointByMovementId.get(id);
+      if(point)circle.setAttribute('cx',num(pointX.get(id)||x(point.time)).toFixed(2));
     });
-    for(const item of meta.points)item.cx=x(item.point.time);
+    for(const item of meta.points){
+      const id=String(item?.point?.movement?.id||'');
+      item.cx=num(pointX.get(id)||x(item.point.time));
+    }
     pane.querySelector('.ce-bank-balance-hover-marker')?.classList.add('hidden');
     pane.querySelectorAll('[data-ce-bank-restore-balance-chart]').forEach(button=>button.classList.toggle('active',Boolean(active)));
   }
@@ -836,7 +870,7 @@
     }).join('');
     const statusHtml=status?`<span class="ce-bank-balance-pane-status ${esc(statusClass)}">${esc(status)}</span>`:'';
     const actionBlock=(actionsHtml||statusHtml)?`<div class="ce-bank-balance-pane-actions">${actionsHtml||''}${statusHtml}</div>`:'';
-    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}" title="Mantén pulsado y arrastra a izquierda o derecha: mueves esa frontera como al ensanchar una columna en Excel; un lado se comprime y el otro se expande. Restaurar gráfica vuelve al eje normal."><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" data-ce-bank-balance-line="1" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
+    const html=`<section class="ce-bank-balance-pane ${zoom?'zoom':''}" data-pane-id="${esc(id)}"><div class="ce-bank-balance-pane-head"><div><strong>${esc(title)}</strong><span>${esc(subtitle)}</span></div>${actionBlock}</div><div class="ce-bank-balance-plot"><svg viewBox="0 0 ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(title)}" title="Mantén pulsado y arrastra a izquierda o derecha: mueves esa frontera como al ensanchar una columna en Excel; un lado se comprime y el otro se expande. Si varios movimientos comparten fecha, al abrir el grupo se aprovecha también la hora para separarlos mejor. Restaurar gráfica vuelve al eje normal."><g class="ce-bank-balance-grid">${yGrid}${xGrid}${startEnd}</g>${highlight}<path class="ce-bank-balance-line subtle" data-ce-bank-balance-line="1" d="${path}"></path><g>${eventPoints}</g><g class="ce-bank-balance-hover-marker hidden"><line x1="0" y1="${top}" x2="0" y2="${top+plotH}"></line><circle cx="0" cy="0" r="4.5"></circle></g></svg></div></section>`;
     const meta={id,width,height,left,right,top,bottom,plotW,plotH,safeMinTime,safeMaxTime,series,y,shadeStart,shadeEnd,pointByMovementId,points:interactivePoints.map(point=>({cx:x(point.time),cy:y(point.balance),point})),currentSpread:null};
     return {html,meta};
   }
@@ -1171,9 +1205,9 @@
       :(finalSnapshot?'Hay filas almacenadas del Cuadre, pero ninguna quedó incluida En saldo.':'Todavía no hay movimientos En saldo para construir el zoom del evento.');
     const restoreButton='<button type="button" class="ce-bank-chart-restore" data-ce-bank-restore-balance-chart="1">↺ Restaurar gráfica</button>';
     const zoomPane=includedRows.length
-      ?chartPane({id:'zoom',title:eventData.title,subtitle:finalSnapshot?`${includedRows.length} movimiento(s) En saldo almacenado(s) al cierre · foto definitiva · Arrastra ← desde una zona para separar puntos`:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom del periodo de trabajo · Arrastra ← desde una zona para separar puntos`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,pointScope:'event',actionsHtml:restoreButton})
+      ?chartPane({id:'zoom',title:eventData.title,subtitle:finalSnapshot?`${includedRows.length} movimiento(s) En saldo almacenado(s) al cierre · foto definitiva · Arrastra desde una frontera a izquierda o derecha para abrir grupos; si comparten fecha, el zoom usa también la hora`:`Desde ${chartDateFull(eventStart)} hasta ${chartDateFull(eventEnd)} · Zoom del periodo de trabajo · Arrastra desde una frontera a izquierda o derecha para abrir grupos; si comparten fecha, el zoom usa también la hora`,status:eventData.status,statusClass:eventData.statusClass,series:zoomSeries,eventIds,minTime:eventStart,maxTime:eventEnd,width:chartWidth,height:zoomHeight,shade:false,zoom:true,pointScope:'event',actionsHtml:restoreButton})
       :{html:`<section class="ce-bank-balance-pane zoom" data-pane-id="zoom"><div class="ce-bank-balance-pane-head"><div><strong>${esc(eventData.title)}</strong><span>${finalSnapshot?'Foto definitiva del Cuadre Banco al cierre':'Cuadre Banco del evento'}</span></div><div class="ce-bank-balance-pane-actions">${restoreButton}<span class="ce-bank-balance-pane-status ${esc(eventData.statusClass)}">${esc(eventData.status)}</span></div></div><div class="ce-bank-balance-chart-empty"><strong>${finalSnapshot&&storedCount<=0?'SIN CUADRE BANCARIO AL CIERRE':'SIN MOVIMIENTOS EN SALDO'}</strong><span>${esc(emptyZoomMessage)}</span></div></section>`,meta:{id:'zoom',width:chartWidth,height:zoomHeight,points:[]}};
-    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'} · Cada cargo rojo / cada abono verde · Arrastra ← desde una zona para separar puntos`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,pointScope:'all',actionsHtml:`<button type="button" class="ce-bank-history-open" data-ce-bank-open-history-list="1">☰ Ver movimientos</button>${restoreButton}`});
+    const historyPane=chartPane({id:'history',title:'Histórico completo de la cuenta',subtitle:`Desde ${chartDateFull(minTime)} hasta ${chartDateFull(maxTime)}${includedRows.length?' · La franja amarilla solo señala el intervalo de las filas En saldo del Cuadre':' · Referencia general, no atribuida al evento'} · Cada cargo rojo / cada abono verde · Arrastra desde una frontera a izquierda o derecha para abrir grupos; si comparten fecha, el zoom usa también la hora`,series,eventIds,minTime,maxTime,width:chartWidth,height:historyHeight,shadeStart:eventStart,shadeEnd:eventEnd,shade:includedRows.length>0,zoom:false,pointScope:'all',actionsHtml:`<button type="button" class="ce-bank-history-open" data-ce-bank-open-history-list="1">☰ Ver movimientos</button>${restoreButton}`});
     const eventCountLabel=finalSnapshot?'Filas almacenadas del Cuadre':'Movimientos En saldo señalados';
     const eventCountValue=finalSnapshot?storedCount:includedRows.length;
     const accountIban=chartAccountIban();

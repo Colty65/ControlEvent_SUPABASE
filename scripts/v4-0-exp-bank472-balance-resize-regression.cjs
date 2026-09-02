@@ -19,15 +19,16 @@ t('movimiento cambia ratio por delta horizontal',/gesture\.startRatio\+dxSvg\/Ma
 t('drag izquierdo comprime izquierda y expande derecha por mapping lineal',/return meta\.left\+u\*\(splitX-meta\.left\)/.test(bank)&&/return splitX\+u\*\(\(meta\.left\+meta\.plotW\)-splitX\)/.test(bank));
 t('límites evitan colapsar completamente un lado',/Math\.max\(\.035,Math\.min\(\.965/.test(bank));
 t('inversa piecewise existe',/if\(clampedX<=splitX\)/.test(bank)&&/return anchorTime\+u\*\(max-anchorTime\)/.test(bank));
-t('puntos y ticks se remapean en vivo',/data-ce-bank-time-tick/.test(bank)&&/circle\.setAttribute\('cx',x\(point\.time\)/.test(bank));
+t('puntos y ticks se remapean en vivo',/data-ce-bank-time-tick/.test(bank)&&(/circle\.setAttribute\('cx',x\(point\.time\)/.test(bank)||/circle\.setAttribute\('cx',num\(pointX\.get\(id\)\|\|x\(point\.time\)\)\.toFixed\(2\)\)/.test(bank)));
 t('botón Restaurar borra ambas vistas',/state\.panes=\{history:null,zoom:null\}/.test(bank));
 t('botón Restaurar gráfica permanece',/Restaurar gráfica/.test(bank));
 t('ayuda describe gesto izquierda o derecha tipo Excel',/arrastra a izquierda o derecha/.test(bank)&&/ens[a-z]*char una columna en Excel/i.test(bank));
 t('pointer capture permite llegar al borde',/setPointerCapture/.test(bank));
 t('click posterior a resize no abre miniatura accidental',/suppressClickUntil=Date\.now\(\)\+420/.test(bank));
 t('touch-action sigue deshabilitado en plot',/touch-action:none!important/.test(css));
-t('cache bust BANK472',/BANK472-BALANCE-RESIZE-PIVOT/.test(index));
+t('cache bust BANK473',/(BANK473-BALANCE-INTRADAY-SPREAD|BANK472-BALANCE-RESIZE-PIVOT)/.test(index));
 t('package registra BANK472',pkg.scripts?.['test:v4-bank472-balance-resize']==='node scripts/v4-0-exp-bank472-balance-resize-regression.cjs');
+t('helper intradía reparte puntos muy juntos',/function balanceResolvedPointPositions/.test(bank)&&/minGap=meta\.id==='zoom'\?18:12/.test(bank));
 
 // Prueba matemática real de la transformación y su inversa.
 try{
