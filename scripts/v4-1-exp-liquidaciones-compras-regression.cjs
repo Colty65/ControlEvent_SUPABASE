@@ -43,7 +43,12 @@ check('reapertura solo escritor',/reopenPurchaseSettlement[\s\S]{0,300}requireWr
 check('histórico muestra cierre',has(ui,'Histórico de liquidaciones','closedAt'));
 check('preview antes del cierre',has(ui,'Documento previo de liquidación','Confirmar, cerrar y emitir PDF'));
 check('PDF imprimible',has(ui,"window.print()",'LIQUIDACIÓN DE COMPRAS'));
-check('PDF declara independencia Banco',ui.includes('no crea ni modifica vínculos de conciliación bancaria'));
+check('PDF elimina texto técnico de criterio/conciliación',!ui.includes('Criterio: saldo = DEBE − HABER − TKxx. Esta liquidación no crea ni modifica vínculos de conciliación bancaria.'));
+check('PDF usa Ticket/s incluido/s',ui.includes('Ticket/s incluido/s'));
+check('PDF usa Ticket en cabecera',ui.includes('<th>Ticket</th><th>Tienda</th><th>Productos</th><th>Responsable</th><th class=\"num\">Importe</th>'));
+check('PDF pie Ticket/s JUSTIFICADO/S',ui.includes('Ticket/s JUSTIFICADO/S'));
+check('Liquidación enriquece tienda y productos',has(service,'namedCatalogMap(PRODUCTS_TABLE)','namedCatalogMap(STORES_TABLE)','productNames','storeNames'));
+check('Liquidaciones no escriben conciliación bancaria (permanece independiente)',!routes.includes('bank-ticket-links') && !routes.includes('bank/movements'));
 check('SQL cabecera',sql.includes('create table if not exists public.ce_purchase_settlements'));
 check('SQL movimientos',sql.includes('create table if not exists public.ce_purchase_cash_movements'));
 check('SQL TKxx',sql.includes('create table if not exists public.ce_purchase_settlement_tickets'));

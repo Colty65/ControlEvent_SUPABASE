@@ -7,6 +7,8 @@ const TICKETS_TABLE = 'ce_purchase_settlement_tickets';
 const PURCHASES_TABLE = 'ce_compras';
 const PEOPLE_TABLE = 'ce_personas';
 const EVENTS_TABLE = 'ce_eventos';
+const PRODUCTS_TABLE = 'ce_productos';
+const STORES_TABLE = 'ce_tiendas';
 const BANK_LINKS_TABLE = 'ce_bank_ticket_links';
 
 const text = value => value == null ? '' : String(value).trim();
@@ -125,6 +127,10 @@ async function purchaseRows(eventId){
     .select('id,event_id,producto_id,unidades,precio,ticket_donacion,tienda_id,responsable_id,created_at,updated_at')
     .eq('event_id',text(eventId)).order('created_at',{ascending:true}));
 }
+async function namedCatalogMap(table){
+  const rows=await selectAll(()=>db().from(table).select('id,nombre').order('nombre'));
+  return new Map(rows.map(row=>[text(row.id),text(row.nombre)||text(row.id)]));
+}
 function purchaseResponsibleIds(rows){
   return new Set(arr(rows).filter(row=>!isDonationTicket(row.ticket_donacion)).map(row=>text(row.responsable_id)).filter(Boolean));
 }
@@ -182,17 +188,20 @@ async function bankLinkedTicketSet(eventId){
     throw error;
   }
 }
-function aggregateTickets(purchases, persons){
+function aggregateTickets(purchases, persons, products=new Map(), stores=new Map()){
   const map = new Map();
   for(const row of arr(purchases)){
     if(isDonationTicket(row.ticket_donacion)) continue;
     const code = normalizeTicket(row.ticket_donacion);
     if(!code) continue;
-    if(!map.has(code)) map.set(code,{ticketCode:code,amount:0,responsibleIds:new Set(),purchaseIds:[],lineCount:0});
+    if(!map.has(code)) map.set(code,{ticketCode:code,amount:0,responsibleIds:new Set(),purchaseIds:[],productIds:new Set(),storeIds:new Set(),lineCount:0});
     const target = map.get(code);
     target.amount = round2(target.amount + amount(row.unidades) * amount(row.precio));
     const responsibleId = text(row.responsable_id);
     if(responsibleId) target.responsibleIds.add(responsibleId);
+    const productId=text(row.producto_id),storeId=text(row.tienda_id);
+    if(productId) target.productIds.add(productId);
+    if(storeId) target.storeIds.add(storeId);
     if(text(row.id)) target.purchaseIds.push(text(row.id));
     target.lineCount += 1;
   }
@@ -200,11 +209,14 @@ function aggregateTickets(purchases, persons){
     const responsibleIds=[...item.responsibleIds];
     const mixedResponsible=responsibleIds.length>1;
     const responsibleId=responsibleIds.length===1?responsibleIds[0]:'';
+    const productNames=[...item.productIds].map(id=>products.get(id)||'').filter(Boolean);
+    const storeNames=[...item.storeIds].map(id=>stores.get(id)||'').filter(Boolean);
     return {
       ticketCode:item.ticketCode,amount:round2(item.amount),responsibleId,
       responsibleName:responsibleId?(persons.get(responsibleId)?.name||''):'',
       responsibleNames:responsibleIds.map(id=>persons.get(id)?.name||id),
-      mixedResponsible,purchaseIds:item.purchaseIds,lineCount:item.lineCount
+      mixedResponsible,purchaseIds:item.purchaseIds,lineCount:item.lineCount,
+      productNames:[...new Set(productNames)],storeNames:[...new Set(storeNames)]
     };
   }).sort((a,b)=>Number(a.ticketCode.replace(/\D/g,''))-Number(b.ticketCode.replace(/\D/g,'')));
 }
@@ -212,15 +224,19 @@ async function rawSettlementData(eventId){
   const id = text(eventId);
   const persons = await peopleMap();
   const purchases = await purchaseRows(id);
-  const [settlementsRaw,movementsRaw,ticketsRaw,bank] = await Promise.all([
+  const [settlementsRaw,movementsRaw,ticketsRaw,bank,products,stores] = await Promise.all([
     selectAll(()=>db().from(SETTLEMENTS_TABLE).select('*').eq('event_id',id).order('created_at',{ascending:false})),
     selectAll(()=>db().from(MOVEMENTS_TABLE).select('*').eq('event_id',id).order('movement_date',{ascending:true}).order('created_at',{ascending:true})),
     selectAll(()=>db().from(TICKETS_TABLE).select('*').eq('event_id',id).order('ticket_code',{ascending:true})),
-    bankLinkedTicketSet(id)
+    bankLinkedTicketSet(id),
+    namedCatalogMap(PRODUCTS_TABLE),
+    namedCatalogMap(STORES_TABLE)
   ]);
   const settlements=settlementsRaw.map(row=>settlementFromDb(row,persons));
   const movements=movementsRaw.map(row=>movementFromDb(row,persons));
-  const tickets=ticketsRaw.map(row=>ticketFromDb(row,persons));
+  const aggregated=aggregateTickets(purchases,persons,products,stores);
+  const aggregatedByCode=new Map(aggregated.map(ticket=>[ticket.ticketCode,ticket]));
+  const tickets=ticketsRaw.map(row=>{const ticket=ticketFromDb(row,persons),live=aggregatedByCode.get(ticket.ticketCode);return live?{...ticket,storeNames:live.storeNames||[],productNames:live.productNames||[]}:ticket;});
   const ticketsBySettlement=new Map();
   tickets.forEach(ticket=>{if(!ticketsBySettlement.has(ticket.settlementId))ticketsBySettlement.set(ticket.settlementId,[]);ticketsBySettlement.get(ticket.settlementId).push(ticket);});
   const movementsBySettlement=new Map();
@@ -231,7 +247,6 @@ async function rawSettlementData(eventId){
     row.calculated=computePurchaseSettlementTotals(row.movements,row.tickets);
   });
   const settlementLinkByTicket=new Map(tickets.map(ticket=>[ticket.ticketCode,ticket.settlementId]));
-  const aggregated=aggregateTickets(purchases,persons);
   const eligibleTickets=aggregated.filter(ticket=>!ticket.mixedResponsible&&!bank.set.has(ticket.ticketCode)&&!settlementLinkByTicket.has(ticket.ticketCode));
   const responsibleIds=purchaseResponsibleIds(purchases);
   const cashPeople=[...persons.values()].filter(p=>p.range==='SOCIO').sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
@@ -367,7 +382,8 @@ async function ticketsForEvent(eventId, persons, purchases, settlementId=''){
     selectAll(()=>db().from(TICKETS_TABLE).select('*').eq('event_id',text(eventId)).order('ticket_code'))
   ]);
   const existingByCode=new Map(existingLinks.map(row=>[normalizeTicket(row.ticket_code),row]));
-  return {bank,existingLinks,existingByCode,aggregated:aggregateTickets(purchases,persons),settlementId:text(settlementId)};
+  const [products,stores]=await Promise.all([namedCatalogMap(PRODUCTS_TABLE),namedCatalogMap(STORES_TABLE)]);
+  return {bank,existingLinks,existingByCode,aggregated:aggregateTickets(purchases,persons,products,stores),settlementId:text(settlementId)};
 }
 function validateSelectedTickets(ticketCodes, ticketData, counterpartyId){
   const wanted=[...new Set(arr(ticketCodes).map(normalizeTicket).filter(Boolean))];
@@ -388,13 +404,17 @@ function validateSelectedTickets(ticketCodes, ticketData, counterpartyId){
 async function fullSettlement(id){
   const row=await settlementRow(id);
   const persons=await peopleMap();
-  const [movementsRaw,ticketsRaw]=await Promise.all([
+  const [movementsRaw,ticketsRaw,purchases,products,stores]=await Promise.all([
     selectAll(()=>db().from(MOVEMENTS_TABLE).select('*').eq('settlement_id',text(id)).order('movement_date').order('created_at')),
-    selectAll(()=>db().from(TICKETS_TABLE).select('*').eq('settlement_id',text(id)).order('ticket_code'))
+    selectAll(()=>db().from(TICKETS_TABLE).select('*').eq('settlement_id',text(id)).order('ticket_code')),
+    purchaseRows(row.event_id),
+    namedCatalogMap(PRODUCTS_TABLE),
+    namedCatalogMap(STORES_TABLE)
   ]);
+  const aggregatedByCode=new Map(aggregateTickets(purchases,persons,products,stores).map(ticket=>[ticket.ticketCode,ticket]));
   const settlement=settlementFromDb(row,persons);
   settlement.movements=movementsRaw.map(r=>movementFromDb(r,persons));
-  settlement.tickets=ticketsRaw.map(r=>ticketFromDb(r,persons));
+  settlement.tickets=ticketsRaw.map(r=>{const ticket=ticketFromDb(r,persons),live=aggregatedByCode.get(ticket.ticketCode);return live?{...ticket,storeNames:live.storeNames||[],productNames:live.productNames||[]}:ticket;});
   settlement.calculated=computePurchaseSettlementTotals(settlement.movements,settlement.tickets);
   return settlement;
 }

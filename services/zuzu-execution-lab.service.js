@@ -78,10 +78,14 @@ function buildCases(f={}){
 function wsColumns(ws={}){return arr(ws.base_columns||ws.columns).map(trim).filter(Boolean);}
 function wsHiddenLabels(ws={}){const hidden=new Set(arr(ws?.view_state?.hidden_columns)),cat=arr(ws?.column_catalog);return cat.filter(c=>hidden.has(c.id)).map(c=>trim(c.label)).filter(Boolean);}
 function compactWs(ws={}){return{dataset_id:trim(ws.dataset_id),table_key:trim(ws.key||ws.table_key),title:trim(ws.title),columns:wsColumns(ws),hidden_columns:wsHiddenLabels(ws),row_count:num(ws.total_rows||arr(ws.base_rows).length),view_filters:arr(ws?.view_state?.filters)};}
-function sessionContext(session={},fixtures={}){
-  const ctx={screen_event:fixtures.eventA.name,recent_entities:arr(session.recentEntities).slice(-4),session_ledger:arr(session.ledger).slice(-20)};
+const DATASET_CONTEXT_STOP=new Set(['tabla','tablas','lista','listado','datos','resumen','detalle','evento','eventos','por','para','de','del','la','las','el','los','en','registrado','registrada','vinculado','vinculada']);
+function datasetContextScore(prompt='',ws={}){const p=` ${norm(prompt)} `,title=norm(ws?.title),key=norm(ws?.key||ws?.table_key);if(!p.trim()||!title)return 0;let score=title&&p.includes(` ${title} `)?100:0;if(key&&key.length>=4&&p.includes(` ${key} `))score+=60;const toks=title.split(' ').filter(t=>t.length>=3&&!DATASET_CONTEXT_STOP.has(t));for(const t of toks)if(p.includes(` ${t} `))score+=t.length>=6?8:5;return score;}
+function contextDatasets(session={},prompt=''){const currentId=trim(session.currentDataset?.dataset_id),scored=arr(session.datasets).map(ws=>({ws,score:datasetContextScore(prompt,ws)})).filter(x=>x.score>=8&&trim(x.ws?.dataset_id)!==currentId).sort((a,b)=>b.score-a.score),out=[];if(session.currentDataset)out.push(compactWs(session.currentDataset));for(const x of scored.slice(0,4)){const c=compactWs(x.ws);if(!out.some(d=>trim(d.dataset_id)===trim(c.dataset_id)))out.push(c);}return out;}
+function uniqueRecentEntities(values=[]){const out=[];for(const v of arr(values)){const x=trim(v);if(!x)continue;const i=out.findIndex(y=>norm(y)===norm(x));if(i>=0)out.splice(i,1);out.push(x);}return out;}
+function sessionContext(session={},fixtures={},prompt=''){
+  const ctx={screen_event:fixtures.eventA.name,recent_entities:uniqueRecentEntities(session.recentEntities).slice(-4),session_ledger:arr(session.ledger).slice(-14)};
   if(session.currentDataset)ctx.current_dataset=compactWs(session.currentDataset);
-  if(session.datasets.length)ctx.visible_datasets=session.datasets.slice(-24).map(compactWs);
+  const relevant=contextDatasets(session,prompt);if(relevant.length)ctx.visible_datasets=relevant;
   if(session.activeFocus)ctx.active_focus=clone(session.activeFocus);
   if(session.memoryMatches.length)ctx.memory_matches=session.memoryMatches.map((m,i)=>({index:i+1,title:m.title}));
   if(session.selectedMemory)ctx.selected_memory_episode={result_index:session.selectedMemory.index,title:session.selectedMemory.title};
@@ -94,7 +98,7 @@ function rememberResultDatasets(session,result,capability,args){
   const sets=vnextP125WorkingSetsFromResult(result,capability==='recall_memory'?'recall_memory':'query_ce',{operation:capability,...(args||{})});
   sets.forEach((ws,i)=>mergeDataset(session,ws,{makeCurrent:i===0}));
 }
-function updateFocus(session,plan={}){const type=trim(plan.type).toUpperCase(),people=arr(plan.people).map(trim).filter(Boolean),events=arr(plan.events).map(trim).filter(Boolean);if(type==='PERSON'&&people.length){session.recentEntities=[...session.recentEntities,...people].slice(-8);session.activeFocus={type:people.length>1?'multi_person':'person',entities:people};}else if(type==='DATA'&&events.length){session.activeFocus={type:events.length>1?'multi_event':'event',entities:events};}}
+function updateFocus(session,plan={}){const type=trim(plan.type).toUpperCase(),people=arr(plan.people).map(trim).filter(Boolean),events=arr(plan.events).map(trim).filter(Boolean);if(type==='PERSON'&&people.length){session.recentEntities=uniqueRecentEntities([...session.recentEntities,...people]).slice(-8);session.activeFocus={type:people.length>1?'multi_person':'person',entities:uniqueRecentEntities(people)};}else if(type==='DATA'&&events.length){session.activeFocus={type:events.length>1?'multi_event':'event',entities:[...new Set(events)]};}}
 function resultSummary(result={}){return{ok:result?.ok!==false,title:trim(result?.title),operation:trim(result?._vnext_operation||result?.facts?.operation||result?.facts?.action),facts:result?.facts||{},tables:arr(result?.tables).slice(0,8).map(t=>({key:trim(t?.key),title:trim(t?.title),columns:arr(t?.columns).length?arr(t.columns):Object.keys(t?.schema||{}),row_count:arr(t?.rows).length,rows:arr(t?.rows).slice(0,12)}))};}
 function validateCeResult(action={},result={}){
   const issues=[];if(!result||result.ok===false)issues.push(trim(result?.error)||'CE devolvió resultado no OK');
@@ -132,16 +136,16 @@ function validateCasePostcondition(c={},session={}){
 function expectedForCase(c,session){const e=clone(c.expected||{});if(c.id==='exec-18'){const ws=session.datasets.find(w=>norm(w.title).includes(norm(c.requiresDatasetTitle)));if(ws)e.dataset=ws.dataset_id;}return e;}
 function prerequisites(c,session){if(c.requiresDataset&&!session.currentDataset)return'No existe dataset actual real.';if(c.requiresDatasetTitle&&!session.datasets.some(w=>norm(w.title).includes(norm(c.requiresDatasetTitle))))return`No existe dataset previo «${c.requiresDatasetTitle}».`;if(c.requiresMemoryMatch&&!session.memoryMatches.length)return'La búsqueda de memoria no devolvió recuerdos.';if(c.requiresSelectedMemory&&!session.selectedMemory)return'No existe recuerdo seleccionado.';return'';}
 
-export async function previewExecutionBattery({stateOverride=null}={}){const state=stateOverride||await getState(),fixtures=chooseFixtures(state),cases=buildCases(fixtures);return{ok:true,source:'execution-lab-v1',batteryCode:'EXECUTION-CONTROLLED-V1-25',label:'ITV · EJECUCIÓN CONTROLADA · 25',total:cases.length,readOnly:true,executesCE:true,replacesZuzu:false,narrates:false,planner:'INTÉRPRETE GEMINI V2.3',fixtures,cases:cases.map(c=>({id:c.id,label:c.label,prompt:c.prompt,expected:c.expected}))};}
+export async function previewExecutionBattery({stateOverride=null}={}){const state=stateOverride||await getState(),fixtures=chooseFixtures(state),cases=buildCases(fixtures);return{ok:true,source:'execution-lab-v1',batteryCode:'EXECUTION-CONTROLLED-V1-FIX2-25',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX2 · 25',total:cases.length,readOnly:true,executesCE:true,replacesZuzu:false,narrates:false,planner:'INTÉRPRETE GEMINI V2.3',fixtures,cases:cases.map(c=>({id:c.id,label:c.label,prompt:c.prompt,expected:c.expected}))};}
 
 export async function runExecutionStream({send,signal=null,actor={},maxCases=25,stateOverride=null}={}){
   const state=stateOverride||await getState(),fixtures=chooseFixtures(state),catalog=liveCatalog(state),cases=buildCases(fixtures).slice(0,Math.max(1,Math.min(25,num(maxCases)||25))),session={datasets:[],currentDataset:null,recentEntities:[],activeFocus:null,memoryMatches:[],selectedMemory:null,ledger:[],currentPrompt:''},rows=[];
-  send?.({type:'start',batteryCode:'EXECUTION-CONTROLLED-V1-25',label:'ITV · EJECUCIÓN CONTROLADA · 25',total:cases.length,readOnly:true,executesCE:true,narrates:false,fixtures});
+  send?.({type:'start',batteryCode:'EXECUTION-CONTROLLED-V1-FIX2-25',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX2 · 25',total:cases.length,readOnly:true,executesCE:true,narrates:false,fixtures});
   let plannerCalls=0,ceCalls=0,tokens=0,costEur=0;
   for(let i=0;i<cases.length;i++){
     if(signal?.aborted)break;const c=cases[i],pre=prerequisites(c,session);send?.({type:'progress',index:i+1,total:cases.length,id:c.id,label:c.label,prompt:c.prompt});
-    if(pre){const row={id:c.id,label:c.label,prompt:c.prompt,status:'SKIP',diagnosis:'DATA_GAP',reasons:[pre],expected:expectedForCase(c,session),plan:null,translatedActions:[],ceResults:[],context:sessionContext(session,fixtures),usage:{totalTokens:0,costEur:0}};rows.push(row);session.ledger.push({kind:'skip',value:`${c.label}: ${pre}`});send?.({type:'case',case:row});continue;}
-    const expected=expectedForCase(c,session),context=sessionContext(session,fixtures);session.currentPrompt=c.prompt;let row;
+    if(pre){const row={id:c.id,label:c.label,prompt:c.prompt,status:'SKIP',diagnosis:'DATA_GAP',reasons:[pre],expected:expectedForCase(c,session),plan:null,translatedActions:[],ceResults:[],context:sessionContext(session,fixtures,c.prompt),usage:{totalTokens:0,costEur:0}};rows.push(row);session.ledger.push({kind:'skip',value:`${c.label}: ${pre}`});send?.({type:'case',case:row});continue;}
+    const expected=expectedForCase(c,session),context=sessionContext(session,fixtures,c.prompt);session.currentPrompt=c.prompt;let row;
     try{
       const planned=await runInterpreterPlan({prompt:c.prompt,context,entityCatalog:catalog,signal});plannerCalls++;tokens+=num(planned.usage?.totalTokens);costEur=round(costEur+num(planned.usage?.costEur),6);
       const intent=planned.parsed?.parsed?conceptualIntentMatch(planned.plan,expected):{ok:false,reasons:[planned.parsed?.error||'Plan no parseable']};
@@ -167,4 +171,4 @@ export async function runExecutionStream({send,signal=null,actor={},maxCases=25,
   const summary={done,total:cases.length,ok,ko,skip,endToEndPct:Math.round(ok*10000/eligible)/100,plannerCalls,ceCalls,tokens,costEur,diagnosis:diag,readOnly:true,executesCE:true,narrates:false,completed:done===cases.length&&!signal?.aborted,datasetsMaterialized:session.datasets.length,memoryMatches:session.memoryMatches.length};send?.({type:'summary',summary});return summary;
 }
 
-export function __executionLabForRegression(){return{chooseFixtures,buildCases,liveCatalog,compactWs,validateCeResult,validateCasePostcondition,resultSummary,sessionContext,readOnlyCapabilities:[...READ_ONLY_CAPABILITIES]};}
+export function __executionLabForRegression(){return{chooseFixtures,buildCases,liveCatalog,compactWs,validateCeResult,validateCasePostcondition,resultSummary,sessionContext,contextDatasets,datasetContextScore,uniqueRecentEntities,readOnlyCapabilities:[...READ_ONLY_CAPABILITIES]};}

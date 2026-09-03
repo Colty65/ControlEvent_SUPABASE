@@ -143,7 +143,9 @@ REGLAS:
 - available_datasets contiene tablas ya materializadas. Si el usuario quiere volver, mostrar o trabajar con una de ellas, prioriza TABLE sobre volver a consultar DATA.
 - Si una pregunta analítica se refiere a una tabla ya materializada (incluida una comparación), usa TABLE/analyze o TABLE/summarize según corresponda; no reconstruyas la fuente.
 - Para varias personas usa people:[...], no inventes una identidad compuesta.
-- Los pronombres se resuelven con active_focus/recent_entities/screen_event.
+- Los pronombres se resuelven con active_focus/recent_entities/screen_event. Si active_focus.type es person/multi_person, sus entities son PERSON y nunca deben colocarse en events ni reinterpretarse como eventos. Si active_focus.type es event/multi_event, sus entities son EVENT y nunca deben colocarse en people.
+- Los tipos de recognized_entities son autoritativos: una entidad type=PERSON solo puede ir en people; una type=EVENT solo puede ir en events.
+- Si memory_matches contiene resultados y el usuario pide abrir/leer/entrar en uno de ellos, usa MEMORY/read con result_index. MEMORY/search se reserva para iniciar una búsqueda NUEVA de recuerdos, no para abrir resultados ya encontrados.
 - TABLE/filter expresa field + values. No construyas view_filters.
 - TABLE/hide expresa column. TABLE/show_sort expresa column + sort. No construyas visible_columns/view_sort.
 - TABLE/reset significa quitar filtros/restaurar todas las filas de la tabla actual; TABLE/select solo selecciona una tabla distinta o ya materializada.
@@ -224,8 +226,7 @@ function ambiguityGuard(state={}){const r=state?.entity_resolution||{};return no
 function knownEntities(state={},type=''){return arr(state.recognized_entities).filter(e=>norm(e.type)===norm(type));}
 function resolveKnownName(value,state={},type=''){const v=trim(value),known=knownEntities(state,type);if(!v)return'';const hit=known.find(e=>same(e.canonical,v));return hit?trim(hit.canonical):'';}
 function canonicalPeople(plan={},state={}){
-  const raw=arr(plan.people).map(trim).filter(Boolean),direct=raw.map(v=>resolveKnownName(v,state,'PERSON')).filter(Boolean);if(raw.length)return [...new Set(direct)];
-  return [...new Set(knownEntities(state,'PERSON').map(e=>trim(e.canonical)).filter(Boolean))];
+  const raw=arr(plan.people).map(trim).filter(Boolean),direct=raw.map(v=>resolveKnownName(v,state,'PERSON')).filter(Boolean);return raw.length?[...new Set(direct)]:[];
 }
 function canonicalEvents(plan={},state={}){
   const direct=arr(plan.events).map(v=>resolveKnownName(v,state,'EVENT')).filter(Boolean);if(direct.length)return [...new Set(direct)];
