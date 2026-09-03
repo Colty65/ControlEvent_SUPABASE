@@ -82,7 +82,8 @@
     "test:vnext-p2": "node scripts/v4-0-exp-vnext-p2-one-decision-regression.cjs",
     "test:vnext-p2r": "node scripts/v4-0-exp-vnext-p2r-minimal-planner-regression.cjs",
     "test:bank48-magnifier": "node scripts/v4-0-exp-bank48-magnifier-regression.cjs",
-    "test:interpreter-lab": "node scripts/v4-0-exp-interpreter-gemini-lab-regression.cjs"
+    "test:interpreter-lab": "node scripts/v4-0-exp-interpreter-gemini-lab-regression.cjs",
+    "test:execution-controlled": "node scripts/v4-0-exp-execution-controlled-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

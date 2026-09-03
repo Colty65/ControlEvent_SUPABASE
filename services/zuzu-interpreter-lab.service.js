@@ -63,9 +63,10 @@ function fuzzyMentioned(haystack,name){
   const words=nt.filter(t=>!/^\d+$/.test(t));if(!words.length)return false;
   return words.every(w=>ht.some(t=>{if(t.length<3)return false;const max=w.length<=7?1:w.length<=12?2:Math.max(2,Math.floor(w.length*.18));return editDistance(t,w)<=max;}));
 }
-function enrichState(caseDef={}){
+function enrichState(caseDef={},entityFixture=ENTITY_FIXTURE){
   const state=clone(caseDef.context||{}),recognized=[];
-  for(const e of ENTITY_FIXTURE){if(mentioned(caseDef.prompt,e.canonical))recognized.push({...e,source:'literal_catalog_match'});else if(fuzzyMentioned(caseDef.prompt,e.canonical))recognized.push({...e,source:'fuzzy_catalog_match'});}
+  const fixture=arr(entityFixture).length?arr(entityFixture):ENTITY_FIXTURE;
+  for(const e of fixture){if(mentioned(caseDef.prompt,e.canonical))recognized.push({...e,source:'literal_catalog_match'});else if(fuzzyMentioned(caseDef.prompt,e.canonical))recognized.push({...e,source:'fuzzy_catalog_match'});}
   if(state?.screen_event&&!recognized.some(e=>same(e.canonical,state.screen_event)))recognized.push({canonical:state.screen_event,type:'EVENT',source:'screen_event'});
   const focusType=norm(state?.active_focus?.type);for(const e of arr(state?.active_focus?.entities)){const type=focusType.includes('person')?'PERSON':focusType.includes('event')?'EVENT':'';if(type&&!recognized.some(x=>same(x.canonical,e)))recognized.push({canonical:e,type,source:'active_focus'});}
   for(const p of arr(state?.recent_entities))if(!recognized.some(e=>same(e.canonical,p)))recognized.push({canonical:p,type:'PERSON',source:'recent_entity'});
@@ -153,7 +154,7 @@ REGLAS:
 - El runtime decide de forma determinista analysis para TABLE/analyze, TABLE/summarize, MEMORY/summarize y CALCULATE. No necesitas acertar esa bandera en esos casos.
 - En DATA/compare_events usa analysis=true únicamente si el usuario pide además interpretación/insights. En una comparación mecánica, false. No afecta a qué datos hay que obtener.`;}
 
-function userInput(caseDef={}){return `ESTADO ENRIQUECIDO:\n${JSON.stringify(enrichState(caseDef))}\n\nMENSAJE DEL USUARIO:\n${caseDef.prompt}`;}
+function userInput(caseDef={},enrichedOverride=null){const enriched=enrichedOverride&&typeof enrichedOverride==='object'?enrichedOverride:enrichState(caseDef);return `ESTADO ENRIQUECIDO:\n${JSON.stringify(enriched)}\n\nMENSAJE DEL USUARIO:\n${caseDef.prompt}`;}
 
 function c(id,category,prompts,context,expected,analysis=false,note=''){const ps=Array.isArray(prompts)?prompts:[prompts];if(ps.length!==3)throw new Error(`interp-${id} necesita exactamente 3 paráfrasis`);return{id:`interp-${String(id).padStart(2,'0')}`,category,prompts:ps,context,expected:{...expected,analysis},note};}
 const BASE_CASES=Object.freeze([
@@ -301,15 +302,23 @@ function translatorAudit(translation={}){const audits=arr(translation.actions).m
 function canonicalConceptSignature(plan={}){plan=normalizeConceptPlan(plan);const p={type:trim(plan.type).toUpperCase(),request:norm(plan.request),events:arr(plan.events).map(norm).sort(),people:arr(plan.people).map(norm).sort(),dataset:norm(plan.dataset),field:norm(plan.field),values:arr(plan.values).map(norm).sort(),column:norm(plan.column),query:norm(plan.query),result_index:num(plan.result_index),status:norm(plan.status),label:norm(plan.label),sort:plan.sort?{field:norm(plan.sort.field),direction:norm(plan.sort.direction)}:null};return JSON.stringify(p);}
 function canonicalExecutionSignature(translation={}){const guard=translation?.guard?.blocked?{blocked:true,reason:translation.guard.reason,candidates:arr(translation.guard.candidates).map(norm).sort()}:null,actions=arr(translation.actions).map(a=>({capability:trim(a.capability),arguments:a.arguments||{}}));return JSON.stringify({guard,actions});}
 
-async function callGemini(caseDef={},externalSignal=null){
+async function callGemini(caseDef={},externalSignal=null,enrichedOverride=null){
   const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para ITV INTÉRPRETE GEMINI V2.3.');e.status=503;throw e;}
   const model=interpreterModel(),url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
-  const body={systemInstruction:{parts:[{text:systemInstruction()}]},contents:[{role:'user',parts:[{text:userInput(caseDef)}]}],generationConfig:{temperature:0.1,maxOutputTokens:500,responseMimeType:'application/json'}};
+  const body={systemInstruction:{parts:[{text:systemInstruction()}]},contents:[{role:'user',parts:[{text:userInput(caseDef,enrichedOverride)}]}],generationConfig:{temperature:0.1,maxOutputTokens:500,responseMimeType:'application/json'}};
   const timer=timeoutSignal(Number(process.env.CONTROLEVENT_ZUZU_INTERPRETER_TIMEOUT_MS)||30000,externalSignal),started=Date.now();
   try{const res=await fetch(`${url}?key=${encodeURIComponent(apiKey)}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:timer.signal});let payload={};try{payload=await res.json();}catch(_){}if(!res.ok){const e=new Error(payload?.error?.message||`Gemini HTTP ${res.status}`);e.status=res.status;e.details=payload;throw e;}const raw=extractCandidateText(payload),parsed=parseConceptPlan(raw),usage=payload?.usageMetadata||{};return{model,raw,parsed,payload,durationMs:Date.now()-started,usage:{promptTokens:num(usage.promptTokenCount),outputTokens:num(usage.candidatesTokenCount),totalTokens:num(usage.totalTokenCount),costEur:estimateCost(model,usage)}};}finally{timer.dispose();}
 }
 
 function publicCase(base={},variant=1){const prompt=arr(base.prompts)[variant-1]||arr(base.prompts)[0]||'';const cdef={...base,prompt};return{id:`${base.id}-p${variant}`,baseId:base.id,variant,repeat:variant,category:base.category,prompt,context:clone(base.context),enriched:enrichState(cdef),expected:clone(base.expected),note:base.note||''};}
+export async function runInterpreterPlan({prompt='',context={},entityCatalog=[],signal=null}={}){
+  const cdef={id:'execution-live',category:'LIVE',prompt:trim(prompt),context:context&&typeof context==='object'?clone(context):{},expected:{}};
+  if(!cdef.prompt)throw new Error('Falta el mensaje del usuario para el intérprete.');
+  const state=enrichState(cdef,arr(entityCatalog).length?entityCatalog:ENTITY_FIXTURE),got=await callGemini(cdef,signal,state),parsed=got.parsed,plan=parsed.plan&&typeof parsed.plan==='object'?normalizeConceptPlan(parsed.plan):{};
+  const translation=parsed.parsed?translateConcept(plan,state):{ok:false,actions:[],issues:['plan no parseable'],guard:null},ce=translatorAudit(translation),policy=parsed.parsed?resolveAnalysisPolicy(plan):{ok:false,required:false,source:'unavailable'};
+  return{ok:parsed.parsed&&ce.ok,prompt:cdef.prompt,context:cdef.context,enriched:state,plan,raw:got.raw,parsed,translation,translationAudit:ce,analysisDecision:policy,conceptSignature:canonicalConceptSignature(plan),executionSignature:canonicalExecutionSignature(translation),usage:got.usage,model:got.model,durationMs:got.durationMs};
+}
+
 export function previewInterpreterBattery(){const cases=[];for(const base of BASE_CASES)for(let v=1;v<=3;v++)cases.push(publicCase(base,v));return{ok:true,source:'interpreter-lab-v2-3-paraphrases-hardened',batteryCode:'INTERPRETER-GEMINI-V2-3-PARAPHRASE-HARDENED-30X3',label:'ITV · INTÉRPRETE GEMINI V2.3 · PARÁFRASIS HARDENED · 90',baseCases:30,paraphrases:3,repeats:3,total:90,model:interpreterModel(),executesCE:false,usesFunctionCalling:false,conceptLanguage:'DATA|TABLE|CALCULATE|MEMORY|PERSON|CHAT|CLARIFY|UNSUPPORTED',cases};}
 function baseFromPublic(caseDef={}){return{id:trim(caseDef.baseId||caseDef.id).replace(/-[rp]\d+$/,''),category:caseDef.category,prompt:trim(caseDef.prompt),context:caseDef.context||{},expected:caseDef.expected||{},note:trim(caseDef.note)};}
 export async function runInterpreterCase({caseDef,signal=null}={}){

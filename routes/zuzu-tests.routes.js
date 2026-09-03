@@ -4,6 +4,7 @@ import { assertGdActor, previewZuzuBattery, previewZuzuLanguageBattery, runZuzuT
 import { parseZuzuBatteryExcel } from '../services/zuzu-itv-excel.service.js';
 import { saveZuzuTestRun, listZuzuTestRuns, getZuzuTestRun, deleteZuzuTestRun } from '../services/zuzu-test-history.service.js';
 import { previewInterpreterBattery, runInterpreterStream } from '../services/zuzu-interpreter-lab.service.js';
+import { previewExecutionBattery, runExecutionStream } from '../services/zuzu-execution-lab.service.js';
 
 const router = express.Router();
 function actorFromRequest(req){
@@ -47,6 +48,29 @@ router.post('/zuzu-tests/history/:runKey/run-case', async (req,res,next)=>{
 });
 
 
+
+router.get('/zuzu-tests/execution-preview', asyncHandler(async (req,res)=>{
+  await assertGdActor(actorFromRequest(req));
+  res.json(await previewExecutionBattery());
+}));
+
+router.post('/zuzu-tests/execution-run-stream', async (req,res,next)=>{
+  try{
+    const actor=await assertGdActor(actorFromRequest(req));
+    res.status(200);
+    res.setHeader('Content-Type','application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control','no-store, no-cache, must-revalidate');
+    res.setHeader('X-Accel-Buffering','no');
+    res.flushHeaders?.();
+    const controller=new AbortController();req.on('aborted',()=>controller.abort());res.on('close',()=>{if(!res.writableEnded)controller.abort();});
+    const send=payload=>{if(!res.writableEnded){res.write(`${JSON.stringify(payload)}\n`);res.flush?.();}};
+    await runExecutionStream({send,signal:controller.signal,actor,maxCases:req.body?.maxCases||25});
+    if(!res.writableEnded)res.end();
+  }catch(error){
+    if(res.headersSent){try{res.write(`${JSON.stringify({type:'error',error:error?.message||String(error)})}\n`);res.end();}catch(_){}return;}
+    next(error);
+  }
+});
 
 router.get('/zuzu-tests/interpreter-preview', asyncHandler(async (req,res)=>{
   await assertGdActor(actorFromRequest(req));
