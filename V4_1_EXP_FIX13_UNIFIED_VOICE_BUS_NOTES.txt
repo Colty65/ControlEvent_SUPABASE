@@ -1,0 +1,13 @@
+ControlEvent v4_1_exp · FIX13 · VOZ UNIFICADA
+
+Objetivo: una sola entrada y una sola salida de voz en PC/iPhone/iPad/Android.
+
+- Entrada estándar: getUserMedia + MediaRecorder + /api/zuzu-voice/transcribe (Voz CE). Web Speech queda fuera del camino normal.
+- Salida estándar: /api/zuzu-voice/synthesize con voz neural Algenib a 1.10x.
+- speechSynthesis del navegador NO se usa como fallback automático ni para frases de espera. Si TTS neural falla, Zuzu no cambia de voz: vuelve a escuchar.
+- Las microseñales de espera quedan solo como texto visual para evitar una segunda voz.
+- Barge-in usa el mismo stream CE y transcripción mode=barge.
+- Modo oral: datasets/tablas siguen internos; salida visible sin tablas. Presupuesto numérico 0 por defecto; 1 cifra solo cuando el usuario la pide explícitamente. Sin céntimos.
+- La validación cliente acepta importes hablados redondeados al euro si proceden de un valor CE certificado.
+- Wake word: se utiliza j.wake del transcriptor CE además del texto literal; tolera una entrada ligeramente recortada.
+- Limitación de plataforma: Safari/iOS puede exigir un gesto real para conceder/activar el micrófono. FIX13 rearma la Voz CE en el primer pointer/touch/click/keydown y tras login; después el contrato de entrada es el mismo.

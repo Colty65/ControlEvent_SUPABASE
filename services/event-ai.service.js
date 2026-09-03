@@ -18394,30 +18394,39 @@ function vnextP2NeedsNarration(results=[]){
   }
   return false;
 }
+function vnextVoiceNumberBudget(userPrompt=''){
+  const p=vnextNorm(userPrompt);
+  if(/\b(?:cuanto|cuanta|cuantos|cuantas|importe|precio|saldo exacto|cantidad exacta|numero exacto|exactamente cuanto|exactamente cuantos)\b/.test(p))return 1;
+  if(/\b(?:porcentaje|temperatura|grados|fecha|hora|dias|dia|personas exactas|movimientos exactos)\b/.test(p))return 1;
+  return 0;
+}
+function vnextVoiceNumericCount(answer=''){
+  let t=trim(answer).replace(/\b(?:19|20)\d{2}\b/g,'').replace(/\bTK\s*\d+\b/gi,'');
+  return (t.match(/[-+]?\d+(?:[.,]\d+)?/g)||[]).length;
+}
+function vnextVoiceNeedsLeanRewrite(answer='',userPrompt=''){
+  const budget=vnextVoiceNumberBudget(userPrompt),count=vnextVoiceNumericCount(answer);
+  if(count>budget)return true;
+  return /\b(?:tabla|dataset|fila|filas|columna|columnas|grafica|gráfica|te dejo el detalle|indicador\s*:|registros? de compra\s*[·,])/i.test(trim(answer));
+}
 async function vnextP2NarrateResults({userPrompt,model,results=[],flowTrace=[],externalSignal=null,voiceConversation=false}={}){
   const compact=arr(results).filter(x=>x?.result).slice(0,6).map(x=>({tool:trim(x?.call?.name),operation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),result:vnextCompactResult(x.result)}));
   if(!compact.length)return{answer:'',payload:null};
-  const oralRules=voiceConversation?`
-
-MODO HABLADO OBLIGATORIO:
-- Responde como un amigo que conoce los datos, normalmente en 1 o 2 frases y como máximo 3.
-- Empieza por la conclusión que contesta a la pregunta. No hagas inventario de campos.
-- NO menciones tablas, datasets, filas, columnas, gráficos, «te dejo el detalle» ni nada que obligue a mirar la pantalla.
-- Si hay muchos datos, escoge solo uno, dos o tres que cambien la conclusión. El resto se calla hasta que el usuario pregunte.
-- Prioriza lenguaje cualitativo natural cuando sea suficiente: «estuvo bien la cosa», «quedó prácticamente cuadrado», «no quedó nadie pendiente», «llevó casi todo el peso».
-- Si una cifra monetaria ayuda, redondéala al euro entero. JAMÁS pronuncies céntimos ni decimales de euro.
-- No acabes ofreciendo tablas, detalles o más información. Continúa la conversación, sin coletilla comercial.`:'';
-  const input=`PETICIÓN DEL USUARIO:
-${userPrompt}
-
-DATOS CERTIFICADOS YA OBTENIDOS:
-${JSON.stringify(compact)}
-
-Responde únicamente con esos datos. Integra todas las partes de la petición. Si falta información, dilo; no inventes nada.${oralRules}`;
-  const instruction=voiceConversation?'Eres Zuzu hablando en voz alta con una persona. No estás redactando un informe. Usa exclusivamente los datos certificados, pero cuenta solo lo esencial con lenguaje cotidiano. La naturalidad manda sobre la exhaustividad. Verifica cualquier comparación numérica. No menciones la interfaz ni las tablas. Los importes hablados van siempre sin céntimos.':'Eres Zuzu. Redacta una respuesta humana y breve a partir exclusivamente de los datos certificados proporcionados. No menciones tools, JSON, contratos ni IDs internos. Verifica aritméticamente cualquier afirmación de mayor/menor/diferencia antes de expresarla; si no es verificable, no la formules.';
-  const payload=await v261CallInteraction({input,previousInteractionId:'',model,systemInstruction:instruction,tools:[],flowTrace,stage:voiceConversation?'VNEXT P2 · narración oral natural':'VNEXT P2 · narración factual opcional',externalSignal,maxCalls:2,maxOutputTokens:voiceConversation?190:760,minOutputTokens:voiceConversation?128:120,plainTextResponse:true});
-  return{payload,answer:trim(v261OutputText(payload))};
+  const budget=vnextVoiceNumberBudget(userPrompt);
+  const oralRules=voiceConversation?`\n\nMODO HABLADO ESTRICTO — CONVERSACIÓN ENTRE AMIGOS:\n- Responde como alguien que conoce bien el asunto, no como un informe; normalmente en 1 o 2 frases y como máximo 3.\n- Primero di la conclusión humana. Si puede contestarse sin cifras, NO des cifras.\n- PRESUPUESTO DE CIFRAS EXACTAS EN ESTE TURNO: ${budget}. Los años que forman parte del nombre de un evento no cuentan. No superes ese presupuesto.\n- Si el usuario NO ha preguntado expresamente cuánto/cuántos/importe/precio/saldo exacto, sustituye magnitudes por lenguaje natural: «quedó bien», «no quedó nadie pendiente», «hubo bastante margen», «Colty llevó casi todo el peso», «estuvo muy ajustado».\n- No recites en una misma respuesta ingresos + compras + donaciones + saldo + asistencia. Eso es un informe, no una conversación.\n- Si el usuario pide una cantidad, da como máximo UNA cifra útil, redondeada al euro entero; jamás céntimos.\n- NO menciones tablas, datasets, filas, columnas, gráficos, indicadores ni «te dejo el detalle». Aunque CE haya usado tablas internamente, para el usuario no existen.\n- No acabes ofreciendo tablas, detalles o más información ni remitiendo a la pantalla. Deja espacio para que el usuario pregunte lo siguiente.\n\nEJEMPLOS DE TONO (solo estilo, NO copies datos):\nPregunta: «¿Cómo acabamos de compras?» → «Bien, quedó todo comprado y no se arrastró nada pendiente.»\nPregunta: «¿El banco quedó bien?» → «Sí, quedó cuadrado y todo justificado.»\nPregunta: «¿Quién se encargó principalmente?» → «Colty, claramente; llevó casi todo el peso de las compras.»\nPregunta: «¿Cuánto quedó?» → «Unos 777 euros.»`:'';
+  const input=`PETICIÓN DEL USUARIO:\n${userPrompt}\n\nDATOS CERTIFICADOS YA OBTENIDOS:\n${JSON.stringify(compact)}\n\nResponde únicamente con esos datos. Integra todas las partes de la petición. Si falta información, dilo; no inventes nada.${oralRules}`;
+  const instruction=voiceConversation?'Eres Zuzu hablando en voz alta con una persona de confianza. No estás redactando ni leyendo un informe. La naturalidad y la conclusión mandan sobre la cantidad de datos. Usa solo hechos certificados por CE. No menciones la interfaz. No pronuncies céntimos. Si no te piden una cifra, evita cifras.':'Eres Zuzu. Redacta una respuesta humana y breve a partir exclusivamente de los datos certificados proporcionados. No menciones tools, JSON, contratos ni IDs internos. Verifica aritméticamente cualquier afirmación de mayor/menor/diferencia antes de expresarla; si no es verificable, no la formules.';
+  let payload=await v261CallInteraction({input,previousInteractionId:'',model,systemInstruction:instruction,tools:[],flowTrace,stage:voiceConversation?'VNEXT P2 · narración oral natural':'VNEXT P2 · narración factual opcional',externalSignal,maxCalls:2,maxOutputTokens:voiceConversation?120:760,minOutputTokens:voiceConversation?36:120,plainTextResponse:true});
+  let answer=trim(v261OutputText(payload));
+  if(voiceConversation&&answer&&vnextVoiceNeedsLeanRewrite(answer,userPrompt)){
+    const retryInput=`REESCRIBE PARA VOZ la respuesta provisional de abajo usando los mismos hechos certificados.\n\nPETICIÓN ORIGINAL:\n${userPrompt}\n\nRESPUESTA PROVISIONAL:\n${answer}\n\nREGLAS OBLIGATORIAS:\n- Conversación natural, una o dos frases.\n- Máximo ${budget} cifra(s) exacta(s), sin contar años de nombres de eventos.\n- Si el presupuesto es 0, no des importes, recuentos ni porcentajes: expresa la conclusión cualitativamente.\n- Cero céntimos.\n- No digas tabla, dataset, filas, columnas, gráfico, indicador ni «te dejo el detalle».\n- No inventes hechos ni añadas datos nuevos.`;
+    const retry=await v261CallInteraction({input:retryInput,previousInteractionId:'',model,systemInstruction:'Eres Zuzu en conversación oral. Reescribe fielmente con máxima naturalidad y mínimo dato numérico. No inventes.',tools:[],flowTrace,stage:'VNEXT P2 · poda oral de cifras',externalSignal,maxCalls:2,maxOutputTokens:90,minOutputTokens:24,plainTextResponse:true});
+    const lean=trim(v261OutputText(retry));
+    if(lean){answer=lean;payload=retry;zuzuTracePush(flowTrace,'VNEXT P2 · PODA ORAL','OK',`La respuesta excedía el presupuesto oral de ${budget} cifra(s) o contenía lenguaje de interfaz; se reescribió antes de hablar.`);}
+  }
+  return{payload,answer};
 }
+
 function vnextP2ContextFromResults(results=[],final={},history=[],userPrompt=''){
   const rc=vnextP1222ContextFromResults(results,final,history,userPrompt),out={...rc};delete out.dialogue_state;delete out.pending_intent;
   const people=[];for(const x of arr(results)){const a=x?.args||{},op=trim(x?.result?._vnext_operation||a.operation);if(['person_profile','person_events','person_income_status','person_event_status'].includes(op)){const p=trim(a.person||x?.result?.facts?.person);if(p&&!people.some(y=>vnextNorm(y)===vnextNorm(p)))people.push(p);}}
@@ -18517,7 +18526,7 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),visibleTables=voiceConversation?[]:finalTables,visibleCharts=voiceConversation?[]:charts.slice(0,8),presentationEvidence=vnextP124PresentationEvidence(visibleTables,visibleCharts);
   if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan solo como estado interno; salida visible=0. Importes hablados sin céntimos.`);
   zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo normal=1; en voz factual=2 para narración natural) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R FIX11 · planificador mínimo + CE factual + narración oral natural; en voz datasets internos sin tablas visibles',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R FIX13 · voz unificada + CE factual + narración oral austera; datasets internos sin tablas visibles',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
