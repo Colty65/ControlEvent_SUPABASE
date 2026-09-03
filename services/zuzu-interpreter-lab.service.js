@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · ITV INTÉRPRETE GEMINI V2.2 · PARÁFRASIS
+/* ControlEvent v4_0_exp · ITV INTÉRPRETE GEMINI V2.3 · PARÁFRASIS HARDENED
    Laboratorio AISLADO: ENRIQUECIMIENTO determinista -> Gemini entiende conceptos ->
    TRADUCTOR determinista a contratos CE -> auditoría. NO ejecuta CE, NO consulta Supabase,
    NO usa function calling y NO modifica el runtime Zuzu. */
@@ -16,7 +16,7 @@ function timeoutSignal(ms=30000,externalSignal=null){const c=new AbortController
 function estimateCost(model,usage={}){const input=num(usage.promptTokenCount||usage.promptTokens),output=num(usage.candidatesTokenCount||usage.outputTokens),lite=/flash-lite/i.test(model),ir=lite?0.10:0.30,or=lite?0.40:2.50;return round(input/1e6*ir+output/1e6*or,6);}
 function extractCandidateText(payload={}){return arr(payload?.candidates)[0]?.content?.parts?.map(p=>trim(p?.text)).filter(Boolean).join('\n')||'';}
 
-/* V2.2 conserva la distinción entre transporte limpio de intención recuperable. Si Gemini añade basura después
+/* V2.3 conserva la distinción entre transporte limpio de intención recuperable. Si Gemini añade basura después
    de un objeto JSON completo, la intención aún puede analizarse sin una segunda llamada IA. */
 function firstJsonObject(raw=''){
   const s=trim(raw).replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
@@ -45,19 +45,31 @@ const ENTITY_FIXTURE=Object.freeze([
   {canonical:'SySA 2024',type:'EVENT'},{canonical:'SySA 2025',type:'EVENT'},{canonical:'SySA 2026',type:'EVENT'},{canonical:'FUNCION 2026',type:'EVENT'}
 ]);
 function mentioned(haystack,name){const h=` ${norm(haystack)} `,n=` ${norm(name)} `;return h.includes(n);}
-function editDistance(a='',b=''){a=norm(a);b=norm(b);const m=a.length,n=b.length,dp=Array.from({length:m+1},(_,i)=>[i,...Array(n).fill(0)]);for(let j=0;j<=n;j++)dp[0][j]=j;for(let i=1;i<=m;i++)for(let j=1;j<=n;j++)dp[i][j]=a[i-1]===b[j-1]?dp[i-1][j-1]:1+Math.min(dp[i-1][j],dp[i][j-1],dp[i-1][j-1]);return dp[m][n];}
+/* Distancia Damerau-Levenshtein acotada: una transposición oral/escrita cuenta como un error.
+   V2.3 endurece el fuzzy para evitar falsos positivos como "corto" -> "Colty" sin perder
+   Sisa/SySA, Pohcolo/Pocholo o Colti/Colty. */
+function editDistance(a='',b=''){
+  a=norm(a);b=norm(b);const m=a.length,n=b.length,dp=Array.from({length:m+1},()=>Array(n+1).fill(0));
+  for(let i=0;i<=m;i++)dp[i][0]=i;for(let j=0;j<=n;j++)dp[0][j]=j;
+  for(let i=1;i<=m;i++)for(let j=1;j<=n;j++){
+    const cost=a[i-1]===b[j-1]?0:1;dp[i][j]=Math.min(dp[i-1][j]+1,dp[i][j-1]+1,dp[i-1][j-1]+cost);
+    if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])dp[i][j]=Math.min(dp[i][j],dp[i-2][j-2]+1);
+  }
+  return dp[m][n];
+}
 function fuzzyMentioned(haystack,name){
   const ht=norm(haystack).split(' ').filter(Boolean),nt=norm(name).split(' ').filter(Boolean);if(!ht.length||!nt.length)return false;
   for(const token of nt.filter(t=>/^\d+$/.test(t)))if(!ht.includes(token))return false;
   const words=nt.filter(t=>!/^\d+$/.test(t));if(!words.length)return false;
-  return words.every(w=>ht.some(t=>{if(t.length<3)return false;const max=w.length<=4?1:w.length<=7?2:Math.max(2,Math.floor(w.length*.25));return editDistance(t,w)<=max;}));
+  return words.every(w=>ht.some(t=>{if(t.length<3)return false;const max=w.length<=7?1:w.length<=12?2:Math.max(2,Math.floor(w.length*.18));return editDistance(t,w)<=max;}));
 }
 function enrichState(caseDef={}){
   const state=clone(caseDef.context||{}),recognized=[];
   for(const e of ENTITY_FIXTURE){if(mentioned(caseDef.prompt,e.canonical))recognized.push({...e,source:'literal_catalog_match'});else if(fuzzyMentioned(caseDef.prompt,e.canonical))recognized.push({...e,source:'fuzzy_catalog_match'});}
   if(state?.screen_event&&!recognized.some(e=>same(e.canonical,state.screen_event)))recognized.push({canonical:state.screen_event,type:'EVENT',source:'screen_event'});
+  const focusType=norm(state?.active_focus?.type);for(const e of arr(state?.active_focus?.entities)){const type=focusType.includes('person')?'PERSON':focusType.includes('event')?'EVENT':'';if(type&&!recognized.some(x=>same(x.canonical,e)))recognized.push({canonical:e,type,source:'active_focus'});}
   for(const p of arr(state?.recent_entities))if(!recognized.some(e=>same(e.canonical,p)))recognized.push({canonical:p,type:'PERSON',source:'recent_entity'});
-  const datasets=arr(state.visible_datasets).map(d=>({dataset_id:d.dataset_id,table_key:d.table_key,title:d.title,columns:arr(d.columns),hidden_columns:arr(d.hidden_columns),row_count:d.row_count}));
+  const datasets=arr(state.visible_datasets).map(d=>({dataset_id:d.dataset_id,table_key:d.table_key,title:d.title,columns:arr(d.columns),hidden_columns:arr(d.hidden_columns),row_count:d.row_count,base_row_count:d.base_row_count,view_filters:arr(d.view_filters)}));
   if(state.current_dataset&&state.current_dataset.dataset_id&&!datasets.some(d=>d.dataset_id===state.current_dataset.dataset_id))datasets.unshift(clone(state.current_dataset));
   const datasetHints=[];
   for(const d of datasets){
@@ -107,28 +119,39 @@ CLARIFY = existe una ambigüedad real que impide saber sobre qué entidad actuar
 UNSUPPORTED = ControlEvent no dispone de esa capacidad.
 
 SEMÁNTICA DE CAPACIDADES:
+- DATA/event_summary = visión general / estado global / puesta al día de un evento. Es la opción para conocer cómo está el evento en conjunto.
+- DATA/event_documentation = SOLO documentos, archivos o documentación vinculada al evento. NUNCA sustituye a event_summary.
 - DATA/event_purchases ya significa las compras realizadas del evento en el contrato actual; no necesitas repetir status=realized.
 - DATA/event_income_status usa por defecto el estado pending en el contrato actual; no necesitas repetir status=pending cuando eso es lo pedido.
-- PERSON/profile describe a la persona en general.
+- DATA/compare_events obtiene una comparación NUEVA entre eventos identificados. Si ya existe una tabla de comparación en available_datasets y el usuario pregunta por conclusiones, incoherencias o rarezas de ESA tabla, usa TABLE/analyze.
+- PERSON/profile describe datos de la persona en general; no recupera conversaciones pasadas.
 - PERSON/events obtiene los eventos relacionados con la persona.
 - PERSON/event_status describe la situación/estado de una persona DENTRO de un evento concreto y requiere people + events.
+- MEMORY/search busca conversaciones históricas o recuerdos previos sobre un sujeto/tema. Si la petición trata de si ya se habló o se recuerda algo anteriormente, es MEMORY, aunque el sujeto sea una PERSON.
 - MEMORY se refiere EXCLUSIVAMENTE a conversaciones históricas/recuerdos almacenados. No lo uses para resumir la conversación actual.
 - CHAT/social se usa para saludos o charla social simple; NO lo conviertas en session_summary.
 - CHAT/session_summary se usa SOLO para resumir lo ocurrido en la sesión/conversación ACTUAL usando session_ledger.
+- TABLE/select cambia a una tabla YA materializada; no elimina filtros por sí mismo.
+- TABLE/reset restaura la tabla actual a todas sus filas quitando filtros.
+- CALCULATE opera únicamente sobre campos de una tabla ya materializada en current_dataset/available_datasets. No predice valores futuros ni inventa campos/datos.
+- UNSUPPORTED se usa cuando la petición exige una capacidad o un dato que ControlEvent no posee, especialmente predicciones futuras sin datos/capacidad predictiva.
 
 REGLAS:
 - recognized_entities informa qué nombres existen y de qué tipo son. Úsalo como conocimiento, no como orden.
 - Si entity_resolution.status="ambiguous", responde CLARIFY. No elijas tú un candidato.
-- available_datasets contiene tablas ya materializadas. TABLE/select elige por dataset id; TABLE no reabre módulos empresariales.
+- available_datasets contiene tablas ya materializadas. Si el usuario quiere volver, mostrar o trabajar con una de ellas, prioriza TABLE sobre volver a consultar DATA.
+- Si una pregunta analítica se refiere a una tabla ya materializada (incluida una comparación), usa TABLE/analyze o TABLE/summarize según corresponda; no reconstruyas la fuente.
 - Para varias personas usa people:[...], no inventes una identidad compuesta.
 - Los pronombres se resuelven con active_focus/recent_entities/screen_event.
 - TABLE/filter expresa field + values. No construyas view_filters.
-- TABLE/show_sort expresa column + sort. No construyas visible_columns/view_sort.
+- TABLE/hide expresa column. TABLE/show_sort expresa column + sort. No construyas visible_columns/view_sort.
+- TABLE/reset significa quitar filtros/restaurar todas las filas de la tabla actual; TABLE/select solo selecciona una tabla distinta o ya materializada.
 - MEMORY/search: si el sujeto ya aparece en recognized_entities, usa people:[...] y no es obligatorio query. Usa query para temas libres no representados por una entidad reconocida.
-- CALCULATE: expresa request + field. No inventes label; el traductor CE puede deducir una columna descriptiva si es inequívoca. Usa column solo si el usuario la identifica explícitamente.
+- CALCULATE: expresa request + field sobre una tabla existente. No inventes label; el traductor CE puede deducir una columna descriptiva si es inequívoca. Usa column solo si el usuario la identifica explícitamente.
+- Si la petición requiere conocer un valor futuro que no existe en ningún dataset/capacidad, responde UNSUPPORTED; no simules una predicción con COUNT, PERSON/event_status ni otra operación factual.
 - No repitas parámetros que ya estén fijados inequívocamente por type/request y por el contrato conceptual.
 - El runtime decide de forma determinista analysis para TABLE/analyze, TABLE/summarize, MEMORY/summarize y CALCULATE. No necesitas acertar esa bandera en esos casos.
-- En DATA/compare_events usa analysis=true únicamente si el usuario pide además interpretación/insights (por ejemplo, qué llama la atención). En una comparación mecánica, false. No afecta a qué datos hay que obtener.`;}
+- En DATA/compare_events usa analysis=true únicamente si el usuario pide además interpretación/insights. En una comparación mecánica, false. No afecta a qué datos hay que obtener.`;}
 
 function userInput(caseDef={}){return `ESTADO ENRIQUECIDO:\n${JSON.stringify(enrichState(caseDef))}\n\nMENSAJE DEL USUARIO:\n${caseDef.prompt}`;}
 
@@ -147,7 +170,7 @@ const BASE_CASES=Object.freeze([
   c(11,'TABLE',['Oculta la columna Valor.','Quítame de la vista la columna Valor.','No quiero ver Valor en esta tabla.'],{current_dataset:{dataset_id:'econ-sysa26',table_key:'economics_chart',title:'Economía · SySA 2026',columns:['Indicador','Valor'],row_count:2}}, {type:'TABLE',request:'hide',column:'Valor'}),
   c(12,'TABLE',['Recupérala y ordénalo por Valor de mayor a menor.','Vuelve a mostrar Valor y ordénala de más a menos por esa columna.','Recupera Valor y pon primero los importes más altos.'],{current_dataset:{dataset_id:'econ-sysa26',table_key:'economics_chart',title:'Economía · SySA 2026',columns:['Indicador','Valor'],hidden_columns:['Valor'],row_count:2}}, {type:'TABLE',request:'show_sort',column:'Valor',sort:{field:'Valor',direction:'desc'}}),
   c(13,'CALCULATE',['¿Cuál de esas filas tiene el Valor más alto y cuánto es?','De esas dos, ¿cuál tiene el importe mayor?','Dime la fila con más Valor y su cifra.'],{current_dataset:{dataset_id:'econ-sysa26',table_key:'economics_chart',title:'Economía · SySA 2026',columns:['Indicador','Valor'],row_count:2}}, {type:'CALCULATE',request:'MAX',field:'Valor'}),
-  c(14,'TABLE',['Quita los filtros y déjala completa otra vez.','Vuelve a enseñarme todas las filas.','Déjala como estaba antes de filtrar.'],{current_dataset:{dataset_id:'econ-sysa26',table_key:'economics_chart',title:'Economía · SySA 2026',columns:['Indicador','Valor'],row_count:2}}, {type:'TABLE',request:'reset'}),
+  c(14,'TABLE',['Quita los filtros y déjala completa otra vez.','Vuelve a enseñarme todas las filas.','Déjala como estaba antes de filtrar.'],{current_dataset:{dataset_id:'econ-sysa26',table_key:'economics_chart',title:'Economía · SySA 2026',columns:['Indicador','Valor'],row_count:2,base_row_count:5,view_filters:[{field:'Indicador',operator:'eq',value:'Ingresos'},{field:'Indicador',operator:'eq',value:'Compras realizadas'}]}}, {type:'TABLE',request:'reset'}),
   c(15,'TABLE',['Volvamos a la tabla de Economía de SySA 2026 que dejamos antes.','Regresa a Economía de SySA 2026.','Quiero la tabla de Economía que teníamos antes.'],{current_dataset:{dataset_id:'person-events-colty',table_key:'person_events',title:'Eventos · Colty',columns:['Evento','Fecha']},visible_datasets:[{dataset_id:'econ-sysa26',table_key:'economics_chart',title:'Economía · SySA 2026',columns:['Indicador','Valor'],row_count:2},{dataset_id:'person-events-colty',table_key:'person_events',title:'Eventos · Colty',columns:['Evento','Fecha'],row_count:17}]}, {type:'TABLE',request:'select',dataset:'econ-sysa26'}),
   c(16,'PERSON',['Háblame de Colty.','Cuéntame quién es Colty.','Háblame un poco de Colti.'],{}, {type:'PERSON',request:'profile',people:['Colty']}),
   c(17,'PERSON',['Háblame de Colty y Esther.','Dame información de Colty y de Esther.','Cuéntame cosas de Esther y Colti.'],{}, {type:'PERSON',request:'profile',people:['Colty','Esther']}),
@@ -168,7 +191,18 @@ const BASE_CASES=Object.freeze([
 
 function scalarMatch(actual,expected){return expected===undefined||same(actual,expected);}
 function listMatch(actual,expected){if(expected===undefined)return true;const a=arr(actual).map(norm),e=arr(expected).map(norm);return e.length===a.length&&e.every(x=>a.includes(x));}
+const DERIVE_REQUESTS=Object.freeze(['MAX','MIN','SUM','AVG','COUNT']);
+/* Normalización sintáctica/conceptual V2.3. No interpreta lenguaje: acepta dos formas inequívocamente
+   equivalentes que Gemini puede producir (field/column y TABLE/MAX frente a CALCULATE/MAX). */
+function normalizeConceptPlan(plan={}){
+  const p=clone(plan||{}),hasRequest=Object.prototype.hasOwnProperty.call(p,'request'),type=trim(p.type).toUpperCase(),rq=trim(p.request),op=rq.toUpperCase();p.type=type;if(hasRequest)p.request=rq;else delete p.request;
+  if(type==='TABLE'&&DERIVE_REQUESTS.includes(op)){p.type='CALCULATE';p.request=op;}
+  if(p.type==='CALCULATE'&&!trim(p.field)&&trim(p.column))p.field=trim(p.column);
+  if(p.type==='TABLE'&&['hide','show_sort'].includes(norm(p.request))&&!trim(p.column)&&trim(p.field))p.column=trim(p.field);
+  return p;
+}
 function conceptualIntentMatch(plan={},expected={}){
+  plan=normalizeConceptPlan(plan);expected=normalizeConceptPlan(expected);
   const reasons=[];
   if(!scalarMatch(trim(plan.type).toUpperCase(),trim(expected.type).toUpperCase()))reasons.push(`type esperado ${expected.type}; recibido ${plan.type||'—'}`);
   if(expected.request!==undefined&&!scalarMatch(plan.request,expected.request))reasons.push(`request esperado ${expected.request}; recibido ${plan.request||'—'}`);
@@ -186,10 +220,18 @@ function analysisPolicyMatch(plan={},expected={}){const decision=resolveAnalysis
 function datasetById(state,id){return arr(state.available_datasets).find(d=>same(d.dataset_id,id))||null;}
 function currentDataset(state){return state.current_dataset||arr(state.available_datasets)[0]||null;}
 function ambiguityGuard(state={}){const r=state?.entity_resolution||{};return norm(r.status)==='ambiguous'?{blocked:true,reason:'AMBIGUOUS_ENTITY',query:trim(r.query),candidates:arr(r.candidates).map(trim).filter(Boolean)}:{blocked:false};}
+function knownEntities(state={},type=''){return arr(state.recognized_entities).filter(e=>norm(e.type)===norm(type));}
+function resolveKnownName(value,state={},type=''){const v=trim(value),known=knownEntities(state,type);if(!v)return'';const hit=known.find(e=>same(e.canonical,v));return hit?trim(hit.canonical):'';}
 function canonicalPeople(plan={},state={}){
-  const direct=arr(plan.people).map(trim).filter(Boolean);if(direct.length)return direct;
-  return arr(state.recognized_entities).filter(e=>norm(e.type)==='person').map(e=>trim(e.canonical)).filter(Boolean);
+  const raw=arr(plan.people).map(trim).filter(Boolean),direct=raw.map(v=>resolveKnownName(v,state,'PERSON')).filter(Boolean);if(raw.length)return [...new Set(direct)];
+  return [...new Set(knownEntities(state,'PERSON').map(e=>trim(e.canonical)).filter(Boolean))];
 }
+function canonicalEvents(plan={},state={}){
+  const direct=arr(plan.events).map(v=>resolveKnownName(v,state,'EVENT')).filter(Boolean);if(direct.length)return [...new Set(direct)];
+  const single=resolveKnownName(plan.event,state,'EVENT');if(single)return[single];
+  return[];
+}
+function canonicalColumn(ds,value){const v=trim(value),cols=arr(ds?.columns).map(trim).filter(Boolean);return cols.find(c=>same(c,v))||'';}
 function memorySearchQuery(plan={},state={}){
   const people=canonicalPeople(plan,state);if(people.length)return people.join(' ');
   return trim(plan.query);
@@ -200,13 +242,14 @@ function inferLabelColumn(plan={},ds=null){
   const others=cols.filter(c=>!same(c,field));return others.length===1?others[0]:'';
 }
 function translateConcept(plan={},state={}){
+  plan=normalizeConceptPlan(plan);
   const type=trim(plan.type).toUpperCase(),request=trim(plan.request),actions=[],issues=[],guard=ambiguityGuard(state);
   const push=(capability,arguments_)=>actions.push({capability,arguments:arguments_});
   if(guard.blocked&&type!=='CLARIFY')return{ok:true,actions,issues,guard};
   if(type==='CHAT'){if(!CHAT_REQUESTS.includes(request))issues.push(`CHAT request desconocida: ${request||'—'}`);return{ok:issues.length===0,actions,issues,guard};}
   if(['CLARIFY','UNSUPPORTED'].includes(type))return{ok:true,actions,issues,guard};
   if(type==='DATA'){
-    const events=arr(plan.events).map(trim).filter(Boolean),event=events[0];
+    const events=canonicalEvents(plan,state),event=events[0];
     if(!DATA_REQUESTS.includes(request))issues.push(`DATA request desconocida: ${request||'—'}`);
     else if(request==='compare_events'){if(events.length<2)issues.push('compare_events necesita al menos 2 eventos');else push('compare_events',{events});}
     else if(!event)issues.push(`${request} necesita evento`);
@@ -214,7 +257,7 @@ function translateConcept(plan={},state={}){
     else if(request==='event_income_status')push('event_income_status',{event,status:trim(plan.status)||'pending'});
     else push(request,{event});
   }else if(type==='PERSON'){
-    const people=canonicalPeople(plan,state),event=arr(plan.events).map(trim).filter(Boolean)[0]||trim(plan.event);
+    const people=canonicalPeople(plan,state),event=canonicalEvents(plan,state)[0]||'';
     if(!PERSON_REQUESTS.includes(request))issues.push(`PERSON request desconocida: ${request||'—'}`);else if(!people.length)issues.push('PERSON necesita people');
     else if(request==='profile')people.forEach(person=>push('person_profile',{person}));
     else if(request==='events')people.forEach(person=>push('person_events',{person}));
@@ -229,13 +272,17 @@ function translateConcept(plan={},state={}){
       const ds=datasetById(state,trim(plan.dataset))||currentDataset(state),base={};if(ds?.dataset_id)base.dataset_id=ds.dataset_id;if(ds?.table_key)base.table_key=ds.table_key;
       if(request==='select'){if(!ds?.dataset_id)issues.push('TABLE select necesita dataset válido');else push('view_current',base);}
       else if(request==='filter'){if(!trim(plan.field)||!arr(plan.values).length)issues.push('TABLE filter necesita field+values');else push('view_current',{...base,view_filters:arr(plan.values).map(value=>({field:trim(plan.field),operator:'eq',value}))});}
-      else if(request==='hide'){if(!trim(plan.column))issues.push('TABLE hide necesita column');else push('view_current',{...base,hidden_columns:[trim(plan.column)]});}
-      else if(request==='show_sort'){const column=trim(plan.column||plan.sort?.field),sf=trim(plan.sort?.field||column),direction=norm(plan.sort?.direction)==='asc'?'asc':'desc';if(!column||!sf)issues.push('TABLE show_sort necesita column+sort');else{const cols=arr(ds?.columns).map(trim).filter(Boolean),visible=cols.includes(column)?cols:[...cols,column];push('view_current',{...base,visible_columns:visible,view_sort:[{field:sf,direction}]});}}
+      else if(request==='hide'){const column=canonicalColumn(ds,plan.column||plan.field);if(!column)issues.push('TABLE hide necesita column válida');else push('view_current',{...base,hidden_columns:[column]});}
+      else if(request==='show_sort'){const column=canonicalColumn(ds,plan.column||plan.field||plan.sort?.field),sf=canonicalColumn(ds,plan.sort?.field||column),direction=norm(plan.sort?.direction)==='asc'?'asc':'desc';if(!column||!sf)issues.push('TABLE show_sort necesita column+sort válidos');else{const cols=arr(ds?.columns).map(trim).filter(Boolean),visible=cols.includes(column)?cols:[...cols,column];push('view_current',{...base,visible_columns:visible,view_sort:[{field:sf,direction}]});}}
       else if(request==='reset')push('view_current',{...base,reset_filters:true});
       else if(request==='summarize'||request==='analyze')push('summarize_current',base);
     }
   }else if(type==='CALCULATE'){
-    const op=trim(request).toUpperCase(),ds=datasetById(state,trim(plan.dataset))||currentDataset(state);if(!['MAX','MIN','SUM','AVG','COUNT'].includes(op))issues.push(`CALCULATE request desconocida: ${request||'—'}`);else if(!trim(plan.field))issues.push('CALCULATE necesita field');else{const label=inferLabelColumn(plan,ds);push('derive',{...(ds?.dataset_id?{dataset_id:ds.dataset_id}:{}),...(ds?.table_key?{table_key:ds.table_key}:{}),derive_operation:op,derive_field:trim(plan.field),...(label?{label_field:label}:{})});}
+    const op=trim(request).toUpperCase(),ds=datasetById(state,trim(plan.dataset))||currentDataset(state),field=canonicalColumn(ds,plan.field||plan.column);
+    if(!DERIVE_REQUESTS.includes(op))issues.push(`CALCULATE request desconocida: ${request||'—'}`);
+    else if(!ds?.dataset_id)issues.push('CALCULATE necesita dataset materializado');
+    else if(!field)issues.push('CALCULATE necesita field existente en el dataset');
+    else{const label=inferLabelColumn({...plan,field},ds);push('derive',{dataset_id:ds.dataset_id,...(ds?.table_key?{table_key:ds.table_key}:{}),derive_operation:op,derive_field:field,...(label?{label_field:label}:{})});}
   }else issues.push(`type conceptual desconocido: ${type||'—'}`);
   return{ok:issues.length===0,actions,issues,guard};
 }
@@ -251,11 +298,11 @@ function auditAction(action={}){
 }
 function translatorAudit(translation={}){const audits=arr(translation.actions).map(a=>({capability:a.capability,...auditAction(a)}));const known=translation.ok&&audits.every(a=>a.known),executable=translation.ok&&audits.every(a=>a.executable);return{ok:translation.ok&&known&&executable,known,executable,audits,issues:[...arr(translation.issues),...audits.flatMap(a=>a.executable?[]:a.issues)]};}
 
-function canonicalConceptSignature(plan={}){const p={type:trim(plan.type).toUpperCase(),request:norm(plan.request),events:arr(plan.events).map(norm).sort(),people:arr(plan.people).map(norm).sort(),dataset:norm(plan.dataset),field:norm(plan.field),values:arr(plan.values).map(norm).sort(),column:norm(plan.column),query:norm(plan.query),result_index:num(plan.result_index),status:norm(plan.status),label:norm(plan.label),sort:plan.sort?{field:norm(plan.sort.field),direction:norm(plan.sort.direction)}:null};return JSON.stringify(p);}
+function canonicalConceptSignature(plan={}){plan=normalizeConceptPlan(plan);const p={type:trim(plan.type).toUpperCase(),request:norm(plan.request),events:arr(plan.events).map(norm).sort(),people:arr(plan.people).map(norm).sort(),dataset:norm(plan.dataset),field:norm(plan.field),values:arr(plan.values).map(norm).sort(),column:norm(plan.column),query:norm(plan.query),result_index:num(plan.result_index),status:norm(plan.status),label:norm(plan.label),sort:plan.sort?{field:norm(plan.sort.field),direction:norm(plan.sort.direction)}:null};return JSON.stringify(p);}
 function canonicalExecutionSignature(translation={}){const guard=translation?.guard?.blocked?{blocked:true,reason:translation.guard.reason,candidates:arr(translation.guard.candidates).map(norm).sort()}:null,actions=arr(translation.actions).map(a=>({capability:trim(a.capability),arguments:a.arguments||{}}));return JSON.stringify({guard,actions});}
 
 async function callGemini(caseDef={},externalSignal=null){
-  const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para ITV INTÉRPRETE GEMINI V2.2.');e.status=503;throw e;}
+  const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para ITV INTÉRPRETE GEMINI V2.3.');e.status=503;throw e;}
   const model=interpreterModel(),url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const body={systemInstruction:{parts:[{text:systemInstruction()}]},contents:[{role:'user',parts:[{text:userInput(caseDef)}]}],generationConfig:{temperature:0.1,maxOutputTokens:500,responseMimeType:'application/json'}};
   const timer=timeoutSignal(Number(process.env.CONTROLEVENT_ZUZU_INTERPRETER_TIMEOUT_MS)||30000,externalSignal),started=Date.now();
@@ -263,7 +310,7 @@ async function callGemini(caseDef={},externalSignal=null){
 }
 
 function publicCase(base={},variant=1){const prompt=arr(base.prompts)[variant-1]||arr(base.prompts)[0]||'';const cdef={...base,prompt};return{id:`${base.id}-p${variant}`,baseId:base.id,variant,repeat:variant,category:base.category,prompt,context:clone(base.context),enriched:enrichState(cdef),expected:clone(base.expected),note:base.note||''};}
-export function previewInterpreterBattery(){const cases=[];for(const base of BASE_CASES)for(let v=1;v<=3;v++)cases.push(publicCase(base,v));return{ok:true,source:'interpreter-lab-v2-2-paraphrases',batteryCode:'INTERPRETER-GEMINI-V2-2-PARAPHRASE-30X3',label:'ITV · INTÉRPRETE GEMINI V2.2 · PARÁFRASIS · 90',baseCases:30,paraphrases:3,repeats:3,total:90,model:interpreterModel(),executesCE:false,usesFunctionCalling:false,conceptLanguage:'DATA|TABLE|CALCULATE|MEMORY|PERSON|CHAT|CLARIFY|UNSUPPORTED',cases};}
+export function previewInterpreterBattery(){const cases=[];for(const base of BASE_CASES)for(let v=1;v<=3;v++)cases.push(publicCase(base,v));return{ok:true,source:'interpreter-lab-v2-3-paraphrases-hardened',batteryCode:'INTERPRETER-GEMINI-V2-3-PARAPHRASE-HARDENED-30X3',label:'ITV · INTÉRPRETE GEMINI V2.3 · PARÁFRASIS HARDENED · 90',baseCases:30,paraphrases:3,repeats:3,total:90,model:interpreterModel(),executesCE:false,usesFunctionCalling:false,conceptLanguage:'DATA|TABLE|CALCULATE|MEMORY|PERSON|CHAT|CLARIFY|UNSUPPORTED',cases};}
 function baseFromPublic(caseDef={}){return{id:trim(caseDef.baseId||caseDef.id).replace(/-[rp]\d+$/,''),category:caseDef.category,prompt:trim(caseDef.prompt),context:caseDef.context||{},expected:caseDef.expected||{},note:trim(caseDef.note)};}
 export async function runInterpreterCase({caseDef,signal=null}={}){
   const cdef=baseFromPublic(caseDef),started=Date.now(),state=enrichState(cdef);
@@ -285,4 +332,4 @@ export async function runInterpreterStream({send,signal=null,maxCases=90}={}){
   send?.({type:'summary',summary});return summary;
 }
 
-export function __interpreterLabForRegression(){return{BASE_CASES,ENTITY_FIXTURE,parseConceptPlan,enrichState,conceptualIntentMatch,translateConcept,translatorAudit,canonicalConceptSignature,canonicalExecutionSignature,ambiguityGuard,resolveAnalysisPolicy,fuzzyMentioned,systemInstruction};}
+export function __interpreterLabForRegression(){return{BASE_CASES,ENTITY_FIXTURE,parseConceptPlan,enrichState,conceptualIntentMatch,translateConcept,translatorAudit,canonicalConceptSignature,canonicalExecutionSignature,ambiguityGuard,resolveAnalysisPolicy,fuzzyMentioned,editDistance,normalizeConceptPlan,systemInstruction};}

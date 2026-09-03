@@ -4,7 +4,7 @@ let ok=0,ko=0;function t(name,pass){if(pass){ok++;console.log('OK',name);}else{k
 (async()=>{
   const service=read('services/zuzu-interpreter-lab.service.js'),routes=read('routes/zuzu-tests.routes.js'),ui=read('public/app/features/zuzu-interpreter-lab-gd.js'),consoleJs=read('public/app/features/zuzu-test-console-gd.js'),index=read('public/index.html'),pkg=JSON.parse(read('package.json'));
   const mod=await import(pathToFileURL(path.join(root,'services/zuzu-interpreter-lab.service.js')).href+'?t='+Date.now()),h=mod.__interpreterLabForRegression(),preview=mod.previewInterpreterBattery();
-  t('V2.2 paráfrasis aislado',/INTÉRPRETE GEMINI V2\.2 · PARÁFRASIS/.test(service)&&/TRADUCTOR determinista/.test(service));
+  t('V2.3 paráfrasis hardened aislado',/INTÉRPRETE GEMINI V2\.3 · PARÁFRASIS HARDENED/.test(service)&&/TRADUCTOR determinista/.test(service));
   t('30 intenciones base',h.BASE_CASES.length===30);
   t('90 casos = 30x3',preview.total===90&&preview.baseCases===30&&preview.paraphrases===3&&preview.cases.length===90);
   t('3 frases distintas por intención',h.BASE_CASES.every(b=>Array.isArray(b.prompts)&&b.prompts.length===3&&new Set(b.prompts).size===3));
@@ -13,10 +13,11 @@ let ok=0,ko=0;function t(name,pass){if(pass){ok++;console.log('OK',name);}else{k
   t('sin function calling',!/tool_choice/.test(service)&&!/functionDeclarations/.test(service)&&/responseMimeType:'application\/json'/.test(service));
   t('CE no ejecuta',/executesCE:false/.test(service)&&!/event-ai\.service/.test(service)&&!/state\.service/.test(service));
   t('enriquecimiento literal',/literal_catalog_match/.test(service)&&/recognized_entities/.test(service));
-  t('enriquecimiento fuzzy genérico',/function fuzzyMentioned/.test(service)&&/function editDistance/.test(service)&&/fuzzy_catalog_match/.test(service));
+  t('enriquecimiento fuzzy Damerau estricto',/function fuzzyMentioned/.test(service)&&/Damerau-Levenshtein/.test(service)&&/fuzzy_catalog_match/.test(service));
   t('Sisa 2026 resuelve SySA 2026',h.fuzzyMentioned('Cuéntame cómo está Sisa 2026.','SySA 2026'));
   t('Pohcolo resuelve Pocholo',h.fuzzyMentioned('¿Te suena algo de Pohcolo?','Pocholo'));
   t('Colti resuelve Colty',h.fuzzyMentioned('Háblame un poco de Colti.','Colty'));
+  t('corto NO resuelve Colty',!h.fuzzyMentioned('Hazme un resumen corto de ese recuerdo.','Colty'));
   t('año evita evento incorrecto',!h.fuzzyMentioned('Cuéntame cómo está Sisa 2026.','SySA 2025'));
   const p1v3=preview.cases.find(c=>c.id==='interp-01-p3');t('fuzzy entra en estado enriquecido',p1v3.enriched.recognized_entities.some(e=>e.canonical==='SySA 2026'&&e.source==='fuzzy_catalog_match'));
   t('dataset hints conservados',/available_datasets/.test(service)&&/dataset_hints/.test(service));
@@ -41,14 +42,20 @@ let ok=0,ko=0;function t(name,pass){if(pass){ok++;console.log('OK',name);}else{k
   const tr6=h.translateConcept(h.BASE_CASES[5].expected,h.enrichState({...h.BASE_CASES[5],prompt:h.BASE_CASES[5].prompts[2]}));t('MEMORY sujeto fuzzy compila query canónica',tr6.actions[0]?.arguments?.action==='search'&&tr6.actions[0]?.arguments?.query==='Pocholo');
   const tr13=h.translateConcept(h.BASE_CASES[12].expected,h.enrichState({...h.BASE_CASES[12],prompt:h.BASE_CASES[12].prompts[1]}));t('MAX deduce label descriptivo único',tr13.actions[0]?.arguments?.label_field==='Indicador');
   const ambBase={...h.BASE_CASES[26],prompt:h.BASE_CASES[26].prompts[1]},amb=h.translateConcept({type:'PERSON',request:'profile',people:['Pocholo']},h.enrichState(ambBase));t('ambigüedad bloquea aunque Gemini elija',amb.guard?.blocked===true&&amb.actions.length===0&&h.translatorAudit(amb).ok);
+  const hideState=h.enrichState({...h.BASE_CASES[10],prompt:h.BASE_CASES[10].prompts[2]}),hidePlan={type:'TABLE',request:'hide',dataset:'econ-sysa26',field:'Valor'};t('field alias column se normaliza sin semántica',h.conceptualIntentMatch(hidePlan,h.BASE_CASES[10].expected).ok&&h.translatorAudit(h.translateConcept(hidePlan,hideState)).ok);
+  const maxState=h.enrichState({...h.BASE_CASES[12],prompt:h.BASE_CASES[12].prompts[2]}),maxPlan={type:'TABLE',request:'MAX',dataset:'econ-sysa26',field:'Valor',column:'Indicador'};t('TABLE/MAX se normaliza a CALCULATE/MAX',h.conceptualIntentMatch(maxPlan,h.BASE_CASES[12].expected).ok&&h.translateConcept(maxPlan,maxState).actions[0]?.capability==='derive');
+  const unsafeCalc=h.translateConcept({type:'CALCULATE',request:'COUNT',field:'cubatas',events:['próximo evento'],people:['cada persona']},h.enrichState({prompt:'Predice cuántos cubatas beberá cada persona en el próximo evento.',context:{}}));t('cálculo sin dataset queda NO ejecutable',!unsafeCalc.ok&&unsafeCalc.actions.length===0&&unsafeCalc.issues.some(x=>/dataset materializado/.test(x)));
+  const inventedPerson=h.translateConcept({type:'PERSON',request:'profile',people:['cada persona']},h.enrichState({prompt:'cada persona',context:{}}));t('persona no reconocida no se ejecuta',!inventedPerson.ok&&inventedPerson.actions.length===0);
+  const eventSummaryWrong={type:'DATA',request:'event_documentation',events:['SySA 2026']};t('normalizador NO oculta error summary/documentation',!h.conceptualIntentMatch(eventSummaryWrong,h.BASE_CASES[0].expected).ok);
+  const compareExistingWrong={type:'DATA',request:'compare_events',analysis:true};t('normalizador NO inventa eventos para compare_events',!h.translatorAudit(h.translateConcept(compareExistingWrong,h.enrichState({...h.BASE_CASES[23],prompt:h.BASE_CASES[23].prompts[0]}))).ok);
   const recovered=h.parseConceptPlan('{"type":"CHAT","request":"social"}\n"basura"');t('JSON recuperable sigue separado de transporte',recovered.parsed&&recovered.recovered&&!recovered.transportClean);
   t('métricas generalización 3/3',/stable3of3/.test(service)&&/paraphrase3of3/.test(service)&&/stability3of3Pct/.test(service));
   t('métrica consistencia CE 3/3',/stableCE/.test(service)&&/paraphraseCEPct/.test(service)&&/executionSignature/.test(service));
   t('rutas conservadas',/interpreter-preview/.test(routes)&&/interpreter-run-stream/.test(routes));
-  t('UI V2.2 paráfrasis',/INTÉRPRETE GEMINI V2\.2 · PARÁFRASIS/.test(ui)&&/GENERALIZACIÓN 3\/3/.test(ui)&&/CONSISTENCIA CE 3\/3/.test(ui)&&/MODO RESPUESTA/.test(ui));
-  t('descarga V2.2 identificable',/INTERPRETER-LAB-V2\.2-PARAPHRASES/.test(ui)&&/interpreter-gemini-v2-2-paraphrases-90/.test(ui));
+  t('UI V2.3 paráfrasis hardened',/INTÉRPRETE GEMINI V2\.3 · PARÁFRASIS HARDENED/.test(ui)&&/GENERALIZACIÓN 3\/3/.test(ui)&&/CONSISTENCIA CE 3\/3/.test(ui)&&/MODO RESPUESTA/.test(ui));
+  t('descarga V2.3 identificable',/INTERPRETER-LAB-V2\.3-PARAPHRASES-HARDENED/.test(ui)&&/interpreter-gemini-v2-3-paraphrases-hardened-90/.test(ui));
   t('botón intérprete conservado',/id="ztInterpreter"/.test(consoleJs)&&/ceOpenZuzuInterpreterLab/.test(consoleJs));
-  t('cache bust V2.2',/zuzu-interpreter-lab-gd\.js\?v=20260903-INTERPRETER-LAB-V2-2-PARAPHRASES/.test(index));
+  t('cache bust V2.3',/zuzu-interpreter-lab-gd\.js\?v=20260903-INTERPRETER-LAB-V2-3-PARAPHRASES-HARDENED/.test(index));
   t('package registra test',pkg.scripts?.['test:interpreter-lab']==='node scripts/v4-0-exp-interpreter-gemini-lab-regression.cjs');
-  console.log(`\nINTERPRETER GEMINI LAB V2.2 PARAPHRASES: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;
+  console.log(`\nINTERPRETER GEMINI LAB V2.3 PARAPHRASES HARDENED: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;
 })().catch(e=>{console.error(e);process.exitCode=1;});
