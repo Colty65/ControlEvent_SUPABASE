@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · ITV EJECUCIÓN CONTROLADA V1 FIX3
+/* ControlEvent v4_1_exp · ITV EJECUCIÓN CONTROLADA V1 FIX5
    Laboratorio read-only: contexto real -> Intérprete Gemini V2.3 -> traductor conceptual ->
    executor canónico CE REAL. No sustituye Zuzu, no genera respuesta narrativa y no escribe BBDD. */
 import { getState } from './state.service.js';
@@ -138,11 +138,11 @@ function validateCasePostcondition(c={},session={}){
 function expectedForCase(c,session){const e=clone(c.expected||{});if(c.id==='exec-18'){const ws=session.datasets.find(w=>norm(w.title).includes(norm(c.requiresDatasetTitle)));if(ws)e.dataset=ws.dataset_id;}return e;}
 function prerequisites(c,session){if(c.requiresDataset&&!session.currentDataset)return'No existe dataset actual real.';if(c.requiresDatasetTitle&&!session.datasets.some(w=>norm(w.title).includes(norm(c.requiresDatasetTitle))))return`No existe dataset previo «${c.requiresDatasetTitle}».`;if(c.requiresMemoryMatch&&!session.memoryMatches.length)return'La búsqueda de memoria no devolvió recuerdos.';if(c.requiresSelectedMemory&&!session.selectedMemory)return'No existe recuerdo seleccionado.';return'';}
 
-export async function previewExecutionBattery({stateOverride=null}={}){const state=stateOverride||await getState(),fixtures=chooseFixtures(state),cases=buildCases(fixtures);return{ok:true,source:'execution-lab-v1',batteryCode:'EXECUTION-CONTROLLED-V1-FIX4-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX4 · 27',total:cases.length,readOnly:true,executesCE:true,replacesZuzu:false,narrates:false,planner:'INTÉRPRETE GEMINI V2.3',fixtures,cases:cases.map(c=>({id:c.id,label:c.label,prompt:c.prompt,expected:c.expected}))};}
+export async function previewExecutionBattery({stateOverride=null}={}){const state=stateOverride||await getState(),fixtures=chooseFixtures(state),cases=buildCases(fixtures);return{ok:true,source:'execution-lab-v1',batteryCode:'EXECUTION-CONTROLLED-V1-FIX5-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX5 · 27',total:cases.length,readOnly:true,executesCE:true,replacesZuzu:false,narrates:false,planner:'INTÉRPRETE GEMINI V2.3',fixtures,cases:cases.map(c=>({id:c.id,label:c.label,prompt:c.prompt,expected:c.expected}))};}
 
 export async function runExecutionStream({send,signal=null,actor={},maxCases=27,stateOverride=null}={}){
   const state=stateOverride||await getState(),fixtures=chooseFixtures(state),catalog=liveCatalog(state),cases=buildCases(fixtures).slice(0,Math.max(1,Math.min(27,num(maxCases)||27))),session={datasets:[],currentDataset:null,recentEntities:[],activeFocus:null,memoryMatches:[],selectedMemory:null,ledger:[],currentPrompt:''},rows=[];
-  send?.({type:'start',batteryCode:'EXECUTION-CONTROLLED-V1-FIX4-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX4 · 27',total:cases.length,readOnly:true,executesCE:true,narrates:false,fixtures});
+  send?.({type:'start',batteryCode:'EXECUTION-CONTROLLED-V1-FIX5-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX5 · 27',total:cases.length,readOnly:true,executesCE:true,narrates:false,fixtures});
   let plannerCalls=0,ceCalls=0,tokens=0,costEur=0;
   for(let i=0;i<cases.length;i++){
     if(signal?.aborted)break;const c=cases[i],pre=prerequisites(c,session);send?.({type:'progress',index:i+1,total:cases.length,id:c.id,label:c.label,prompt:c.prompt});
@@ -164,7 +164,9 @@ export async function runExecutionStream({send,signal=null,actor={},maxCases=27,
         }
         if(status==='OK'){const post=validateCasePostcondition(c,session);if(!post.ok){diagnosis='CE';status='KO';reasons.push(...post.issues);}}
       }
-      updateFocus(session,planned.plan);session.ledger.push({kind:trim(planned.plan?.type).toLowerCase()||'turn',value:`${c.label}: ${trim(planned.plan?.request)||trim(planned.plan?.type)}`});
+      // Un turno KO no debe mutar el foco ni contaminar el ledger que reciben los turnos siguientes.
+      // El laboratorio conserva el fallo en su row/diagnóstico, pero el contexto conversacional solo incorpora turnos válidos.
+      if(status==='OK'){updateFocus(session,planned.plan);session.ledger.push({kind:trim(planned.plan?.type).toLowerCase()||'turn',value:`${c.label}: ${trim(planned.plan?.request)||trim(planned.plan?.type)}`});}
       row={id:c.id,label:c.label,prompt:c.prompt,status,diagnosis,reasons,expected,context,enriched:planned.enriched,plan:planned.plan,rawPlan:planned.raw,translatedActions:translated.actions,executionGuard:translated.guard||null,ceResults,metrics:{planParsed:planned.parsed?.parsed===true,intentCorrect:intent.ok,translationCE:translated.ok&&ta.ok,ceExecuted:ceResults.length>0,ceValid:ceResults.length?ceResults.every(x=>x.validation?.ok):c.expectNoExecution===true},usage:planned.usage,model:planned.model};
     }catch(error){row={id:c.id,label:c.label,prompt:c.prompt,status:'KO',diagnosis:'TRANSPORT',reasons:[error?.message||String(error)],expected,context,plan:null,translatedActions:[],ceResults:[],usage:{totalTokens:0,costEur:0}};}
     rows.push(row);send?.({type:'case',case:row});

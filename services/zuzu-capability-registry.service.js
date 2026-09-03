@@ -81,7 +81,8 @@ export const CAPABILITY_REGISTRY=Object.freeze({
 
 const OP_DESCRIPTIONS={
   event_management:'Gestión operativa del evento: Hitos y tareas LG. No es documentación ni justificantes.',
-  event_liquidations:'Liquidaciones de compras del evento. DEBE = sale dinero de la caja de la Peña; HABER = entra dinero en la caja. Por defecto devuelve movimientos, responsables y resumen de Ticket/s. detail=full despliega todas las líneas/productos de COMPRAS de los TKxx incluidos. Es independiente del Cuadre Banco.',
+  event_bank:'Cuadre Banco / conciliación bancaria del evento: movimientos bancarios, saldos, vínculos y situación de conciliación. Es la capacidad autoritativa cuando el usuario pregunta por banco, cuenta bancaria, cuadre o conciliación bancaria. No son Liquidaciones de compras.',
+  event_liquidations:'Liquidaciones de compras entre la caja de la Peña y responsables de compras. DEBE = sale dinero de la caja de la Peña; HABER = entra dinero en la caja. Por defecto devuelve movimientos de caja, responsables y resumen de Ticket/s. detail=full despliega todas las líneas/productos de COMPRAS de los TKxx incluidos. Es independiente del Cuadre Banco y no representa banco ni conciliación bancaria.',
   event_documentation:'Estado estructurado del expediente: justificantes de ingresos, TKxx/imágenes, DOC/adjuntos y evidencias faltantes. No son Hitos/LG.',
   event_income_status:'Ingresos recibidos/pendientes de ingreso. No representa compras pendientes.',
   event_purchases:'Compras del evento. purchase_status=pending significa pendiente DE COMPRA; realized son compras ya realizadas; all incluye ambas.',

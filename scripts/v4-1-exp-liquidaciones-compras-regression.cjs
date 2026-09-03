@@ -60,8 +60,10 @@ check('selector Ticket carga miniaturas reales',has(ui,'/api/ticket-images?event
 check('miniatura de Ticket se puede ampliar',has(ui,'openTicketImage','ce-liq-image-overlay','data-ce-liq-image'));
 check('selector muestra base contable del Ticket',has(ui,'Base contable:','Banco: SIN APAREAR','lineCount'));
 check('RO mantiene acceso visual a foto y contabilidad',has(ui,'RO · consulta únicamente','ticketThumbHtml','ticketAccountingText'));
-check('Mapa de recursos expone Liquidaciones junto a Responsables/PDF',mapUi.indexOf('id="btnVistaAereaLiquidaciones"')>mapUi.indexOf('id="btnVistaAereaResponsables"'));
-check('Mapa abre la misma ventana de Liquidaciones',has(mapUi,'btnVistaAereaLiquidaciones','openPurchaseSettlements'));
+check('Vista aérea expone Liquidaciones junto a Responsables/PDF',mapUi.indexOf('id="btnVistaAereaLiquidaciones"')>mapUi.indexOf('id="btnVistaAereaResponsables"'));
+check('Mapa de recursos real inyecta Liquidaciones a la derecha de Responsables/PDF',has(ui,'btnMapaLiquidaciones','btnMapaResponsables',"insertAdjacentElement('afterend',btn)"));
+check('Mapa y Vista aérea abren la misma ventana de Liquidaciones',has(mapUi,'btnVistaAereaLiquidaciones','openPurchaseSettlements')&&has(ui,'#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones'));
+check('accesos Liquidaciones se fuerzan habilitados para consulta',has(ui,'hardEnableEntry','pointer-events','btnMapaLiquidaciones'));
 check('RO puede consultar backend y UI queda solo lectura',has(service,"['GD','RW','RO'].includes(clean.nivel)",'Los usuarios RO solo pueden consultar Liquidaciones')&&has(ui,'RO · consulta únicamente'));
 check('Zuzu registra capacidad event_liquidations',has(registry,'event_liquidations','LIQUIDACIONES','settlement_status','detail'));
 check('Zuzu ejecuta liquidaciones desde fuente propia',has(eventAi,"op==='event_liquidations'",'getPurchaseSettlementReadModel','ce_purchase_settlements'));
@@ -69,6 +71,7 @@ check('semántica DEBE/HABER autoritativa para Zuzu',has(eventAi,'DEBE = sale di
 check('detalle estándar no necesita COMPRAS completas',has(eventAi,'detail=standard','resumen de Ticket/s'));
 check('detalle full cruza TKxx con COMPRAS',has(service,"detail==='FULL'",'fullProductRows','ticketCodes.has(normalizeTicket(row.ticket_donacion))')&&has(eventAi,"detail==='full'",'liquidation_products'));
 check('Intérprete conceptual conoce event_liquidations',has(interpreter,"event_liquidations","detail=full","DEBE significa que SALE dinero"));
+check('Intérprete no confunde Cuadre Banco con Liquidaciones',has(interpreter,'DATA/event_bank = Cuadre Banco / cuadre bancario / conciliación bancaria','NUNCA lo sustituyas por event_liquidations'));
 check('INFOEVENTO añade hoja LIQUIDACIONES',has(infoBundle,'addLiquidacionesInfoEventoV413',"x.sheet('LIQUIDACIONES'",'MOVIMIENTOS DE CAJA','TICKET/S INCLUIDO/S'));
 check('INFOEVENTO documenta DEBE/HABER',has(infoBundle,'DEBE = sale dinero de la caja de la Peña','HABER = entra dinero en la caja de la Peña'));
 

@@ -27,6 +27,7 @@ let ok=0,ko=0;function t(name,pass){if(pass){ok++;console.log('OK',name);}else{k
   let translationsOk=0;
   for(const base of h.BASE_CASES){const cdef={...base,prompt:base.prompts[0]},state=h.enrichState(cdef),tr=h.translateConcept(base.expected,state),audit=h.translatorAudit(tr);if(audit.ok)translationsOk++;else console.error('TRANSLATOR KO',base.id,tr.issues,audit.issues);}
   t('30 planes esperados traducibles a CE',translationsOk===30);
+  const bankBase=h.BASE_CASES[29];t('Cuadre bancario pertenece a event_bank',bankBase.expected.request==='event_bank'&&bankBase.prompts.some(x=>/cuadre bancario/i.test(x))&&/DATA\/event_bank = Cuadre Banco/.test(service)&&/NUNCA lo sustituyas por event_liquidations/.test(service));
   const chatBase=h.BASE_CASES[24],chatExpected=chatBase.expected;
   t('saludo exige CHAT/social',chatExpected.type==='CHAT'&&chatExpected.request==='social');
   t('session_summary ya no aprueba saludo',!h.conceptualIntentMatch({type:'CHAT',request:'session_summary'},chatExpected).ok);

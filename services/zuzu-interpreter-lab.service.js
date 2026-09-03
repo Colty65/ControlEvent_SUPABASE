@@ -125,7 +125,8 @@ SEMÁNTICA DE CAPACIDADES:
 - DATA/event_documentation = SOLO documentos, archivos o documentación vinculada al evento. NUNCA sustituye a event_summary.
 - DATA/event_purchases ya significa las compras realizadas del evento en el contrato actual; no necesitas repetir status=realized.
 - DATA/event_income_status usa por defecto el estado pending en el contrato actual; no necesitas repetir status=pending cuando eso es lo pedido.
-- DATA/event_liquidations = liquidaciones de compras. DEBE significa que SALE dinero de la caja de la Peña; HABER significa que ENTRA dinero en la caja de la Peña. Por defecto detail=standard: movimientos + Ticket/s + resumen suficiente de cada Ticket. Si el usuario pide TODO el detalle, todas las líneas o todos los productos de los Tickets incluidos, usa detail=full: CE consultará COMPRAS por esos TKxx. Puedes usar people:[persona] para limitar la liquidación a una persona.
+- DATA/event_bank = Cuadre Banco / cuadre bancario / conciliación bancaria del evento: movimientos bancarios, saldos, vínculos y situación de conciliación. Si el sujeto explícito es banco, cuenta bancaria, cuadre o conciliación bancaria, usa event_bank. NUNCA lo sustituyas por event_liquidations.
+- DATA/event_liquidations = liquidaciones de compras entre la caja de la Peña y responsables de compras. DEBE significa que SALE dinero de la caja de la Peña; HABER significa que ENTRA dinero en la caja de la Peña. Es independiente del Cuadre Banco y NUNCA representa una consulta sobre banco, cuenta bancaria, cuadre o conciliación bancaria. Por defecto detail=standard: movimientos de caja + Ticket/s + resumen suficiente de cada Ticket. Si el usuario pide TODO el detalle, todas las líneas o todos los productos de los Tickets incluidos, usa detail=full: CE consultará COMPRAS por esos TKxx. Puedes usar people:[persona] para limitar la liquidación a una persona.
 - DATA/compare_events obtiene una comparación NUEVA entre eventos identificados. Si ya existe una tabla de comparación en available_datasets y el usuario pregunta por conclusiones, incoherencias o rarezas de ESA tabla, usa TABLE/analyze.
 - PERSON/profile describe datos de la persona en general; no recupera conversaciones pasadas.
 - PERSON/events obtiene los eventos relacionados con la persona.
@@ -191,7 +192,7 @@ const BASE_CASES=Object.freeze([
   c(27,'CLARIFY',['Dime cosas de Manolo.','Háblame de Manolo.','Quiero información sobre Manolo.'],{entity_resolution:{query:'Manolo',status:'ambiguous',candidates:['Pocholo','Pocholo y Celes']}}, {type:'CLARIFY'}),
   c(28,'UNSUPPORTED',['Predice cuántos cubatas beberá cada persona en el próximo evento.','Dime cuántos cubatas va a beber cada uno en el próximo evento.','Pronostica el consumo individual de cubatas de la próxima fiesta.'],{}, {type:'UNSUPPORTED'}),
   c(29,'DATA',['Enséñame los documentos del evento que tengo abierto.','Muéstrame los documentos del evento actual.','Quiero ver la documentación del evento que está en pantalla.'],{screen_event:'FUNCION 2026'}, {type:'DATA',request:'event_documentation',events:['FUNCION 2026']}),
-  c(30,'DATA',['Sácame la situación del banco de SySA 2026.','¿Cómo está el banco de SySA 2026?','Dame la situación bancaria de Sisa 2026.'],{}, {type:'DATA',request:'event_bank',events:['SySA 2026']})
+  c(30,'DATA',['¿Qué hay en el cuadre bancario de SySA 2026?','¿Cómo está el banco de SySA 2026?','Dame la situación de conciliación bancaria de Sisa 2026.'],{}, {type:'DATA',request:'event_bank',events:['SySA 2026']})
 ]);
 
 function scalarMatch(actual,expected){return expected===undefined||same(actual,expected);}

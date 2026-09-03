@@ -1,0 +1,7 @@
+ControlEvent v4_1_exp · FIX5 · 2026-09-03
+
+1. ITV JSON FIX4-27: único KO exec-09. «cuadre bancario» se interpretó como event_liquidations en lugar de event_bank.
+2. Se añade frontera conceptual autoritativa: event_bank = Cuadre/conciliación bancaria; event_liquidations = caja Peña ↔ responsables de compras. Son capacidades independientes y no sustituibles.
+3. La ITV de ejecución no modifica active_focus/session_ledger cuando un turno sale KO, evitando contaminar los siguientes turnos con una interpretación fallida.
+4. Mapa de recursos (pestaña real, no solo Vista aérea): se inyecta [Liquidaciones] inmediatamente después de [Responsables / PDF], abre la misma ventana y queda habilitado también en contexto de consulta/RO.
+5. Batería renombrada a EXECUTION-CONTROLLED-V1-FIX5-27 para distinguir las nuevas pruebas.
