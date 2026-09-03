@@ -1,0 +1,90 @@
+ControlEvent v4_1_exp · FIX10
+P2-R GROUNDED CONTINUITY / TRUST / VOICE DATE RANGE
+
+Origen
+------
+Conversación real de 46 turnos exportada el 03/09/2026 17:03 y grabación WebM
+(~10m20s, Opus mono 48 kHz). FIX9 mejora reentrada de compras, persona y cálculo,
+pero la conversación real muestra fallos de segunda capa: referentes plurales,
+narración de VIEW, repetición por operación, Liquidaciones por persona/tickets,
+identidad no fundamentada y tiempo relativo.
+
+Cambios FIX10
+-------------
+1. VIEW factual narrado de verdad
+   - narrate=true del plan se conserva tras el audit de capability registry.
+   - Preguntas como "¿Quién se encargó principalmente?" sobre la tabla por
+     Responsable ya no quedan reducidas a "Mantengo el dataset...".
+
+2. Comparación de personas por referente plural
+   - Si el plan trae un solo person_profile pero el mensaje pide comparar
+     "los dos/ambos" y hay dos personas recientes, se abren ambos dossiers.
+
+3. DERIVE / seguimiento de métricas
+   - args label= se canoniza a label_field= antes del contrato CE.
+   - Evita KO por "Claves no registradas para derive: label".
+   - Salida numérica local redondea flotantes para evitar colas tipo
+     1145.8400000000001.
+
+4. Repetición por operación reforzada
+   - Las señales de repetir/de nuevo/otra vez activan recuperación del último
+     sujeto de ESA operación aunque el planner olvide repeat=true.
+   - "dime otra vez cómo quedó el banco" vuelve al último event_bank real.
+
+5. Reentrada "el otro / evento anterior"
+   - Una respuesta CHAT sobre el otro miembro de la última comparación se
+     convierte en event_summary real de CE.
+   - Se impide que CHAT fabrique cifras sobre un evento conocido.
+
+6. "Compáralos" sin campo
+   - Si llega erróneamente como DERIVE/MAX sin field y existe una comparación
+     previa, se recupera compare_events en vez de fallar por MAX sin field.
+
+7. Memoria seleccionada
+   - "qué sacas en claro / conclusión / resumen" se normaliza a MEMORY
+     summarize cuando hay episodio seleccionado, incluso si el planner emite
+     read o CHAT.
+
+8. Resumen de sesión
+   - recall_memory(current) y el resumidor usan hasta 80 turnos, no solo 40.
+   - Una conversación de 46 turnos ya no pierde el comienzo.
+
+9. Liquidaciones por persona y detalle
+   - Persona nombrada (p.ej. Cito) se inyecta en event_liquidations.
+   - ticket/producto/justificación fuerza detail=full.
+   - abierta/cerrada fija settlement_status de forma estructurada.
+   - workspace y resultContext conservan settlement_status/detail.
+   - Si no hay abiertas pero sí cerradas, el cierre local muestra magnitudes
+     closed_* en vez de recitar ceros open_*.
+
+10. Identidad y confianza
+    - Si el usuario pregunta quién es, Zuzu solo afirma la identidad autenticada
+      de la sesión ("Aquí te conozco como ...").
+    - Una broma o petición de peloteo no convierte "soy tu creador" en un hecho.
+
+11. Dictado ambiguo
+    - Instrucción explícita: números compactos de voz pueden ser ambiguos
+      (año vs cantidad); si la gramática no resuelve, se pregunta por esa
+      ambigüedad concreta y no se fuerza una interpretación.
+
+12. Tiempo relativo
+    - Parser determinista de rangos DD/MM con "hoy/desde/hasta" usando la fecha
+      local de la sesión.
+    - "desde hoy hasta el 7/9" el 03/09/2026 => 2026-09-03..2026-09-07.
+    - Las fechas pedidas mandan sobre las fechas históricas del evento de
+      contexto y la respuesta por rango se rotula por localidad.
+
+Regresiones
+-----------
+- FIX8 Natural Dialogue Continuity: 29/29
+- FIX9 Dialogue Reentry:             27/27
+- FIX10 Grounded Continuity:          19/19
+- P2-R Minimal Planner:               36/36
+- Ejecución Controlada:               76/76
+- Liquidaciones Compras:              70/70
+- Intérprete Gemini V2.3:             51/51
+- Versionado v4_1_exp:                10/10
+
+No se cambia la arquitectura general ni se añaden respuestas factuales hard-codeadas.
+Los cambios son de continuidad estructurada, normalización de contrato, grounding y
+recuperación del sujeto/fuente autoritativa.
