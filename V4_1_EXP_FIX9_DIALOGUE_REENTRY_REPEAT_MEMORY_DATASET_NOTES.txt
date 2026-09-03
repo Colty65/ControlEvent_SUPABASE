@@ -1,0 +1,73 @@
+ControlEvent v4_1_exp · FIX9
+P2-R REENTRY / REPEAT / MEMORY / DATASETS
+
+Origen de esta revisión
+-----------------------
+Prueba conversacional real de 36 turnos exportada el 03/09/2026 16:15.
+FIX8 mostró una mejora sustancial: evento explícito, perfiles de Colty/Cito,
+memoria search→read→summarize, banco y comparación de eventos ya funcionaban.
+Quedaban fallos de segundo nivel al reentrar en datasets, repetir operaciones,
+resolver referentes largos y profundizar en liquidaciones.
+
+Cambios FIX9
+------------
+1. Repetición por operación
+   - El workspace P2-R publica last_by_operation y last_comparison.
+   - El plan mínimo admite repeat=true.
+   - Una repetición recupera el sujeto de la última ejecución DE ESA MISMA
+     operación, no el último evento mencionado en cualquier tema.
+   - Evita que "dime otra vez cómo quedó el banco" salte a FUNCION 2026 si
+     el banco que se consultó antes era Semana Santa.
+
+2. Reentrada fiable en datasets históricos
+   - Cada working set conserva procedencia: evento/s, persona, operación y
+     marca de tabla primaria.
+   - Cuando varias tablas hermanas de una misma consulta empatan, se prioriza
+     la tabla primaria de aquella consulta.
+   - "Vuelve a las compras de Semana Santa" recupera purchase_lines y no una
+     tabla derivada de una fila o la comparativa posterior.
+
+3. Liquidaciones detail=full
+   - Se separan argumentos key=value incrustados accidentalmente en strings de
+     entidad, por ejemplo "Semana Santa ... - detail=full".
+   - El evento se resuelve limpio y detail=full se conserva como argumento.
+   - Los cierres usan totales closed_* cuando settlement_status=closed.
+
+4. Personas / compras
+   - person_purchases deja de ser una operación inexistente: se canoniza a
+     person_profile con requested_fields=purchases.
+   - La respuesta puede proyectar únicamente compras, registros y tickets.
+
+5. Memoria reabierta después de cambiar de tema
+   - El episodio seleccionado permanece disponible.
+   - MEMORY/read sin conversation_id puede reutilizar selected_memory_episode.
+   - "Vuelve a lo de Pocholo" no necesita lanzar una búsqueda desde cero.
+
+6. Métricas y lenguaje natural
+   - Alias españoles de métricas: gastos→Compras realizadas, ingresos,
+     donaciones, saldo, valoración, asistencia, importe, unidades, etc.
+   - requested_fields/fields se conserva en el plan.
+
+7. Comparación de personas
+   - Si se obtienen dos dossiers PERSON, la comparación básica se construye
+     localmente con magnitudes certificadas equivalentes: nº eventos,
+     ingresos vinculados, compras bajo responsabilidad y donaciones.
+   - Evita una segunda llamada de IA para una comparación aritmética simple.
+
+8. Preguntas factuales sobre VIEW
+   - Preguntas como "¿Quién se encargó principalmente?" sobre una tabla
+     seleccionada activan narración factual del dataset en vez del mensaje
+     genérico "mantengo el dataset".
+
+Regresiones relevantes
+----------------------
+- FIX8 Natural Dialogue Continuity: 29/29
+- FIX9 Dialogue Reentry:             27/27
+- P2-R Minimal Planner:               36/36
+- Ejecución Controlada:               76/76
+- Liquidaciones Compras:              70/70
+- Versionado v4_1_exp:                10/10
+
+No se ha reabierto la arquitectura semántica general ni se han añadido frases
+hard-codeadas de la conversación. Los cambios actúan sobre estado estructurado,
+contratos canónicos, selección de dataset y reparación de argumentos.

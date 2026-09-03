@@ -85,7 +85,8 @@
     "test:interpreter-lab": "node scripts/v4-1-exp-interpreter-gemini-lab-regression.cjs",
     "test:execution-controlled": "node scripts/v4-1-exp-execution-controlled-regression.cjs",
     "test:version-v4-1-exp": "node scripts/v4-1-exp-version-regression.cjs",
-    "test:fix8-dialogue": "node scripts/v4-1-exp-fix8-natural-dialogue-continuity-regression.cjs"
+    "test:fix8-dialogue": "node scripts/v4-1-exp-fix8-natural-dialogue-continuity-regression.cjs",
+    "test:fix9-dialogue": "node scripts/v4-1-exp-fix9-dialogue-reentry-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
