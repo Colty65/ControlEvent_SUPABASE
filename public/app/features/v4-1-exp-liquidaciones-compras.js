@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · LIQUIDACIONES DE COMPRAS V1.7 · FOTO TICKET + CONTABILIDAD + ZUZU/INFOEVENTO
+/* ControlEvent v4_1_exp · LIQUIDACIONES DE COMPRAS V1.8 · FOTO TICKET + CONTABILIDAD + ZUZU/INFOEVENTO
    Caja Peña (DEBE/HABER) + TKxx no liquidados/no conciliados + cierre histórico PDF.
    Independiente del acto de conciliación bancaria: solo consulta si un TKxx ya está apareado. */
 (function(root){
@@ -31,7 +31,7 @@
   let data=null,selectedMovementIds=new Set(),selectedTicketCodes=new Set(),editingId='',loading=false;
 
   async function api(path,options={}){
-    const response=await fetch(path,{cache:'no-store',...options,headers:{'Content-Type':'application/json','X-ControlEvent-Feature':'liquidaciones-compras-v1-7','X-ControlEvent-Actor':actorHeader(),...(options.headers||{})}});
+    const response=await fetch(path,{cache:'no-store',...options,headers:{'Content-Type':'application/json','X-ControlEvent-Feature':'liquidaciones-compras-v1-8','X-ControlEvent-Actor':actorHeader(),...(options.headers||{})}});
     let payload={};try{payload=await response.json();}catch(_){ }
     if(!response.ok)throw new Error(payload?.error||`Error ${response.status}`);
     return payload;
@@ -148,15 +148,31 @@
     const moves=s.movements||[],tickets=s.tickets||[],open=upper(s.status)==='ABIERTA',live=open&&s.calculated?s.calculated:null,t={debe:num(live?.debe??s.totalDebe),haber:num(live?.haber??s.totalHaber),tickets:num(live?.tickets??s.totalTickets),balance:num(live?.balance??s.resultBalance)};const title=`Liquidación ${s.code||''} ${eventTitle()}`;const win=window.open('','_blank','width=1080,height=820');if(!win){alert('El navegador ha bloqueado la ventana del PDF. Permite ventanas emergentes y vuelve a pulsar PDF.');return;}
     win.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4 portrait;margin:12mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#243944;margin:0}header{border-bottom:3px solid #126d70;padding-bottom:9px;margin-bottom:12px}h1{font-size:19px;margin:0;color:#173b4e}header p{font-size:9px;color:#617681;margin:4px 0}.meta{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0}.meta div{border:1px solid #d8e3e7;border-radius:7px;padding:6px}.meta span{display:block;font-size:7px;color:#70838d;text-transform:uppercase}.meta b{font-size:10px;color:#173b4e}h2{font-size:12px;color:#173b4e;margin:13px 0 4px}table{width:100%;border-collapse:collapse;font-size:9px}th,td{padding:5px 6px;border-bottom:1px solid #dfe8eb;text-align:left}th{font-size:7px;text-transform:uppercase;background:#f3f7f8;color:#667b85}.num{text-align:right;white-space:nowrap}.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px}.summary div{padding:7px;border:1px solid #d8e3e7;border-radius:7px}.summary span{display:block;font-size:7px;color:#70838d;text-transform:uppercase}.summary b{font-size:11px;color:#173b4e}.result{margin-top:8px;padding:8px;border:2px solid #9bcfc4;border-radius:8px;font-size:11px;font-weight:bold;color:#155d50}.sign{display:grid;grid-template-columns:1fr 1fr;gap:45px;margin-top:48px}.sign div{border-top:1px solid #687b84;padding-top:5px;font-size:8px;text-align:center}.note{font-size:8px;color:#6c7f88;margin-top:12px}.obs{font-size:8px;color:#4e626c}.code{font-weight:bold;color:#126d70}</style></head><body><header><h1>LIQUIDACIÓN DE COMPRAS · ${esc(eventTitle())}</h1><p>ControlEvent v4_1_exp · <span class="code">${esc(s.code||'')}</span> · cierre ${esc(s.closedAt?new Date(s.closedAt).toLocaleString('es-ES'):new Date().toLocaleString('es-ES'))}</p></header><div class="meta"><div><span>Responsable caja Peña</span><b>${esc(s.cashPersonName||'')}</b></div><div><span>Persona responsable de compras</span><b>${esc(s.counterpartyPersonName||'')}</b></div><div><span>Descripción</span><b>${esc(s.description||'')}</b></div><div><span>Estado</span><b>${esc(s.status||'CERRADA')}</b></div></div><h2>Movimientos de efectivo</h2><table><thead><tr><th>Fecha</th><th>Descripción</th><th>Observaciones</th><th>D/H</th><th class="num">Importe</th></tr></thead><tbody>${moves.map(m=>`<tr><td>${esc(m.date)}</td><td>${esc(m.description)}</td><td class="obs">${esc(m.observations||'')}</td><td>${esc(m.direction)}</td><td class="num">${esc(money(m.amount))}</td></tr>`).join('')||'<tr><td colspan="5">Sin movimientos.</td></tr>'}</tbody></table><h2>Ticket/s incluido/s</h2><table><thead><tr><th>Ticket</th><th>Tienda</th><th>Productos</th><th>Responsable</th><th class="num">Importe</th></tr></thead><tbody>${tickets.map(x=>`<tr><td>${esc(x.ticketCode)}</td><td>${esc(ticketStoreText(x))}</td><td>${esc(ticketProductsText(x))}</td><td>${esc(x.responsiblePersonName||s.counterpartyPersonName||'')}</td><td class="num">${esc(money(x.amount))}</td></tr>`).join('')||'<tr><td colspan="5">Sin Ticket/s.</td></tr>'}</tbody></table><div class="summary"><div><span>DEBE · sale caja</span><b>${esc(money(t.debe))}</b></div><div><span>HABER · entra caja</span><b>${esc(money(t.haber))}</b></div><div><span>Ticket/s JUSTIFICADO/S</span><b>${esc(money(t.tickets))}</b></div><div><span>Saldo</span><b>${esc(money(t.balance))}</b></div></div><div class="result">${esc(resultText(t.balance,s.counterpartyPersonName||'la persona'))}</div><div class="sign"><div>${esc(s.cashPersonName||'Responsable caja')}<br>Responsable caja Peña</div><div>${esc(s.counterpartyPersonName||'Responsable compras')}<br>Persona responsable de compras</div></div><script>window.onload=function(){setTimeout(function(){window.focus();window.print()},220)}<\/script></body></html>`);win.document.close();
   }
-  function hardEnableEntry(btn){if(!btn)return;btn.disabled=false;btn.removeAttribute('disabled');btn.removeAttribute('aria-disabled');btn.style.setProperty('pointer-events','auto','important');btn.style.setProperty('opacity','1','important');}
+  function hardEnableEntry(btn){
+    if(!btn)return;
+    btn.disabled=false;btn.removeAttribute('disabled');btn.removeAttribute('aria-disabled');
+    btn.style.setProperty('pointer-events','auto','important');btn.style.setProperty('opacity','1','important');
+    btn.style.setProperty('position','relative','important');btn.style.setProperty('z-index','4','important');
+    if(btn.__ceLiqDirectBound)return;btn.__ceLiqDirectBound=true;
+    let lastRun=0;
+    const run=ev=>{
+      try{ev?.preventDefault?.();ev?.stopPropagation?.();ev?.stopImmediatePropagation?.();}catch(_){ }
+      const now=Date.now();if(now-lastRun<350)return false;lastRun=now;
+      load();return false;
+    };
+    btn.addEventListener('click',run,true);
+    btn.addEventListener('pointerup',run,true);
+    btn.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' ')run(ev);},true);
+    btn.onclick=run;
+  }
   function ensureButton(){let btn=$('btnPurchaseSettlements');if(!btn){const resp=$('btnComprasResponsables');if(resp){btn=document.createElement('button');btn.type='button';btn.className='outline';btn.id='btnPurchaseSettlements';btn.title='Liquidaciones de compras y movimientos de efectivo';btn.innerHTML='<span>🧾</span> Liquidaciones';resp.insertAdjacentElement('afterend',btn);}}hardEnableEntry(btn);}
   function ensureMapButton(){const resp=$('btnMapaResponsables');let btn=$('btnMapaLiquidaciones');if(!btn&&resp){btn=document.createElement('button');btn.type='button';btn.className='ce-resp-map-launch';btn.id='btnMapaLiquidaciones';btn.title='Liquidaciones de compras y movimientos de efectivo';btn.innerHTML='<span>🧾</span> Liquidaciones';resp.insertAdjacentElement('afterend',btn);}if(btn&&resp&&btn.previousElementSibling!==resp)resp.insertAdjacentElement('afterend',btn);hardEnableEntry(btn);}
   function ensureEntryButtons(){ensureButton();ensureMapButton();hardEnableEntry($('btnVistaAereaLiquidaciones'));}
-  document.addEventListener('click',ev=>{const btn=ev.target?.closest?.('#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones');if(!btn)return;ev.preventDefault();ev.stopPropagation();load();},true);
-  document.addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target?.closest?.('#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones')){ev.preventDefault();load();return;}if(ev.key==='Escape'){if($('ceLiqImageOverlay'))$('ceLiqImageOverlay').remove();else if($('ceLiqPreview'))$('ceLiqPreview').remove();else if(modal())closeModal();}});
+  document.addEventListener('click',ev=>{const btn=ev.target?.closest?.('#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones');if(!btn||btn.__ceLiqDirectBound)return;ev.preventDefault();ev.stopPropagation();load();},true);
+  document.addEventListener('keydown',ev=>{const btn=ev.target?.closest?.('#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones');if((ev.key==='Enter'||ev.key===' ')&&btn&&!btn.__ceLiqDirectBound){ev.preventDefault();load();return;}if(ev.key==='Escape'){if($('ceLiqImageOverlay'))$('ceLiqImageOverlay').remove();else if($('ceLiqPreview'))$('ceLiqPreview').remove();else if(modal())closeModal();}});
   document.addEventListener('DOMContentLoaded',()=>{ensureEntryButtons();[120,500,1200,2500].forEach(ms=>setTimeout(ensureEntryButtons,ms));});
   let entryTimer=0;const entryObs=new MutationObserver(()=>{clearTimeout(entryTimer);entryTimer=setTimeout(ensureEntryButtons,40);});entryObs.observe(document.documentElement,{childList:true,subtree:true});
   ['controlevent:runtime-ready','controlevent:app-ready','controlevent:event-ready','controlevent:event-loaded','controlevent:module-mounted'].forEach(n=>root.addEventListener(n,ensureEntryButtons));
   setTimeout(ensureEntryButtons,1000);
-  root.openPurchaseSettlements=load;
+  root.openPurchaseSettlements=load;root.ControlEventPurchaseSettlements={open:load,version:'v4_1_exp-LIQUIDACIONES-V1.8-MAPA-CLICK'};
 })(window);

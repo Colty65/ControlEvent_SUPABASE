@@ -65,6 +65,7 @@ check('Mapa de recursos real trae botones estáticos Responsables/PDF + Liquidac
 check('Mapa conserva fallback de Liquidaciones a la derecha de Responsables/PDF',has(ui,'btnMapaLiquidaciones','btnMapaResponsables',"insertAdjacentElement('afterend',btn)"));
 check('Mapa y Vista aérea abren la misma ventana de Liquidaciones',has(mapUi,'btnVistaAereaLiquidaciones','openPurchaseSettlements')&&has(ui,'#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones'));
 check('accesos Liquidaciones se fuerzan habilitados para consulta',has(ui,'hardEnableEntry','pointer-events','btnMapaLiquidaciones'));
+check('Mapa Liquidaciones tiene cableado directo robusto como Responsables/PDF',has(ui,'__ceLiqDirectBound',"addEventListener('pointerup',run,true)",'btn.onclick=run','stopImmediatePropagation')&&index.includes('id="btnMapaLiquidaciones"')&&index.includes('onclick="return window.openPurchaseSettlements'));
 check('RO puede consultar backend y UI queda solo lectura',has(service,"['GD','RW','RO'].includes(clean.nivel)",'Los usuarios RO solo pueden consultar Liquidaciones')&&has(ui,'RO · consulta únicamente'));
 check('Zuzu registra capacidad event_liquidations',has(registry,'event_liquidations','LIQUIDACIONES','settlement_status','detail'));
 check('Zuzu ejecuta liquidaciones desde fuente propia',has(eventAi,"op==='event_liquidations'",'getPurchaseSettlementReadModel','ce_purchase_settlements'));

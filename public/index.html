@@ -334,7 +334,7 @@
               <p>Vista conjunta de compras y donaciones para ver la necesidad real del evento por tienda y producto.</p>
             </div>
             <button type="button" id="btnMapaResponsables" class="ce-resp-map-launch" title="Compras y donaciones agrupadas por responsable"><span>👥</span> Responsables / PDF</button>
-            <button type="button" id="btnMapaLiquidaciones" class="ce-resp-map-launch" title="Liquidaciones de compras y movimientos de efectivo"><span>🧾</span> Liquidaciones</button>
+            <button type="button" id="btnMapaLiquidaciones" class="ce-resp-map-launch" title="Liquidaciones de compras y movimientos de efectivo" onclick="return window.openPurchaseSettlements ? (window.openPurchaseSettlements(), false) : false;"><span>🧾</span> Liquidaciones</button>
           </div>
           <div id="mapaProductosSummary" class="mapa-summary-grid"></div>
           <div class="separator"></div>
@@ -728,7 +728,7 @@
     <script src="./app/features/v26-prod-fix9-3-personas-historicas.js?v=20260827-V4_1_EXP-MEMORY-FLASHBACK-BANK2"></script>
   <script src="./app/features/v28-5-1-prod-detail-globes.js?v=20260827-V4_1_EXP-MEMORY-FLASHBACK-BANK2"></script>
   <script src="./app/features/v4-1-exp-responsables-pdf.js?v=20260827-V4_1_EXP-BANK43-RESP-TITULO"></script>
-  <script src="./app/features/v4-1-exp-liquidaciones-compras.js?v=20260903-V4_1_EXP-LIQUIDACIONES-COMPRAS-V1_7-MAPA-STATIC"></script>
+  <script src="./app/features/v4-1-exp-liquidaciones-compras.js?v=20260903-V4_1_EXP-LIQUIDACIONES-COMPRAS-V1_8-MAPA-CLICK"></script>
   <script src="./app/features/v4-1-exp-donaciones-situacion.js?v=20260827-V4_1_EXP-BANK43-DONACIONES-ESTADO"></script>
   <script src="./app/features/v4-1-exp-version-hardlock.js?v=20260827-V4_1_EXP-MEMORY-FLASHBACK-BANK2"></script>
   </body>

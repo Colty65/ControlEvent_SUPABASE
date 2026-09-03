@@ -104,3 +104,9 @@ No se conecta todavía el cierre de la liquidación con el acto de conciliación
 - Cada Ticket disponible muestra miniatura de su foto real de `ce_ticket_images`; clic/tap amplía el justificante sin cambiar la selección.
 - Junto al Ticket se muestra la base contable: número de líneas de compra, suma del Ticket y estado de apareo en Banco.
 - La miniatura y la información contable son visibles también para RO; los controles de escritura continúan deshabilitados.
+
+## V1.8 · acceso robusto desde Mapa de recursos
+- El botón `[Liquidaciones]` de **Mapa de recursos** usa el mismo patrón de enlace robusto que `[Responsables / PDF]`: `click`, `pointerup`, teclado y `onclick` directo, con antirrebote para evitar dobles aperturas.
+- Se mantiene además el listener delegado como fallback, pero ya no es el único camino de entrada.
+- El botón se fuerza habilitado y por encima de posibles capas de la cabecera (`pointer-events`, `position`, `z-index`) para evitar que un control visible quede sin respuesta al pulsarlo.
+- Vista aérea conserva sus accesos `[Responsables / PDF]` y `[Liquidaciones]` sin cambios funcionales.
