@@ -18310,6 +18310,31 @@ function vnextP2ContextFromResults(results=[],final={},history=[],userPrompt='')
   if(people.length)out.current_entities=people;else{for(let i=arr(history).length-1;i>=0;i--){const e=arr(history)[i]?.resultContext?.current_entities;if(arr(e).length){out.current_entities=arr(e).map(trim).filter(Boolean).slice(0,8);break;}}}
   return out;
 }
+
+function vnextP2RPlanJsonSchema(){
+  return {type:'object',properties:{
+    intent:{type:'string',enum:['DATA','VIEW','CALCULATE','MEMORY','PERSON','CHAT']},
+    operation:{type:'string'},target:{type:'string'},entities:{type:'array',items:{type:'string'}},args:{type:'string'},response:{type:'string'},narrate:{type:'boolean'}
+  },required:['intent']};
+}
+function vnextP2RNormalizePlanObject(value={}){
+  const x=(value&&typeof value==='object'&&!Array.isArray(value))?value:{};
+  const intent=trim(x.intent).toUpperCase(),allowed=new Set(['DATA','VIEW','CALCULATE','MEMORY','PERSON','CHAT']);
+  if(!allowed.has(intent))throw new Error(`Plan P2-R alternativo sin intent válido: ${intent||'—'}.`);
+  return {intent,operation:trim(x.operation),target:trim(x.target),entities:arr(x.entities).map(trim).filter(Boolean).slice(0,8),args:trim(x.args),response:trim(x.response),narrate:x.narrate===true};
+}
+async function vnextP2RGenerateContentPlan({input='',model='',systemInstruction='',flowTrace=[],externalSignal=null}={}){
+  const apiKey=geminiKey();if(!apiKey){const e=new Error('Falta GEMINI_API_KEY para Zuzu.');e.status=503;throw e;}
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const fallbackInstruction=`${systemInstruction}\n\nFALLBACK TÉCNICO DE PROTOCOLO: no hay function_call disponible en esta llamada. Devuelve SOLO el objeto JSON equivalente a plan_turn con exactamente los mismos campos y significado. No respondas al usuario fuera de response cuando intent=CHAT.`;
+  const body={systemInstruction:{parts:[{text:fallbackInstruction}]},contents:[{role:'user',parts:[{text:String(input||'')}]}],generationConfig:{responseMimeType:'application/json',responseSchema:vnextP2RPlanJsonSchema(),temperature:0.05,maxOutputTokens:560,thinkingConfig:{thinkingBudget:0}}};
+  let res,payload;try{({res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_PLANNER_TIMEOUT_MS||22000),externalSignal));}
+  catch(error){zuzuTracePush(flowTrace,'VNEXT P2-R · fallback generateContent','KO',cleanGeminiError(error),{model});throw error;}
+  const usage=usageSmall(payload,model);if(!res.ok){const e=new Error(payload?.error?.message||`Gemini generateContent HTTP ${res.status}`);e.status=res.status;e.details=payload;zuzuTracePush(flowTrace,'VNEXT P2-R · fallback generateContent','KO',cleanGeminiError(e),{model,usage});throw e;}
+  const raw=trim(geminiOutText(payload));let parsed={};try{parsed=JSON.parse(raw||'{}');}catch(_){try{parsed=parsePlanJsonLenientHf37(raw).parsed||{};}catch(__){parsed={};}}
+  const plan=vnextP2RNormalizePlanObject(parsed);zuzuTracePush(flowTrace,'VNEXT P2-R · fallback generateContent','OK',`Plan mínimo recuperado por transporte alternativo · intent=${plan.intent} · operation=${plan.operation||'—'}.`,{model,usage});
+  return {payload,plan,usage};
+}
 async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,externalSignal=null,conversationId=''}={}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP2Tools();
   let state=null,stateWaitMs=0,calls=0,decisionMs=0,toolMs=0,narrationMs=0,payload=null,final={title:'Zuzu',answer:'',warnings:[]},results=[],tables=[],charts=[];
@@ -18319,8 +18344,16 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
   const systemInstruction=vnextP2SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime,screenEventName});
   zuzuTracePush(flowTrace,'VNEXT P2-R · ARQUITECTURA','OK','1 plan_turn mínimo → traductor determinista CE → contratos canónicos → cierre local. Gemini entiende; CE conoce contratos; el estado recuerda.');
   zuzuTracePush(flowTrace,'VNEXT P2 · WORKSPACE','OK',JSON.stringify(vnextP2Workspace(conversationHistory,screenEventName)||{}).slice(0,900));
-  const d0=Date.now();payload=await v261CallInteraction({input:vnextP2Input(userPrompt,conversationHistory,screenEventName),previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'VNEXT P2-R · planificador mínimo',toolChoice:'required',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?360:560,minOutputTokens:160,plainTextResponse:true});calls++;decisionMs=Date.now()-d0;
-  const payloadId=trim(payload?.id),rawCalls=v261FunctionCalls(payload),functionCalls=vnextP2NormalizeCalls(rawCalls,conversationHistory,flowTrace);
+  const d0=Date.now(),plannerInput=vnextP2Input(userPrompt,conversationHistory,screenEventName);let rawCalls=[],plannerFallbackUsed=false,plannerPrimaryError='';
+  try{
+    payload=await v261CallInteraction({input:plannerInput,previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'VNEXT P2-R · planificador mínimo',toolChoice:'required',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?360:560,minOutputTokens:160,plainTextResponse:true});calls++;rawCalls=v261FunctionCalls(payload);
+    if(!rawCalls.some(x=>trim(x?.name)==='plan_turn')){const raw=trim(v261OutputText(payload));const e=new Error(raw?'Gemini no devolvió plan_turn en el canal de función.':'Gemini devolvió una Interaction sin plan_turn.');e.code='P2R_PLAN_PROTOCOL';throw e;}
+  }catch(error){
+    plannerPrimaryError=cleanGeminiError(error);zuzuTracePush(flowTrace,'VNEXT P2-R · PLAN TRANSPORT GUARD','WARN',`Falla el canal Interactions/function_call (${plannerPrimaryError}). Se intenta una sola vez el mismo plan mínimo por generateContent; no se cambia la semántica ni se reinterpreta un plan ya válido.`);
+    const fb=await vnextP2RGenerateContentPlan({input:plannerInput,model,systemInstruction,flowTrace,externalSignal});calls++;plannerFallbackUsed=true;payload=fb.payload;rawCalls=[{id:`p2r_fallback_${Date.now().toString(36)}`,name:'plan_turn',arguments:fb.plan}];
+  }
+  decisionMs=Date.now()-d0;
+  const payloadId=trim(payload?.id),functionCalls=vnextP2NormalizeCalls(rawCalls,conversationHistory,flowTrace);
   if(!functionCalls.length){
     const raw=trim(v261OutputText(payload)),leak=vnextP110LooksLikeInternalCall(raw);if(leak)zuzuTracePush(flowTrace,'VNEXT P2 · PROTOCOL GUARD','WARN','La única decisión imprimió protocolo interno; no se reintenta ni se expone.');
     final={title:'Zuzu',answer:leak?'No he podido convertir esa petición en una acción válida. Dime qué dato quieres y seguimos desde el mismo punto.':(raw||'No he podido cerrar esa respuesta con suficiente claridad.'),warnings:[]};
@@ -18362,7 +18395,7 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
   const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),answer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.';const unitGuard=v416VoiceUnitOracle(answer,answer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||answer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true),usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),presentationEvidence=vnextP124PresentationEvidence(finalTables,charts.slice(0,8));
   zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo normal=1, máximo arquitectónico=2) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:finalTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R · planificador mínimo 6 intenciones · traductor determinista CE · 1 llamada normal / 2 solo narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.result?.facts?.operation||x?.capabilityAudit?.effectiveOperation||x?.args?.operation),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:charts.slice(0,8),tables:finalTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R · planificador mínimo 6 intenciones · traductor determinista CE · 1 llamada normal / 2 solo narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.result?.facts?.operation||x?.capabilityAudit?.effectiveOperation||x?.args?.operation),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){

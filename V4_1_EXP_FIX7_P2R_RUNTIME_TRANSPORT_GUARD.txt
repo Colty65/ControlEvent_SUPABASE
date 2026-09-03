@@ -1,0 +1,32 @@
+ControlEvent v4_1_exp · FIX7 · P2-R RUNTIME TRANSPORT GUARD
+03/09/2026
+
+MOTIVO
+La batería EXECUTION-CONTROLLED-V1-FIX6-27 alcanza 27/27, pero una conversación real exportada a PDF devuelve el mismo soft-failure P2 en cinco turnos consecutivos, incluyendo event_summary, continuidad de compras, responsable y PERSON.
+
+DIAGNÓSTICO
+No se modifica la arquitectura semántica ni los contratos CE. El síntoma común está antes de la ejecución útil de P2-R: el planificador mínimo live depende del canal Gemini Interactions/function_call para obtener plan_turn. La ITV controlada certifica intérprete/traducción/CE, pero no demuestra que ese canal de transporte funcione siempre en el runtime conversacional real.
+
+CAMBIO CONTROLADO
+1. Camino normal: una única llamada Gemini Interactions con plan_turn requerido.
+2. Solo si esa llamada falla a nivel transporte/protocolo o no devuelve plan_turn, se hace UNA llamada alternativa a generateContent.
+3. generateContent devuelve el MISMO objeto mínimo equivalente a plan_turn mediante responseMimeType=application/json y responseSchema.
+4. No se reinterpreta un plan ya válido, no se añaden reglas lingüísticas y no se ejecuta ninguna capacidad por inferencia local.
+5. El plan recuperado entra por el MISMO vnextP2NormalizeCalls -> vnextP2RPlanToCalls -> contratos CE.
+6. Si fallan ambos canales, se conserva el soft-failure exterior existente.
+7. Telemetría: meta.performance.plannerFallbackUsed y plannerPrimaryError permiten saber si se activó el guard y por qué.
+
+PRUEBAS
+- v4-1-exp-vnext-p2r-runtime-transport-regression.cjs: 18/18
+- v4-1-exp-vnext-p2r-minimal-planner-regression.cjs: 36/36
+- v4-1-exp-execution-controlled-regression.cjs: 76/76
+- v4-1-exp-liquidaciones-compras-regression.cjs: 70/70
+- v4-1-exp-version-regression.cjs: 10/10
+- node --check services/event-ai.service.js: OK
+- Smoke runtime aislado: Interactions simulado HTTP 500 -> generateContent -> plan_turn CHAT -> respuesta final correcta; plannerFallbackUsed=true y plannerPrimaryError preservado.
+
+NO TOCADO
+- Capacidades CE.
+- Semántica Banco/Liquidaciones.
+- Memoria ya cerrada en FIX6.
+- Botones/UI Liquidaciones V1.8 del ZIP anterior.
