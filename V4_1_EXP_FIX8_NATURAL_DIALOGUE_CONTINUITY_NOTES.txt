@@ -1,0 +1,62 @@
+ControlEvent v4_1_exp · FIX8 · Continuidad natural P2-R
+Fecha: 2026-09-03
+
+Origen
+------
+Conversación real de 39 turnos (03/09/2026). La ITV controlada 27/27 había certificado Intérprete -> traductor -> CE, pero la conversación larga mostró errores de continuidad entre sujetos, datasets y memoria.
+
+Cambios acotados
+----------------
+1. SUJETO EXPLÍCITO > EVENTO DE PANTALLA
+   - Un evento o persona nombrado en el turno actual manda sobre screen_event.
+   - Se reconocen nombres hablados y el nombre canónico de evento sin el sufijo entre paréntesis.
+   - Se impide reutilizar un foco event/dataset como si fuera una persona.
+
+2. ESTADO CONVERSACIONAL ESTRUCTURADO
+   - P2-R recibe recent_events y recent_people separados y ordenados por referencia reciente.
+   - Añade last_action factual para poder revisar un dato anterior sin cambiar de tema accidentalmente.
+   - La completitud de datasets se expone al planificador.
+   - Al cambiar de foco a event/dataset se limpia current_entities de persona para evitar contaminación.
+
+3. COMPARACIONES Y SEGUIMIENTOS
+   - compare_events se completa con dos eventos reales a partir del turno actual + eventos recientes.
+   - Una comparación de personas se traduce en dossiers person_profile paralelos y narración factual; no en compare_events.
+   - CALCULATE tolera un seguimiento corto reutilizando el último operador de cálculo válido cuando el modelo coloca el campo en operation.
+
+4. COMPRAS POR RESPONSABLE
+   - event_purchases añade tabla completa by_responsible (no muestra truncada): responsable, registros, productos distintos, tickets, importe y tiendas.
+   - facts añade top_responsible y top_responsible_amount.
+   - Evita intentar ordenar/filtrar purchase_lines cuando ese dataset es una muestra incompleta.
+
+5. MEMORIA
+   - MEMORY search puede construir query desde entities/foco personal.
+   - MEMORY read sin índice abre el primer resultado materializado de la búsqueda previa.
+   - MEMORY summarize reutiliza el episodio ya seleccionado.
+   - session_summary usa recall_memory/current y resume el transcript de sesión, no solo el último asunto.
+
+6. ANÁLISIS DE TABLAS
+   - "analiza / qué llama la atención" sobre un dataset visible se traduce a summarize_current con narración factual.
+   - Gemini narra solo datos certificados del dataset; no razona libremente sobre cifras recordadas.
+   - La narración exige verificar aritméticamente cualquier mayor/menor/diferencia antes de expresarlo; si no puede verificarlo, describe los valores sin compararlos.
+
+7. LIQUIDACIONES / REVISIÓN DE HECHOS
+   - El prompt de P2-R explicita settlement_status open/closed/all y detail=full para tickets/productos.
+   - Una objeción factual del usuario se apoya en last_action para reabrir la misma operación y sujeto, en vez de saltar a otra entidad.
+   - Se conserva intacto Liquidaciones V1.8 y el acceso desde Mapa de recursos.
+
+Regresión nueva
+---------------
+npm run test:fix8-dialogue
+29 OK / 0 KO. Cubre sujeto explícito, persona/evento, comparación de eventos y personas, memoria, sesión, análisis de dataset, continuidad de cálculo, recent_events/recent_people y compra por responsable.
+
+Suites relevantes
+-----------------
+- test:vnext-p2r
+- test:execution-controlled
+- test:interpreter-lab
+- test:liquidaciones-compras
+- test:version-v4-1-exp
+
+Nota de compatibilidad
+----------------------
+La suite histórica test:vnext-p2 contiene aserciones estáticas de una etapa anterior de P2 (nombres/builds y prohibición absoluta de guardas post-Gemini). Ya estaba roja en FIX7. No se utiliza como criterio de aceptación de FIX8; se vigila que FIX8 no empeore su baseline.
