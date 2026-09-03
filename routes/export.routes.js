@@ -220,6 +220,17 @@ async function rawCompraRowsForBackup(scope){
   }
 }
 
+async function rawPurchaseSettlementRowsForBackup(scope){
+  const scopeText=norm(scope||'TODOS'); const all=!scopeText||scopeText==='TODOS';
+  const applyScope=(q)=>all?q:q.eq('event_id',scopeText);
+  const [settlements,movements,tickets]=await Promise.all([
+    fetchAllSupabaseRows(()=>applyScope(getSupabaseAdmin().from('ce_purchase_settlements').select('*').order('event_id').order('created_at').order('id'))),
+    fetchAllSupabaseRows(()=>applyScope(getSupabaseAdmin().from('ce_purchase_cash_movements').select('*').order('event_id').order('movement_date').order('created_at').order('id'))),
+    fetchAllSupabaseRows(()=>applyScope(getSupabaseAdmin().from('ce_purchase_settlement_tickets').select('*').order('event_id').order('ticket_code').order('id')))
+  ]);
+  return {settlements:settlements||[],movements:movements||[],tickets:tickets||[]};
+}
+
 async function rawHitosRowsForBackup(scope){
   const scopeText=norm(scope||'TODOS'); const all=!scopeText||scopeText==='TODOS';
   const [hitos,lgs]=await Promise.all([
@@ -774,6 +785,21 @@ async function buildBackupWorkbook(fullState, scope){
     addRows('LG',['AVISO'],[[operationalError?.message||String(operationalError)]]);
   }
   try{
+    const liquidation=await rawPurchaseSettlementRowsForBackup(scope);
+    addRows('LIQUIDACIONES', ['ID','SETTLEMENT_CODE','EVENT_ID','CASH_PERSON_ID','COUNTERPARTY_PERSON_ID','CASH_PERSON_NAME_SNAPSHOT','COUNTERPARTY_PERSON_NAME_SNAPSHOT','DESCRIPTION','STATUS','TOTAL_DEBE','TOTAL_HABER','TOTAL_TICKETS','RESULT_BALANCE','CLOSED_AT','CLOSED_BY','REOPENED_AT','REOPENED_BY','CREATED_AT','UPDATED_AT'], liquidation.settlements.map(row=>[
+      row.id||'',row.settlement_code||'',row.event_id||'',row.cash_person_id||'',row.counterparty_person_id||'',row.cash_person_name_snapshot||'',row.counterparty_person_name_snapshot||'',row.description||'',row.status||'ABIERTA',row.total_debe??0,row.total_haber??0,row.total_tickets??0,row.result_balance??0,row.closed_at||'',row.closed_by||'',row.reopened_at||'',row.reopened_by||'',row.created_at||'',row.updated_at||''
+    ]));
+    addRows('LIQUIDACION_MVTOS', ['ID','SETTLEMENT_ID','EVENT_ID','CASH_PERSON_ID','COUNTERPARTY_PERSON_ID','CASH_PERSON_NAME_SNAPSHOT','COUNTERPARTY_PERSON_NAME_SNAPSHOT','MOVEMENT_DATE','DESCRIPTION','DIRECTION','AMOUNT','OBSERVATIONS','STATUS','CREATED_BY','UPDATED_BY','CREATED_AT','UPDATED_AT'], liquidation.movements.map(row=>[
+      row.id||'',row.settlement_id||'',row.event_id||'',row.cash_person_id||'',row.counterparty_person_id||'',row.cash_person_name_snapshot||'',row.counterparty_person_name_snapshot||'',row.movement_date||'',row.description||'',row.direction||'',row.amount??0,row.observations||'',row.status||'ABIERTA',row.created_by||'',row.updated_by||'',row.created_at||'',row.updated_at||''
+    ]));
+    addRows('LIQUIDACION_TK', ['ID','SETTLEMENT_ID','EVENT_ID','TICKET_CODE','TICKET_AMOUNT_SNAPSHOT','RESPONSIBLE_PERSON_ID','RESPONSIBLE_PERSON_NAME_SNAPSHOT','PURCHASE_IDS_JSON','CREATED_AT'], liquidation.tickets.map(row=>[
+      row.id||'',row.settlement_id||'',row.event_id||'',row.ticket_code||'',row.ticket_amount_snapshot??0,row.responsible_person_id||'',row.responsible_person_name_snapshot||'',jsonCell(row.purchase_ids),row.created_at||''
+    ]));
+  }catch(liquidationError){
+    console.warn('[ControlEvent v4_0_exp] No se pudieron añadir Liquidaciones de Compras al BACKUP.',liquidationError?.message||liquidationError);
+    ['LIQUIDACIONES','LIQUIDACION_MVTOS','LIQUIDACION_TK'].forEach(name=>addRows(name,['AVISO'],[[liquidationError?.message||String(liquidationError)]]));
+  }
+  try{
     const bank=await exportBankData({accountId:'TODOS',eventId:scope==='TODOS'?'':scope});
     const bankMovements=Array.isArray(bank?.movements)?bank.movements:[];
     const bankLinks=Array.isArray(bank?.links)?bank.links:[];
@@ -840,7 +866,13 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
   if(all && (!accessUsers.length || !accessUsers.some(row=>norm(row.nivel).toUpperCase()==='GD'))){
     const err=new Error('El BACKUP total no contiene una tabla ACCESOS válida con al menos un usuario GD. Restauración cancelada.');err.status=400;throw err;
   }
+  const restorePurchaseSettlements=tables.purchaseSettlementsPresent===true;
   if(all){
+    if(restorePurchaseSettlements){
+      await deleteRowsByPk('ce_purchase_settlement_tickets','id');
+      await deleteRowsByPk('ce_purchase_cash_movements','id');
+      await deleteRowsByPk('ce_purchase_settlements','id');
+    }
     await deleteRowsByPk('ce_persona_aliases','persona_id');
     await deleteRowsByPk('ce_bank_income_links','id');
     await deleteRowsByPk('ce_bank_movement_settlements','movement_id');
@@ -853,6 +885,11 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
     await deleteRowsByPk('ce_hitos','id');
     await deleteRowsByPk('ce_event_person_snapshots','event_id');
   }else{
+    if(restorePurchaseSettlements){
+      await deleteRowsByPk('ce_purchase_settlement_tickets','id',q=>q.eq('event_id',scope));
+      await deleteRowsByPk('ce_purchase_cash_movements','id',q=>q.eq('event_id',scope));
+      await deleteRowsByPk('ce_purchase_settlements','id',q=>q.eq('event_id',scope));
+    }
     await deleteRowsByPk('ce_bank_income_links','id',q=>q.eq('event_id',scope));
     await deleteRowsByPk('ce_bank_ticket_links','id',q=>q.eq('event_id',scope));
     await deleteRowsByPk('ce_bank_event_movement_state','movement_id',q=>q.eq('event_id',scope));
@@ -871,6 +908,11 @@ router.post('/export/restore-extended', asyncHandler(async (req,res)=>{
     await deleteRowsNotInPk('ce_ticket_images','image_key',(Array.isArray(tables.ticketImageRows)?tables.ticketImageRows:[]).map(row=>row.image_key));
   }
   counts.personAliases=await upsertChunks('ce_persona_aliases',tables.personAliases,'persona_id,alias');
+  if(restorePurchaseSettlements){
+    counts.purchaseSettlements=await upsertChunks('ce_purchase_settlements',tables.purchaseSettlements,'id');
+    counts.purchaseCashMovements=await upsertChunks('ce_purchase_cash_movements',tables.purchaseCashMovements,'id');
+    counts.purchaseSettlementTickets=await upsertChunks('ce_purchase_settlement_tickets',tables.purchaseSettlementTickets,'id');
+  }
   counts.bankImportBatches=await upsertChunks('ce_bank_import_batches',tables.bankImportBatches,'id');
   counts.bankMovements=await upsertChunks('ce_bank_movements',tables.bankMovements,'id');
   counts.bankEventSettings=await upsertChunks('ce_bank_event_settings',tables.bankEventSettings,'event_id');

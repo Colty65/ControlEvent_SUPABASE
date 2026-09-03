@@ -108,8 +108,22 @@
     const ticketImages={};sheetRows(wb,'CE_TICKET_IMAGES_BBDD').forEach(r=>{const key=norm(pick(r,'IMAGE_KEY'));const value=norm(pick(r,'PUBLIC_URL'))||norm(pick(r,'PATHNAME'))||norm(pick(r,'STORAGE_PATH'));if(key&&value)ticketImages[key]=value;});
     return {__forceReplaceAll:true,__allowEmptyReplace:true,eventos,personas,tiendas,productos,colaboradores,compras,eventDocuments,ticketImages,selectedEventId:eventos[0]?.id||''};
   }
+  function sheetHasHeaders(wb,name,required=[]){
+    const key=(wb.SheetNames||[]).find(n=>up(n)===up(name));if(!key)return false;
+    const rows=window.XLSX.utils.sheet_to_json(wb.Sheets[key],{header:1,defval:'',raw:false});
+    const headers=(rows?.[0]||[]).map(v=>up(v).replace(/[^A-Z0-9_]+/g,'_'));
+    return required.every(req=>headers.includes(up(req).replace(/[^A-Z0-9_]+/g,'_')));
+  }
   function extendedTables(wb){
+    const purchaseSettlementsPresent=
+      sheetHasHeaders(wb,'LIQUIDACIONES',['ID','SETTLEMENT_CODE','EVENT_ID']) &&
+      sheetHasHeaders(wb,'LIQUIDACION_MVTOS',['ID','SETTLEMENT_ID','EVENT_ID']) &&
+      sheetHasHeaders(wb,'LIQUIDACION_TK',['ID','SETTLEMENT_ID','EVENT_ID','TICKET_CODE']);
     return {
+      purchaseSettlementsPresent,
+      purchaseSettlements:purchaseSettlementsPresent?sheetRows(wb,'LIQUIDACIONES').map(r=>({id:norm(pick(r,'ID')),settlement_code:norm(pick(r,'SETTLEMENT_CODE')),event_id:norm(pick(r,'EVENT_ID')),cash_person_id:norm(pick(r,'CASH_PERSON_ID')),counterparty_person_id:norm(pick(r,'COUNTERPARTY_PERSON_ID')),cash_person_name_snapshot:norm(pick(r,'CASH_PERSON_NAME_SNAPSHOT'))||null,counterparty_person_name_snapshot:norm(pick(r,'COUNTERPARTY_PERSON_NAME_SNAPSHOT'))||null,description:norm(pick(r,'DESCRIPTION'))||null,status:up(pick(r,'STATUS'))==='CERRADA'?'CERRADA':'ABIERTA',total_debe:number(pick(r,'TOTAL_DEBE')),total_haber:number(pick(r,'TOTAL_HABER')),total_tickets:number(pick(r,'TOTAL_TICKETS')),result_balance:number(pick(r,'RESULT_BALANCE')),closed_at:norm(pick(r,'CLOSED_AT'))||null,closed_by:norm(pick(r,'CLOSED_BY'))||null,reopened_at:norm(pick(r,'REOPENED_AT'))||null,reopened_by:norm(pick(r,'REOPENED_BY'))||null,created_at:norm(pick(r,'CREATED_AT'))||undefined,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.id):[],
+      purchaseCashMovements:purchaseSettlementsPresent?sheetRows(wb,'LIQUIDACION_MVTOS').map(r=>({id:norm(pick(r,'ID')),settlement_id:norm(pick(r,'SETTLEMENT_ID'))||null,event_id:norm(pick(r,'EVENT_ID')),cash_person_id:norm(pick(r,'CASH_PERSON_ID')),counterparty_person_id:norm(pick(r,'COUNTERPARTY_PERSON_ID')),cash_person_name_snapshot:norm(pick(r,'CASH_PERSON_NAME_SNAPSHOT'))||null,counterparty_person_name_snapshot:norm(pick(r,'COUNTERPARTY_PERSON_NAME_SNAPSHOT'))||null,movement_date:norm(pick(r,'MOVEMENT_DATE')),description:norm(pick(r,'DESCRIPTION')),direction:up(pick(r,'DIRECTION')),amount:number(pick(r,'AMOUNT')),observations:norm(pick(r,'OBSERVATIONS'))||null,status:up(pick(r,'STATUS'))==='CERRADA'?'CERRADA':'ABIERTA',created_by:norm(pick(r,'CREATED_BY'))||null,updated_by:norm(pick(r,'UPDATED_BY'))||null,created_at:norm(pick(r,'CREATED_AT'))||undefined,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.id):[],
+      purchaseSettlementTickets:purchaseSettlementsPresent?sheetRows(wb,'LIQUIDACION_TK').map(r=>({id:norm(pick(r,'ID')),settlement_id:norm(pick(r,'SETTLEMENT_ID')),event_id:norm(pick(r,'EVENT_ID')),ticket_code:norm(pick(r,'TICKET_CODE')),ticket_amount_snapshot:number(pick(r,'TICKET_AMOUNT_SNAPSHOT')),responsible_person_id:norm(pick(r,'RESPONSIBLE_PERSON_ID'))||null,responsible_person_name_snapshot:norm(pick(r,'RESPONSIBLE_PERSON_NAME_SNAPSHOT'))||null,purchase_ids:parseJson(pick(r,'PURCHASE_IDS_JSON')),created_at:norm(pick(r,'CREATED_AT'))||undefined})).filter(r=>r.id):[],
       accessUsers:sheetRows(wb,'ACCESOS').map(r=>({identificacion:norm(pick(r,'IDENTIFICACION')),nombre:norm(pick(r,'NOMBRE')),clave:norm(pick(r,'CLAVE')),nivel:up(pick(r,'NIVEL'))||'RO',created_at:norm(pick(r,'CREATED_AT'))||undefined,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.identificacion),
       metaRows:sheetRows(wb,'META_BBDD').map(r=>({key:norm(pick(r,'KEY')),value:parseJsonValue(pick(r,'VALUE_JSON')),updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.key),
       ticketImageRows:sheetRows(wb,'CE_TICKET_IMAGES_BBDD').map(r=>({image_key:norm(pick(r,'IMAGE_KEY')),event_id:norm(pick(r,'EVENT_ID')),label:norm(pick(r,'LABEL')),public_url:norm(pick(r,'PUBLIC_URL'))||null,pathname:norm(pick(r,'PATHNAME'))||null,storage_path:norm(pick(r,'STORAGE_PATH'))||null,content_type:norm(pick(r,'CONTENT_TYPE'))||null,size_bytes:number(pick(r,'SIZE_BYTES'))||null,created_at:norm(pick(r,'CREATED_AT'))||undefined,updated_at:norm(pick(r,'UPDATED_AT'))||undefined})).filter(r=>r.image_key),
@@ -137,7 +151,7 @@
     if(!coreRes.ok){let d={};try{d=await coreRes.json();}catch(_){ }throw new Error(d?.error||`No se pudo restaurar el núcleo (${coreRes.status}).`);}
     const extRes=await fetch('/api/export/restore-extended',{method:'POST',headers:{'Content-Type':'application/json','X-ControlEvent-Actor':actorHeader()},body:JSON.stringify({scope:backupScope(wb),tables:extendedTables(wb)})});
     let ext={};try{ext=await extRes.json();}catch(_){ }if(!extRes.ok)throw new Error(ext?.error||`No se pudieron restaurar Banco/Hitos/LG (${extRes.status}).`);
-    if(status){status.textContent=`BACKUP restaurado completamente. Accesos: ${ext?.counts?.accessUsers||0}; Banco: ${ext?.counts?.bankMovements||0} movimientos; Hitos: ${ext?.counts?.hitos||0}; LG: ${ext?.counts?.lgs||0}. Recargando…`;status.className='ok';}
+    if(status){status.textContent=`BACKUP restaurado completamente. Accesos: ${ext?.counts?.accessUsers||0}; Liquidaciones: ${ext?.counts?.purchaseSettlements||0}; Banco: ${ext?.counts?.bankMovements||0} movimientos; Hitos: ${ext?.counts?.hitos||0}; LG: ${ext?.counts?.lgs||0}. Recargando…`;status.className='ok';}
     setTimeout(()=>location.reload(),900);return true;
   }
   document.addEventListener('click',async ev=>{
