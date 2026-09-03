@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · ITV EJECUCIÓN CONTROLADA V1 FIX5
+/* ControlEvent v4_1_exp · ITV EJECUCIÓN CONTROLADA V1 FIX6
    Laboratorio read-only: contexto real -> Intérprete Gemini V2.3 -> traductor conceptual ->
    executor canónico CE REAL. No sustituye Zuzu, no genera respuesta narrativa y no escribe BBDD. */
 import { getState } from './state.service.js';
@@ -100,7 +100,7 @@ function rememberResultDatasets(session,result,capability,args){
   const sets=vnextP125WorkingSetsFromResult(result,capability==='recall_memory'?'recall_memory':'query_ce',{operation:capability,...(args||{})});
   sets.forEach((ws,i)=>mergeDataset(session,ws,{makeCurrent:i===0}));
 }
-function updateFocus(session,plan={}){const type=trim(plan.type).toUpperCase(),people=arr(plan.people).map(trim).filter(Boolean),events=arr(plan.events).map(trim).filter(Boolean);if(type==='PERSON'&&people.length){session.recentEntities=uniqueRecentEntities([...session.recentEntities,...people]).slice(-8);session.activeFocus={type:people.length>1?'multi_person':'person',entities:uniqueRecentEntities(people)};}else if(type==='DATA'&&events.length){session.activeFocus={type:events.length>1?'multi_event':'event',entities:[...new Set(events)]};}}
+function updateFocus(session,plan={}){const type=trim(plan.type).toUpperCase(),request=norm(plan.request),people=arr(plan.people).map(trim).filter(Boolean),events=arr(plan.events).map(trim).filter(Boolean);if(type==='PERSON'&&people.length){session.recentEntities=uniqueRecentEntities([...session.recentEntities,...people]).slice(-8);session.activeFocus={type:people.length>1?'multi_person':'person',entities:uniqueRecentEntities(people)};}else if(type==='DATA'&&events.length){session.activeFocus={type:events.length>1?'multi_event':'event',entities:[...new Set(events)]};}else if(type==='MEMORY'&&['read','summarize'].includes(request)&&session.selectedMemory){session.activeFocus={type:'memory',entities:[trim(session.selectedMemory.title)||`Recuerdo ${session.selectedMemory.index||1}`]};}}
 function resultSummary(result={}){return{ok:result?.ok!==false,title:trim(result?.title),operation:trim(result?._vnext_operation||result?.facts?.operation||result?.facts?.action),facts:result?.facts||{},tables:arr(result?.tables).slice(0,8).map(t=>({key:trim(t?.key),title:trim(t?.title),columns:arr(t?.columns).length?arr(t.columns):Object.keys(t?.schema||{}),row_count:arr(t?.rows).length,rows:arr(t?.rows).slice(0,12)}))};}
 function validateCeResult(action={},result={}){
   const issues=[];if(!result||result.ok===false)issues.push(trim(result?.error)||'CE devolvió resultado no OK');
@@ -138,11 +138,11 @@ function validateCasePostcondition(c={},session={}){
 function expectedForCase(c,session){const e=clone(c.expected||{});if(c.id==='exec-18'){const ws=session.datasets.find(w=>norm(w.title).includes(norm(c.requiresDatasetTitle)));if(ws)e.dataset=ws.dataset_id;}return e;}
 function prerequisites(c,session){if(c.requiresDataset&&!session.currentDataset)return'No existe dataset actual real.';if(c.requiresDatasetTitle&&!session.datasets.some(w=>norm(w.title).includes(norm(c.requiresDatasetTitle))))return`No existe dataset previo «${c.requiresDatasetTitle}».`;if(c.requiresMemoryMatch&&!session.memoryMatches.length)return'La búsqueda de memoria no devolvió recuerdos.';if(c.requiresSelectedMemory&&!session.selectedMemory)return'No existe recuerdo seleccionado.';return'';}
 
-export async function previewExecutionBattery({stateOverride=null}={}){const state=stateOverride||await getState(),fixtures=chooseFixtures(state),cases=buildCases(fixtures);return{ok:true,source:'execution-lab-v1',batteryCode:'EXECUTION-CONTROLLED-V1-FIX5-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX5 · 27',total:cases.length,readOnly:true,executesCE:true,replacesZuzu:false,narrates:false,planner:'INTÉRPRETE GEMINI V2.3',fixtures,cases:cases.map(c=>({id:c.id,label:c.label,prompt:c.prompt,expected:c.expected}))};}
+export async function previewExecutionBattery({stateOverride=null}={}){const state=stateOverride||await getState(),fixtures=chooseFixtures(state),cases=buildCases(fixtures);return{ok:true,source:'execution-lab-v1',batteryCode:'EXECUTION-CONTROLLED-V1-FIX6-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX6 · 27',total:cases.length,readOnly:true,executesCE:true,replacesZuzu:false,narrates:false,planner:'INTÉRPRETE GEMINI V2.3',fixtures,cases:cases.map(c=>({id:c.id,label:c.label,prompt:c.prompt,expected:c.expected}))};}
 
 export async function runExecutionStream({send,signal=null,actor={},maxCases=27,stateOverride=null}={}){
   const state=stateOverride||await getState(),fixtures=chooseFixtures(state),catalog=liveCatalog(state),cases=buildCases(fixtures).slice(0,Math.max(1,Math.min(27,num(maxCases)||27))),session={datasets:[],currentDataset:null,recentEntities:[],activeFocus:null,memoryMatches:[],selectedMemory:null,ledger:[],currentPrompt:''},rows=[];
-  send?.({type:'start',batteryCode:'EXECUTION-CONTROLLED-V1-FIX5-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX5 · 27',total:cases.length,readOnly:true,executesCE:true,narrates:false,fixtures});
+  send?.({type:'start',batteryCode:'EXECUTION-CONTROLLED-V1-FIX6-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX6 · 27',total:cases.length,readOnly:true,executesCE:true,narrates:false,fixtures});
   let plannerCalls=0,ceCalls=0,tokens=0,costEur=0;
   for(let i=0;i<cases.length;i++){
     if(signal?.aborted)break;const c=cases[i],pre=prerequisites(c,session);send?.({type:'progress',index:i+1,total:cases.length,id:c.id,label:c.label,prompt:c.prompt});

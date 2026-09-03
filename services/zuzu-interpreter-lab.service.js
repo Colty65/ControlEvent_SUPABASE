@@ -149,6 +149,7 @@ REGLAS:
 - Los pronombres se resuelven con active_focus/recent_entities/screen_event. Si active_focus.type es person/multi_person, sus entities son PERSON y nunca deben colocarse en events ni reinterpretarse como eventos. Si active_focus.type es event/multi_event, sus entities son EVENT y nunca deben colocarse en people.
 - Los tipos de recognized_entities son autoritativos: una entidad type=PERSON solo puede ir en people; una type=EVENT solo puede ir en events.
 - Si memory_matches contiene resultados y el usuario pide abrir/leer/entrar en uno de ellos, usa MEMORY/read con result_index. MEMORY/search se reserva para iniciar una búsqueda NUEVA de recuerdos, no para abrir resultados ya encontrados.
+- Si selected_memory_episode existe (o current_dataset.table_key=memory_turns) y el usuario pide resumir, sintetizar, extraer ideas o conclusiones de ESE recuerdo ya abierto, usa MEMORY/summarize. MEMORY/read significa abrir/leer el episodio; no lo uses para resumirlo aunque result_index siga disponible.
 - TABLE/filter expresa field + values. No construyas view_filters.
 - TABLE/hide expresa column. TABLE/show_sort expresa column + sort. No construyas visible_columns/view_sort.
 - TABLE/reset significa quitar filtros/restaurar todas las filas de la tabla actual; TABLE/select solo selecciona una tabla distinta o ya materializada.

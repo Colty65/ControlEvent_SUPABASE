@@ -1,0 +1,7 @@
+ControlEvent v4_1_exp · FIX6
+
+1. FIX5 confirmó Banco: el KO de la batería pasó a exec-22 (resumen de recuerdo).
+2. MEMORY/read queda reservado a abrir/leer un episodio. Con un recuerdo ya seleccionado, resumir/sintetizar/extraer ideas usa MEMORY/summarize.
+3. Al abrir/resumir memoria en la ITV de ejecución, el foco activo pasa a memory para que un foco PERSON anterior no compita semánticamente.
+4. Mapa de recursos: [Responsables / PDF] y [Liquidaciones] están ahora escritos físicamente en public/index.html, en ese orden. La inyección JS queda solo como fallback.
+5. Vista aérea se mantiene sin cambios, con sus dos accesos actuales.

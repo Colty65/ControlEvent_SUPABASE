@@ -61,7 +61,8 @@ check('miniatura de Ticket se puede ampliar',has(ui,'openTicketImage','ce-liq-im
 check('selector muestra base contable del Ticket',has(ui,'Base contable:','Banco: SIN APAREAR','lineCount'));
 check('RO mantiene acceso visual a foto y contabilidad',has(ui,'RO · consulta únicamente','ticketThumbHtml','ticketAccountingText'));
 check('Vista aérea expone Liquidaciones junto a Responsables/PDF',mapUi.indexOf('id="btnVistaAereaLiquidaciones"')>mapUi.indexOf('id="btnVistaAereaResponsables"'));
-check('Mapa de recursos real inyecta Liquidaciones a la derecha de Responsables/PDF',has(ui,'btnMapaLiquidaciones','btnMapaResponsables',"insertAdjacentElement('afterend',btn)"));
+check('Mapa de recursos real trae botones estáticos Responsables/PDF + Liquidaciones en orden',index.indexOf('id="btnMapaLiquidaciones"')>index.indexOf('id="btnMapaResponsables"')&&index.includes('<h2>Mapa de recursos</h2>'));
+check('Mapa conserva fallback de Liquidaciones a la derecha de Responsables/PDF',has(ui,'btnMapaLiquidaciones','btnMapaResponsables',"insertAdjacentElement('afterend',btn)"));
 check('Mapa y Vista aérea abren la misma ventana de Liquidaciones',has(mapUi,'btnVistaAereaLiquidaciones','openPurchaseSettlements')&&has(ui,'#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones'));
 check('accesos Liquidaciones se fuerzan habilitados para consulta',has(ui,'hardEnableEntry','pointer-events','btnMapaLiquidaciones'));
 check('RO puede consultar backend y UI queda solo lectura',has(service,"['GD','RW','RO'].includes(clean.nivel)",'Los usuarios RO solo pueden consultar Liquidaciones')&&has(ui,'RO · consulta únicamente'));

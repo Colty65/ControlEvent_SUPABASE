@@ -15,7 +15,7 @@ function check(name,cond){if(cond){ok++;console.log('OK ',name);}else{ko++;conso
 const has=(s,x)=>s.includes(x);
 
 check('servicio ejecución controlada existe',has(execSrc,'ITV EJECUCIÓN CONTROLADA V1'));
-check('batería FIX5 27 turnos identificable',has(execSrc,"batteryCode:'EXECUTION-CONTROLLED-V1-FIX5-27'")&&has(execSrc,"label:'ITV · EJECUCIÓN CONTROLADA V1 FIX5 · 27'"));
+check('batería FIX6 27 turnos identificable',has(execSrc,"batteryCode:'EXECUTION-CONTROLLED-V1-FIX6-27'")&&has(execSrc,"label:'ITV · EJECUCIÓN CONTROLADA V1 FIX6 · 27'"));
 check('usa estado real de CE',has(execSrc,"import { getState } from './state.service.js'"));
 check('usa Intérprete V2.3 real',has(execSrc,'runInterpreterPlan')&&has(execSrc,"planner:'INTÉRPRETE GEMINI V2.3'"));
 check('helper del intérprete se instancia antes de usar conceptualIntentMatch',has(execSrc,'__interpreterLabForRegression()')&&!has(execSrc,'=__interpreterLabForRegression;'));
@@ -70,6 +70,8 @@ check('stream separa llamadas Gemini/CE',has(execSrc,'plannerCalls')&&has(execSr
 check('métrica extremo a extremo',has(execSrc,'endToEndPct'));
 check('turno KO no contamina foco ni session_ledger',has(execSrc,"if(status==='OK'){updateFocus(session,planned.plan);session.ledger.push"));
 check('Intérprete separa Cuadre Banco de Liquidaciones',has(interp,'DATA/event_bank = Cuadre Banco / cuadre bancario / conciliación bancaria')&&has(interp,'NUNCA lo sustituyas por event_liquidations'));
+check('Intérprete distingue abrir recuerdo de resumir recuerdo',has(interp,'selected_memory_episode existe','MEMORY/summarize','MEMORY/read significa abrir/leer el episodio'));
+check('Ejecución cambia foco a memory al abrir/resumir recuerdo',has(execSrc,"type==='MEMORY'")&&has(execSrc,"type:'memory'")&&has(execSrc,"['read','summarize']"));
 
 check('ruta preview GD',has(routes,"router.get('/zuzu-tests/execution-preview'")&&has(routes,'assertGdActor'));
 check('ruta stream ejecución',has(routes,"router.post('/zuzu-tests/execution-run-stream'"));
@@ -77,9 +79,9 @@ check('stream NDJSON no cache',has(routes,'application/x-ndjson')&&has(routes,'X
 check('UI botón EJECUCIÓN CE',has(consoleUi,'⚙️ EJECUCIÓN CE')&&has(consoleUi,'ceOpenZuzuExecutionLab'));
 check('UI muestra cinco etapas',has(ui,'Plan Gemini')&&has(ui,'Orden CE')&&has(ui,'Resultado CE')&&has(ui,'Diagnóstico'));
 check('UI declara SOLO LECTURA',has(ui,'SOLO LECTURA')&&has(ui,'Escrituras: NO'));
-check('UI descarga JSON FIX5 identificable',has(ui,'execution-controlled-v1-fix5-27.json'));
+check('UI descarga JSON FIX6 identificable',has(ui,'execution-controlled-v1-fix6-27.json'));
 check('UI deduplica casos stream por id',has(ui,"rows.findIndex(r=>r.id===m.case?.id)"));
-check('index carga feature ejecución FIX5',has(index,'zuzu-execution-lab-gd.js?v=20260903-EXECUTION-CONTROLLED-V1-FIX5-BANK-DISAMBIG'));
+check('index carga feature ejecución FIX6',has(index,'zuzu-execution-lab-gd.js?v=20260903-EXECUTION-CONTROLLED-V1-FIX6-MEMORY-SUMMARY'));
 check('cache-bust consola sigue disponible',has(index,'zuzu-test-console-gd.js'));
 check('event-ai expone ejecutores solo al test estructural',has(eventAi,'vnextP19ExecuteData,')&&has(eventAi,'vnextRecallMemory,')&&has(eventAi,'vnextP125WorkingSetsFromResult,'));
 check('interpreter expone planner live',has(interp,'export async function runInterpreterPlan'));

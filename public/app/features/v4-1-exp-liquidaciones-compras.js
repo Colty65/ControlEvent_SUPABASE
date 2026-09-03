@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · LIQUIDACIONES DE COMPRAS V1.5 · FOTO TICKET + CONTABILIDAD + ZUZU/INFOEVENTO
+/* ControlEvent v4_1_exp · LIQUIDACIONES DE COMPRAS V1.7 · FOTO TICKET + CONTABILIDAD + ZUZU/INFOEVENTO
    Caja Peña (DEBE/HABER) + TKxx no liquidados/no conciliados + cierre histórico PDF.
    Independiente del acto de conciliación bancaria: solo consulta si un TKxx ya está apareado. */
 (function(root){
@@ -31,7 +31,7 @@
   let data=null,selectedMovementIds=new Set(),selectedTicketCodes=new Set(),editingId='',loading=false;
 
   async function api(path,options={}){
-    const response=await fetch(path,{cache:'no-store',...options,headers:{'Content-Type':'application/json','X-ControlEvent-Feature':'liquidaciones-compras-v1-5','X-ControlEvent-Actor':actorHeader(),...(options.headers||{})}});
+    const response=await fetch(path,{cache:'no-store',...options,headers:{'Content-Type':'application/json','X-ControlEvent-Feature':'liquidaciones-compras-v1-7','X-ControlEvent-Actor':actorHeader(),...(options.headers||{})}});
     let payload={};try{payload=await response.json();}catch(_){ }
     if(!response.ok)throw new Error(payload?.error||`Error ${response.status}`);
     return payload;
@@ -150,7 +150,7 @@
   }
   function hardEnableEntry(btn){if(!btn)return;btn.disabled=false;btn.removeAttribute('disabled');btn.removeAttribute('aria-disabled');btn.style.setProperty('pointer-events','auto','important');btn.style.setProperty('opacity','1','important');}
   function ensureButton(){let btn=$('btnPurchaseSettlements');if(!btn){const resp=$('btnComprasResponsables');if(resp){btn=document.createElement('button');btn.type='button';btn.className='outline';btn.id='btnPurchaseSettlements';btn.title='Liquidaciones de compras y movimientos de efectivo';btn.innerHTML='<span>🧾</span> Liquidaciones';resp.insertAdjacentElement('afterend',btn);}}hardEnableEntry(btn);}
-  function ensureMapButton(){const resp=$('btnMapaResponsables');if(!resp)return;let btn=$('btnMapaLiquidaciones');if(!btn){btn=document.createElement('button');btn.type='button';btn.className='ce-resp-map-launch';btn.id='btnMapaLiquidaciones';btn.title='Liquidaciones de compras y movimientos de efectivo';btn.innerHTML='<span>🧾</span> Liquidaciones';resp.insertAdjacentElement('afterend',btn);}hardEnableEntry(btn);}
+  function ensureMapButton(){const resp=$('btnMapaResponsables');let btn=$('btnMapaLiquidaciones');if(!btn&&resp){btn=document.createElement('button');btn.type='button';btn.className='ce-resp-map-launch';btn.id='btnMapaLiquidaciones';btn.title='Liquidaciones de compras y movimientos de efectivo';btn.innerHTML='<span>🧾</span> Liquidaciones';resp.insertAdjacentElement('afterend',btn);}if(btn&&resp&&btn.previousElementSibling!==resp)resp.insertAdjacentElement('afterend',btn);hardEnableEntry(btn);}
   function ensureEntryButtons(){ensureButton();ensureMapButton();hardEnableEntry($('btnVistaAereaLiquidaciones'));}
   document.addEventListener('click',ev=>{const btn=ev.target?.closest?.('#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones');if(!btn)return;ev.preventDefault();ev.stopPropagation();load();},true);
   document.addEventListener('keydown',ev=>{if((ev.key==='Enter'||ev.key===' ')&&ev.target?.closest?.('#btnPurchaseSettlements,#btnMapaLiquidaciones,#btnVistaAereaLiquidaciones')){ev.preventDefault();load();return;}if(ev.key==='Escape'){if($('ceLiqImageOverlay'))$('ceLiqImageOverlay').remove();else if($('ceLiqPreview'))$('ceLiqPreview').remove();else if(modal())closeModal();}});
