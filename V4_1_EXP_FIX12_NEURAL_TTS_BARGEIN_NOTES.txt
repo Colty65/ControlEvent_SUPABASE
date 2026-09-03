@@ -1,0 +1,19 @@
+ControlEvent v4_1_exp · FIX12 · Zuzu neural TTS + barge-in
+
+OBJETIVO
+- Recuperar interrupción oral mientras Zuzu habla.
+- Sacar la voz principal de Zuzu de speechSynthesis del navegador.
+
+CAMBIOS
+1. Barge-in Web Speech: Perdona/Espera/Calla/Corta/Detente y Para Zuzu / Zuzu para.
+2. Barge-in Voz CE cuando Web Speech cae: captura corta, transcripción Gemini modo barge y cancelación de eco.
+3. TTS neural: /api/zuzu-voice/synthesize con gemini-2.5-flash-preview-tts usando la GEMINI_API_KEY existente.
+4. Voz inicial Algenib, dirigida como masculina, grave, ligeramente áspera y ágil. Alternativas de panel: Orus, Gacrux y Charon.
+5. Reproducción 1.08x por defecto conservando pitch.
+6. Fallback automático a speechSynthesis si TTS neural falla; reintento neural tras 60 s.
+7. El saludo de conversación usa ya la misma voz neural.
+
+NO CAMBIA
+- Arquitectura P2-R / CE.
+- Liquidaciones V1.8.
+- FIX11 de conversación hablada sin tablas/sin céntimos.

@@ -1,0 +1,64 @@
+ControlEvent v4_1_exp · FIX11 · SPOKEN NATURAL CONVERSATION
+============================================================
+
+OBJETIVO
+--------
+Cuando Zuzu está en conversación hablada, prima la naturalidad sobre la exhaustividad.
+La voz deja de funcionar como un informe leído y pasa a responder como una conversación informal.
+
+CAMBIOS
+-------
+1. MODO ORAL SIN TABLAS NI GRÁFICAS VISIBLES
+   - CE sigue creando y conservando datasets, tablas y vistas internamente para calcular, comparar,
+     mantener contexto y poder continuar la conversación.
+   - En voiceConversation esas tablas/gráficas no se devuelven como presentación visible.
+   - Zuzu no debe remitir al usuario a "la tabla", "el dataset", "las filas" o "las columnas".
+   - Si el usuario quiere una tabla o detalle visual, debe pedirlo fuera del modo hablado.
+
+2. NARRACIÓN ORAL EN TODO TURNO FACTUAL
+   - Todo turno factual hablado pasa por una capa breve de narración natural después de que CE
+     haya resuelto los hechos.
+   - La fuente de verdad sigue siendo CE; la narración solo decide cómo contarlo.
+   - Normalmente 1-2 frases, máximo 3.
+   - Conclusión primero; solo 1-3 hechos útiles como apoyo.
+   - No termina ofreciendo tablas o más detalle por sistema.
+
+3. PRIORIDAD A LA CONCLUSIÓN HUMANA
+   Ejemplos de criterio:
+   - En vez de recitar todos los KPI: "En general estuvo bien la cosa; se pagó todo y quedó margen."
+   - En vez de listar un ranking completo: "Colty llevó claramente el peso de las compras."
+   - En vez de "saldo operativo positivo 777,48 €": "quedó margen" salvo que la cifra sea relevante
+     o el usuario pregunte expresamente cuánto.
+
+4. EUROS HABLADOS SIN CÉNTIMOS
+   - En voz, cualquier importe en euros se expresa sin céntimos.
+   - 2.082,52 € -> 2.083 € si realmente merece la pena decir la cifra.
+   - 777,48 € -> 777 € si se cita; preferentemente "quedó margen" si basta la conclusión.
+   - Importes positivos/negativos menores de 1 € -> "menos de un euro" / "menos de un euro en negativo".
+   - En modo escrito se mantiene la precisión y los céntimos cuando proceda.
+
+5. CONTINUIDAD
+   - El estado completo (datasets, vistas y resultados) sigue existiendo internamente aunque no se
+     muestre en voz. La eliminación de tablas es de presentación, no de capacidad.
+
+COSTE / ARQUITECTURA
+--------------------
+- En un turno factual hablado, normalmente hay una llamada de planificación y una segunda llamada
+  corta de narración. Se acepta este pequeño coste adicional para priorizar naturalidad.
+- El narrador no calcula ni modifica hechos: recibe resultados certificados y solo los expresa.
+
+REGRESIONES
+-----------
+- FIX11 voz natural: 16/16
+- FIX10 diálogo: 19/19
+- FIX9 diálogo: 27/27
+- FIX8 diálogo: 29/29
+- P2-R: 36/36
+- Ejecución controlada: 76/76
+- Liquidaciones compras: 70/70
+- Versionado v4_1_exp: 10/10
+
+NOTA LEGACY
+-----------
+La suite antigua BANK4_26 mantiene 3 checks de prosodia KO que ya fallaban de la misma forma en la
+FIX10 original; no son regresiones de FIX11. BANK4_27 permanece verde.

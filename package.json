@@ -87,7 +87,9 @@
     "test:version-v4-1-exp": "node scripts/v4-1-exp-version-regression.cjs",
     "test:fix8-dialogue": "node scripts/v4-1-exp-fix8-natural-dialogue-continuity-regression.cjs",
     "test:fix9-dialogue": "node scripts/v4-1-exp-fix9-dialogue-reentry-regression.cjs",
-    "test:fix10-dialogue": "node scripts/v4-1-exp-fix10-grounded-continuity-regression.cjs"
+    "test:fix10-dialogue": "node scripts/v4-1-exp-fix10-grounded-continuity-regression.cjs",
+    "test:fix11-voice": "node scripts/v4-1-exp-fix11-spoken-natural-conversation-regression.cjs",
+    "test:fix12-voice": "node scripts/v4-1-exp-fix12-neural-tts-bargein-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

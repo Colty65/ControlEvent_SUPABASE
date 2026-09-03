@@ -1,0 +1,28 @@
+const fs=require('fs');
+const voice=fs.readFileSync('public/app/features/v22-voz3-zuzu.js','utf8');
+const svc=fs.readFileSync('services/zuzu-voice.service.js','utf8');
+const routes=fs.readFileSync('routes/zuzu-voice.routes.js','utf8');
+const html=fs.readFileSync('public/index.html','utf8');
+let ok=0,ko=0;
+function t(cond,msg){if(cond){ok++;console.log('OK · '+msg);}else{ko++;console.error('KO · '+msg);}}
+t(/FIX12-NEURAL-TTS-BARGEIN-V59/.test(voice),'build FIX12 activo');
+t(/zuzu-voice\/synthesize/.test(voice)&&/zuzu-voice\/synthesize/.test(routes),'cliente y ruta TTS neural conectados');
+t(/gemini-2\.5-flash-preview-tts/.test(svc),'TTS usa Gemini 2.5 Flash TTS por defecto');
+t(/Algenib/.test(svc)&&/Algenib · áspera/.test(voice),'Algenib es la voz neural inicial');
+t(/Voz masculina adulta, grave y ligeramente áspera/.test(svc),'dirección vocal masculina grave y áspera');
+t(/ritmo ágil/.test(svc),'dirección de ritmo ágil');
+t(/playbackRate=neuralPlaybackRate\(\)/.test(voice),'reproducción neural aplica ritmo configurable');
+t(/preservesPitch=true/.test(voice),'aceleración conserva tono');
+t(/Perdona Zuzu/.test(voice)&&/Para Zuzu/.test(voice)&&/Calla Zuzu/.test(voice)&&/Espera Zuzu/.test(voice),'mensajes de barge-in visibles y variados');
+t(/roots=\['perdona','perdon','espera','esperate','calla','callate','corta','detente','alto'\]/.test(voice),'barge-in reconoce raíces fuertes');
+t(/hasZ&&stop/.test(voice),'Para/Parate exige contexto Zuzu para evitar falsos positivos');
+t(/applyBargeInterruption/.test(voice)&&/stopSpeaking\(true\)/.test(voice),'interrupción corta la locución y devuelve turno');
+t(/kind==='barge'/.test(voice)&&/mode === 'barge'/.test(svc),'Voz CE tiene modo de transcripción de interrupción');
+t(/Ignora la propia voz sintética de Zuzu y cualquier eco/.test(svc),'transcriptor de barge filtra eco de Zuzu');
+t(/cloudBargeMonitorTick/.test(voice)&&/startCloudBargeUtterance/.test(voice),'barge-in funciona también con fallback Voz CE');
+t(/echoCancellation:true,noiseSuppression:true,autoGainControl:true/.test(voice),'micrófono activa cancelación de eco para barge-in');
+t(/cleanupNeuralAudio/.test(voice)&&/state\.neuralAbort\.abort/.test(voice),'Parar/interrumpir cancela audio y petición neural');
+t(/neuralFailureUntil=Date\.now\(\)\+60000/.test(voice)&&/speakChunksBrowser\(answer\)/.test(voice),'si TTS neural falla vuelve al navegador sin romper conversación');
+t(/FIX12-NEURAL-TTS-BARGEIN-V59/.test(html),'cache-buster carga FIX12');
+t(/responseModalities: \['AUDIO'\]/.test(svc)&&/prebuiltVoiceConfig/.test(svc),'contrato Gemini TTS solicita AUDIO y voz predefinida');
+console.log(`\nFIX12 neural TTS + barge-in: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;
