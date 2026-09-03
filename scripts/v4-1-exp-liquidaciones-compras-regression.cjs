@@ -11,6 +11,11 @@ const server=read('server/app.js');
 const sql=read('sql/ControlEvent_SQL_V4_1_EXP_LIQUIDACIONES_COMPRAS.sql');
 const backupServer=read('routes/export.routes.js');
 const backupUi=read('public/app/features/v26-prod-fix1-conciliacion-backup.js');
+const mapUi=read('public/app/features/v19-mapa-recursos-global.js');
+const eventAi=read('services/event-ai.service.js');
+const registry=read('services/zuzu-capability-registry.service.js');
+const interpreter=read('services/zuzu-interpreter-lab.service.js');
+const infoBundle=read('public/app/legacy/legacy-bundle-after-modules-v30.7.js');
 let ok=0,ko=0;
 function check(name,cond){if(cond){console.log('OK ',name);ok++;}else{console.log('KO ',name);ko++;}}
 function has(s,...parts){return parts.every(p=>s.includes(p));}
@@ -49,6 +54,24 @@ check('PDF usa Ticket en cabecera',ui.includes('<th>Ticket</th><th>Tienda</th><t
 check('PDF pie Ticket/s JUSTIFICADO/S',ui.includes('Ticket/s JUSTIFICADO/S'));
 check('Liquidación enriquece tienda y productos',has(service,'namedCatalogMap(PRODUCTS_TABLE)','namedCatalogMap(STORES_TABLE)','productNames','storeNames'));
 check('Liquidaciones no escriben conciliación bancaria (permanece independiente)',!routes.includes('bank-ticket-links') && !routes.includes('bank/movements'));
+check('PDF productos usa ranking por importe, no azar',has(service,'productTotals','productHighlights')&&has(ui,'productHighlights')&&!ui.includes('Math.random()'));
+check('PDF añade coletilla y más si hay más de dos productos',ui.includes("items.length>2?', y más........':''"));
+check('selector Ticket carga miniaturas reales',has(ui,'/api/ticket-images?eventId=','ticketThumbHtml','ce-liq-ticket-thumb'));
+check('miniatura de Ticket se puede ampliar',has(ui,'openTicketImage','ce-liq-image-overlay','data-ce-liq-image'));
+check('selector muestra base contable del Ticket',has(ui,'Base contable:','Banco: SIN APAREAR','lineCount'));
+check('RO mantiene acceso visual a foto y contabilidad',has(ui,'RO · consulta únicamente','ticketThumbHtml','ticketAccountingText'));
+check('Mapa de recursos expone Liquidaciones junto a Responsables/PDF',mapUi.indexOf('id="btnVistaAereaLiquidaciones"')>mapUi.indexOf('id="btnVistaAereaResponsables"'));
+check('Mapa abre la misma ventana de Liquidaciones',has(mapUi,'btnVistaAereaLiquidaciones','openPurchaseSettlements'));
+check('RO puede consultar backend y UI queda solo lectura',has(service,"['GD','RW','RO'].includes(clean.nivel)",'Los usuarios RO solo pueden consultar Liquidaciones')&&has(ui,'RO · consulta únicamente'));
+check('Zuzu registra capacidad event_liquidations',has(registry,'event_liquidations','LIQUIDACIONES','settlement_status','detail'));
+check('Zuzu ejecuta liquidaciones desde fuente propia',has(eventAi,"op==='event_liquidations'",'getPurchaseSettlementReadModel','ce_purchase_settlements'));
+check('semántica DEBE/HABER autoritativa para Zuzu',has(eventAi,'DEBE = sale dinero de la caja de la Peña','HABER = entra dinero en la caja de la Peña'));
+check('detalle estándar no necesita COMPRAS completas',has(eventAi,'detail=standard','resumen de Ticket/s'));
+check('detalle full cruza TKxx con COMPRAS',has(service,"detail==='FULL'",'fullProductRows','ticketCodes.has(normalizeTicket(row.ticket_donacion))')&&has(eventAi,"detail==='full'",'liquidation_products'));
+check('Intérprete conceptual conoce event_liquidations',has(interpreter,"event_liquidations","detail=full","DEBE significa que SALE dinero"));
+check('INFOEVENTO añade hoja LIQUIDACIONES',has(infoBundle,'addLiquidacionesInfoEventoV413',"x.sheet('LIQUIDACIONES'",'MOVIMIENTOS DE CAJA','TICKET/S INCLUIDO/S'));
+check('INFOEVENTO documenta DEBE/HABER',has(infoBundle,'DEBE = sale dinero de la caja de la Peña','HABER = entra dinero en la caja de la Peña'));
+
 check('SQL cabecera',sql.includes('create table if not exists public.ce_purchase_settlements'));
 check('SQL movimientos',sql.includes('create table if not exists public.ce_purchase_cash_movements'));
 check('SQL TKxx',sql.includes('create table if not exists public.ce_purchase_settlement_tickets'));

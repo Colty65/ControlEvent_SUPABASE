@@ -15,7 +15,7 @@ function check(name,cond){if(cond){ok++;console.log('OK ',name);}else{ko++;conso
 const has=(s,x)=>s.includes(x);
 
 check('servicio ejecución controlada existe',has(execSrc,'ITV EJECUCIÓN CONTROLADA V1'));
-check('batería FIX2 25 turnos identificable',has(execSrc,"batteryCode:'EXECUTION-CONTROLLED-V1-FIX2-25'")&&has(execSrc,"label:'ITV · EJECUCIÓN CONTROLADA V1 FIX2 · 25'"));
+check('batería FIX4 27 turnos identificable',has(execSrc,"batteryCode:'EXECUTION-CONTROLLED-V1-FIX4-27'")&&has(execSrc,"label:'ITV · EJECUCIÓN CONTROLADA V1 FIX4 · 27'"));
 check('usa estado real de CE',has(execSrc,"import { getState } from './state.service.js'"));
 check('usa Intérprete V2.3 real',has(execSrc,'runInterpreterPlan')&&has(execSrc,"planner:'INTÉRPRETE GEMINI V2.3'"));
 check('helper del intérprete se instancia antes de usar conceptualIntentMatch',has(execSrc,'__interpreterLabForRegression()')&&!has(execSrc,'=__interpreterLabForRegression;'));
@@ -43,6 +43,11 @@ check('traductor no inventa personas si Gemini no las emite',has(interp,"return 
 check('prompt prohíbe PERSON dentro de events',has(interp,'una entidad type=PERSON solo puede ir en people'));
 check('prompt memoria read usa memory_matches',has(interp,'memory_matches contiene resultados'));
 check('CE no hereda proyección opuesta en mutación de columnas',has(eventAi,'explicitColumnMutation')&&has(eventAi,'!explicitColumnMutation&&arr(prev?.visible_columns).length'));
+check('workspace ITV conserva hasta 80 datasets para reentrada histórica',has(execSrc,'session.datasets.slice(-80)'));
+check('CE no sustituye dataset_id explícito ausente por current_dataset',has(eventAi,'CE no sustituirá esa orden por la tabla actual')&&has(eventAi,'CE no resumirá otro dataset por sustitución'));
+check('ocultar columna explícita no se re-promueve a visible',has(eventAi,'explicitHidden=arr(d.hidden_columns).length>0')&&has(eventAi,'if(!explicitHidden&&resolved.length'));
+check('working sets internos amplían retención sin ampliar contexto Gemini',has(eventAi,'seen=new Set(),limit=80')&&has(execSrc,'contextDatasets'));
+
 check('derive recibe dataset_id propio y no pisa fuente',has(eventAi,"derived=resultOp==='derive'")&&has(eventAi,"derivedId=derived?")&&has(eventAi,"datasetId=derived?baseId"));
 check('caso volver a dataset sin reconsulta',has(execSrc,"id:'exec-18'")&&has(execSrc,'sin volver a consultar las compras'));
 check('referente persona encadenado',has(execSrc,"id:'exec-14'")&&has(execSrc,"prompt:'¿En qué eventos aparece?'"));
@@ -70,19 +75,22 @@ check('stream NDJSON no cache',has(routes,'application/x-ndjson')&&has(routes,'X
 check('UI botón EJECUCIÓN CE',has(consoleUi,'⚙️ EJECUCIÓN CE')&&has(consoleUi,'ceOpenZuzuExecutionLab'));
 check('UI muestra cinco etapas',has(ui,'Plan Gemini')&&has(ui,'Orden CE')&&has(ui,'Resultado CE')&&has(ui,'Diagnóstico'));
 check('UI declara SOLO LECTURA',has(ui,'SOLO LECTURA')&&has(ui,'Escrituras: NO'));
-check('UI descarga JSON FIX2 identificable',has(ui,'execution-controlled-v1-fix2-25.json'));
+check('UI descarga JSON FIX4 identificable',has(ui,'execution-controlled-v1-fix4-27.json'));
 check('UI deduplica casos stream por id',has(ui,"rows.findIndex(r=>r.id===m.case?.id)"));
-check('index carga feature ejecución FIX2',has(index,'zuzu-execution-lab-gd.js?v=20260903-EXECUTION-CONTROLLED-V1-FIX2'));
-check('cache-bust consola actualizado FIX2',has(index,'zuzu-test-console-gd.js?v=20260903-EXECUTION-CONTROLLED-V1-FIX2'));
+check('index carga feature ejecución FIX4',has(index,'zuzu-execution-lab-gd.js?v=20260903-EXECUTION-CONTROLLED-V1-FIX4-LIQUIDACIONES'));
+check('cache-bust consola sigue disponible',has(index,'zuzu-test-console-gd.js'));
 check('event-ai expone ejecutores solo al test estructural',has(eventAi,'vnextP19ExecuteData,')&&has(eventAi,'vnextRecallMemory,')&&has(eventAi,'vnextP125WorkingSetsFromResult,'));
 check('interpreter expone planner live',has(interp,'export async function runInterpreterPlan'));
 check('package conserva test Intérprete V2.3',pkg.scripts?.['test:interpreter-lab']==='node scripts/v4-1-exp-interpreter-gemini-lab-regression.cjs');
 
 const caseBlock=(execSrc.match(/function buildCases\([\s\S]*?\n\}/)||[''])[0];
 const ids=[...caseBlock.matchAll(/id:'(exec-\d+)'/g)].map(m=>m[1]);
-check('25 casos controlados',ids.length===25);
-check('25 ids únicos',new Set(ids).size===25);
-check('secuencia exec-01..exec-25',ids.every((id,i)=>id===`exec-${String(i+1).padStart(2,'0')}`));
+check('27 casos controlados',ids.length===27);
+check('27 ids únicos',new Set(ids).size===27);
+check('secuencia exec-01..exec-27',ids.every((id,i)=>id===`exec-${String(i+1).padStart(2,'0')}`));
+check('ITV incluye liquidaciones estándar',has(execSrc,"id:'exec-25'")&&has(execSrc,"E('DATA','event_liquidations'"));
+check('ITV incluye liquidaciones full productos',has(execSrc,"id:'exec-26'")&&has(execSrc,"detail:'full'"));
+check('allowlist permite event_liquidations solo lectura',has(execSrc,"'event_liquidations'"));
 
 console.log(`\nEJECUCIÓN CONTROLADA V1: ${ok} OK · ${ko} KO`);
 process.exitCode=ko?1:0;

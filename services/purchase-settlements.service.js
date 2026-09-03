@@ -194,13 +194,13 @@ function aggregateTickets(purchases, persons, products=new Map(), stores=new Map
     if(isDonationTicket(row.ticket_donacion)) continue;
     const code = normalizeTicket(row.ticket_donacion);
     if(!code) continue;
-    if(!map.has(code)) map.set(code,{ticketCode:code,amount:0,responsibleIds:new Set(),purchaseIds:[],productIds:new Set(),storeIds:new Set(),lineCount:0});
+    if(!map.has(code)) map.set(code,{ticketCode:code,amount:0,responsibleIds:new Set(),purchaseIds:[],productIds:new Set(),productTotals:new Map(),storeIds:new Set(),lineCount:0});
     const target = map.get(code);
     target.amount = round2(target.amount + amount(row.unidades) * amount(row.precio));
     const responsibleId = text(row.responsable_id);
     if(responsibleId) target.responsibleIds.add(responsibleId);
     const productId=text(row.producto_id),storeId=text(row.tienda_id);
-    if(productId) target.productIds.add(productId);
+    if(productId){ target.productIds.add(productId); target.productTotals.set(productId,round2((target.productTotals.get(productId)||0)+amount(row.unidades)*amount(row.precio))); }
     if(storeId) target.storeIds.add(storeId);
     if(text(row.id)) target.purchaseIds.push(text(row.id));
     target.lineCount += 1;
@@ -209,14 +209,15 @@ function aggregateTickets(purchases, persons, products=new Map(), stores=new Map
     const responsibleIds=[...item.responsibleIds];
     const mixedResponsible=responsibleIds.length>1;
     const responsibleId=responsibleIds.length===1?responsibleIds[0]:'';
-    const productNames=[...item.productIds].map(id=>products.get(id)||'').filter(Boolean);
+    const productHighlights=[...item.productTotals.entries()].map(([id,total])=>({productId:id,name:products.get(id)||id,amount:round2(total)})).filter(x=>text(x.name)).sort((a,b)=>b.amount-a.amount||text(a.name).localeCompare(text(b.name),'es',{sensitivity:'base'}));
+    const productNames=productHighlights.map(x=>x.name);
     const storeNames=[...item.storeIds].map(id=>stores.get(id)||'').filter(Boolean);
     return {
       ticketCode:item.ticketCode,amount:round2(item.amount),responsibleId,
       responsibleName:responsibleId?(persons.get(responsibleId)?.name||''):'',
       responsibleNames:responsibleIds.map(id=>persons.get(id)?.name||id),
       mixedResponsible,purchaseIds:item.purchaseIds,lineCount:item.lineCount,
-      productNames:[...new Set(productNames)],storeNames:[...new Set(storeNames)]
+      productNames:[...new Set(productNames)],productHighlights,storeNames:[...new Set(storeNames)]
     };
   }).sort((a,b)=>Number(a.ticketCode.replace(/\D/g,''))-Number(b.ticketCode.replace(/\D/g,'')));
 }
@@ -236,7 +237,7 @@ async function rawSettlementData(eventId){
   const movements=movementsRaw.map(row=>movementFromDb(row,persons));
   const aggregated=aggregateTickets(purchases,persons,products,stores);
   const aggregatedByCode=new Map(aggregated.map(ticket=>[ticket.ticketCode,ticket]));
-  const tickets=ticketsRaw.map(row=>{const ticket=ticketFromDb(row,persons),live=aggregatedByCode.get(ticket.ticketCode);return live?{...ticket,storeNames:live.storeNames||[],productNames:live.productNames||[]}:ticket;});
+  const tickets=ticketsRaw.map(row=>{const ticket=ticketFromDb(row,persons),live=aggregatedByCode.get(ticket.ticketCode);return live?{...ticket,storeNames:live.storeNames||[],productNames:live.productNames||[],productHighlights:live.productHighlights||[]}:ticket;});
   const ticketsBySettlement=new Map();
   tickets.forEach(ticket=>{if(!ticketsBySettlement.has(ticket.settlementId))ticketsBySettlement.set(ticket.settlementId,[]);ticketsBySettlement.get(ticket.settlementId).push(ticket);});
   const movementsBySettlement=new Map();
@@ -251,7 +252,7 @@ async function rawSettlementData(eventId){
   const responsibleIds=purchaseResponsibleIds(purchases);
   const cashPeople=[...persons.values()].filter(p=>p.range==='SOCIO').sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
   const purchasePeople=[...responsibleIds].map(id=>persons.get(id)).filter(Boolean).sort((a,b)=>a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
-  return {persons,purchases,settlements,movements,tickets,aggregatedTickets:aggregated,eligibleTickets,cashPeople,purchasePeople,bankLinkCheckAvailable:bank.available,bankLinkedTickets:[...bank.set],settlementLinkByTicket};
+  return {persons,products,stores,purchases,settlements,movements,tickets,aggregatedTickets:aggregated,eligibleTickets,cashPeople,purchasePeople,bankLinkCheckAvailable:bank.available,bankLinkedTickets:[...bank.set],settlementLinkByTicket};
 }
 function buildPairSummaries(data){
   const byPair=new Map();
@@ -272,6 +273,63 @@ function buildPairSummaries(data){
   }
   return [...byPair.values()].map(row=>({...row,...resultFor({debe:row.debe,haber:row.haber,tickets:row.tickets})})).sort((a,b)=>a.counterpartyPersonName.localeCompare(b.counterpartyPersonName,'es',{sensitivity:'base'})||a.cashPersonName.localeCompare(b.cashPersonName,'es',{sensitivity:'base'}));
 }
+export async function getPurchaseSettlementReadModel(eventId, options = {}){
+  try{
+    const event=await eventExists(eventId);
+    const data=await rawSettlementData(eventId);
+    const personId=text(options.personId||options.person_id);
+    const wantedStatus=upper(options.settlementStatus||options.settlement_status||'ALL');
+    const detail=upper(options.detail||'STANDARD')==='FULL'?'FULL':'STANDARD';
+    const statusOk=value=>wantedStatus==='ALL'||(wantedStatus==='OPEN'&&normalizeStatus(value)==='ABIERTA')||(wantedStatus==='CLOSED'&&normalizeStatus(value)==='CERRADA')||(wantedStatus==='ABIERTA'&&normalizeStatus(value)==='ABIERTA')||(wantedStatus==='CERRADA'&&normalizeStatus(value)==='CERRADA');
+    const personOk=row=>!personId||text(row.cashPersonId||row.cash_person_id)===personId||text(row.counterpartyPersonId||row.counterparty_person_id)===personId||text(row.responsiblePersonId||row.responsible_person_id)===personId;
+    const settlements=data.settlements.filter(row=>personOk(row)&&statusOk(row.status));
+    const settlementIds=new Set(settlements.map(row=>text(row.id)).filter(Boolean));
+    const movements=data.movements.filter(row=>personOk(row)&&statusOk(row.status)&&(!text(row.settlementId)||settlementIds.has(text(row.settlementId))));
+    const tickets=data.tickets.filter(row=>settlementIds.has(text(row.settlementId))&&personOk(row));
+    const openMovements=movements.filter(row=>normalizeStatus(row.status)==='ABIERTA');
+    const openSettlementIds=new Set(settlements.filter(row=>normalizeStatus(row.status)==='ABIERTA').map(row=>text(row.id)).filter(Boolean));
+    const openTickets=tickets.filter(row=>openSettlementIds.has(text(row.settlementId)));
+    const openTotals=computePurchaseSettlementTotals(openMovements,openTickets);
+    const closed=settlements.filter(row=>normalizeStatus(row.status)==='CERRADA');
+    const closedDebe=round2(closed.reduce((sum,row)=>sum+amount(row.totalDebe),0));
+    const closedHaber=round2(closed.reduce((sum,row)=>sum+amount(row.totalHaber),0));
+    const closedTickets=round2(closed.reduce((sum,row)=>sum+amount(row.totalTickets),0));
+    const codeById=new Map(settlements.map(row=>[text(row.id),text(row.code)]));
+    const settlementRows=settlements.map(row=>({
+      Código:row.code,Estado:row.status,'Responsable caja':row.cashPersonName,'Responsable compras':row.counterpartyPersonName,
+      Descripción:row.description,DEBE:row.totalDebe,HABER:row.totalHaber,'Ticket/s':row.totalTickets,Saldo:row.resultBalance,
+      'Cerrada el':row.closedAt||'', 'Reabierta el':row.reopenedAt||''
+    }));
+    const movementRows=movements.map(row=>({
+      Fecha:row.date,'Responsable caja':row.cashPersonName,'Responsable compras':row.counterpartyPersonName,Descripción:row.description,
+      'Debe/Haber':row.direction,Importe:row.amount,Observaciones:row.observations||'',Estado:row.status,Liquidación:codeById.get(text(row.settlementId))||'ABIERTA SIN CERRAR'
+    }));
+    const ticketRows=tickets.map(row=>({
+      Liquidación:codeById.get(text(row.settlementId))||'',Ticket:row.ticketCode,Tienda:arr(row.storeNames).join(' · '),
+      Productos:arr(row.productHighlights).slice(0,2).map(x=>text(x?.name)).filter(Boolean).join(', ')+(arr(row.productHighlights).length>2?', y más........':''),
+      Responsable:row.responsiblePersonName,Importe:row.amount
+    }));
+    const ticketCodes=new Set(tickets.map(row=>normalizeTicket(row.ticketCode)).filter(Boolean));
+    const fullProductRows=detail==='FULL'?data.purchases.filter(row=>ticketCodes.has(normalizeTicket(row.ticket_donacion))).map(row=>{
+      const ticketCode=normalizeTicket(row.ticket_donacion),productId=text(row.producto_id),storeId=text(row.tienda_id),responsibleId=text(row.responsable_id),units=amount(row.unidades),price=amount(row.precio);
+      return {Ticket:ticketCode,Producto:text(data.products?.get(productId)||productId),Unidades:units,Precio:price,Importe:round2(units*price),Tienda:text(data.stores?.get(storeId)||storeId),Responsable:text(data.persons?.get(responsibleId)?.name||responsibleId)};
+    }).sort((a,b)=>a.Ticket.localeCompare(b.Ticket,'es',{numeric:true})||b.Importe-a.Importe||a.Producto.localeCompare(b.Producto,'es',{sensitivity:'base'})):[];
+    return {
+      ok:true,event:{id:text(event.id),title:text(event.titulo||event.descripcion||event.id)},personId,settlementStatus:wantedStatus,detail,
+      facts:{
+        settlement_count:settlements.length,open_settlement_count:settlements.filter(row=>normalizeStatus(row.status)==='ABIERTA').length,
+        closed_settlement_count:closed.length,open_movement_count:openMovements.length,ticket_count:tickets.length,
+        open_debe:openTotals.debe,open_haber:openTotals.haber,open_tickets:openTotals.tickets,open_balance:openTotals.balance,open_result_kind:openTotals.kind,
+        closed_debe:closedDebe,closed_haber:closedHaber,closed_tickets:closedTickets,detail_level:detail.toLowerCase(),full_product_line_count:fullProductRows.length,
+        debe_semantics:'DEBE = sale dinero de la caja de la Peña hacia la persona responsable de compras.',
+        haber_semantics:'HABER = entra dinero en la caja de la Peña desde la persona responsable de compras.'
+      },
+      settlements,movements,tickets,pairSummaries:buildPairSummaries(data).filter(personOk),
+      tables:{settlements:settlementRows,movements:movementRows,tickets:ticketRows,products:fullProductRows}
+    };
+  }catch(error){throw friendlyDbError(error);}
+}
+
 export async function listPurchaseSettlements(eventId, actor = {}){
   try{
     requireActor(actor);
@@ -414,7 +472,7 @@ async function fullSettlement(id){
   const aggregatedByCode=new Map(aggregateTickets(purchases,persons,products,stores).map(ticket=>[ticket.ticketCode,ticket]));
   const settlement=settlementFromDb(row,persons);
   settlement.movements=movementsRaw.map(r=>movementFromDb(r,persons));
-  settlement.tickets=ticketsRaw.map(r=>{const ticket=ticketFromDb(r,persons),live=aggregatedByCode.get(ticket.ticketCode);return live?{...ticket,storeNames:live.storeNames||[],productNames:live.productNames||[]}:ticket;});
+  settlement.tickets=ticketsRaw.map(r=>{const ticket=ticketFromDb(r,persons),live=aggregatedByCode.get(ticket.ticketCode);return live?{...ticket,storeNames:live.storeNames||[],productNames:live.productNames||[],productHighlights:live.productHighlights||[]}:ticket;});
   settlement.calculated=computePurchaseSettlementTotals(settlement.movements,settlement.tickets);
   return settlement;
 }

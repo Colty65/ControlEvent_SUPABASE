@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · ITV EJECUCIÓN CONTROLADA V1
+/* ControlEvent v4_1_exp · ITV EJECUCIÓN CONTROLADA V1 FIX3
    Laboratorio read-only: contexto real -> Intérprete Gemini V2.3 -> traductor conceptual ->
    executor canónico CE REAL. No sustituye Zuzu, no genera respuesta narrativa y no escribe BBDD. */
 import { getState } from './state.service.js';
@@ -11,7 +11,7 @@ const text=v=>v==null?'':String(v),trim=v=>text(v).trim(),arr=v=>Array.isArray(v
 const norm=v=>trim(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
 const clone=v=>JSON.parse(JSON.stringify(v));
 const round=(v,d=6)=>{const p=10**d;return Math.round((Number(v)||0)*p)/p;};
-const READ_ONLY_CAPABILITIES=new Set(['event_summary','event_purchases','event_income_status','compare_events','event_weather','event_documentation','event_bank','person_profile','person_events','person_event_status','view_current','summarize_current','derive','recall_memory']);
+const READ_ONLY_CAPABILITIES=new Set(['event_summary','event_purchases','event_income_status','compare_events','event_weather','event_documentation','event_bank','event_liquidations','person_profile','person_events','person_event_status','view_current','summarize_current','derive','recall_memory']);
 
 function eventName(e={}){return trim(e?.titulo||e?.nombre||e?.title);}
 function personName(p={}){return trim(p?.nombre||p?.Nombre);}
@@ -71,7 +71,9 @@ function buildCases(f={}){
     {id:'exec-22',label:'Resumir recuerdo',prompt:'Resúmeme ese recuerdo en tres ideas.',expected:E('MEMORY','summarize'),requiresSelectedMemory:true},
     {id:'exec-23',label:'Capacidad inexistente',prompt:'Predice cuántos cubatas beberá cada persona en el próximo evento.',expected:E('UNSUPPORTED',undefined),expectNoExecution:true},
     {id:'exec-24',label:'Cambio de foco',prompt:`Cambiamos de tema: ponme al día con ${B}.`,expected:E('DATA','event_summary',{events:[B]})},
-    {id:'exec-25',label:'Resumen de sesión',prompt:'Resúmeme qué hemos consultado en esta sesión y qué ha quedado abierto.',expected:E('CHAT','session_summary'),expectNoExecution:true}
+    {id:'exec-25',label:'Liquidaciones estándar',prompt:`Enséñame las liquidaciones de compras de ${A}.`,expected:E('DATA','event_liquidations',{events:[A]})},
+    {id:'exec-26',label:'Liquidaciones · productos completos',prompt:`De las liquidaciones de ${A}, dame TODO el detalle de productos que componen los Tickets incluidos.`,expected:E('DATA','event_liquidations',{events:[A],detail:'full'})},
+    {id:'exec-27',label:'Resumen de sesión',prompt:'Resúmeme qué hemos consultado en esta sesión y qué ha quedado abierto.',expected:E('CHAT','session_summary'),expectNoExecution:true}
   ];
 }
 
@@ -91,7 +93,7 @@ function sessionContext(session={},fixtures={},prompt=''){
   if(session.selectedMemory)ctx.selected_memory_episode={result_index:session.selectedMemory.index,title:session.selectedMemory.title};
   return ctx;
 }
-function historyForSession(session={}){return[{resultContext:{current_dataset:session.currentDataset||null,presented_datasets:session.datasets.slice(-16)}}];}
+function historyForSession(session={}){return[{resultContext:{current_dataset:session.currentDataset||null,presented_datasets:session.datasets.slice(-80)}}];}
 function mergeDataset(session,ws,{makeCurrent=true}={}){if(!ws||!trim(ws.dataset_id))return;const i=session.datasets.findIndex(x=>trim(x.dataset_id)===trim(ws.dataset_id));if(i>=0)session.datasets[i]=ws;else session.datasets.push(ws);if(makeCurrent)session.currentDataset=ws;}
 function rememberResultDatasets(session,result,capability,args){
   if(result?._current_dataset){mergeDataset(session,result._current_dataset);return;}
@@ -136,11 +138,11 @@ function validateCasePostcondition(c={},session={}){
 function expectedForCase(c,session){const e=clone(c.expected||{});if(c.id==='exec-18'){const ws=session.datasets.find(w=>norm(w.title).includes(norm(c.requiresDatasetTitle)));if(ws)e.dataset=ws.dataset_id;}return e;}
 function prerequisites(c,session){if(c.requiresDataset&&!session.currentDataset)return'No existe dataset actual real.';if(c.requiresDatasetTitle&&!session.datasets.some(w=>norm(w.title).includes(norm(c.requiresDatasetTitle))))return`No existe dataset previo «${c.requiresDatasetTitle}».`;if(c.requiresMemoryMatch&&!session.memoryMatches.length)return'La búsqueda de memoria no devolvió recuerdos.';if(c.requiresSelectedMemory&&!session.selectedMemory)return'No existe recuerdo seleccionado.';return'';}
 
-export async function previewExecutionBattery({stateOverride=null}={}){const state=stateOverride||await getState(),fixtures=chooseFixtures(state),cases=buildCases(fixtures);return{ok:true,source:'execution-lab-v1',batteryCode:'EXECUTION-CONTROLLED-V1-FIX2-25',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX2 · 25',total:cases.length,readOnly:true,executesCE:true,replacesZuzu:false,narrates:false,planner:'INTÉRPRETE GEMINI V2.3',fixtures,cases:cases.map(c=>({id:c.id,label:c.label,prompt:c.prompt,expected:c.expected}))};}
+export async function previewExecutionBattery({stateOverride=null}={}){const state=stateOverride||await getState(),fixtures=chooseFixtures(state),cases=buildCases(fixtures);return{ok:true,source:'execution-lab-v1',batteryCode:'EXECUTION-CONTROLLED-V1-FIX4-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX4 · 27',total:cases.length,readOnly:true,executesCE:true,replacesZuzu:false,narrates:false,planner:'INTÉRPRETE GEMINI V2.3',fixtures,cases:cases.map(c=>({id:c.id,label:c.label,prompt:c.prompt,expected:c.expected}))};}
 
-export async function runExecutionStream({send,signal=null,actor={},maxCases=25,stateOverride=null}={}){
-  const state=stateOverride||await getState(),fixtures=chooseFixtures(state),catalog=liveCatalog(state),cases=buildCases(fixtures).slice(0,Math.max(1,Math.min(25,num(maxCases)||25))),session={datasets:[],currentDataset:null,recentEntities:[],activeFocus:null,memoryMatches:[],selectedMemory:null,ledger:[],currentPrompt:''},rows=[];
-  send?.({type:'start',batteryCode:'EXECUTION-CONTROLLED-V1-FIX2-25',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX2 · 25',total:cases.length,readOnly:true,executesCE:true,narrates:false,fixtures});
+export async function runExecutionStream({send,signal=null,actor={},maxCases=27,stateOverride=null}={}){
+  const state=stateOverride||await getState(),fixtures=chooseFixtures(state),catalog=liveCatalog(state),cases=buildCases(fixtures).slice(0,Math.max(1,Math.min(27,num(maxCases)||27))),session={datasets:[],currentDataset:null,recentEntities:[],activeFocus:null,memoryMatches:[],selectedMemory:null,ledger:[],currentPrompt:''},rows=[];
+  send?.({type:'start',batteryCode:'EXECUTION-CONTROLLED-V1-FIX4-27',label:'ITV · EJECUCIÓN CONTROLADA V1 FIX4 · 27',total:cases.length,readOnly:true,executesCE:true,narrates:false,fixtures});
   let plannerCalls=0,ceCalls=0,tokens=0,costEur=0;
   for(let i=0;i<cases.length;i++){
     if(signal?.aborted)break;const c=cases[i],pre=prerequisites(c,session);send?.({type:'progress',index:i+1,total:cases.length,id:c.id,label:c.label,prompt:c.prompt});

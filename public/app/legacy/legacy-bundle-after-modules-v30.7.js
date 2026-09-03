@@ -3274,6 +3274,47 @@ window.__ceDisableLegacyBarGraficas = true;
     }
   }
 
+  function liquidationActorHeaderV413(){
+    let raw={};try{ raw=(typeof authUser!=='undefined'&&authUser)||window.authUser||{}; }catch(_){ raw=window.authUser||{}; }
+    return encodeURIComponent(JSON.stringify({nivel:up(raw?.nivel||raw?.Nivel||role()),identificacion:norm(raw?.identificacion||raw?.Identificacion),nombre:norm(raw?.nombre||raw?.Nombre)}));
+  }
+  function liquidationProductsTextV413(ticket){
+    const ranked=(Array.isArray(ticket?.productHighlights)?ticket.productHighlights:[]).map(x=>({name:norm(x?.name),amount:num(x?.amount)})).filter(x=>x.name).sort((a,b)=>b.amount-a.amount||a.name.localeCompare(b.name,'es',{sensitivity:'base'}));
+    const raw=ranked.length?ranked.map(x=>x.name):(Array.isArray(ticket?.productNames)?ticket.productNames.map(norm).filter(Boolean):[]),items=[...new Set(raw)],shown=items.slice(0,2);
+    return (shown.join(', ')||'—')+(items.length>2?', y más........':'');
+  }
+  async function loadLiquidacionesInfoEventoV413(evId){
+    const res=await fetch(`/api/purchase-settlements?eventId=${encodeURIComponent(evId)}&_=${Date.now()}`,{cache:'no-store',headers:{'X-ControlEvent-Feature':'infoevento-liquidaciones-v4-1-exp','X-ControlEvent-Actor':liquidationActorHeaderV413()}});
+    let body={};try{body=await res.json();}catch(_){ }
+    if(!res.ok)throw new Error(body?.error||`Liquidaciones HTTP ${res.status}`);
+    return body||{};
+  }
+  async function addLiquidacionesInfoEventoV413(wb,x,ev){
+    if(!wb||!x||!ev?.id)return;
+    if((wb.worksheets||[]).some(ws=>up(ws?.name)==='LIQUIDACIONES'))return;
+    try{
+      const data=await loadLiquidacionesInfoEventoV413(ev.id),ws=x.sheet('LIQUIDACIONES',[18,14,24,24,34,16,16,16,16,22]);
+      x.title(ws,1,'LIQUIDACIONES DE COMPRAS',10);
+      x.text(ws,2,1,'Evento','soft',true);ws.mergeCells(2,2,2,10);x.text(ws,2,2,ev.titulo||ev.id,'soft',true);
+      x.text(ws,3,1,'Criterio DEBE / HABER','soft',true);ws.mergeCells(3,2,3,10);x.text(ws,3,2,'DEBE = sale dinero de la caja de la Peña · HABER = entra dinero en la caja de la Peña.','soft',true);
+      let rr=5;
+      x.text(ws,rr++,1,'LIQUIDACIONES / HISTÓRICO','white',true);ws.mergeCells(rr-1,1,rr-1,10);
+      x.headers(ws,rr++,['Código','Estado','Responsable caja','Responsable compras','Descripción','DEBE','HABER','Ticket/s','Saldo','Cierre / reapertura']);
+      const settlements=Array.isArray(data?.settlements)?data.settlements:[];
+      if(!settlements.length){x.text(ws,rr,1,'Sin liquidaciones','soft',true);ws.mergeCells(rr,2,rr,10);x.text(ws,rr++,2,'No hay liquidaciones registradas para este evento.','soft');}
+      else for(const q of settlements){x.text(ws,rr,1,q.code||'');x.text(ws,rr,2,q.status||'');x.text(ws,rr,3,q.cashPersonName||'');x.text(ws,rr,4,q.counterpartyPersonName||'');x.text(ws,rr,5,q.description||'');x.euro(ws,rr,6,q.totalDebe||0);x.euro(ws,rr,7,q.totalHaber||0);x.euro(ws,rr,8,q.totalTickets||0);x.euro(ws,rr,9,q.resultBalance||0);x.text(ws,rr++,10,q.closedAt||q.reopenedAt||'');}
+      rr+=2;x.text(ws,rr++,1,'MOVIMIENTOS DE CAJA','white',true);ws.mergeCells(rr-1,1,rr-1,10);x.headers(ws,rr++,['Fecha','Estado','Responsable caja','Responsable compras','Descripción','DEBE/HABER','Importe','Observaciones','Liquidación','']);
+      const codeById=new Map(settlements.map(q=>[String(q.id||''),q.code||''])),movements=Array.isArray(data?.movements)?data.movements:[];
+      if(!movements.length){x.text(ws,rr,1,'Sin movimientos','soft',true);ws.mergeCells(rr,2,rr,10);x.text(ws,rr++,2,'No hay movimientos de liquidación para este evento.','soft');}
+      else for(const m of movements){x.text(ws,rr,1,m.date||'');x.text(ws,rr,2,m.status||'');x.text(ws,rr,3,m.cashPersonName||'');x.text(ws,rr,4,m.counterpartyPersonName||'');x.text(ws,rr,5,m.description||'');x.text(ws,rr,6,m.direction||'');x.euro(ws,rr,7,m.amount||0);x.text(ws,rr,8,m.observations||'');x.text(ws,rr++,9,codeById.get(String(m.settlementId||''))||(m.status==='ABIERTA'?'ABIERTA SIN CERRAR':''));}
+      rr+=2;x.text(ws,rr++,1,'TICKET/S INCLUIDO/S','white',true);ws.mergeCells(rr-1,1,rr-1,10);x.headers(ws,rr++,['Ticket','Tienda','Productos principales','Responsable','Importe','Liquidación','','','','']);
+      const ticketRows=[];for(const q of settlements)for(const t of (Array.isArray(q?.tickets)?q.tickets:[]))ticketRows.push({q,t});
+      if(!ticketRows.length){x.text(ws,rr,1,'Sin Ticket/s','soft',true);ws.mergeCells(rr,2,rr,10);x.text(ws,rr++,2,'No hay Ticket/s incluidos en liquidaciones.','soft');}
+      else for(const it of ticketRows){const t=it.t,q=it.q;x.text(ws,rr,1,t.ticketCode||'');x.text(ws,rr,2,(Array.isArray(t.storeNames)?t.storeNames:[]).join(' · '));x.text(ws,rr,3,liquidationProductsTextV413(t));x.text(ws,rr,4,t.responsiblePersonName||'');x.euro(ws,rr,5,t.amount||0);x.text(ws,rr++,6,q.code||'');}
+      try{ws.autoFilter={from:{row:6,column:1},to:{row:6,column:10}};}catch(_){ }
+    }catch(error){console.warn('[ControlEvent v4_1_exp] No se pudo añadir LIQUIDACIONES al INFOEVENTO.',error);}
+  }
+
   async function exportExcelV257(){
     const ev = currentEvent();
     if(!ev || !ev.id){ alert('Elige un evento antes de sacar INFOEVENTO.'); return; }
@@ -3357,6 +3398,7 @@ window.__ceDisableLegacyBarGraficas = true;
     addImage(wb, wsGraf, makeEventChart(), 3, 1, 1500, 775);
     for(let rr = 3; rr <= 40; rr++) wsGraf.getRow(rr).height = 20;
     await addDocumentosInfoEventoV85(wb, x);
+    await addLiquidacionesInfoEventoV413(wb, x, ev);
     // v27.7: las hojas RESUMEN_MODULAR y GRAFICAS_MODULAR fueron útiles para auditoría,
     // pero ya no se añaden al INFOEVENTO por defecto porque ensuciaban el libro final.
     // Se mantienen disponibles sólo como herramientas standalone desde consola.

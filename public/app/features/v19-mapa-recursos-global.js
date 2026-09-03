@@ -407,6 +407,7 @@
         <div class="ce-v19-global-head" id="ceV19VistaAereaHead">
           <div><h2>📊 Vista aérea</h2><p><span class="ce-v19-event-title ${esc(model.statusCls)}" style="color:${statusColor}!important">${esc(model.title)}</span> · <span class="ce-v19-event-state ${esc(model.statusCls)}" style="color:${statusColor}!important">${esc(model.statusLabel)}</span></p></div>
           <button type="button" class="ce-v19-resp-report" id="btnVistaAereaResponsables" title="Compras y donaciones agrupadas por responsable"><span>👥</span> Responsables / PDF</button>
+          <button type="button" class="ce-v19-resp-report" id="btnVistaAereaLiquidaciones" title="Liquidaciones de compras · RO consulta en solo lectura"><span>🧾</span> Liquidaciones</button>
           <button type="button" class="ce-v19-close" data-v19-close="1" aria-label="Cerrar">Cerrar</button>
         </div>
         <div class="ce-v19-metrics">
@@ -730,6 +731,10 @@
       try{ window.ceOpenResponsablesReport?.('combinado'); }catch(_){ }
       return stopModalEvent(ev, true);
     }
+    if(closestMatch(target,'#btnVistaAereaLiquidaciones')){
+      try{ window.openPurchaseSettlements?.(); }catch(_){ }
+      return stopModalEvent(ev, true);
+    }
     if(target?.classList?.contains('ce-v19-global-backdrop') || closestMatch(target,'.ce-v19-close,[data-v19-close]')){
       if(root.__ceV19Close) root.__ceV19Close();
       return stopModalEvent(ev, true);
@@ -792,6 +797,7 @@
       const target = ev.target;
       if(closestMatch(target,'[data-v19-home-top]')){ ev.preventDefault(); scrollVistaAereaTop(); return; }
       if(closestMatch(target,'#btnVistaAereaResponsables')){ ev.preventDefault(); try{ window.ceOpenResponsablesReport?.('combinado'); }catch(_){ } return; }
+      if(closestMatch(target,'#btnVistaAereaLiquidaciones')){ ev.preventDefault(); try{ window.openPurchaseSettlements?.(); }catch(_){ } return; }
       if(target?.classList?.contains('ce-v19-global-backdrop') || closestMatch(target,'.ce-v19-close,[data-v19-close]')){ ev.preventDefault(); close(); return; }
       const income = closestMatch(target,'[data-v19-income-key]');
       if(income){ ev.preventDefault(); const k = income.getAttribute('data-v19-income-key') || ''; if(!requireMobileDoubleTap(ev, 'income:' + k, income)) return; clearResourceSelection(); renderIncomeDetail(k); return; }

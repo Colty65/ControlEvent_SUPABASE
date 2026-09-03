@@ -7,13 +7,13 @@ const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
 const arr=v=>Array.isArray(v)?v:[];
 
-export const CAPABILITY_REGISTRY_VERSION='20260902-P123';
+export const CAPABILITY_REGISTRY_VERSION='20260903-P124-LIQUIDACIONES';
 
 const P={
   operation:{type:'string'},
   event:{type:'string'},events:{type:'array',items:{type:'string'}},person:{type:'string'},store:{type:'string'},product:{type:'string'},ticket:{type:'string'},responsible:{type:'string'},
   scope:{type:'string',enum:['active_event','named_event','all_events']},
-  status:{type:'string',enum:['pending','received','realized','all']},purchase_status:{type:'string',enum:['pending','realized','all']},population:{type:'string',enum:['socios','all']},attendance_mode:{type:'string',enum:['attendees','attending_members','attending_non_members','non_attending_members','attendance_full']},
+  status:{type:'string',enum:['pending','received','realized','all']},purchase_status:{type:'string',enum:['pending','realized','all']},settlement_status:{type:'string',enum:['open','closed','all']},population:{type:'string',enum:['socios','all']},attendance_mode:{type:'string',enum:['attendees','attending_members','attending_non_members','non_attending_members','attendance_full']},
   detail:{type:'string',enum:['brief','standard','full']},start_date:{type:'string'},end_date:{type:'string'},chart:{type:'boolean'},chart_type:{type:'string',enum:['line','bar','horizontalBar']},metric:{type:'string',enum:['all','purchases','income','donations','attendance']},
   tone:{type:'string',enum:['friendly','banter','neutral']},register:{type:'string',enum:['normal','close','banter']},tease:{type:'boolean'},narrate:{type:'boolean'},
   mine:{type:'boolean'},order_by:{type:'string',enum:['store_product','product','store','amount_desc']},store_filter_mode:{type:'string',enum:['all','include','exclude']},include_stores:{type:'array',items:{type:'string'}},exclude_stores:{type:'array',items:{type:'string'}},exclude_products:{type:'array',items:{type:'string'}},
@@ -70,6 +70,7 @@ export const CAPABILITY_REGISTRY=Object.freeze({
   compare_events:def('COMPARACION',['events'],['metric','chart','chart_type','derive_operation','derive_field','field','label_field','top_n'],'comparison',[],{metric:'all'}),
   event_documentation:def('DOCUMENTOS',['event'],['scope'],'event_documentation'),
   event_management:def('GESTION',['event'],['scope'],'event_management'),
+  event_liquidations:def('LIQUIDACIONES',['event'],['person','settlement_status','detail'],'purchase_settlements',[],{settlement_status:'all',detail:'standard'}),
   store_purchases:def('TIENDAS',['store'],['event','scope','status','include_empty'],'store_purchases',[],{scope:'all_events',status:'realized'}),
   events_overview:def('EVENTOS',[],['scope','metric','chart','chart_type'],'events_overview',[],{metric:'all'}),
   // Vista genérica sobre el dataset/tablas del turno anterior. No reabre módulos de negocio.
@@ -80,6 +81,7 @@ export const CAPABILITY_REGISTRY=Object.freeze({
 
 const OP_DESCRIPTIONS={
   event_management:'Gestión operativa del evento: Hitos y tareas LG. No es documentación ni justificantes.',
+  event_liquidations:'Liquidaciones de compras del evento. DEBE = sale dinero de la caja de la Peña; HABER = entra dinero en la caja. Por defecto devuelve movimientos, responsables y resumen de Ticket/s. detail=full despliega todas las líneas/productos de COMPRAS de los TKxx incluidos. Es independiente del Cuadre Banco.',
   event_documentation:'Estado estructurado del expediente: justificantes de ingresos, TKxx/imágenes, DOC/adjuntos y evidencias faltantes. No son Hitos/LG.',
   event_income_status:'Ingresos recibidos/pendientes de ingreso. No representa compras pendientes.',
   event_purchases:'Compras del evento. purchase_status=pending significa pendiente DE COMPRA; realized son compras ya realizadas; all incluye ambas.',

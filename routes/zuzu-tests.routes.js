@@ -64,7 +64,7 @@ router.post('/zuzu-tests/execution-run-stream', async (req,res,next)=>{
     res.flushHeaders?.();
     const controller=new AbortController();req.on('aborted',()=>controller.abort());res.on('close',()=>{if(!res.writableEnded)controller.abort();});
     const send=payload=>{if(!res.writableEnded){res.write(`${JSON.stringify(payload)}\n`);res.flush?.();}};
-    await runExecutionStream({send,signal:controller.signal,actor,maxCases:req.body?.maxCases||25});
+    await runExecutionStream({send,signal:controller.signal,actor,maxCases:req.body?.maxCases||27});
     if(!res.writableEnded)res.end();
   }catch(error){
     if(res.headersSent){try{res.write(`${JSON.stringify({type:'error',error:error?.message||String(error)})}\n`);res.end();}catch(_){}return;}

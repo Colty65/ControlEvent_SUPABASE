@@ -83,7 +83,7 @@ function enrichState(caseDef={},entityFixture=ENTITY_FIXTURE){
 
 /* Lenguaje conceptual: Gemini NO conoce arrays/aliases/contratos CE. */
 const CONCEPT_TYPES=Object.freeze(['DATA','TABLE','CALCULATE','MEMORY','PERSON','CHAT','CLARIFY','UNSUPPORTED']);
-const DATA_REQUESTS=Object.freeze(['event_summary','event_purchases','event_income_status','compare_events','event_weather','event_documentation','event_bank']);
+const DATA_REQUESTS=Object.freeze(['event_summary','event_purchases','event_income_status','event_liquidations','compare_events','event_weather','event_documentation','event_bank']);
 const TABLE_REQUESTS=Object.freeze(['select','filter','hide','show_sort','reset','summarize','analyze']);
 const PERSON_REQUESTS=Object.freeze(['profile','events','event_status']);
 const MEMORY_REQUESTS=Object.freeze(['search','read','summarize']);
@@ -105,12 +105,13 @@ Devuelve EXCLUSIVAMENTE un JSON con estas claves simples:
   "query":"texto libre solo cuando no haya un sujeto reconocido suficiente",
   "result_index":1,
   "status":"opcional",
+  "detail":"standard|full opcional",
   "analysis":false,
   "summary":"frase interna breve"
 }
 
 VOCABULARIO CONCEPTUAL:
-DATA request = event_summary | event_purchases | event_income_status | compare_events | event_weather | event_documentation | event_bank.
+DATA request = event_summary | event_purchases | event_income_status | event_liquidations | compare_events | event_weather | event_documentation | event_bank.
 TABLE request = select | filter | hide | show_sort | reset | summarize | analyze.
 CALCULATE request = MAX | MIN | SUM | AVG | COUNT.
 MEMORY request = search | read | summarize.
@@ -124,6 +125,7 @@ SEMÁNTICA DE CAPACIDADES:
 - DATA/event_documentation = SOLO documentos, archivos o documentación vinculada al evento. NUNCA sustituye a event_summary.
 - DATA/event_purchases ya significa las compras realizadas del evento en el contrato actual; no necesitas repetir status=realized.
 - DATA/event_income_status usa por defecto el estado pending en el contrato actual; no necesitas repetir status=pending cuando eso es lo pedido.
+- DATA/event_liquidations = liquidaciones de compras. DEBE significa que SALE dinero de la caja de la Peña; HABER significa que ENTRA dinero en la caja de la Peña. Por defecto detail=standard: movimientos + Ticket/s + resumen suficiente de cada Ticket. Si el usuario pide TODO el detalle, todas las líneas o todos los productos de los Tickets incluidos, usa detail=full: CE consultará COMPRAS por esos TKxx. Puedes usar people:[persona] para limitar la liquidación a una persona.
 - DATA/compare_events obtiene una comparación NUEVA entre eventos identificados. Si ya existe una tabla de comparación en available_datasets y el usuario pregunta por conclusiones, incoherencias o rarezas de ESA tabla, usa TABLE/analyze.
 - PERSON/profile describe datos de la persona en general; no recupera conversaciones pasadas.
 - PERSON/events obtiene los eventos relacionados con la persona.
@@ -211,7 +213,7 @@ function conceptualIntentMatch(plan={},expected={}){
   if(expected.request!==undefined&&!scalarMatch(plan.request,expected.request))reasons.push(`request esperado ${expected.request}; recibido ${plan.request||'—'}`);
   if(expected.events!==undefined&&!listMatch(plan.events,expected.events))reasons.push(`events esperados ${JSON.stringify(expected.events)}; recibidos ${JSON.stringify(plan.events||[])}`);
   if(expected.people!==undefined&&!listMatch(plan.people,expected.people))reasons.push(`people esperados ${JSON.stringify(expected.people)}; recibidos ${JSON.stringify(plan.people||[])}`);
-  for(const k of ['dataset','field','column','query','status','label'])if(expected[k]!==undefined&&!scalarMatch(plan[k],expected[k]))reasons.push(`${k} esperado ${expected[k]}; recibido ${plan[k]??'—'}`);
+  for(const k of ['dataset','field','column','query','status','label','detail'])if(expected[k]!==undefined&&!scalarMatch(plan[k],expected[k]))reasons.push(`${k} esperado ${expected[k]}; recibido ${plan[k]??'—'}`);
   if(expected.values!==undefined&&!listMatch(plan.values,expected.values))reasons.push(`values esperados ${JSON.stringify(expected.values)}; recibidos ${JSON.stringify(plan.values||[])}`);
   if(expected.result_index!==undefined&&num(plan.result_index)!==num(expected.result_index))reasons.push(`result_index esperado ${expected.result_index}; recibido ${plan.result_index??'—'}`);
   if(expected.sort){if(!plan.sort||!scalarMatch(plan.sort.field,expected.sort.field)||!scalarMatch(plan.sort.direction,expected.sort.direction))reasons.push(`sort esperado ${JSON.stringify(expected.sort)}; recibido ${JSON.stringify(plan.sort||{})}`);}
@@ -257,6 +259,7 @@ function translateConcept(plan={},state={}){
     else if(!event)issues.push(`${request} necesita evento`);
     else if(request==='event_purchases')push('event_purchases',{event,purchase_status:trim(plan.status)||'realized'});
     else if(request==='event_income_status')push('event_income_status',{event,status:trim(plan.status)||'pending'});
+    else if(request==='event_liquidations'){const people=canonicalPeople(plan,state);push('event_liquidations',{event,...(people[0]?{person:people[0]}:{}),settlement_status:trim(plan.status)||'all',detail:norm(plan.detail)==='full'?'full':'standard'});}
     else push(request,{event});
   }else if(type==='PERSON'){
     const people=canonicalPeople(plan,state),event=canonicalEvents(plan,state)[0]||'';
@@ -300,7 +303,7 @@ function auditAction(action={}){
 }
 function translatorAudit(translation={}){const audits=arr(translation.actions).map(a=>({capability:a.capability,...auditAction(a)}));const known=translation.ok&&audits.every(a=>a.known),executable=translation.ok&&audits.every(a=>a.executable);return{ok:translation.ok&&known&&executable,known,executable,audits,issues:[...arr(translation.issues),...audits.flatMap(a=>a.executable?[]:a.issues)]};}
 
-function canonicalConceptSignature(plan={}){plan=normalizeConceptPlan(plan);const p={type:trim(plan.type).toUpperCase(),request:norm(plan.request),events:arr(plan.events).map(norm).sort(),people:arr(plan.people).map(norm).sort(),dataset:norm(plan.dataset),field:norm(plan.field),values:arr(plan.values).map(norm).sort(),column:norm(plan.column),query:norm(plan.query),result_index:num(plan.result_index),status:norm(plan.status),label:norm(plan.label),sort:plan.sort?{field:norm(plan.sort.field),direction:norm(plan.sort.direction)}:null};return JSON.stringify(p);}
+function canonicalConceptSignature(plan={}){plan=normalizeConceptPlan(plan);const p={type:trim(plan.type).toUpperCase(),request:norm(plan.request),events:arr(plan.events).map(norm).sort(),people:arr(plan.people).map(norm).sort(),dataset:norm(plan.dataset),field:norm(plan.field),values:arr(plan.values).map(norm).sort(),column:norm(plan.column),query:norm(plan.query),result_index:num(plan.result_index),status:norm(plan.status),label:norm(plan.label),detail:norm(plan.detail),sort:plan.sort?{field:norm(plan.sort.field),direction:norm(plan.sort.direction)}:null};return JSON.stringify(p);}
 function canonicalExecutionSignature(translation={}){const guard=translation?.guard?.blocked?{blocked:true,reason:translation.guard.reason,candidates:arr(translation.guard.candidates).map(norm).sort()}:null,actions=arr(translation.actions).map(a=>({capability:trim(a.capability),arguments:a.arguments||{}}));return JSON.stringify({guard,actions});}
 
 async function callGemini(caseDef={},externalSignal=null,enrichedOverride=null){

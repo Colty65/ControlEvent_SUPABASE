@@ -82,3 +82,25 @@ La restauración integral recrea primero las cabeceras y después movimientos/TK
 ## Fuera de alcance V1
 
 No se conecta todavía el cierre de la liquidación con el acto de conciliación bancaria. Una futura versión podrá permitir que cerrar/aprobar una liquidación aparee sus TKxx con el movimiento bancario correspondiente, pero esa automatización queda deliberadamente fuera de esta versión.
+
+
+## V1.3 · PDF y acceso RO desde Mapa de recursos
+- En PDF, la columna Productos muestra los dos productos de mayor importe del Ticket; si hay más, añade `, y más........`.
+- Acceso adicional `[Liquidaciones]` en Vista aérea / Mapa de recursos junto a `[Responsables / PDF]`.
+- Usuarios RO acceden desde Mapa en modo consulta; las operaciones de escritura siguen reservadas a GD/RW también en backend.
+
+
+## V1.4 · Datos de primera clase en ControlEvent
+- Semántica canónica: **DEBE = sale dinero de la caja de la Peña**; **HABER = entra dinero en la caja de la Peña**.
+- Zuzu incorpora la capacidad `event_liquidations`, filtrable por evento/persona y por estado abierta/cerrada.
+- Consulta normal (`detail=standard`): usa la propia liquidación, movimientos y Ticket/s, con Tienda y los dos productos de mayor importe por Ticket.
+- Consulta de detalle total (`detail=full`): toma los TKxx incluidos en la liquidación y cruza exclusivamente esos códigos con COMPRAS para devolver todas sus líneas/productos.
+- INFOEVENTO incorpora una hoja `LIQUIDACIONES` con histórico, movimientos y Ticket/s.
+- BACKUP/RESTORE mantiene las tres hojas `LIQUIDACIONES`, `LIQUIDACION_MVTOS` y `LIQUIDACION_TK`.
+- El acceso desde Mapa de recursos permite consulta RO; las escrituras siguen bloqueadas por UI y backend.
+
+
+## V1.5 · justificante visible en selección
+- Cada Ticket disponible muestra miniatura de su foto real de `ce_ticket_images`; clic/tap amplía el justificante sin cambiar la selección.
+- Junto al Ticket se muestra la base contable: número de líneas de compra, suma del Ticket y estado de apareo en Banco.
+- La miniatura y la información contable son visibles también para RO; los controles de escritura continúan deshabilitados.
