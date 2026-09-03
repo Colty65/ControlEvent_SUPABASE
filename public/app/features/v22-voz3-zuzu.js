@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · Zuzu Voice · RAW14U/Z1H · guard local de residuos + barge-in robusto + pensamiento breve de espera
+/* ControlEvent v4_1_exp · Zuzu Voice · RAW14U/Z1H · guard local de residuos + barge-in robusto + pensamiento breve de espera
    Objetivo: recuperar la escucha ambiental que sí funcionó y mantener conversación oral humana.
    Flujo deliberadamente simple:
    AMBIENTE -> "Hola Zuzu" -> USUARIO -> ESPERA IA -> ZUZU HABLA -> USUARIO.
@@ -10,7 +10,7 @@
   if(window.__ceV22Voz3Zuzu) return;
   window.__ceV22Voz3Zuzu=true;
 
-  var BUILD='v4_0_exp-VNEXT-P17-FILTER-VOICE-EMPHASIS-V58';
+  var BUILD='v4_1_exp-VNEXT-P17-FILTER-VOICE-EMPHASIS-V58';
   var PANEL_ID='ceV22Voz3Panel';
   var STYLE_ID='ceZuzuVoiceV2Style';
   var STORAGE={
@@ -405,7 +405,7 @@
   function renderEntertainmentPhrase(raw){
     var item=(raw&&typeof raw==='object')?raw:{display:String(raw||''),speech:[[String(raw||''),0]]};
     var d=new Date(),months=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'],days=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'],h=d.getHours(),moment=h<7?'madrugada':h<13?'mañana':h<15?'mediodía':h<20?'tarde':'noche',pad=function(n){return String(n).padStart(2,'0');};
-    var vars={usuario:voiceAddressName(false),nombre:voiceGreetingName(),mes_actual:months[d.getMonth()],mes:months[d.getMonth()],diasemana:days[d.getDay()],dia_semana:days[d.getDay()],ano_actual:String(d.getFullYear()),'añoactual':String(d.getFullYear()),dia_mes:String(d.getDate()),hora_actual:pad(h)+':'+pad(d.getMinutes()),fecha_hoy:pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(),momento_dia:moment,version:'v4_0_exp'};
+    var vars={usuario:voiceAddressName(false),nombre:voiceGreetingName(),mes_actual:months[d.getMonth()],mes:months[d.getMonth()],diasemana:days[d.getDay()],dia_semana:days[d.getDay()],ano_actual:String(d.getFullYear()),'añoactual':String(d.getFullYear()),dia_mes:String(d.getDate()),hora_actual:pad(h)+':'+pad(d.getMinutes()),fecha_hoy:pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear(),momento_dia:moment,version:'v4_1_exp'};
     function inject(v){var out=String(v||'');Object.keys(vars).forEach(function(k){out=out.replace(new RegExp('\\{'+k+'\\}','g'),vars[k]);});return clean(out);}
     var speech=Array.isArray(item.speech)?item.speech:[];
     return{display:inject(item.display),speech:speech.map(function(part){if(Array.isArray(part))return{text:inject(part[0]),pauseMs:Math.max(0,Number(part[1])||0),rate:Number(part[2])||0,pitch:Number(part[3])||0};return{text:inject(part&&part.text),pauseMs:Math.max(0,Number(part&&part.pauseMs)||0),rate:Number(part&&part.rate)||0,pitch:Number(part&&part.pitch)||0};}).filter(function(x){return !!x.text;})};

@@ -1,4 +1,4 @@
--- ControlEvent v4_0_exp · VNext P1.18
+-- ControlEvent v4_1_exp · VNext P1.18
 -- Registro/canonizador auditable de capacidades y observaciones JSON. NHC: NO contiene frases del usuario como reglas.
 
 create table if not exists public.ce_zuzu_capabilities (

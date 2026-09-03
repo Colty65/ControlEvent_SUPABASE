@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp FIX23 - rendimiento real:
+/* ControlEvent v4_1_exp FIX23 - rendimiento real:
    - evita cargas /api/state globales sin evento (boot ligero)
    - reduce DOM de Compras/Donaciones: filas compactas y edición bajo demanda
    - no cambia cálculos, fotos, permisos ni versión visible. */
@@ -339,5 +339,5 @@
   document.addEventListener('change', ev => { if(ev.target?.id === 'selectedEvent') clearEditingOnEvent(); }, true);
   [100,500,1500].forEach(ms => setTimeout(run, ms));
 
-  window.ControlEventFix23Performance = {version:'v4_0_exp_fix23_performance_dom_event_scope', run, renderCompras:()=>renderCompraKind('compra'), renderDonaciones:()=>renderCompraKind('donacion')};
+  window.ControlEventFix23Performance = {version:'v4_1_exp_fix23_performance_dom_event_scope', run, renderCompras:()=>renderCompraKind('compra'), renderDonaciones:()=>renderCompraKind('donacion')};
 })();

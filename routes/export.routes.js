@@ -6,8 +6,8 @@ import { getSupabaseAdmin } from '../lib/supabase.js';
 import { exportBankData } from '../services/bank-reconciliation.service.js';
 
 const router = express.Router();
-const BACKUP_VERSION = 'ControlEvent v4_0_exp';
-const BACKUP_VERSION_FILE = 'ControlEvent_v4_0_exp';
+const BACKUP_VERSION = 'ControlEvent v4_1_exp';
+const BACKUP_VERSION_FILE = 'ControlEvent_v4_1_exp';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 // Excel admite como máximo 32.767 caracteres de texto por celda. Dejamos margen y,
@@ -633,10 +633,16 @@ async function protectWorkbook(wb){
 }
 function backupVersionText(value){
   if(typeof value !== 'string') return value;
-  const oldFile = 'ControlEvent_' + 'v3_' + '0_prod';
-  const oldText = 'ControlEvent ' + 'v3.' + '0_prod';
-  const oldTextAlt = 'ControlEvent ' + 'v3_' + '0_prod';
-  return value.split(oldFile).join(BACKUP_VERSION_FILE).split(oldText).join(BACKUP_VERSION).split(oldTextAlt).join(BACKUP_VERSION);
+  const legacyPairs = [
+    ['ControlEvent_' + 'v4_' + '0_exp', 'ControlEvent ' + 'v4_' + '0_exp'],
+    ['ControlEvent_' + 'v3_' + '0_prod', 'ControlEvent ' + 'v3.' + '0_prod'],
+    ['ControlEvent_' + 'v3_' + '0_prod', 'ControlEvent ' + 'v3_' + '0_prod']
+  ];
+  let out=value;
+  for(const [oldFile,oldText] of legacyPairs){
+    out=out.split(oldFile).join(BACKUP_VERSION_FILE).split(oldText).join(BACKUP_VERSION);
+  }
+  return out;
 }
 function enforceBackupVersion(wb){
   try{ wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`; }catch(_){ }
@@ -767,7 +773,7 @@ async function buildBackupWorkbook(fullState, scope){
       row.key||'',jsonCell(row.value),row.updated_at||''
     ]));
   }catch(globalError){
-    console.warn('[ControlEvent v4_0_exp] No se pudieron añadir ACCESOS/META al BACKUP.',globalError?.message||globalError);
+    console.warn('[ControlEvent v4_1_exp] No se pudieron añadir ACCESOS/META al BACKUP.',globalError?.message||globalError);
     addRows('ACCESOS',['AVISO'],[[globalError?.message||String(globalError)]]);
     addRows('META_BBDD',['AVISO'],[[globalError?.message||String(globalError)]]);
   }
@@ -780,7 +786,7 @@ async function buildBackupWorkbook(fullState, scope){
       row.id||'',row.event_id||'',row.hito_id||'',row.descripcion||'',row.fecha_minima||'',row.fecha_maxima||'',row.notas||'',row.dependencia_tipo||'',jsonCell(row.dependencias_previas),jsonCell(row.dependencias_posteriores),row.responsable_id||'',row.responsable_nombre||'',row.cumplida===true?'SI':'NO',row.cumplida_at||'',row.orden??'',row.created_at||'',row.updated_at||''
     ]));
   }catch(operationalError){
-    console.warn('[ControlEvent v4_0_exp] No se pudieron añadir HITOS/LG al BACKUP.',operationalError?.message||operationalError);
+    console.warn('[ControlEvent v4_1_exp] No se pudieron añadir HITOS/LG al BACKUP.',operationalError?.message||operationalError);
     addRows('HITOS',['AVISO'],[[operationalError?.message||String(operationalError)]]);
     addRows('LG',['AVISO'],[[operationalError?.message||String(operationalError)]]);
   }
@@ -796,7 +802,7 @@ async function buildBackupWorkbook(fullState, scope){
       row.id||'',row.settlement_id||'',row.event_id||'',row.ticket_code||'',row.ticket_amount_snapshot??0,row.responsible_person_id||'',row.responsible_person_name_snapshot||'',jsonCell(row.purchase_ids),row.created_at||''
     ]));
   }catch(liquidationError){
-    console.warn('[ControlEvent v4_0_exp] No se pudieron añadir Liquidaciones de Compras al BACKUP.',liquidationError?.message||liquidationError);
+    console.warn('[ControlEvent v4_1_exp] No se pudieron añadir Liquidaciones de Compras al BACKUP.',liquidationError?.message||liquidationError);
     ['LIQUIDACIONES','LIQUIDACION_MVTOS','LIQUIDACION_TK'].forEach(name=>addRows(name,['AVISO'],[[liquidationError?.message||String(liquidationError)]]));
   }
   try{
@@ -829,7 +835,7 @@ async function buildBackupWorkbook(fullState, scope){
       row.eventId||'',row.movementId||'',row.included===false?'NO':'SI',row.updatedBy||'',row.createdAt||'',row.updatedAt||''
     ]));
   }catch(bankError){
-    console.warn('[ControlEvent v4_0_exp] No se pudo añadir Cuadre Banco al BACKUP de servidor.',bankError?.message||bankError);
+    console.warn('[ControlEvent v4_1_exp] No se pudo añadir Cuadre Banco al BACKUP de servidor.',bankError?.message||bankError);
     ['BANCO_IMPORTACIONES','BANCO_MVTOS','BANCO_TK_LINKS','BANCO_INGRESOS_LINKS','BANCO_CIERRE_MVTO','BANCO_PERIODOS','BANCO_ESTADO_MVTO'].forEach(name=>addRows(name,['AVISO'],[[bankError?.message||String(bankError)]]));
   }
   // BANK4.4: antes de proteger/escribir, materializa fuera de sharedStrings cualquier

@@ -1,10 +1,10 @@
-/* ControlEvent v4_0_exp BANK4.8 · puntos históricos + lupa temporal independiente sin deformar la gráfica. */
+/* ControlEvent v4_1_exp BANK4.8 · puntos históricos + lupa temporal independiente sin deformar la gráfica. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v4_0_exp';
+  const VERSION = 'v4_1_exp';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -248,7 +248,7 @@
     }
     if(target.id==='ceBankFilter'){
       const next=text(target.value)||'TODOS';
-      // v4_0_exp · Un evento FINALIZADO es una foto definitiva: la vista queda siempre
+      // v4_1_exp · Un evento FINALIZADO es una foto definitiva: la vista queda siempre
       // en «Incluidos en saldo». El selector está además deshabilitado en solo lectura.
       store.filter=store.readOnly?'INCLUIDOS':next;
       target.value=store.filter; store.page=1; invalidateMovementCache(); scheduleBodyRender(true);
@@ -448,7 +448,7 @@
       invalidateMovementCache();
       store.accountId=data.selectedAccount||store.accountId;
       store.readOnly=data.readOnly===true;
-      // v4_0_exp · Al consultar un FINALIZADO se muestran siempre las filas «En saldo».
+      // v4_1_exp · Al consultar un FINALIZADO se muestran siempre las filas «En saldo».
       // Evita que quede heredado «Todos los movimientos» de una sesión/evento anterior.
       if(store.readOnly||data?.event?.finalized===true) store.filter='INCLUIDOS';
       store.dateFrom=text(data?.period?.dateFrom); store.dateTo=text(data?.period?.dateTo);
@@ -1554,7 +1554,7 @@
     const button=$('ceBankTicketModal')?.querySelector('[data-ce-bank-save-tickets]');
     if(button){button.disabled=true;button.textContent='Guardando…';}
     const selectedTotal=store.tickets.filter(item=>item.selected).reduce((sum,item)=>sum+num(item.amount),0);
-    // v4.0_exp BANK2 · una diferencia en cualquiera de los dos sentidos NO impide guardar
+    // v4.1_exp BANK2 · una diferencia en cualquiera de los dos sentidos NO impide guardar
     // los justificantes reales. El movimiento seguirá pendiente globalmente hasta cuadrar o
     // hasta que el usuario acepte expresamente el residual.
     const selectedKeys=new Set(store.tickets.filter(item=>item.selected).map(item=>item.key));

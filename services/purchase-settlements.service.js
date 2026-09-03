@@ -55,7 +55,7 @@ function actorLabel(actor){
 function friendlyDbError(error){
   const message = text(error?.message || error);
   if(/ce_purchase_settlements|ce_purchase_cash_movements|ce_purchase_settlement_tickets|relation .* does not exist|schema cache|pgrst205|42p01/i.test(message)){
-    const out = new Error('El módulo Liquidaciones todavía no está creado en Supabase. Ejecuta sql/ControlEvent_SQL_V4_0_EXP_LIQUIDACIONES_COMPRAS.sql en el SQL Editor y vuelve a abrir la ventana.');
+    const out = new Error('El módulo Liquidaciones todavía no está creado en Supabase. Ejecuta sql/ControlEvent_SQL_V4_1_EXP_LIQUIDACIONES_COMPRAS.sql en el SQL Editor y vuelve a abrir la ventana.');
     out.status = 503;
     out.code = 'PURCHASE_SETTLEMENT_SCHEMA_MISSING';
     return out;

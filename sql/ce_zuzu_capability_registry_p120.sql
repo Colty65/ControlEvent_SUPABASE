@@ -1,4 +1,4 @@
--- ControlEvent v4_0_exp · VNext P1.20
+-- ControlEvent v4_1_exp · VNext P1.20
 -- Envelope canónico + registro auditable de capacidades/firmas JSON.
 -- NHC: describe estructura JSON; no contiene frases del usuario ni reglas lingüísticas.
 

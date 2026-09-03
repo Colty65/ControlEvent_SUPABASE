@@ -1,4 +1,4 @@
-# ControlEvent v4_0_exp · VNext P1.18
+# ControlEvent v4_1_exp · VNext P1.18
 ## Capability JSON Canonicalizer · Factual Coverage ITV · Structured Focus · GOLDEN 110 · NHC
 
 P1.18 no añade reglas de castellano al runtime. Su objetivo es que Gemini pueda expresar la misma intención mediante formas JSON estructuralmente equivalentes, que CE las canonice y que ITV juzgue hechos/capacidades, no una única ruta interna.

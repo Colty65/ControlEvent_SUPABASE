@@ -1,10 +1,10 @@
--- ControlEvent v4_0_exp · Histórico de ITV Zuzu.
+-- ControlEvent v4_1_exp · Histórico de ITV Zuzu.
 -- Ejecutar una sola vez en Supabase SQL Editor. La app funciona mientras tanto con ce_meta fallback.
 create table if not exists public.ce_zuzu_test_runs (
   run_key text primary key,
   seed bigint not null,
   battery_clock text not null default '',
-  app_version text not null default 'v4_0_exp',
+  app_version text not null default 'v4_1_exp',
   created_by text not null default '',
   generated_at timestamptz not null default now(),
   data_counts jsonb not null default '{}'::jsonb,

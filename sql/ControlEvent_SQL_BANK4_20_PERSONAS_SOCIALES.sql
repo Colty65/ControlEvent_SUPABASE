@@ -1,4 +1,4 @@
--- ControlEvent v4_0_exp · BANK4_20
+-- ControlEvent v4_1_exp · BANK4_20
 -- Identidad social persistente de PERSONAS.
 -- Ejecutar UNA vez en Supabase > SQL Editor antes de probar la versión BANK4_20.
 -- NHC: los motes dejan de vivir en JavaScript y pasan a datos mantenibles.

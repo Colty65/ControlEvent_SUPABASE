@@ -1,4 +1,4 @@
--- ControlEvent v4_0_exp · DONACIONES PENDIENTES · BANK4.3
+-- ControlEvent v4_1_exp · DONACIONES PENDIENTES · BANK4.3
 -- Migración idempotente. Puede ejecutarse aunque una versión anterior se quedara a medias.
 -- Regla histórica:
 --   Evento Finalizado -> donación registrada = Entregada.

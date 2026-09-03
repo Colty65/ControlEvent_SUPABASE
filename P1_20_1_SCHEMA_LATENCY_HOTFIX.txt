@@ -1,4 +1,4 @@
-ControlEvent v4_0_exp · VNext P1.20.1 · Schema Latency Hotfix · NHC
+ControlEvent v4_1_exp · VNext P1.20.1 · Schema Latency Hotfix · NHC
 
 Motivo:
 - En P1.20 el ENVELOPE (context + view + presentation) se publicó como opcional en las 23 ramas del schema query_ce.

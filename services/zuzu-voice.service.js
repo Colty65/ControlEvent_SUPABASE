@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · FIX29 · Transcripción de voz CE
+/* ControlEvent v4_1_exp · FIX29 · Transcripción de voz CE
    Fallback independiente de Web Speech: recibe un fragmento corto de audio y
    devuelve únicamente la transcripción. Reutiliza la clave Gemini ya existente. */
 

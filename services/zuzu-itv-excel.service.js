@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · Importador XLSX de baterías ITV Zuzu.
+/* ControlEvent v4_1_exp · Importador XLSX de baterías ITV Zuzu.
    Lectura server-side para no cargar ExcelJS en navegadores modestos y para aceptar
    XLSX OOXML válidos aunque usen prefijos de namespace (p. ej. x:worksheet). */
 import { inflateRawSync } from 'node:zlib';

@@ -1,4 +1,4 @@
-ControlEvent v4_0_exp · VNext P1.22.1
+ControlEvent v4_1_exp · VNext P1.22.1
 
 1. events_catalog + query: query se resuelve contra catálogos canónicos antes de validar. Solo coincidencia exacta e inequívoca de persona/evento cambia el contrato a person_events/event_summary.
 2. events_catalog no puede borrar una persona canónica explícita del turno.

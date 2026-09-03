@@ -1,7 +1,7 @@
-/* ControlEvent v4_0_exp - hotfix sin cambio visible de versión.
+/* ControlEvent v4_1_exp - hotfix sin cambio visible de versión.
    - INGRESOS: una situación vacía se considera Pendiente, no ingreso realizado.
    - RESUMEN: saldo actual = ingresos realmente ingresados - gastos realizados.
-   - Se mantiene v4_0_exp en pantalla/INFOEVENTO/BACKUP. */
+   - Se mantiene v4_1_exp en pantalla/INFOEVENTO/BACKUP. */
 (function(){
   'use strict';
   if(window.__ceV14HotfixResumenCatalogoPlan) return;

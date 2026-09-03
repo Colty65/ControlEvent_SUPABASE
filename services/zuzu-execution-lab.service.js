@@ -1,11 +1,11 @@
-/* ControlEvent v4_0_exp · ITV EJECUCIÓN CONTROLADA V1
+/* ControlEvent v4_1_exp · ITV EJECUCIÓN CONTROLADA V1
    Laboratorio read-only: contexto real -> Intérprete Gemini V2.3 -> traductor conceptual ->
    executor canónico CE REAL. No sustituye Zuzu, no genera respuesta narrativa y no escribe BBDD. */
 import { getState } from './state.service.js';
 import { runInterpreterPlan, __interpreterLabForRegression } from './zuzu-interpreter-lab.service.js';
 import { __zuzuStructuralTesting } from './event-ai.service.js';
 
-const { conceptualIntentMatch }=__interpreterLabForRegression;
+const { conceptualIntentMatch }=__interpreterLabForRegression();
 const { vnextP19ExecuteData, vnextRecallMemory, vnextP125WorkingSetsFromResult }=__zuzuStructuralTesting;
 const text=v=>v==null?'':String(v),trim=v=>text(v).trim(),arr=v=>Array.isArray(v)?v:[],num=v=>Number(v)||0;
 const norm=v=>trim(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();

@@ -2,14 +2,14 @@ import { registerExcelModule, ensureExcelJS as ensureRuntimeExcelJS } from './_e
 
 export const meta = {
   name: 'backup',
-  appVersion: 'v4_0_exp',
+  appVersion: 'v4_1_exp',
   version: 'v33.7',
   mode: 'server-backup-download-with-client-fallback',
   description: 'Descarga de datos/backup: descarga principal generada por /api/export/backup y fallback cliente si el endpoint no está disponible.'
 };
 
-const BACKUP_VERSION = 'ControlEvent v4_0_exp';
-const BACKUP_VERSION_FILE = 'ControlEvent_v4_0_exp';
+const BACKUP_VERSION = 'ControlEvent v4_1_exp';
+const BACKUP_VERSION_FILE = 'ControlEvent_v4_1_exp';
 const BACKUP_PASSWORD = 'open_excel_arrastre';
 const COLLECTIONS = ['eventos','personas','tiendas','productos','colaboradores','compras'];
 
@@ -504,10 +504,16 @@ async function protectWorkbook(wb){
 }
 function backupVersionText(value){
   if(typeof value !== 'string') return value;
-  const oldFile = 'ControlEvent_' + 'v3_' + '0_prod';
-  const oldText = 'ControlEvent ' + 'v3.' + '0_prod';
-  const oldTextAlt = 'ControlEvent ' + 'v3_' + '0_prod';
-  return value.split(oldFile).join(BACKUP_VERSION_FILE).split(oldText).join(BACKUP_VERSION).split(oldTextAlt).join(BACKUP_VERSION);
+  const legacyPairs = [
+    ['ControlEvent_' + 'v4_' + '0_exp', 'ControlEvent ' + 'v4_' + '0_exp'],
+    ['ControlEvent_' + 'v3_' + '0_prod', 'ControlEvent ' + 'v3.' + '0_prod'],
+    ['ControlEvent_' + 'v3_' + '0_prod', 'ControlEvent ' + 'v3_' + '0_prod']
+  ];
+  let out=value;
+  for(const [oldFile,oldText] of legacyPairs){
+    out=out.split(oldFile).join(BACKUP_VERSION_FILE).split(oldText).join(BACKUP_VERSION);
+  }
+  return out;
 }
 function enforceBackupVersion(wb){
   try{ wb.creator = `${BACKUP_VERSION} - ©oltyLAB '26`; }catch(_){ }

@@ -1,4 +1,4 @@
--- ControlEvent v4_0_exp · RAW14Q · Memoria episódica Zuzu
+-- ControlEvent v4_1_exp · RAW14Q · Memoria episódica Zuzu
 -- Ejecutar una sola vez en Supabase. Es idempotente y también está incluido al final de ce_zuzu_conversation_ledger.sql.
 alter table public.ce_zuzu_conversations
   add column if not exists memory_summary text not null default '',

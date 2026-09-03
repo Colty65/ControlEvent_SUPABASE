@@ -10,4 +10,4 @@ Objetivo: mantener nombres canónicos exactos en pantalla/datos y usar una capa 
 - La pantalla y el Ledger siguen usando los nombres canónicos: los alias no modifican BBDD, filtros, DATASET ni VIEW.
 - BANK4_16 sigue actuando antes: primero se protege la unidad monetaria; después se humanizan nombres en voz.
 
-Regresión: `node scripts/v4-0-exp-bank417-human-speech-regression.cjs`.
+Regresión: `node scripts/v4-1-exp-bank417-human-speech-regression.cjs`.

@@ -1,9 +1,9 @@
-/* ControlEvent v4_0_exp · Control de Hitos y Líneas de Gestión */
+/* ControlEvent v4_1_exp · Control de Hitos y Líneas de Gestión */
 (function(root){
   'use strict';
   const PREVIOUS_API = root.ControlEventHitos || null;
 
-  const VERSION = 'v4_0_exp-hitos4-orden-permisos-zuzu';
+  const VERSION = 'v4_1_exp-hitos4-orden-permisos-zuzu';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const norm = value => {

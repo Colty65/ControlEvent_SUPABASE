@@ -1,7 +1,7 @@
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v4_0_exp';
-  const VERSION_FILE = 'ControlEvent_v4_0_exp';
+  const VERSION = 'ControlEvent v4_1_exp';
+  const VERSION_FILE = 'ControlEvent_v4_1_exp';
   const INSTALLED = '__ceV15Hotfix6ResumenAvanceManto';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

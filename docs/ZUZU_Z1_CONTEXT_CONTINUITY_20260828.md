@@ -1,4 +1,4 @@
-# ControlEvent v4_0_exp · ZUZU Z1 · Contexto y continuidad
+# ControlEvent v4_1_exp · ZUZU Z1 · Contexto y continuidad
 
 Fecha: 28/08/2026
 
@@ -29,7 +29,7 @@ El compilador tiene instrucciones explícitas para:
 
 ## Trazas
 
-Cada turno incorpora `v4_0_exp · Z1 · CONTEXTO DE ENTRADA`, que muestra de forma compacta:
+Cada turno incorpora `v4_1_exp · Z1 · CONTEXTO DE ENTRADA`, que muestra de forma compacta:
 
 - scope conversacional;
 - últimos temas operativos;

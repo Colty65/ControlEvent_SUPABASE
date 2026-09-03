@@ -1,4 +1,4 @@
--- ControlEvent v4_0_exp · BANK4_23
+-- ControlEvent v4_1_exp · BANK4_23
 -- Nombre específico de cada evento para respuesta hablada de Zuzu.
 -- El título canónico no cambia y sigue usándose para BBDD, tablas, búsquedas y pantalla.
 

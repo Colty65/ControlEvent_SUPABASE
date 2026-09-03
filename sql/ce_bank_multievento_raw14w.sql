@@ -1,4 +1,4 @@
--- ControlEvent v4_0_exp · RAW14W
+-- ControlEvent v4_1_exp · RAW14W
 -- Cuadre Banco multievento: un movimiento bancario único puede quedar justificado
 -- por TKxx de varios eventos. La diferencia residual, si existe, se acepta de forma
 -- explícita y GLOBAL; nunca se reparte artificialmente entre eventos.
@@ -17,7 +17,7 @@ create index if not exists idx_ce_bank_movement_settlements_accepted_at
 
 -- RAW14W usa movement_id + event_id + ticket_code. En algunas instalaciones históricas
 -- puede existir una restricción UNIQUE antigua sobre movement_id/event_id que impide
--- varios TKxx del mismo evento. v4.0_exp BANK2 la elimina de forma idempotente mediante
+-- varios TKxx del mismo evento. v4.1_exp BANK2 la elimina de forma idempotente mediante
 -- sql/ce_bank_ticket_links_multi_v4.sql.
 
 comment on table public.ce_bank_movement_settlements is

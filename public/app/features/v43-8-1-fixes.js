@@ -1,9 +1,9 @@
-/* ControlEvent v4_0_exp - corrección móvil de Planificación inicial y precio en COMPRAS.
+/* ControlEvent v4_1_exp - corrección móvil de Planificación inicial y precio en COMPRAS.
    No modifica los motores de INFOEVENTO ni BACKUP. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v4_0_exp';
-  const VERSION_FILE = 'ControlEvent_v4_0_exp';
+  const VERSION = 'ControlEvent v4_1_exp';
+  const VERSION_FILE = 'ControlEvent_v4_1_exp';
   const $ = id => document.getElementById(id);
 
   function st(){

@@ -9,4 +9,4 @@ Cambios principales:
 - Los años incrustados en nombres canónicos de eventos se restauran desde el catálogo antes de presentar.
 - El prompt final compacto vuelve a declarar explícitamente la diferencia entre amount, units, count, años, fechas y nombres.
 
-Regresión: `node scripts/v4-0-exp-bank416-voice-unit-oracle-regression.cjs`.
+Regresión: `node scripts/v4-1-exp-bank416-voice-unit-oracle-regression.cjs`.

@@ -1,4 +1,4 @@
-# ControlEvent v4_0_exp · Auditoría ANSWER_BLUEPRINT + ANSWER_PAYLOAD
+# ControlEvent v4_1_exp · Auditoría ANSWER_BLUEPRINT + ANSWER_PAYLOAD
 
 Fecha: 23/08/2026
 

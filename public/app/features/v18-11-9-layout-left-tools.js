@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp - herramientas laterales izquierdas sin ficha, pequeñas y repartidas. */
+/* ControlEvent v4_1_exp - herramientas laterales izquierdas sin ficha, pequeñas y repartidas. */
 (function(){
   'use strict';
   if(window.__ceV18119LeftTools) return; window.__ceV18119LeftTools=true;

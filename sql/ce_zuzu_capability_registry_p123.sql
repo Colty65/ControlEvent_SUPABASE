@@ -1,6 +1,6 @@
--- ControlEvent v4_0_exp · VNext P1.23 · DIALOGUE STATE AUTHORITY / ADAPTIVE ITV / REVERSIBLE VIEW · NHC
+-- ControlEvent v4_1_exp · VNext P1.23 · DIALOGUE STATE AUTHORITY / ADAPTIVE ITV / REVERSIBLE VIEW · NHC
 -- Espejo persistente y auditable del registro canónico. El runtime funciona sin ejecutar este SQL.
--- ControlEvent v4_0_exp · VNext P1.23
+-- ControlEvent v4_1_exp · VNext P1.23
 -- Dialogue State Authority + reversible view + registro auditable de capacidades/firmas JSON.
 -- NHC: describe estructura JSON; no contiene frases del usuario ni reglas lingüísticas.
 

@@ -1,5 +1,5 @@
 {
-  "version": "v4_0_exp-router-shadow-3-regression-19pdf",
+  "version": "v4_1_exp-router-shadow-3-regression-19pdf",
   "description": "Banco de 100 casos de enrutamiento Zuzu: 55 consultas independientes + 15 conversaciones de 3 turnos (45 mensajes). No consulta datos ni valida la respuesta factual; valida la decisión de tubería/contexto.",
   "cases": [
     {

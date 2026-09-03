@@ -1,13 +1,13 @@
-/* ControlEvent v4_0_exp - saneamiento de versión visible y diagnóstico. */
+/* ControlEvent v4_1_exp - saneamiento de versión visible y diagnóstico. */
 (function(){
   'use strict';
   if(window.__ceV18114VersionTrace) return;
   window.__ceV18114VersionTrace = true;
-  var VERSION_LABEL = 'v4_0_exp';
-  var VERSION_TEXT = 'ControlEvent v4_0_exp';
-  var VERSION_FILE = 'ControlEvent_v4_0_exp';
-  var BUILD_ID = '20260827-V4_0_EXP-MEMORY-FLASHBACK-BANK2';
-  var ZIP_NAME = 'ControlEvent_v4_0_exp.zip';
+  var VERSION_LABEL = 'v4_1_exp';
+  var VERSION_TEXT = 'ControlEvent v4_1_exp';
+  var VERSION_FILE = 'ControlEvent_v4_1_exp';
+  var BUILD_ID = '20260827-V4_1_EXP-MEMORY-FLASHBACK-BANK2';
+  var ZIP_NAME = 'ControlEvent_v4_1_exp.zip';
   var OLD_RE = /(ControlEvent\s+)?v18(?:[._](?:9|10|11)(?:[._]\d+)?|(?:_9|_10|_11(?:_\d+)?))_prod/ig;
   var OLD_FILE_RE = /ControlEvent_v18_(?:9|10|11(?:_\d+)?)_prod/ig;
   var applying = false;

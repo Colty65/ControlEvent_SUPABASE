@@ -1,0 +1,14 @@
+const fs=require('fs');const path=require('path');const root=path.resolve(__dirname,'..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');let ok=0,ko=0;const t=(n,c)=>{if(c){ok++;console.log('OK ',n)}else{ko++;console.error('KO ',n)}};
+const version=read('public/app/version.js'),paths=read('server/paths.js'),idx=read('public/index.html'),info=read('public/modules/excel/infoevento.js'),backup=read('public/modules/excel/backup.js'),exp=read('routes/export.routes.js'),hard=read('public/app/features/v4-1-exp-version-hardlock.js'),execui=read('public/app/features/zuzu-execution-lab-gd.js');
+t('central VERSION v4_1_exp',version.includes("VERSION = 'v4_1_exp'")&&version.includes("VERSION_TEXT = 'ControlEvent v4_1_exp'")&&version.includes("VERSION_FILE = 'ControlEvent_v4_1_exp'"));
+t('server paths v4_1_exp',paths.includes("APP_VERSION_LABEL = 'v4_1_exp'")&&paths.includes("APP_VERSION_FILE = 'ControlEvent_v4_1_exp'"));
+t('title visible v4_1_exp',idx.includes('<title>ControlEvent v4_1_exp</title>'));
+t('INFOEVENTO metadata v4_1_exp',info.includes("appVersion: 'v4_1_exp'"));
+t('BACKUP cliente v4_1_exp',backup.includes("BACKUP_VERSION = 'ControlEvent v4_1_exp'")&&backup.includes("BACKUP_VERSION_FILE = 'ControlEvent_v4_1_exp'"));
+t('BACKUP servidor v4_1_exp',exp.includes("BACKUP_VERSION = 'ControlEvent v4_1_exp'")&&exp.includes("BACKUP_VERSION_FILE = 'ControlEvent_v4_1_exp'"));
+t('hardlock visible v4_1_exp',hard.includes("LABEL='v4_1_exp'")&&hard.includes("FILE='ControlEvent_v4_1_exp'"));
+t('ITV export v4_1_exp',execui.includes("version:'v4_1_exp'")&&execui.includes('ControlEvent_v4_1_exp_ITV_Zuzu_'));
+t('migra almacenamiento desde versión anterior codificada',version.includes("'ControlEvent_' + 'v4_' + '0_exp'"));
+t('backup migra marca anterior codificada',backup.includes("'ControlEvent_' + 'v4_' + '0_exp'")&&exp.includes("'ControlEvent_' + 'v4_' + '0_exp'"));
+console.log(`\nVERSION v4_1_exp: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;

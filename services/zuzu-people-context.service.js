@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp - Contexto privado de personas para Zuzu.
+/* ControlEvent v4_1_exp - Contexto privado de personas para Zuzu.
    Este fichero permanece en servidor: no se exporta a BACKUP/INFOEVENTO ni al navegador.
    Zuzu recibe solo perfiles pertinentes al prompt y minimizados por sensibilidad. */
 

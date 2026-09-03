@@ -1,4 +1,4 @@
-ControlEvent v4_0_exp · VNext P1.25
+ControlEvent v4_1_exp · VNext P1.25
 NATURAL VISIBLE DATASET DIALOGUE · NHC
 Fecha: 2026-09-02
 

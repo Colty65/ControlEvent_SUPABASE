@@ -1,10 +1,10 @@
-/* ControlEvent v4_0_exp - HOTFIX1: cierre/colores avance + versión v16 visible. */
+/* ControlEvent v4_1_exp - HOTFIX1: cierre/colores avance + versión v16 visible. */
 (function(){
   'use strict';
   const INSTALLED='__ceV16Hotfix1SaldoAvanceVersion';
   if(window[INSTALLED]) return; window[INSTALLED]=true;
-  const VERSION='ControlEvent v4_0_exp';
-  const VERSION_FILE='ControlEvent_v4_0_exp';
+  const VERSION='ControlEvent v4_1_exp';
+  const VERSION_FILE='ControlEvent_v4_1_exp';
   const $=id=>document.getElementById(id);
   const isLayerVisible=layer=>!!(layer && layer.classList.contains('visible'));
   const num=value=>{
@@ -115,7 +115,7 @@
     document.querySelectorAll('[data-ce-version-label],.ce-v104-brand-mini span,.appname span,.appname-stack span').forEach(el=>{
       try{
         const txt=el.textContent||'';
-        if(/v\d+_prod/i.test(txt) || /ControlEvent\s+v\d+_prod/i.test(txt)) el.textContent=txt.replace(/ControlEvent\s+v\d+_prod/ig,VERSION).replace(/v\d+_prod/ig,'v4_0_exp');
+        if(/v\d+_prod/i.test(txt) || /ControlEvent\s+v\d+_prod/i.test(txt)) el.textContent=txt.replace(/ControlEvent\s+v\d+_prod/ig,VERSION).replace(/v\d+_prod/ig,'v4_1_exp');
       }catch(_){ }
     });
   }

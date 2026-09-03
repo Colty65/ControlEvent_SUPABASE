@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · VNext P1.23 · DIALOGUE STATE AUTHORITY + ADAPTIVE CONVERSATION ITV
+/* ControlEvent v4_1_exp · VNext P1.23 · DIALOGUE STATE AUTHORITY + ADAPTIVE CONVERSATION ITV
    Registro + canonizador estructural de capacidades query_ce.
    NHC: describe/normaliza JSON y semántica de contratos; nunca interpreta frases del usuario. */
 import crypto from 'node:crypto';

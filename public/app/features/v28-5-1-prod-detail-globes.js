@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · GRAFICAS / globos exhaustivos por destino.
+/* ControlEvent v4_1_exp · GRAFICAS / globos exhaustivos por destino.
    Comportamiento restaurado de la versión estable anterior a petición del usuario.
    Reconstruye las filas desde state.compras del evento activo para que el detalle del globo
    no dependa de listas intermedias. Sin datos de negocio hardcodeados. */

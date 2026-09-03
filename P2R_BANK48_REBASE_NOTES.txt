@@ -1,4 +1,4 @@
-ControlEvent v4_0_exp · P2-R + BANK4.8
+ControlEvent v4_1_exp · P2-R + BANK4.8
 
 OBJETIVO
 Rebase limpio tras P2.1/P2.2/P2.3 y BANK4.7.2–4.7.5. Se recupera la base P2 de una decisión y la base BANK4.7.1 estable, conservando solo las mejoras válidas.

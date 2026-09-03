@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp · ITV INTÉRPRETE GEMINI V2.3 · PARÁFRASIS HARDENED
+/* ControlEvent v4_1_exp · ITV INTÉRPRETE GEMINI V2.3 · PARÁFRASIS HARDENED
    Laboratorio AISLADO: ENRIQUECIMIENTO determinista -> Gemini entiende conceptos ->
    TRADUCTOR determinista a contratos CE -> auditoría. NO ejecuta CE, NO consulta Supabase,
    NO usa function calling y NO modifica el runtime Zuzu. */

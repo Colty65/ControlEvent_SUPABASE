@@ -1,6 +1,6 @@
-# Auditoría v4_0_exp · Ledger físico + analítica + COMPRAS/DONACIONES proporcionales
+# Auditoría v4_1_exp · Ledger físico + analítica + COMPRAS/DONACIONES proporcionales
 
-Cambios aplicados sobre `ControlEvent_v4_0_exp_ZUZU_ITV_ORACULO_EJECUCION_CAPABILITIES_COMPRAS_DONACIONES_AUDITED.zip`.
+Cambios aplicados sobre `ControlEvent_v4_1_exp_ZUZU_ITV_ORACULO_EJECUCION_CAPABILITIES_COMPRAS_DONACIONES_AUDITED.zip`.
 
 ## Zuzu / ITV
 - Los IDs de evento ya certificados por SCC/ledger se resuelven directamente contra `state.eventos`; no vuelven a certificarse como texto.

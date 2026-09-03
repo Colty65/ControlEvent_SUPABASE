@@ -1,4 +1,4 @@
-ControlEvent v4_0_exp · VNext P1.24
+ControlEvent v4_1_exp · VNext P1.24
 
 Objetivo
 - Separar latencia real de Zuzu de la latencia del usuario sintético ITV.

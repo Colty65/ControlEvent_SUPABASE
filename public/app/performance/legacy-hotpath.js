@@ -1,4 +1,4 @@
-/* ControlEvent v4_0_exp - Optimizador conservador de rutas calientes legacy.
+/* ControlEvent v4_1_exp - Optimizador conservador de rutas calientes legacy.
    Objetivo móvil: reducir recalculos repetidos dentro del mismo estado sin tocar INFOEVENTO/BACKUP.
    Cachea selectores/calculos puros y se invalida ante cambios de formulario, clicks y mutaciones legacy. */
 import { VERSION } from '../version.js';
