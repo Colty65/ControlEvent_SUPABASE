@@ -1,0 +1,7 @@
+ControlEvent v4_1_exp · ANTONIO LAB V3.3 · acceso dentro de ITV
+
+- Eliminado el botón/micrófono Antonio del menú principal.
+- Añadido botón 🎙️ ANTONIO dentro de la cabecera de ITV Zuzu.
+- El botón nace habilitado y no depende de estado de pestañas ni polling.
+- Al pulsarlo navega directamente a /antonio-lab.html.
+- No se modifica la lógica interna de Antonio LAB V3.2 ni BANK4.9.
