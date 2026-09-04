@@ -91,7 +91,8 @@
     "test:fix11-voice": "node scripts/v4-1-exp-fix11-spoken-natural-conversation-regression.cjs",
     "test:antonio-lab": "node scripts/v4-1-exp-antonio-lab-v3-regression.cjs",
     "test:bank49-manual": "node scripts/v4-1-exp-bank49-manual-state-authority-regression.cjs",
-    "test:antonio-lab-v3": "node scripts/v4-1-exp-antonio-lab-v3-regression.cjs"
+    "test:antonio-lab-v3": "node scripts/v4-1-exp-antonio-lab-v3-regression.cjs",
+    "test:antonio-lab-v31": "node scripts/v4-1-exp-antonio-lab-v31-first-click-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

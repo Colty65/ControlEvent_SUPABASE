@@ -26,3 +26,11 @@ IMPORTANTE SOBRE WAKE WORD
 DIAGNÓSTICO
 - JSON/PDF incluyen permisos, sample rate, RMS/umbral VAD, latencias STT/TTS, caché de voz, interrupciones, segundos enviados a Gemini y últimos eventos.
 - No incluyen GEMINI_API_KEY ni audio.
+
+
+V3.1 FIRST CLICK
+- El botón Activar Antonio nace habilitado: el primer clic nunca se descarta mientras carga /api/antonio-lab/config.
+- activate() espera internamente configPromise.
+- El micrófono queda ACTIVE en cuanto startMic() termina; la preparación/descarga Piper no bloquea el oído.
+- La voz Piper se precarga en segundo plano y puede completar después.
+- Cache-buster actualizado a V31-FIRST-CLICK para impedir que el navegador reutilice el JS V3 anterior.
