@@ -1000,6 +1000,14 @@ async function persistAutomaticIncomeReconciliation(eventId,accountId='',actor={
   ]);
   const autoIncomeRows=arr(existingIncomeRows).filter(row=>/^AUTO_INGRESO(?::|$)/i.test(text(row.created_by)));
   const autoStateRows=arr(existingStateRows).filter(row=>/^AUTO_INGRESO(?::|$)/i.test(text(row.updated_by)));
+  // BANK4.9 · AUTORIDAD PERSISTENTE DEL ESTADO DEL EVENTO.
+  // Una vez que ESTE evento tiene una fila de estado para un movimiento, ningún proceso
+  // automático vuelve a cambiarla ni a borrarla. La conciliación automática puede crear
+  // un estado inicial cuando todavía no existe, pero desde ese momento «En saldo / Inactivo»
+  // solo cambia mediante una acción explícita del usuario. Esto elimina los apagados
+  // espontáneos observados tras regenerar ingresos/periodos.
+  const protectedStateIds=new Set(arr(existingStateRows)
+    .map(row=>text(row.movement_id)).filter(Boolean));
   if(autoIncomeRows.length){
     const ids=autoIncomeRows.map(row=>text(row.id)).filter(Boolean);
     for(let i=0;i<ids.length;i+=200){
@@ -1007,13 +1015,9 @@ async function persistAutomaticIncomeReconciliation(eventId,accountId='',actor={
       if(error) throw error;
     }
   }
-  if(autoStateRows.length){
-    const movementIds=[...new Set(autoStateRows.map(row=>text(row.movement_id)).filter(Boolean))];
-    for(let i=0;i<movementIds.length;i+=200){
-      const {error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).delete().eq('event_id',selectedEvent).in('movement_id',movementIds.slice(i,i+200));
-      if(error) throw error;
-    }
-  }
+  // BANK4.9 · NO borrar estados de movimiento al regenerar ingresos automáticos.
+  // Los vínculos AUTO_INGRESO sí se recalculan; la pertenencia del movimiento al saldo del
+  // evento es una decisión persistente e independiente de que cambie su justificante.
 
   // Se usa exactamente el mismo oráculo de asociación que ve la ventana. Solo se persisten
   // abonos incluidos que quedan CUADRADOS al céntimo; una sugerencia PENDIENTE/EXCESO nunca
@@ -1041,7 +1045,11 @@ async function persistAutomaticIncomeReconciliation(eventId,accountId='',actor={
         created_by:autoTag
       });
     }
-    stateRows.push({event_id:selectedEvent,movement_id:text(movement.id),included:true,updated_by:autoTag});
+    // No sobrescribir jamás una decisión previa del evento. El vínculo automático puede
+    // persistirse igualmente, pero el interruptor En saldo conserva su estado/autoría previa.
+    if(!protectedStateIds.has(text(movement.id))){
+      stateRows.push({event_id:selectedEvent,movement_id:text(movement.id),included:true,updated_by:autoTag});
+    }
   }
   for(let i=0;i<linkRows.length;i+=200){
     const {error}=await db().from(INCOME_LINKS_TABLE).insert(linkRows.slice(i,i+200));
@@ -1053,7 +1061,8 @@ async function persistAutomaticIncomeReconciliation(eventId,accountId='',actor={
   }
   return {
     removedLinks:autoIncomeRows.length,
-    removedStates:autoStateRows.length,
+    removedStates:0,
+    preservedStates:protectedStateIds.size,
     createdLinks:linkRows.length,
     createdStates:stateRows.length,
     movementIds:stateRows.map(row=>row.movement_id)
@@ -1257,7 +1266,10 @@ export async function setMovementIncluded(id,eventId,included,actor={}){
       if(linksError) throw linksError;
       if(arr(ownLinks).length) fail('Este movimiento tiene TKxx de este evento. Quita primero esos justificantes antes de sacarlo del saldo del evento.',409,'BANK_EVENT_HAS_TICKETS');
     }
-    const row={event_id:selectedEvent,movement_id:movementId,included:included!==false,updated_by:text(actor.identificacion||actor.nombre)};
+    const actorName=text(actor.identificacion||actor.nombre)||'USUARIO';
+    // BANK4.9 · El toggle es una decisión explícita del usuario y queda marcado como tal.
+    // Los procesos automáticos solo pueden crear estados cuando no existe ya una decisión.
+    const row={event_id:selectedEvent,movement_id:movementId,included:included!==false,updated_by:`MANUAL:${actorName}`};
     const {data,error}=await db().from(EVENT_MOVEMENT_STATE_TABLE).upsert(row,{onConflict:'event_id,movement_id'}).select('*').single();
     if(error) throw error;
     return {ok:true,state:{eventId:text(data.event_id),movementId:text(data.movement_id),included:data.included!==false}};

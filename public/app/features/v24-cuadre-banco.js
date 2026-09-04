@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp BANK4.8 · puntos históricos + lupa temporal independiente sin deformar la gráfica. */
+/* ControlEvent v4_1_exp BANK4.9 · autoridad persistente En saldo + lupa temporal independiente. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
@@ -296,6 +296,14 @@
     root.addEventListener('pointerdown',event=>{
       const target=event.target;
       if(!$('ceBankOverlay')||$('ceBankOverlay').classList.contains('hidden')) return;
+      const stateSwitch=target?.closest?.('[data-ce-bank-included],[data-ce-bank-forced]');
+      if(stateSwitch){
+        // BANK4.9 · El gesto del interruptor pertenece exclusivamente al propio checkbox.
+        // Cortamos capturadores heredados de fila SIN preventDefault, para que el navegador
+        // cambie checked una sola vez y el evento change sea la única escritura al servidor.
+        try{event.stopPropagation();event.stopImmediatePropagation();}catch(_){ }
+        return;
+      }
       const ticketAction=target?.closest?.('[data-ce-bank-add-ticket]');
       if(ticketAction){
         // Evita que manejadores heredados de la fila interpreten la pulsación
@@ -1707,10 +1715,6 @@
       if(movementId&&actionAllowed(`ticket-picker:${movementId}`,500)) openTicketPicker(movementId);
       return;
     }
-    const included=event.target?.closest?.('[data-ce-bank-included]');
-    if(included){stopEvent(event);toggleIncluded(included.dataset.ceBankIncluded,included.checked,included);return;}
-    const forced=event.target?.closest?.('[data-ce-bank-forced]');
-    if(forced){stopEvent(event);toggleForced(forced.dataset.ceBankForced,forced.checked,forced);return;}
     const acceptedDiff=event.target?.closest?.('[data-ce-bank-accept-diff]');
     if(acceptedDiff){stopEvent(event);toggleAcceptedDifference(acceptedDiff.dataset.ceBankAcceptDiff,acceptedDiff.dataset.accepted!=='1',acceptedDiff);return;}
     const editIncome=event.target?.closest?.('[data-ce-bank-edit-income]');
@@ -1744,6 +1748,16 @@
     pageNavigate(event);
   },true);
   document.addEventListener('change',event=>{
+    const included=event.target?.closest?.('[data-ce-bank-included]');
+    if(included){
+      try{event.stopPropagation();event.stopImmediatePropagation();}catch(_){ }
+      toggleIncluded(included.dataset.ceBankIncluded,included.checked,included);return;
+    }
+    const forced=event.target?.closest?.('[data-ce-bank-forced]');
+    if(forced){
+      try{event.stopPropagation();event.stopImmediatePropagation();}catch(_){ }
+      toggleForced(forced.dataset.ceBankForced,forced.checked,forced);return;
+    }
     const ticketChoice=event.target?.closest?.('[data-ce-bank-ticket-choice]');
     if(ticketChoice){
       const item=store.tickets.find(row=>text(row.key)===text(ticketChoice.dataset.ceBankTicketChoice));

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Antonio LAB · ControlEvent</title>
+<style>
+:root{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#172033;background:#eef3f7}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 15% 0,#d9fbef 0,transparent 32%),linear-gradient(145deg,#edf3f8,#f8fafc 48%,#e7eef4)}
+main{max-width:980px;margin:auto;padding:24px}.card{background:#fff;border:1px solid #d9e2ea;border-radius:24px;box-shadow:0 18px 60px rgba(15,23,42,.11);overflow:hidden}
+header{padding:24px 26px;background:#0d2133;color:#fff;display:flex;justify-content:space-between;gap:18px;align-items:center}header h1{margin:0;font-size:clamp(24px,4vw,40px)}header p{margin:6px 0 0;color:#b9cedd;font-weight:650}.tag{padding:8px 12px;border-radius:999px;background:#153a4f;color:#b7ffe2;font-size:12px;font-weight:900}
+.panel{padding:22px 26px}.hero{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:center;border-bottom:1px solid #e2e8f0}.phase{font-size:14px;font-weight:900;color:#64748b}.phase strong{display:block;font-size:28px;color:#0f172a;margin-top:4px}.phase small{display:block;margin-top:6px;color:#64748b;line-height:1.45}
+button{border:0;border-radius:16px;padding:15px 22px;font-size:15px;font-weight:900;cursor:pointer;background:#0e8f6a;color:#fff;box-shadow:0 8px 24px rgba(14,143,106,.23)}button.secondary{background:#e8eef4;color:#334155;box-shadow:none}button.danger{background:#a83535}button:disabled{opacity:.45;cursor:not-allowed}.actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}.meter{border:1px solid #e2e8f0;border-radius:16px;padding:13px;background:#f8fafc}.meter span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:#64748b;font-weight:900}.meter b{display:block;margin-top:5px;font-size:15px}.ok{color:#087757}.bad{color:#b42318}.wait{color:#9a6700}
+.transcript{margin-top:18px;border-radius:18px;border:1px solid #dbe5ec;background:#f8fafc;padding:17px;min-height:120px}.transcript label{font-size:11px;font-weight:900;color:#64748b;text-transform:uppercase}.interim{color:#82909d;margin-top:8px;min-height:24px;font-style:italic}.final{font-size:20px;font-weight:800;margin-top:7px;line-height:1.35}.antonio{margin-top:14px;border-left:5px solid #0e8f6a;padding:10px 14px;background:#edfdf7;border-radius:0 14px 14px 0}.antonio b{display:block;color:#087757}.antonio p{margin:4px 0 0;font-size:18px;font-weight:700}
+.help{margin-top:18px;padding:16px 18px;border:1px dashed #b7c7d3;border-radius:16px;color:#475569;line-height:1.55}.help strong{color:#0f172a}.log{margin-top:18px;background:#0f172a;color:#cbd5e1;padding:14px 16px;border-radius:16px;font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace;height:190px;overflow:auto;white-space:pre-wrap}.foot{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:16px 26px 22px;color:#64748b;font-size:12px}.foot a{color:#0e6c9b;font-weight:900;text-decoration:none}
+@media(max-width:720px){main{padding:10px}.card{border-radius:18px}header,.panel,.foot{padding-left:16px;padding-right:16px}.hero{grid-template-columns:1fr}.actions{justify-content:flex-start}.grid{grid-template-columns:1fr 1fr}.final{font-size:18px}}
+</style>
+</head>
+<body>
+<main><section class="card">
+<header><div><h1>Antonio LAB</h1><p>Solo oído + una boca. Sin VNext, sin CE, sin tablas y sin voces del navegador.</p></div><span class="tag">VOICE LAB V1</span></header>
+<div class="panel hero"><div class="phase">Estado<strong id="phase">SIN ACTIVAR</strong><small id="phaseDetail">Pulsa una vez. Después Antonio queda escuchando de forma continua.</small></div><div class="actions"><button id="activate">Activar Antonio</button><button id="testVoice" class="secondary" disabled>Probar voz</button><button id="stopVoice" class="danger" disabled>Callar</button></div></div>
+<div class="panel">
+<div class="grid">
+ <div class="meter"><span>Oído</span><b id="earState" class="wait">Desconectado</b></div>
+ <div class="meter"><span>Micrófono</span><b id="micState" class="wait">Sin permiso</b></div>
+ <div class="meter"><span>Boca</span><b id="mouthState" class="wait">Desconectada</b></div>
+ <div class="meter"><span>Voz fija</span><b id="voiceName">Algenib</b></div>
+ <div class="meter"><span>Interrupciones</span><b id="interruptions">0</b></div>
+ <div class="meter"><span>Última latencia boca</span><b id="latency">—</b></div>
+</div>
+<div class="transcript"><label>Lo que oye Antonio</label><div id="interim" class="interim">—</div><div id="final" class="final">—</div><div class="antonio"><b>Antonio</b><p id="antonioText">Todavía no ha hablado.</p></div></div>
+<div class="help"><strong>Prueba mínima:</strong> di «Hola Antonio» o «Hola Zuzu». Antonio debe contestar solo con su voz fija. Mientras habla, empieza a decir «Perdona Antonio», «Para Zuzu», «Calla Antoñito» o simplemente otra pregunta: el audio debe cortarse en cuanto el oído detecte tu nueva voz. Esta pantalla no consulta ningún dato de ControlEvent.</div>
+<div id="log" class="log"></div>
+</div>
+<div class="foot"><span id="build">Cargando configuración…</span><a href="/">← Volver a ControlEvent</a></div>
+</section></main>
+<script src="./app/features/antonio-lab.js?v=20260904-ANTONIO-LAB-V1"></script>
+</body></html>

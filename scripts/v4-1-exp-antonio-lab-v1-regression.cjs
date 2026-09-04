@@ -1,0 +1,24 @@
+const fs=require('fs'),path=require('path');
+const root=path.resolve(__dirname,'..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');
+let ok=0,ko=0;function t(n,c){if(c){ok++;console.log('OK ',n)}else{ko++;console.error('KO ',n)}}
+const html=read('public/antonio-lab.html'),js=read('public/app/features/antonio-lab.js'),svc=read('services/antonio-lab.service.js'),app=read('server/app.js'),index=read('public/index.html');
+t('laboratorio existe',/Antonio LAB/.test(html)&&/antonio-lab\.js/.test(html));
+t('oído dedicado transcribe live',/gemini-3\.5-transcribe-live/.test(svc));
+t('boca dedicada live 3.1',/gemini-3\.1-flash-live-preview/.test(svc));
+t('voz fija Algenib',/ANTONIO_LAB_VOICE\|\|'Algenib'/.test(svc));
+t('dos tokens separados',/ear-token/.test(read('routes/antonio-lab.routes.js'))&&/mouth-token/.test(read('routes/antonio-lab.routes.js')));
+t('main no carga voice-next viejo',!/voice-next1-zuzu/.test(index));
+t('server monta Antonio Lab',/antonioLabRoutes/.test(app));
+t('lab no usa SpeechRecognition',!/SpeechRecognition|webkitSpeechRecognition/.test(js));
+t('lab no usa speechSynthesis',!/speechSynthesis|SpeechSynthesisUtterance/.test(js));
+t('lab no usa MediaRecorder',!/MediaRecorder/.test(js));
+t('lab no llama VNext ni CE',!/analyze-vnext|event-ai|query_ce|VNext\/CE/.test(js));
+t('setup espera setupComplete',/m\.setupComplete[\s\S]{0,300}resolve\(ws\)/.test(js));
+t('micro y Live se activan en paralelo tras un único gesto',/const micPromise=startMic\(\)/.test(js)&&/Promise\.all\(\[openLive\(earInfo,'OÍDO'\),openLive\(mouthInfo,'BOCA'\),micPromise\]\)/.test(js));
+t('barge-in corta en interim',/interim[\s\S]{0,500}stopPlayback\('barge-in por voz detectada'\)/.test(js));
+t('wake acepta Antonio y Zuzu',/antonio\|antonito\|zuzu\|zuzito/.test(js));
+t('salida es PCM Live',/inlineData&&p\.inlineData\.data/.test(js)&&/createBuffer\(1,pcm\.length,24000\)/.test(js));
+t('entrada es PCM 16 kHz',/audio\/pcm;rate=16000/.test(js));
+t('una sola activación humana',/id="activate"[^>]*>Activar Antonio</.test(html)&&!/<button[^>]*>\s*(?:Auto|Leer|VNext)\s*</i.test(html));
+console.log(`ANTONIO-LAB-V1 ${ok} OK / ${ko} KO`);process.exitCode=ko?1:0;

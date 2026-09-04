@@ -1,0 +1,32 @@
+ControlEvent v4_1_exp · ANTONIO LAB V1 + BANK4.9
+04/09/2026
+
+OBJETIVO DE VOZ
+- La voz NO está conectada a Zuzu/CE en la aplicación principal.
+- Se elimina del runtime principal VOICE-NEXT 1 y sus rutas/servicios.
+- Laboratorio aislado: /antonio-lab.html
+- OÍDO: gemini-3.5-transcribe-live, PCM 16 kHz, es-ES, vocabulario propio.
+- BOCA: gemini-3.1-flash-live-preview, voz fija Algenib, PCM 24 kHz.
+- Un único gesto inicial: pide micro y abre las dos sesiones en paralelo.
+- Barge-in: cualquier transcripción interina durante la voz corta inmediatamente el buffer local.
+- Wake aliases: Antonio / Antoñito / Zuzu / Zuzito.
+- El laboratorio NO llama VNext, CE, Banco, Compras, Liquidaciones ni ningún dato de negocio.
+- Sin SpeechRecognition, speechSynthesis, SpeechSynthesisUtterance ni MediaRecorder.
+- Sin Auto / Leer / VNext / selectores de voz o micrófono.
+
+BANK4.9 · EN SALDO NO SE CAMBIA SOLO
+Causa localizada:
+- persistAutomaticIncomeReconciliation podía hacer upsert de un estado included=true ya existente,
+  reemplazando updated_by manual por AUTO_INGRESO.
+- En una regeneración posterior, los estados AUTO_INGRESO se borraban y el movimiento podía volver
+  al included global (normalmente false), apareciendo Inactivo sin clic del usuario.
+
+Nueva regla:
+- Una vez existe ce_bank_event_movement_state para evento+movimiento, ningún proceso automático lo
+  cambia ni lo borra.
+- AUTO_INGRESO puede crear el estado inicial únicamente si todavía no existe.
+- El toggle del usuario queda auditado como MANUAL:<usuario>.
+- La regeneración de ingresos automáticos recalcula vínculos, pero NO borra estados En saldo/Inactivo.
+- UI del checkbox: escritura única en change; el click deja de usar preventDefault y no se duplica.
+
+SIN CAMBIOS DE ESQUEMA SQL.
