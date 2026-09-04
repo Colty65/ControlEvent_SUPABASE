@@ -202,7 +202,7 @@
   function openAntonioLab(){
     const root=$('ceZuzuTestOverlay');if(!root)return;
     closeAntonioLab();
-    const ov=document.createElement('div');ov.id='ceAntonioLabOverlay';ov.innerHTML=`<div class="cal-shell"><div class="cal-head"><b>🎙️ Antonio LAB V3.4</b><span>Oído · turnos · voz local · interrupciones</span><span class="cal-spacer"></span><button type="button" class="cal-close" id="calClose">✕ VOLVER A ITV</button></div><iframe id="calFrame" title="Antonio LAB V3.4" allow="microphone; autoplay" src="/antonio-lab.html?embedded=itv&v=20260904-V34"></iframe></div>`;
+    const ov=document.createElement('div');ov.id='ceAntonioLabOverlay';ov.innerHTML=`<div class="cal-shell"><div class="cal-head"><b>🎙️ Antonio LAB V3.5</b><span>Oído · VNext/CE · voz local · interrupciones</span><span class="cal-spacer"></span><button type="button" class="cal-close" id="calClose">✕ VOLVER A ITV</button></div><iframe id="calFrame" title="Antonio LAB V3.5" allow="microphone; autoplay" src="/antonio-lab.html?embedded=itv&v=20260904-V35"></iframe></div>`;
     root.appendChild(ov);$('calClose').onclick=closeAntonioLab;
   }
   window.addEventListener('message',e=>{if(e.origin!==location.origin)return;if(e.data?.type==='ce:antonio-lab-close')closeAntonioLab();});
