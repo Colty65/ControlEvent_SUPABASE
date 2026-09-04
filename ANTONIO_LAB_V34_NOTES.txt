@@ -1,0 +1,13 @@
+ControlEvent v4_1_exp · ANTONIO LAB V3.4 · TURN MANAGER
+
+Objetivo de esta revisión:
+- No perder fragmentos mientras Gemini transcribe otro turno.
+- Cada comienzo real de voz recibe turnId creciente.
+- Un turno nuevo invalida audio, síntesis y respuesta pendiente del turno anterior.
+- Piper solo empieza a reproducir cuando el usuario ya está en silencio.
+- Guardia inicial de 350 ms para evitar falsas interrupciones instantáneas.
+- STT solicita texto plano y limpia restos JSON si Gemini los devuelve.
+- Diagnóstico JSON/PDF añade cola, turnos y respuestas obsoletas descartadas.
+- Antonio LAB se abre embebido dentro de la ITV mediante iframe same-origin con permiso de micrófono/autoplay.
+- VOLVER A ITV cierra el LAB sin navegar ni recargar ControlEvent, conservando sesión y ventana ITV.
+- BANK4.9 y Liquidaciones no se modifican.
