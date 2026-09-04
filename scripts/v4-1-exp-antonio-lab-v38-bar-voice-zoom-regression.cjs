@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path'),vm=require('vm');
+const root=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(root,p),'utf8');
+const lab=read('public/app/features/antonio-lab-v3.js'),svc=read('services/antonio-lab.service.js'),ai=read('services/event-ai.service.js'),bank=read('public/app/features/v24-cuadre-banco.js'),html=read('public/antonio-lab.html'),itv=read('public/app/features/zuzu-test-console-gd.js');
+const checks=[];const t=(n,p)=>checks.push([n,!!p]);
+t('build V3.8',/V3\.8-BAR-VOICE-ZOOM/.test(lab)&&/V3\.8-BAR-VOICE-ZOOM/.test(svc)&&/Antonio LAB V3\.8/.test(html));
+t('cache V38',/20260905-V38/.test(lab)&&/20260905-V38/.test(html)&&/20260905-V38/.test(itv));
+t('Sharvard se conserva',/es_ES-sharvard-medium/.test(lab)&&/es_ES-sharvard-medium/.test(svc));
+t('ritmo 1.12',/playbackRate\.value=1\.12/.test(lab));
+t('modo cifras 3 niveles',/function v438VoiceFigureMode/.test(ai)&&/return 'full'/.test(ai)&&/return 'brief'/.test(ai)&&/return 'none'/.test(ai));
+t('brief figures local',/function v438VoiceBriefFigures/.test(ai)&&/bits\.length>=2/.test(ai));
+t('full conserva vnextP19',/figureMode==='full'/.test(ai)&&/vnextP19SpokenAnswer/.test(ai));
+t('oral no full cap 220',/figureMode!==\'full\'&&out\.length>220/.test(ai));
+t('mini ticket usa delegate robusto',/ceBankViewTicket:'1'/.test(bank)&&/balanceMiniTicket/.test(bank));
+t('mini ingreso usa delegate robusto',/ceBankViewIncome:'1'/.test(bank)&&/balanceMiniIncome/.test(bank));
+t('mini ingreso conserva evento',/eventId:text\(link\.eventId\|\|store\.eventId\)/.test(bank));
+t('visor contable existe',/function accountingViewer/.test(bank)&&/ce-bank-photo-overlay/.test(bank));
+t('BANK4.9 test sigue presente',fs.existsSync(path.join(root,'scripts/v4-1-exp-bank49-manual-state-authority-regression.cjs')));
+let ok=0;for(const [n,p] of checks){console.log(`${p?'OK':'KO'} · ${n}`);if(p)ok++;}console.log(`\nAntonio LAB V3.8 BAR VOICE + ZOOM: ${ok}/${checks.length}`);process.exitCode=ok===checks.length?0:1;

@@ -18459,16 +18459,38 @@ async function vnextP2RGenerateContentPlan({input='',model='',systemInstruction=
   return {payload,plan,usage};
 }
 
-// ANTONIO V3.7 · contrato oral "amigo en el bar".
+// ANTONIO V3.8 · contrato oral "amigo en el bar".
 // CE conserva todos los datos y el answer escrito completo. La boca solo da cifras
 // cuando el usuario las pide de forma explícita; el resto son conclusiones cualitativas.
 function v437VoiceNoFiguresRequested(userPrompt=''){
   const p=vnextP17LooseNorm(userPrompt);
   return /\b(?:sin\s+(?:cifras?|numeros?|importes?)|no\s+(?:me\s+)?(?:des|digas|quiero|hacen\s+falta)\s+(?:cifras?|numeros?|importes?)|en\s+prosa|solo\s+(?:una\s+)?valoracion|sin\s+detalle)\b/.test(p);
 }
-function v437VoiceWantsFigures(userPrompt=''){
-  const p=vnextP17LooseNorm(userPrompt);if(v437VoiceNoFiguresRequested(p))return false;
-  return /\b(?:cifras?|numeros?|importe(?:s)?|cantidad(?:es)?|euros?|precio(?:s)?|porcentaje(?:s)?|exact[oa]s?|exactamente|desglose|detall(?:e|ado|ada|adamente)|cuanto(?:s|as)?|a\s+cuanto|saldo\s+exacto|total\s+exacto)\b/.test(p);
+function v438VoiceFigureMode(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt);if(v437VoiceNoFiguresRequested(p))return 'none';
+  if(/\b(?:exact[oa]s?|exactamente|desglose|desglosad[oa]|detalle\s+completo|detallad[oa]mente|todas?\s+las?\s+cifras|todos?\s+los?\s+numeros|uno\s+por\s+uno|al\s+centimo|centimos?)\b/.test(p))return 'full';
+  if(/\b(?:cifras?|numeros?|importe(?:s)?|cantidad(?:es)?|euros?|precio(?:s)?|porcentaje(?:s)?|cuanto(?:s|as)?|a\s+cuanto|saldo|grosso\s+modo|volapluma|a\s+ojo|aproximad[oa]s?|mas\s+o\s+menos)\b/.test(p))return 'brief';
+  return 'none';
+}
+function v437VoiceWantsFigures(userPrompt=''){return v438VoiceFigureMode(userPrompt)!=='none';}
+function v438VoiceEuro(value){return `${v26FormatPlainNumber(Math.round(num(value)),0)} euros`;}
+function v438VoiceBriefFigures(result={},decision={},state={},userPrompt=''){
+  const op=trim(result?._vnext_operation||decision?.operation),f=result?.facts||{},event=v437VoiceEventLabel(result,decision,state),p=vnextP17LooseNorm(userPrompt),bits=[];
+  const add=(label,value)=>{if(bits.length>=2||!Number.isFinite(Number(value)))return;bits.push(`${label} ${v438VoiceEuro(value)}`);};
+  if(op==='event_summary'){
+    if(/ingres|recaud|cobro/.test(p))add('entraron unos',f.income_total);
+    if(/compr|gasto/.test(p))add('en compras llevamos unos',f.purchases_realized);
+    if(/donac/.test(p))add('las donaciones rondan',f.donations_value);
+    if(/saldo|sobr|margen|qued/.test(p))add(num(f.operating_balance)>=0?'de margen quedan unos':'vamos por debajo unos',Math.abs(num(f.operating_balance)));
+    if(/asist|gente|persona/.test(p)&&bits.length<2)bits.push(`somos unas ${Math.round(num(f.attendees_canonical))} personas`);
+    if(!bits.length){add('entraron unos',f.income_total);add(num(f.operating_balance)>=0?'y de margen quedan unos':'y vamos por debajo unos',Math.abs(num(f.operating_balance)));}
+    return `${event}: ${bits.join(' y ')}.`;
+  }
+  if(op==='event_purchases'){add('las compras rondan',f.total_amount||f.realized_purchase_amount);if(num(f.pending_purchase_amount)>0)add('y queda pendiente alrededor de',f.pending_purchase_amount);if(bits.length)return`${event}: ${bits.join(' y ')}.`;}
+  if(op==='event_donations'){add('las donaciones rondan',f.donations_value||f.total_amount);if(bits.length)return`${event}: ${bits.join(' y ')}.`;}
+  if(op==='event_income_status'){add('queda por cobrar alrededor de',f.income_pending);if(bits.length)return`${event}: ${bits.join(' y ')}.`;}
+  if(op==='event_bank'){add('el impacto del banco ronda',f.bank_impact);if(bits.length<2)add('y el cierre queda sobre',f.closing_balance);if(bits.length)return`${event}: ${bits.join(' y ')}.`;}
+  return '';
 }
 function v437VoiceAsksWho(userPrompt=''){return /\b(?:quien|quienes|nombres?|personas?|responsables?)\b/.test(vnextP17LooseNorm(userPrompt));}
 function v437VoiceEventLabel(result={},decision={},state={}){const f=result?.facts||{};return vnextP14EventSpokenLabel(state,trim(f.event)||trim(decision?.event))||'el evento';}
@@ -18548,15 +18570,19 @@ function v437VoiceChatPolish(text=''){
   return t;
 }
 function v437VoiceAnswerFromResults(good=[],state={},userPrompt='',writtenAnswer=''){
-  const wantsFigures=v437VoiceWantsFigures(userPrompt),parts=[];
+  const figureMode=v438VoiceFigureMode(userPrompt),wantsFigures=figureMode!=='none',parts=[];
   for(const x of arr(good)){
     const name=trim(x?.call?.name);
-    if(name==='query_ce')parts.push(wantsFigures?vnextP19SpokenAnswer(x.result,x.args,state,userPrompt):v437VoiceQueryCeQualitative(x.result,x.args,state,userPrompt));
-    else if(name==='local_response')parts.push(v437VoiceChatPolish(trim(x?.result?.facts?.response)||writtenAnswer));
+    if(name==='query_ce'){
+      if(figureMode==='full')parts.push(vnextP19SpokenAnswer(x.result,x.args,state,userPrompt));
+      else if(figureMode==='brief')parts.push(v438VoiceBriefFigures(x.result,x.args,state,userPrompt)||v437VoiceQueryCeQualitative(x.result,x.args,state,userPrompt));
+      else parts.push(v437VoiceQueryCeQualitative(x.result,x.args,state,userPrompt));
+    }else if(name==='local_response')parts.push(v437VoiceChatPolish(trim(x?.result?.facts?.response)||writtenAnswer));
   }
-  let out=[...new Set(parts.map(trim).filter(Boolean))].slice(0,2).join(' ');
+  let out=[...new Set(parts.map(trim).filter(Boolean))].slice(0,figureMode==='full'?2:1).join(' ');
   if(!out)out=v437VoiceChatPolish(writtenAnswer||'Vale, seguimos.');
-  return {spoken:v40ConversationalPolish(out,userPrompt,true),wantsFigures};
+  if(figureMode!=='full'&&out.length>220)out=out.slice(0,217).replace(/[,:;\s]+$/,'')+'.';
+  return {spoken:v40ConversationalPolish(out,userPrompt,true),wantsFigures,figureMode};
 }
 
 async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,externalSignal=null,conversationId=''}={}){
@@ -18628,9 +18654,9 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
   // FIX11 · En voz los datasets siguen vivos en resultContext para razonar y mantener el hilo,
   // pero NO se materializan en la UI. Hablamos; no obligamos al usuario a mirar una tabla minúscula.
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),visibleTables=voiceConversation?[]:finalTables,visibleCharts=voiceConversation?[]:charts.slice(0,8),presentationEvidence=vnextP124PresentationEvidence(visibleTables,visibleCharts);
-  if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral V3.7: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan como estado interno; cifras habladas=${voiceWantsFigures?'sí, porque el usuario las pidió':'no por defecto'}.`);
+  if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral V3.8: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan como estado interno; cifras habladas=${voiceWantsFigures?'sí, porque el usuario las pidió':'no por defecto'}.`);
   zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo voz factual=1; segunda llamada solo para resúmenes de memoria que la necesitan) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ANTONIO V3.7 · CE factual + salida oral coloquial sin cifras por defecto + fast path sin segunda narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ANTONIO V3.8 · CE factual + salida oral coloquial sin cifras por defecto + fast path sin segunda narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){

@@ -1,0 +1,16 @@
+ControlEvent v4_1_exp · ANTONIO LAB V3.8 · BAR VOICE + BALANCE PHOTO ZOOM
+
+Base: V3.7 BAR VOICE FAST + BANK4.9.
+
+Cambios V3.8:
+- La voz mantiene modo coloquial sin cifras por defecto.
+- Peticiones numéricas se dividen en 3 niveles:
+  * NONE: sin cifras.
+  * BRIEF: «alguna cifra», «grosso modo», «a ojo», «cuánto», etc. -> máximo 1-2 cifras útiles, sin céntimos.
+  * FULL: «exacto», «desglose», «detalle completo», etc. -> puede usar el cierre numérico completo.
+- Respuesta oral no FULL limitada a 220 caracteres para contener TTS y latencia.
+- Voz Sharvard conservada; playback 1.12x.
+- Evolución temporal del saldo: las miniaturas de justificantes de la cabecera reciben ahora los data-* del visor canónico y un delegado de click robusto. Al pulsar ticket/ingreso abre el visor ampliado con foto y contabilidad.
+- Cache-bust V38 en Antonio y v24-cuadre-banco.
+
+No se modifica BANK4.9, Liquidaciones, P2-R ni Ejecución Controlada.

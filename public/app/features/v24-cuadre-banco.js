@@ -848,7 +848,7 @@
       const items=[];
       if(num(movement.amount)>=0){
         for(const link of arr(movement.incomeLinks).filter(link=>text(link?.imageUrl))){
-          items.push({kind:'income',src:text(link.imageUrl),movementId:currentMovementId,incomeId:text(link.id),personName:text(link.personName||'Ingreso'),amount:num(link.amount),paymentMethod:text(link.paymentMethod||'Banco'),label:text(link.personName||'Ingreso')});
+          items.push({kind:'income',src:text(link.imageUrl),movementId:currentMovementId,incomeId:text(link.id),eventId:text(link.eventId||store.eventId),eventTitle:text(link.eventTitle||store.data?.event?.title||'Evento'),personName:text(link.personName||'Ingreso'),amount:num(link.amount),paymentMethod:text(link.paymentMethod||'Banco'),label:text(link.personName||'Ingreso')});
         }
       }else{
         const allLinks=arr(movement.displayLinks||movement.links);
@@ -873,10 +873,12 @@
       media.querySelectorAll('[data-ce-bank-balance-mini]').forEach(button=>{
         const item=items[Number(button.dataset.ceBankBalanceMini)||0];if(!item)return;
         if(item.kind==='ticket'){
-          Object.assign(button.dataset,{eventId:item.eventId,ticketCode:item.ticketCode,eventTitle:item.eventTitle,ticketAmount:String(item.ticketAmount),movementId:item.movementId});
+          Object.assign(button.dataset,{ceBankViewTicket:'1',eventId:item.eventId,ticketCode:item.ticketCode,eventTitle:item.eventTitle,ticketAmount:String(item.ticketAmount),movementId:item.movementId});
+          button.setAttribute('aria-label',`Ampliar ${item.ticketCode||item.label||'ticket'}`);
           button.addEventListener('click',event=>openBankTicketPhoto(button,event));
         }else{
-          Object.assign(button.dataset,{imageSrc:item.src,incomeId:item.incomeId,personName:item.personName,incomeAmount:String(item.amount),paymentMethod:item.paymentMethod,movementId:item.movementId});
+          Object.assign(button.dataset,{ceBankViewIncome:'1',imageSrc:item.src,incomeId:item.incomeId,eventId:item.eventId||store.eventId,eventTitle:item.eventTitle||store.data?.event?.title||'Evento',personName:item.personName,incomeAmount:String(item.amount),paymentMethod:item.paymentMethod,movementId:item.movementId});
+          button.setAttribute('aria-label',`Ampliar justificante de ${item.personName||'ingreso'}`);
           button.addEventListener('click',event=>openBankIncomePhoto(button,event));
         }
       });
@@ -1699,6 +1701,10 @@
     if(historyClose||event.target?.id==='ceBankHistoryOverlay'){stopEvent(event);closeBankHistory();return;}
     const historySort=event.target?.closest?.('[data-ce-bank-history-sort]');
     if(historySort){stopEvent(event);changeBankHistorySort(historySort.dataset.ceBankHistorySort);return;}
+    const balanceMiniTicket=event.target?.closest?.('.ce-bank-balance-mini[data-ce-bank-view-ticket="1"]');
+    if(balanceMiniTicket){openBankTicketPhoto(balanceMiniTicket,event);return;}
+    const balanceMiniIncome=event.target?.closest?.('.ce-bank-balance-mini[data-ce-bank-view-income="1"]');
+    if(balanceMiniIncome){openBankIncomePhoto(balanceMiniIncome,event);return;}
     const historyTicket=event.target?.closest?.('[data-ce-bank-history-ticket="1"]');
     if(historyTicket){openBankTicketPhoto(historyTicket,event);return;}
     const historyIncome=event.target?.closest?.('[data-ce-bank-history-income="1"]');
