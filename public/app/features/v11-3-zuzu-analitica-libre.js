@@ -214,7 +214,7 @@
           '<div class="ce-ai-prompt-grid">'+
             '<div class="ce-ai-prompt-main">'+
               '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
-              '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary ce-ai-vnext-toggle" id="ceAiVNextMode" title="Prototipo paralelo: conversación open-world + contratos de datos tipados + fast path">🧪 VNext</button><button type="button" class="ce-ai-secondary" id="ceAiRestorePrompt" title="Recuperar el último prompt escrito/enviado">↶ Prompt</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
+              '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiRestorePrompt" title="Recuperar el último prompt escrito/enviado">↶ Prompt</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
             '</div>'+
             '<aside class="ce-ai-conversation-rail" aria-label="Rastro de la conversación">'+
               '<div class="ce-ai-conversation-rail-head"><span>💬 Rastro de conversación</span><span class="ce-ai-conversation-rail-count" id="ceAiConversationRailCount">0</span></div>'+
@@ -456,9 +456,9 @@
   }
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
-  function isZuzuVNextMode(){ try{return sessionStorage.getItem(zuzuVNextKey())==='1';}catch(_){return false;} }
-  function renderZuzuVNextMode(){ var b=$('ceAiVNextMode'); if(!b)return; var on=isZuzuVNextMode(); b.classList.toggle('is-active',on); b.setAttribute('aria-pressed',on?'true':'false'); b.textContent=on?'🧪 VNext ACTIVO':'🧪 VNext'; var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧪 VNext P1.24</span><span class="ce-ai-mode-help">Dialogue State Authority + instrumentación de latencia real Zuzu/simulador, presentación materializada visible para ITV y búsqueda histórica paralelizada. NHC.</span>';}}
-  function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} var on=!isZuzuVNextMode(); try{sessionStorage.setItem(zuzuVNextKey(),on?'1':'0');}catch(_){} saveZuzuInteractionId(''); renderZuzuVNextMode(); setStatus(on?'VNext experimental activado.':'BANK4_27 activo.',''); }
+  function isZuzuVNextMode(){ return true; }
+  function renderZuzuVNextMode(){ var on=true,b=$('ceAiVNextMode'); if(b){b.classList.add('is-active');b.setAttribute('aria-pressed','true');b.textContent='VNext';} var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🎙 Antonio</span><span class="ce-ai-mode-help">Conversación ControlEvent · VNext permanente.</span>';}}
+  function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} try{sessionStorage.setItem(zuzuVNextKey(),'1');}catch(_){} renderZuzuVNextMode(); }
 
   function openModal(){
     closeGraphInfoBubble();
