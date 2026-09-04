@@ -1,0 +1,20 @@
+const fs=require('fs'),path=require('path'),root=path.resolve(__dirname,'..');let ok=0,ko=0;const read=p=>fs.readFileSync(path.join(root,p),'utf8');function t(n,f){let pass=false;try{pass=!!f()}catch{}if(pass){ok++;console.log('OK ',n)}else{ko++;console.error('KO ',n)}}
+const html=read('public/antonio-lab.html'),js=read('public/app/features/antonio-lab-v3.js'),worklet=read('public/app/features/antonio-v3-capture-worklet.js'),svc=read('services/antonio-lab.service.js'),routes=read('routes/antonio-lab.routes.js'),app=read('server/app.js');
+t('HTML carga V3',()=>/antonio-lab-v3\.js/.test(html)&&/Antonio LAB V3/.test(html));
+t('sin SDK ni variables ElevenLabs',()=>!/@elevenlabs|ELEVENLABS_AGENT_ID|ELEVENLABS_API_KEY|convai\//i.test(html+js+svc+routes));
+t('sin APIs de voz del navegador',()=>!/SpeechSynthesisUtterance|window\.speechSynthesis|speechSynthesis\.speak|SpeechRecognition/.test(js));
+t('captura AudioWorklet',()=>/AudioWorkletNode/.test(js)&&/registerProcessor\('antonio-capture'/.test(worklet));
+t('VAD local',()=>/threshold/.test(js)&&/Inicio de voz/.test(js));
+t('barge in corta audio local',()=>/Interrupción local detectada/.test(js)&&/stopAudio\('voz del usuario detectada'\)/.test(js));
+t('Gemini solo transcribe',()=>/antonio-lab\/transcribe/.test(js)&&/gemini-2\.5-flash-lite/.test(svc));
+t('Piper VITS local',()=>/@diffusionstudio\/vits-web@1\.0\.3/.test(js)&&/es_ES-davefx-medium/.test(js));
+t('sin fallback voz navegador',()=>!/SpeechSynthesis/.test(html+js+svc));
+t('wake Antonio/Zuzu',()=>/antonio\|antonito/.test(js)&&/zuzu\|zuzito/.test(js));
+t('diagnóstico JSON',()=>/Descargar diagnóstico JSON/.test(html)&&/function diagnostic/.test(js));
+t('diagnóstico PDF',()=>/diagnostic-pdf/.test(js)&&/createAntonioDiagnosticPdf/.test(svc));
+t('sin nuevas variables de pago',()=>!/ELEVENLABS|XI_API_KEY/.test(svc+routes+js));
+t('config usa Gemini existente',()=>/GEMINI_API_KEY/.test(svc));
+t('servidor monta Antonio',()=>/antonioLabRoutes/.test(app));
+t('acceso visible desde ControlEvent',()=>/antonioLabBtn/.test(read('public/index.html'))&&/antonio-lab\.html/.test(read('public/index.html')));
+t('notas V3',()=>fs.existsSync(path.join(root,'ANTONIO_LAB_V3_NOTES.txt')));
+console.log(`\nANTONIO LAB V3: ${ok} OK / ${ko} KO`);process.exitCode=ko?1:0;

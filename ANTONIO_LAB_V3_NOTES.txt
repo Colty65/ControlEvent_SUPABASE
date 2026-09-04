@@ -1,0 +1,28 @@
+ControlEvent v4_1_exp · ANTONIO LAB V3 · 04/09/2026
+
+OBJETIVO
+- Probar una conversación de voz sin otro servicio de pago.
+- No toca VNext/CE ni la ventana Zuzu.
+- Banco BANK4.9 permanece sin cambios.
+
+ARQUITECTURA
+1. getUserMedia + AudioWorklet (captura única de micro).
+2. VAD local por RMS adaptativo: el silencio no sale del dispositivo.
+3. Solo cada fragmento con voz se envía a Gemini 2.5 Flash-Lite para transcripción.
+4. Despertar por «Hola Antonio» / «Hola Zuzu» se decide sobre esa transcripción.
+5. La respuesta del LAB es local y deliberadamente simple; todavía no consulta ControlEvent.
+6. Piper/VITS Web sintetiza es_ES-davefx-medium dentro del navegador. El modelo (~63 MB) se descarga una vez y se guarda en OPFS.
+7. Mientras Antonio habla, el VAD sigue activo. Al detectar voz humana se corta el audio local antes de esperar la transcripción.
+
+COSTE
+- No hay nueva suscripción ni API adicional.
+- Solo Gemini STT. El LAB muestra segundos de audio enviados y una estimación de coste.
+- No se envía silencio a Gemini.
+
+IMPORTANTE SOBRE WAKE WORD
+- V3 prioriza funcionamiento reproducible sin entrenar un modelo particular: usa VAD local + transcripción Gemini para validar «Hola Antonio».
+- Heed sigue siendo candidato para convertir el wake word en 100% local cuando tengamos un modelo «Hola Antonio» entrenado y validado. No se ha fingido ni incluido un modelo Heed de otra frase.
+
+DIAGNÓSTICO
+- JSON/PDF incluyen permisos, sample rate, RMS/umbral VAD, latencias STT/TTS, caché de voz, interrupciones, segundos enviados a Gemini y últimos eventos.
+- No incluyen GEMINI_API_KEY ni audio.
