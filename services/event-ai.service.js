@@ -18458,6 +18458,107 @@ async function vnextP2RGenerateContentPlan({input='',model='',systemInstruction=
   const plan=vnextP2RNormalizePlanObject(parsed);zuzuTracePush(flowTrace,'VNEXT P2-R · fallback generateContent','OK',`Plan mínimo recuperado por transporte alternativo · intent=${plan.intent} · operation=${plan.operation||'—'}.`,{model,usage});
   return {payload,plan,usage};
 }
+
+// ANTONIO V3.7 · contrato oral "amigo en el bar".
+// CE conserva todos los datos y el answer escrito completo. La boca solo da cifras
+// cuando el usuario las pide de forma explícita; el resto son conclusiones cualitativas.
+function v437VoiceNoFiguresRequested(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt);
+  return /\b(?:sin\s+(?:cifras?|numeros?|importes?)|no\s+(?:me\s+)?(?:des|digas|quiero|hacen\s+falta)\s+(?:cifras?|numeros?|importes?)|en\s+prosa|solo\s+(?:una\s+)?valoracion|sin\s+detalle)\b/.test(p);
+}
+function v437VoiceWantsFigures(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt);if(v437VoiceNoFiguresRequested(p))return false;
+  return /\b(?:cifras?|numeros?|importe(?:s)?|cantidad(?:es)?|euros?|precio(?:s)?|porcentaje(?:s)?|exact[oa]s?|exactamente|desglose|detall(?:e|ado|ada|adamente)|cuanto(?:s|as)?|a\s+cuanto|saldo\s+exacto|total\s+exacto)\b/.test(p);
+}
+function v437VoiceAsksWho(userPrompt=''){return /\b(?:quien|quienes|nombres?|personas?|responsables?)\b/.test(vnextP17LooseNorm(userPrompt));}
+function v437VoiceEventLabel(result={},decision={},state={}){const f=result?.facts||{};return vnextP14EventSpokenLabel(state,trim(f.event)||trim(decision?.event))||'el evento';}
+function v437VoiceQualitativeBalance(f={},event='el evento'){
+  const income=num(f.income_total),balance=num(f.operating_balance),pending=num(f.purchases_pending),incomePending=num(f.income_pending),pendingPeople=num(f.income_pending_records),eps=.005,den=Math.max(Math.abs(income),1),ratio=Math.abs(balance)/den,open=pending>eps||incomePending>eps||/curso|prepar|abiert|planific/.test(vnextP17LooseNorm(f.status));
+  let lead='';
+  if(balance<-eps){lead=ratio<=.05?'Aquí se nos ha pegado a las costillas un poco la cosa; vamos un pelín por debajo.':'Aquí la cosa se nos ha ido un poco; vamos en negativo y conviene mirar dónde se nos fue la mano.';}
+  else if(Math.abs(balance)<=eps){lead=open?'Vamos al ras, sin margen para hacer mucho el animal.':'No sobró ni zarapeta, pero quedó cuadrado.';}
+  else if(ratio<=.05){lead=open?'Vamos bien, aunque bastante justitos de margen.':'Sobró poca pasta, pero bien; quedó ajustado y sin sustos.';}
+  else if(ratio<=.15){lead=open?'La cosa va bastante bien; hay un margen apañado para terminar.':'Todo fue bastante bien; se cubrió todo y quedó un margen apañado.';}
+  else{lead=open?'La cosa pinta muy bien; tenemos margen de sobra para rematarlo.':'Todo fue estupendo; se pagó todo y todavía quedó margen de sobra.';}
+  const tail=[];if(pending>eps)tail.push('Eso sí, todavía queda alguna compra por rematar.');if(pendingPeople>0||incomePending>eps)tail.push('Y queda todavía algún rezaguero por pagar.');else if(!open)tail.push('Ha pagao todo el mundo.');
+  return `${event}: ${lead}${tail.length?' '+tail.join(' '):''}`.trim();
+}
+function v437VoiceQueryCeQualitative(result={},decision={},state={},userPrompt=''){
+  const op=trim(result?._vnext_operation||decision?.operation),f=result?.facts||{},event=v437VoiceEventLabel(result,decision,state),p=vnextP17LooseNorm(userPrompt),asksWho=v437VoiceAsksWho(userPrompt),reg=vnextP15SocialRegister(decision),seed=`v37|${op}|${event}|${p}`;
+  if(['person_income_status','person_event_status'].includes(op)){
+    const who=vnextP14PersonSocialLabel(state,trim(f.person)||trim(decision?.person),decision?.person,'friendly'),att=trim(f.attendance_status),pending=!!f.pending;
+    if(att==='not_attending')return`${who} no viene a ${event}.`;
+    if(att==='attending'&&pending)return`${who} viene, pero todavía tiene pendiente el pago.`;
+    if(att==='attending')return`${who} viene y ya lo tiene pagao.`;
+    return pending?`${who} todavía tiene el pago de ${event} en el aire.`:`${who} tiene lo de ${event} resuelto.`;
+  }
+  if(op==='event_summary')return v437VoiceQualitativeBalance(f,event);
+  if(op==='event_income_status'){
+    const rows=arr(vnextP1Table(result,'income_status')?.rows),pending=trim(f.status)==='pending',names=rows.map(r=>vnextP1SpokenPersonLabel(state,trim(r?.Persona))).filter(Boolean);
+    if(pending&&!rows.length)return`En ${event} ha pagao todo el mundo; por ahí estamos tranquilos.`;
+    if(pending&&asksWho&&names.length)return`En ${event} todavía quedan por pagar ${vnextP15NaturalJoin(names.slice(0,10))}.`;
+    if(pending)return rows.length>=5?`En ${event} quedan todavía unos cuantos rezagueros por pagar.`:`En ${event} queda todavía algún rezaguero por pagar.`;
+    if(asksWho&&names.length)return`En ${event} ya tengo el pago de ${vnextP15NaturalJoin(names.slice(0,10))}.`;
+    return`Los ingresos de ${event} van bastante bien encaminados.`;
+  }
+  if(op==='event_income_lines')return`Los ingresos de ${event} están localizados. Si quieres nombres o cifras concretas, te los digo.`;
+  if(op==='event_attendance'){
+    const n=num(f.attendees_canonical);return n>=30?`En ${event} va a haber buena cuadrilla; pinta animado.`:n>=15?`En ${event} vamos bien de gente; hay una cuadrilla apañada.`:`En ${event} de gente vamos más justitos, pero hay grupo.`;
+  }
+  if(op==='event_purchases'){
+    const resp=trim(f.responsible)||trim(decision?.responsible),top=trim(f.top_responsible),st=trim(f.status||decision?.purchase_status),who=resp?vnextP1SpokenPersonLabel(state,resp):top?vnextP1SpokenPersonLabel(state,top):'';
+    if(resp)return st==='pending'?`${who} todavía tiene alguna compra por rematar en ${event}.`:`Lo que lleva ${who} en compras de ${event} está bastante encarrilado.`;
+    if(asksWho&&top)return`En ${event}, quien más peso lleva en las compras es ${who}.`;
+    if(st==='pending'||num(f.pending_purchase_count)>0)return`Las compras de ${event} van encaminadas, pero todavía queda alguna cosa por rematar.`;
+    return`Lo gordo de las compras de ${event} ya está hecho y la cosa va bastante ordenada.`;
+  }
+  if(op==='event_donations')return num(f.donor_count)>0?`En ${event} las donaciones nos han echado un buen cable.`:`En ${event} por donaciones no hay gran cosa registrada.`;
+  if(op==='event_bank'){
+    if(f.has_bank_reconciliation===false||!f.bank_data_available)return`El cuadre bancario de ${event} todavía no está suficientemente montado como para darlo por bueno.`;
+    const left=num(f.unlinked_movement_count);return left<=0?`El cuadre bancario de ${event} está bastante limpio; por ahí la cosa pinta bien.`:`El banco de ${event} está bastante encarrilado, aunque queda algún movimiento por justificar.`;
+  }
+  if(op==='event_weather'){
+    const mood=vnextP15WeatherMood(arr(vnextP1Table(result,'weather')?.rows));if(mood==='calor_fuerte')return`Para ${event} pinta un calor de narices; habrá que tener bebida fría y sombra.`;if(mood==='calor_fuerte_con_riesgo_de_lluvia')return`Para ${event} pinta calor fuerte y además puede caer algo; mejor tener plan B.`;if(mood==='calor')return`Para ${event} va a apretar el calor, pero nada que no arreglemos con bebida fría.`;if(mood==='lluvia')return`Para ${event} hay riesgo de lluvia; yo tendría un plan B por si acaso.`;return`Para ${event} el tiempo pinta bastante apañado.`;
+  }
+  if(op==='event_stores_used')return`En ${event} las compras están repartidas entre varias tiendas; nada raro a primera vista.`;
+  if(op==='event_products')return`En ${event} hay bastante variedad de producto y la compra está bien repartida.`;
+  if(op==='event_scenario')return num(f.adjusted_operating_balance)<0?`Con ese escenario, ${event} se nos queda un poco pegado a las costillas; tocaría apretar algo el gasto.`:`Con ese escenario, ${event} sigue respirando y no parece que haya que hacer recortes serios.`;
+  if(op==='event_liquidations')return num(f.open_settlement_count)>0?`En ${event} todavía queda alguna liquidación por cerrar.`:`En ${event} las liquidaciones están cerradas; por ahí no queda nada colgando.`;
+  if(op==='event_documentation')return num(f.missing_evidence_count)>0?`La documentación de ${event} va bastante bien, aunque queda alguna cosa por justificar o adjuntar.`:`La documentación de ${event} está bastante bien cerrada.`;
+  if(op==='event_management')return num(f.lg_pending)>0?`En ${event} todavía queda alguna tarea por rematar.`:`La parte de gestión de ${event} está prácticamente cerrada.`;
+  if(op==='person_profile'){
+    const who=vnextP14PersonSocialLabel(state,trim(f.person)||trim(decision?.person),decision?.person,'friendly');return`De ${who} tengo bastante historia por aquí. Si quieres, nos metemos en un evento concreto y te cuento lo importante.`;
+  }
+  if(op==='person_events'){
+    const who=vnextP14PersonSocialLabel(state,trim(f.person)||trim(decision?.person),decision?.person,'friendly'),rows=arr(vnextP1Table(result,'events')?.rows),names=rows.slice(0,4).map(r=>vnextP14EventSpokenLabel(state,trim(r?.Evento))).filter(Boolean);return names.length?`${who} aparece por ${vnextP15NaturalJoin(names)}. Si quieres seguimos por uno de ellos.`:`${who} aparece en varios eventos; dime cuál quieres mirar.`;
+  }
+  if(op==='compare_events'){
+    const names=arr(f.event_names).map(x=>vnextP14EventSpokenLabel(state,x)).filter(Boolean);return names.length?`He puesto ${vnextP15NaturalJoin(names)} cara a cara. Si quieres, te digo cuál salió más holgado y dónde se nota la diferencia.`:`Ya tengo los eventos comparados. Te cuento la diferencia importante sin marearte con cifras.`;
+  }
+  if(op==='events_overview')return`Tenemos bastante movimiento de eventos. Si quieres, vamos a uno concreto y te cuento cómo salió sin darte la chapa.`;
+  if(op==='derive'){
+    const label=trim(f.winner);return label?`El que sale arriba en esa comparación es ${label}. Si quieres la cifra exacta, te la doy.`:`Ya tengo el cálculo. Te doy la conclusión y, si quieres, luego vamos a la cifra exacta.`;
+  }
+  if(op==='store_purchases')return`En esa tienda hemos tenido bastante movimiento de compras. Si quieres, te digo en qué eventos se concentró.`;
+  return vnextP15Pick(seed,[`Ya lo tengo. La cosa está bastante clara; si quieres cifra o detalle, me lo pides.`,`Sí, ya lo he mirado. Te doy la idea general y dejamos los números para cuando hagan falta.`]);
+}
+function v437VoiceChatPolish(text=''){
+  let t=v40ConversationalPolish(text,'',true);const n=vnextP17LooseNorm(t);
+  if(/^pido disculpas|^mis disculpas|^lamento/.test(n))return'Vale, entendido. Vamos a hacerlo más natural.';
+  return t;
+}
+function v437VoiceAnswerFromResults(good=[],state={},userPrompt='',writtenAnswer=''){
+  const wantsFigures=v437VoiceWantsFigures(userPrompt),parts=[];
+  for(const x of arr(good)){
+    const name=trim(x?.call?.name);
+    if(name==='query_ce')parts.push(wantsFigures?vnextP19SpokenAnswer(x.result,x.args,state,userPrompt):v437VoiceQueryCeQualitative(x.result,x.args,state,userPrompt));
+    else if(name==='local_response')parts.push(v437VoiceChatPolish(trim(x?.result?.facts?.response)||writtenAnswer));
+  }
+  let out=[...new Set(parts.map(trim).filter(Boolean))].slice(0,2).join(' ');
+  if(!out)out=v437VoiceChatPolish(writtenAnswer||'Vale, seguimos.');
+  return {spoken:v40ConversationalPolish(out,userPrompt,true),wantsFigures};
+}
+
 async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,externalSignal=null,conversationId=''}={}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP2Tools();
   let state=null,stateWaitMs=0,calls=0,decisionMs=0,toolMs=0,narrationMs=0,payload=null,final={title:'Zuzu',answer:'',warnings:[]},results=[],tables=[],charts=[];
@@ -18513,20 +18614,23 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
     for(const x of good){const name=trim(x.call?.name);if(name==='query_ce'){const st=await ensureState();parts.push(vnextP19LocalFinal(x.result,x.args,st));}else if(name==='resolve_entity')parts.push(vnextP11ResolveFinal(x.result));else if(name==='search_documents')parts.push(vnextP11DocsFinal(x.result));else if(name==='local_response')parts.push({title:'Zuzu',answer:trim(x.result?.facts?.response)||'Seguimos desde aquí.'});else parts.push(vnextP11MemoryFinal(x.result,userPrompt,x.args));}
     if(good.length){final={title:parts.length===1?parts[0].title:'Zuzu',answer:[...new Set(parts.map(x=>trim(x.answer)).filter(Boolean))].join('\n\n'),warnings:bad.map(x=>x.error)};const pc=vnextP2LocalPersonComparison(good);if(pc)final={...final,title:'Comparación de personas',answer:pc};}
     else final={title:'No he podido cerrar ese dato',answer:`No he podido ejecutar esa consulta con un contrato válido${bad.length?`: ${[...new Set(bad.map(x=>x.error).filter(Boolean))].join(' · ')}`:'.'}`,warnings:bad.map(x=>x.error)};
-    const voiceNeedsNaturalNarration=voiceConversation&&good.some(x=>x?.result&&trim(x?.call?.name)!=='local_response');
-    if(good.length&&(voiceNeedsNaturalNarration||vnextP2NeedsNarration(good))){
-      const currentSummary=good.length===1&&trim(good[0]?.call?.name)==='recall_memory'&&trim(good[0]?.args?.action||good[0]?.result?.facts?.action)==='current'?good[0]:null,memoryEpisodeSummary=good.length===1&&trim(good[0]?.call?.name)==='recall_memory'&&trim(good[0]?.args?.action||good[0]?.result?.facts?.action)==='summarize'?good[0]:null,n0=Date.now();
+    const currentSummary=good.length===1&&trim(good[0]?.call?.name)==='recall_memory'&&trim(good[0]?.args?.action||good[0]?.result?.facts?.action)==='current'?good[0]:null,memoryEpisodeSummary=good.length===1&&trim(good[0]?.call?.name)==='recall_memory'&&trim(good[0]?.args?.action||good[0]?.result?.facts?.action)==='summarize'?good[0]:null;
+    // V3.7 FAST: en voz factual no hacemos una segunda llamada Gemini para "narrar" datos que CE ya conoce.
+    // Eso ahorra una espera completa y evita que la narración vuelva a convertir la charla en un informe numérico.
+    const needsOptionalNarration=good.length&&((!voiceConversation&&vnextP2NeedsNarration(good))||(voiceConversation&&(currentSummary||memoryEpisodeSummary)));
+    if(needsOptionalNarration){
+      const n0=Date.now();
       try{let n;if(currentSummary)n=await vnextP122SummarizeCurrentConversation({userPrompt,model,result:currentSummary.result,flowTrace,externalSignal,voiceConversation});else if(memoryEpisodeSummary)n=await vnextP1223SummarizeMemoryEpisode({userPrompt,model,result:memoryEpisodeSummary.result,flowTrace,externalSignal,voiceConversation});else n=await vnextP2NarrateResults({userPrompt,model,results:good,flowTrace,externalSignal,voiceConversation});calls++;narrationMs=Date.now()-n0;if(trim(n?.answer))final={...final,title:currentSummary?'Resumen de la conversación':final.title,answer:trim(n.answer)};}catch(error){narrationMs=Date.now()-n0;if(currentSummary)final={...final,title:'Resumen de la conversación',answer:vnextP1221LocalConversationSummary(currentSummary.result)};zuzuTracePush(flowTrace,'VNEXT P2 · NARRACIÓN OPCIONAL','WARN',`Se conserva el cierre local: ${cleanGeminiError(error)}`);}
-    }
+    }else if(voiceConversation&&good.some(x=>trim(x?.call?.name)==='query_ce'))zuzuTracePush(flowTrace,'ANTONIO V3.7 · FAST PATH ORAL','OK','Datos factuales cerrados por CE sin segunda narración Gemini.');
   }
   if(vnextP2IdentityQuestion(userPrompt)&&results.filter(x=>x?.result).every(x=>trim(x?.call?.name)==='local_response')){const display=zuzuLoggedUserDisplayName({usuarioLogado,user,authUser,ce_acceso});final={...final,title:'Zuzu',answer:`Aquí te conozco como ${display}. No tengo base para afirmar otra identidad o relación distinta de la que consta en esta sesión.`};zuzuTracePush(flowTrace,'VNEXT P2-R · IDENTITY GROUNDING','OK',`Identidad limitada al usuario autenticado de sesión: ${display}.`);}
-  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),writtenAnswer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.';const unitGuard=v416VoiceUnitOracle(writtenAnswer,writtenAnswer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||writtenAnswer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`}),spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true),answer=voiceConversation?spokenAnswer:writtenAnswer,usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
+  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),writtenAnswer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.';let spokenAnswer=writtenAnswer,voiceWantsFigures=false;if(voiceConversation){const oral=v437VoiceAnswerFromResults(results.filter(x=>x?.result),stForVoice,userPrompt,writtenAnswer);spokenAnswer=oral.spoken;voiceWantsFigures=oral.wantsFigures;}else{const unitGuard=v416VoiceUnitOracle(writtenAnswer,writtenAnswer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||writtenAnswer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`});spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true);}const answer=writtenAnswer,usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
   // FIX11 · En voz los datasets siguen vivos en resultContext para razonar y mantener el hilo,
   // pero NO se materializan en la UI. Hablamos; no obligamos al usuario a mirar una tabla minúscula.
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),visibleTables=voiceConversation?[]:finalTables,visibleCharts=voiceConversation?[]:charts.slice(0,8),presentationEvidence=vnextP124PresentationEvidence(visibleTables,visibleCharts);
-  if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan solo como estado interno; salida visible=0. Importes hablados sin céntimos.`);
-  zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo normal=1; en voz factual=2 para narración natural) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R FIX13 · voz unificada + CE factual + narración oral austera; datasets internos sin tablas visibles',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral V3.7: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan como estado interno; cifras habladas=${voiceWantsFigures?'sí, porque el usuario las pidió':'no por defecto'}.`);
+  zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo voz factual=1; segunda llamada solo para resúmenes de memoria que la necesitan) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ANTONIO V3.7 · CE factual + salida oral coloquial sin cifras por defecto + fast path sin segunda narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){

@@ -1,0 +1,12 @@
+CONTROL EVENT v4_1_exp · ANTONIO LAB V3.7 · BAR VOICE FAST
+
+- Conversación oral por defecto en prosa cualitativa: sin cifras salvo petición explícita.
+- El answer escrito conserva el detalle completo; spokenAnswer es la versión de bar/peña.
+- Resumen de evento: interpreta saldo/pagos/compras en lenguaje coloquial.
+- Pagos pendientes: "ha pagao todo el mundo" / "queda algún rezaguero" según hechos CE.
+- Vía factual de voz evita la segunda llamada Gemini de narración: menos latencia y menos coste.
+- Memoria local de la conversación guarda lo que Antonio realmente dijo; el detalle escrito se conserva aparte.
+- Voz de prueba cambiada a es_ES-sharvard-medium (speaker 0 masculino en VITS Web).
+- Playback 1.10x y cierre VAD ~600 ms (antes ~680 ms).
+- Barge-in eleva el umbral mientras Antonio habla para evitar que el iPhone vuelva a transcribir la propia voz de Antonio como si fuera el usuario.
+- BANK4.9 y resto de ControlEvent no se modifican.
