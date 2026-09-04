@@ -1,0 +1,13 @@
+ControlEvent v4_1_exp · ANTONIO LAB V3.6 · COMMIT ON SPEAK
+
+Objetivo de esta versión:
+- Un vocativo/intervención breve ("Antonio", "oye Antonio", "perdona") NO cancela una respuesta VNext que todavía no se ha oído.
+- Una petición sustantiva nueva sí invalida la respuesta pendiente anterior.
+- Si Antonio ya está hablando, el barge-in sigue cortando el audio inmediatamente.
+- VNext usa commit diferido: la respuesta sólo entra en el historial/memoria de Zuzu cuando el audio empieza realmente a reproducirse.
+- Si una respuesta se descarta antes de hablar, también se descarta su commit y VNext no debería creer que ya la dijo.
+- Fragmentos cortos/incompletos (p.ej. "dame" + "info de Pocholo") se retienen y se intentan unir antes de consultar VNext.
+- Se aumenta ligeramente la tolerancia de silencio del VAD (34 frames) para reducir cortes de frase.
+- Se conserva WebAudio/AudioBufferSourceNode para iPhone/iPad y el retorno embebido a ITV.
+
+No cambia BANK4.9 ni Liquidaciones.
