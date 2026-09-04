@@ -4,7 +4,7 @@
 function clean(v,max=20000){return String(v==null?'':v).replace(/\u0000/g,'').trim().slice(0,max)}
 function geminiKey(){return process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||process.env.CONTROLEVENT_GEMINI_API_KEY||process.env.GOOGLE_GENERATIVE_AI_API_KEY||(/^(AIza)/i.test(String(process.env.OPENAI_API_KEY||''))?process.env.OPENAI_API_KEY:'')||''}
 function model(){return clean(process.env.CONTROLEVENT_ANTONIO_STT_MODEL||'gemini-2.5-flash-lite',120).replace(/^models\//i,'')}
-const BUILD='ANTONIO-LAB-V3-LOCAL-GEMINI-PIPER';
+const BUILD='ANTONIO-LAB-V3.2-MIC-ROBUST-GEMINI-PIPER';
 export function antonioLabConfig(){return {ok:true,build:BUILD,configured:Boolean(geminiKey()),provider:'Gemini STT + Piper/VITS local',sttModel:model(),voiceId:'es_ES-davefx-medium',voiceRuntime:'@diffusionstudio/vits-web@1.0.3',wakeMode:'VAD local + wake semántico sobre transcripción',paidNewServices:0,notes:'No usa ElevenLabs, speechSynthesis ni Web Speech. Gemini recibe únicamente fragmentos con voz detectada.'}}
 function extractText(payload){return clean(payload?.candidates?.[0]?.content?.parts?.map(p=>p?.text||'').join(' ')||'',2000)}
 function parse(raw){let s=clean(raw,1800).replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();try{const o=JSON.parse(s);return clean(o?.text||o?.transcript||o?.transcription||'',1200)}catch{return clean(s.replace(/^["']|["']$/g,''),1200)}}

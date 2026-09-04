@@ -1,0 +1,9 @@
+ControlEvent v4_1_exp · ANTONIO LAB V3.2
+
+Objetivo: corregir activación real del micrófono.
+- El AudioContext se crea/reanuda dentro del gesto del usuario, antes de cualquier await.
+- La voz Piper (~63 MB) ya NO se precarga al abrir la página; se inicia después de tener el micrófono armado.
+- Captura primaria con AudioWorklet y fallback automático a ScriptProcessor.
+- El acceso de la barra principal a Antonio LAB es un enlace HTML real, sin depender de onclick.
+- Cache-busters V3.2 nuevos.
+- BANK4.9 y resto de módulos no se modifican.
