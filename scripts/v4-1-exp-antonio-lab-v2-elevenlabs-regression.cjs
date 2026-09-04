@@ -1,0 +1,21 @@
+const fs=require('fs'),path=require('path');const root=path.resolve(__dirname,'..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');let ok=0,ko=0;
+function t(name,fn){try{if(!fn())throw new Error('condición falsa');console.log('OK',name);ok++;}catch(e){console.error('KO',name,'-',e.message);ko++;}}
+const html=read('public/antonio-lab.html'),js=read('public/app/features/antonio-lab-elevenlabs.js'),svc=read('services/antonio-lab.service.js'),routes=read('routes/antonio-lab.routes.js'),app=read('server/app.js');
+t('LAB carga módulo ElevenLabs V2',()=>/antonio-lab-elevenlabs\.js/.test(html));
+t('LAB no carga antiguo antonio-lab.js',()=>!/<script[^>]+antonio-lab\.js/.test(html));
+t('usa SDK oficial @elevenlabs/client fijado',()=>/@elevenlabs\/client@1\.18\.0/.test(js));
+t('fuerza WebRTC',()=>/connectionType:\s*['"]webrtc['"]/.test(js));
+t('no usa speechSynthesis',()=>!/(speechSynthesis|SpeechSynthesisUtterance)/.test(js));
+t('no usa SpeechRecognition',()=>!/SpeechRecognition|webkitSpeechRecognition/.test(js));
+t('no usa Gemini Live',()=>!/generativelanguage|gemini-3\./i.test(js+svc));
+t('token ElevenLabs en servidor',()=>/convai\/conversation\/token/.test(svc));
+t('API key no se devuelve',()=>!/apiKey\(\).*res\.json/s.test(routes));
+t('botón JSON diagnóstico',()=>/Descargar diagnóstico JSON/.test(html)&&/saveJson/.test(js));
+t('botón PDF diagnóstico',()=>/Descargar diagnóstico PDF/.test(html)&&/diagnostic-pdf/.test(routes));
+t('PDF se genera servidor',()=>/createAntonioDiagnosticPdf/.test(svc));
+t('health inspecciona agente',()=>/convai\/agents\//.test(svc)&&/antonio-lab\/health/.test(routes));
+t('interrupciones quedan registradas',()=>/interruptions\+\+/.test(js));
+t('server sigue montando antonioLabRoutes',()=>/app\.use\('\/api', antonioLabRoutes\)/.test(app));
+t('setup documentado',()=>fs.existsSync(path.join(root,'ANTONIO_LAB_V2_ELEVENLABS_SETUP.txt')));
+console.log(`\nANTONIO LAB V2 ELEVENLABS: ${ok} OK / ${ko} KO`);process.exitCode=ko?1:0;

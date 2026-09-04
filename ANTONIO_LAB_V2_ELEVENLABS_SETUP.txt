@@ -1,0 +1,35 @@
+ControlEvent v4_1_exp · ANTONIO LAB V2 · ELEVENLABS AGENTS / WebRTC
+===================================================================
+
+OBJETIVO
+- Laboratorio aislado para validar: micrófono, una sola voz, latencia e interrupción real.
+- NO conecta con VNext, CE, Banco, Compras ni Liquidaciones.
+- La conversación de audio se externaliza a ElevenLabs Agents.
+
+CONFIGURACIÓN EN VERCEL
+1) ELEVENLABS_AGENT_ID = agent_... (obligatorio)
+2) ELEVENLABS_API_KEY = ... (recomendado para agente privado; nunca se envía al navegador)
+
+Si no hay API key, el LAB intentará abrir ELEVENLABS_AGENT_ID como agente público.
+
+CONFIGURACIÓN RECOMENDADA DEL AGENTE EN ELEVENLABS
+- Idioma: español.
+- Canal: Voice.
+- WebRTC / Agents Platform.
+- Voice: masculina, grave y conversacional (la elegimos en el panel y luego se congela).
+- Turn detection: normal/eager según prueba de latencia.
+- Interruptions: ENABLED.
+- Soft timeout / mensajes de entretenimiento: desactivados (-1), para no meter 'ummm' mecánicos.
+- First message: corto (p.ej. "Dime, te escucho.") o vacío si queremos que hable primero el usuario.
+- Prompt del LAB: responder breve y natural; no hace consultas de ControlEvent.
+
+PRUEBA
+- Abrir /antonio-lab.html
+- Pulsar una sola vez "Activar Antonio".
+- Hablar normal.
+- Mientras Antonio hable, empezar una frase. Debe interrumpirse y escuchar.
+- Pulsar "Descargar diagnóstico JSON" o "Descargar diagnóstico PDF" y adjuntarlo si algo falla.
+
+DIAGNÓSTICO
+Incluye navegador, permiso y settings de micrófono, estado WebRTC, callbacks SDK, cambios speaking/listening,
+transcripciones, errores, latencias e interrupciones observadas. Nunca incluye ELEVENLABS_API_KEY ni conversation token.
