@@ -1,10 +1,9 @@
 import express from 'express';
 import {asyncHandler} from './_async.js';
-import {antonioLabConfig,transcribeAntonioLab,createAntonioDiagnosticPdf,streamZuzuTts,createAntonioLiveToken} from '../services/antonio-lab.service.js';
+import {antonioLabConfig,transcribeAntonioLab,createAntonioDiagnosticPdf,streamZuzuTts} from '../services/antonio-lab.service.js';
 const router=express.Router();
 router.get('/antonio-lab/config',asyncHandler(async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(antonioLabConfig())}));
 router.post('/antonio-lab/transcribe',asyncHandler(async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await transcribeAntonioLab(req.body||{}))}));
-router.post('/antonio-lab/live-token',asyncHandler(async(req,res)=>{res.setHeader('Cache-Control','no-store');res.json(await createAntonioLiveToken(req.body||{}))}));
 router.post('/antonio-lab/tts-stream',asyncHandler(async(req,res)=>{
   const text=String(req.body?.text||'').trim();
   if(!text){res.status(400).json({ok:false,error:'Falta texto para la voz de Zuzu.'});return}

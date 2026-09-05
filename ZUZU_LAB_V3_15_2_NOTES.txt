@@ -1,9 +1,0 @@
-ControlEvent v4_1_exp · ZUZU LAB V3.15.2
-
-HOTFIX RECUPERACIÓN TTS HTTP 404
-- La ruta routes/zuzu-voice.routes.js ya existía, incluyendo POST /zuzu-voice/synthesize.
-- server/app.js no la importaba ni la montaba en /api, por lo que el fallback/reintento servidor de Iapetus recibía HTTP 404.
-- Se importa zuzuVoiceRoutes y se monta app.use('/api', zuzuVoiceRoutes).
-- No cambia la voz: Iapetus sigue siendo la única voz del LAB.
-- No vuelve DaveFX/Piper.
-- Nueva build/cache/session V3.15.2.

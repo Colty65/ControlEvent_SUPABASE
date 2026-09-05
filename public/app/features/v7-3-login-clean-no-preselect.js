@@ -63,18 +63,6 @@
   function enforceSeries(reason){
     [0,80,220,520,1000,1800,3200].forEach(ms => setTimeout(() => { if(auth() && forceActive()) setNoEvent(reason); }, ms));
   }
-  function resetZuzuAuthSession(reason){
-    safe(() => window.ControlEventV113ZuzuAnalitica?.resetSession?.(reason||'auth'));
-    safe(() => document.getElementById('calFrame')?.contentWindow?.ControlEventAntonioLabV3?.resetForLogout?.(reason||'auth'));
-    safe(() => window.ceCloseAntonioLab?.());
-    try{
-      const ss=[];for(let i=0;i<sessionStorage.length;i++){const k=sessionStorage.key(i)||'';if(/_zuzu_(?:conversation|context|interaction_id|usage_total|server_conversation_id|voice_recovery(?:_active)?_v\d+|prompt_(?:draft|last)_p\d+)/i.test(k)||/^controlevent:zuzu-lab:v\d+:session$/i.test(k))ss.push(k);}ss.forEach(k=>sessionStorage.removeItem(k));
-    }catch(_){ }
-    try{
-      const ls=[];for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i)||'';if(/_zuzu_(?:voice_recovery|voice_recovery_active|server_conversation_id)/i.test(k)||/^controlevent:zuzu-lab:v\d+:session$/i.test(k))ls.push(k);}ls.forEach(k=>localStorage.removeItem(k));
-    }catch(_){ }
-    safe(() => window.dispatchEvent(new CustomEvent('controlevent:auth-session-reset',{detail:{reason:reason||'auth'}})));
-  }
   function patchFetch(){
     if(window.__ceV73LoginFetchPatched || typeof window.fetch !== 'function') return;
     window.__ceV73LoginFetchPatched = true;
@@ -86,7 +74,7 @@
         return promise.then(res => {
           try{
             res.clone().json().then(data => {
-              if(res.ok && data && data.ok && data.user){ resetZuzuAuthSession('login'); beginForce(18000); enforceSeries('login'); }
+              if(res.ok && data && data.ok && data.user){ beginForce(18000); enforceSeries('login'); }
             }).catch(()=>{});
           }catch(_){ }
           return res;
@@ -107,7 +95,6 @@
   }
   function softLogout(ev){
     if(ev){ try{ ev.preventDefault(); ev.stopPropagation(); ev.stopImmediatePropagation(); }catch(_){ } }
-    resetZuzuAuthSession('logout');
     beginForce(24000);
     clearChosen();
     sessionStorage.setItem(LOGOUT_AT_KEY, String(now()));
@@ -148,5 +135,5 @@
   ['DOMContentLoaded','load','controlevent:runtime-ready','controlevent:app-ready','controlevent:modules-ready','controlevent:module-mounted'].forEach(evt => window.addEventListener(evt, () => setTimeout(install, 20)));
   [0,120,420,1100].forEach(ms => setTimeout(install, ms));
 
-  window.ControlEventV73LoginCleanNoPreselect = {version:VERSION, versionFile:VERSION_FILE, beginForce, setNoEvent, softLogout, resetZuzuAuthSession};
+  window.ControlEventV73LoginCleanNoPreselect = {version:VERSION, versionFile:VERSION_FILE, beginForce, setNoEvent, softLogout};
 })();

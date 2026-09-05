@@ -1,7 +1,0 @@
-ZUZU LAB V3.15.1 - HOTFIX AUDIO COMMON HELPERS
-
-1. Corrige ERROR CEREBRO: stopAudio is not defined.
-2. Restaura el bloque comun WebAudio eliminado accidentalmente al retirar DaveFX: stopAudio, decodeAudioBuffer, waitForPlaybackWindow, b64Bytes, pcm16ToAudioBuffer, commitAtFirstAudio, finishStreamSpeech y schedulePcmChunk.
-3. No reintroduce DaveFX/Piper. Iapetus sigue siendo la unica voz del LAB.
-4. Streaming Gemini y recuperacion servidor siguen usando la misma Iapetus.
-5. Nueva clave de sesion/cache V3.15.1 para evitar servir JS anterior.
