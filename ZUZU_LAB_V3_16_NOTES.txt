@@ -1,0 +1,32 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.16 · LIVE CONVERSATION RESET
+Fecha: 2026-09-05
+
+Objetivo
+- Recuperar una conversación normal: activar y hablar, sin repetir wake word.
+- Eliminar del camino normal la síntesis TTS 3.1 -> fallo -> recuperación 2.5 que añadía 4-17 s.
+- Fijar fecha/hora actual e identidad masculina de Zuzu como datos autoritativos.
+
+Cambios
+1. Activar Zuzu = despierto. No existe autodormido por temporizador. Solo Dormir lo duerme.
+2. Hola / Hola Zuzu / Hola Antonio / Zuzu se resuelven localmente cuando procede y no pasan por CE.
+3. Fecha/hora directa se resuelve con el reloj del dispositivo; no puede salir una fecha histórica de memoria.
+4. Identidad base: Zuzu es hombre; planner P0/P2 y narrador reciben la regla de masculino.
+5. Protección de trato: Zuzu no devuelve insultos como «pesado» al usuario.
+6. Asentamiento de voz: ya no usa latestTurnId de capturas vacías; ventanas 180/320/650 ms, deadline 1.8 s.
+7. Boca principal: Gemini Live API, modelo gemini-2.5-flash-native-audio-preview-12-2025, voz Iapetus.
+8. Conexión navegador -> Gemini por WebSocket con token efímero de un solo uso generado en backend.
+9. La respuesta final de CE se manda a Live como clientContent turnComplete y se reproduce PCM conforme llega.
+10. Gemini 2.5 Flash TTS queda solo como respaldo de emergencia con la misma Iapetus.
+11. Se conserva STT Ghost Guard de V3.15.5.
+12. Caché/sesión/iframe pasan a V316.
+
+Pruebas
+- V3.16 conversación/reset: 25/25.
+- Token Live simulado: OK (endpoint, modelo, AUDIO, token de un uso).
+- Liquidaciones: 70/70.
+- Ejecución controlada: 76/76.
+- BANK4.9 manual authority: 8/8.
+- BANK4.9 canonical performance: conserva el mismo fallo FAST-LOCAL ya presente en V3.15.5 de partida.
+
+Nota
+Gemini Live Native Audio es la ruta normal. El TTS 2.5 progresivo permanece exclusivamente como paracaídas si Live no puede abrirse o no entrega audio.

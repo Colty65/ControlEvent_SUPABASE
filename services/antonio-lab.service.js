@@ -1,12 +1,26 @@
 /* ControlEvent v4_1_exp · ZUZU LAB V3
-   Laboratorio aislado: Gemini transcribe fragmentos; VNext/CE responde y Gemini 3.1 TTS genera la voz en streaming.
+   Laboratorio aislado: Gemini transcribe fragmentos; VNext/CE responde y Gemini Live Native Audio pronuncia la respuesta con baja latencia.
 */
 function clean(v,max=20000){return String(v==null?'':v).replace(/\u0000/g,'').trim().slice(0,max)}
 function geminiKey(){return process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||process.env.CONTROLEVENT_GEMINI_API_KEY||process.env.GOOGLE_GENERATIVE_AI_API_KEY||(/^(AIza)/i.test(String(process.env.OPENAI_API_KEY||''))?process.env.OPENAI_API_KEY:'')||''}
 function model(){return clean(process.env.CONTROLEVENT_ANTONIO_STT_MODEL||'gemini-3.1-flash-lite',120).replace(/^models\//i,'')}
-const BUILD='ZUZU-LAB-V3.15.5-IAPETUS-STT-GHOST-GUARD';
+const BUILD='ZUZU-LAB-V3.16-LIVE-MOUTH-NO-WAKE-DATE-MALE';
 const LAB_TTS_VOICE='Iapetus';
-export function antonioLabConfig(){return {ok:true,build:BUILD,configured:Boolean(geminiKey()),provider:'Gemini STT + VNext/CE + Gemini 3.1 Flash TTS streaming + Gemini 2.5 Flash TTS recuperación progresiva',sttModel:model(),ttsModel:'gemini-3.1-flash-tts-preview',voiceId:LAB_TTS_VOICE,voiceProfile:'masculina adulta, clara, natural, cercana y poco teatral',fallbackVoiceId:LAB_TTS_VOICE,recoveryTtsModel:'gemini-2.5-flash-preview-tts',wakeMode:'VAD local + wake semántico sobre transcripción',paidNewServices:0,ttsTransport:'3.1 Interactions streaming · 2.5 generateContent progresivo por tramos',notes:'Iapetus queda fijada como voz única. Si 3.1 no entrega audio, se omite durante el resto de la sesión y 2.5 sintetiza por tramos cortos para empezar a hablar antes; no cambia a DaveFX.'}}
+export function antonioLabConfig(){return {ok:true,build:BUILD,configured:Boolean(geminiKey()),provider:'Gemini STT + VNext/CE + Gemini Live 2.5 Native Audio',sttModel:model(),ttsModel:'gemini-2.5-flash-native-audio-preview-12-2025',voiceId:LAB_TTS_VOICE,voiceProfile:'masculina adulta, clara, natural, cercana y poco teatral',fallbackVoiceId:LAB_TTS_VOICE,recoveryTtsModel:'gemini-2.5-flash-preview-tts',wakeMode:'Activar = escucha continua; Dormir = requiere llamada para volver',paidNewServices:0,ttsTransport:'Live API WebSocket directo con token efímero · fallback 2.5 TTS',notes:'Iapetus es voz única. La boca principal usa Gemini Live nativo de baja latencia. Activar Zuzu lo deja despierto; no exige repetir su nombre.'}}
+
+
+const LIVE_MODEL='gemini-2.5-flash-native-audio-preview-12-2025';
+export async function createAntonioLiveToken(){
+  const key=geminiKey();if(!key){const e=new Error('Falta GEMINI_API_KEY para Gemini Live.');e.status=503;throw e}
+  const now=Date.now(),expireTime=new Date(now+18*60*1000).toISOString(),newSessionExpireTime=new Date(now+90*1000).toISOString();
+  const body={uses:1,expireTime,newSessionExpireTime,liveConnectConstraints:{model:`models/${LIVE_MODEL}`,config:{sessionResumption:{},responseModalities:['AUDIO']}}};
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);let res,payload;
+  try{res=await fetch('https://generativelanguage.googleapis.com/v1beta/auth_tokens',{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},signal:controller.signal,body:JSON.stringify(body)});payload=await res.json().catch(()=>({}))}
+  catch(error){const e=new Error(error?.name==='AbortError'?'Gemini Live agotó el tiempo al crear el token.':`No se pudo crear token Gemini Live: ${error?.message||error}`);e.status=502;throw e}
+  finally{clearTimeout(timer)}
+  if(!res.ok||!clean(payload?.name,1000)){const e=new Error(payload?.error?.message||`Gemini Live token HTTP ${res.status}`);e.status=502;throw e}
+  return {ok:true,token:clean(payload.name,1400),model:LIVE_MODEL,voice:LAB_TTS_VOICE,expiresAt:expireTime};
+}
 
 function ttsModel(){return clean(process.env.CONTROLEVENT_ZUZU_TTS_MODEL||'gemini-3.1-flash-tts-preview',120).replace(/^models\//i,'')}
 function ttsVoice(){return LAB_TTS_VOICE}
