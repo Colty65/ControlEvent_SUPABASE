@@ -457,7 +457,7 @@
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
   function isZuzuVNextMode(){ return true; }
-  function renderZuzuVNextMode(){ var on=true,b=$('ceAiVNextMode'); if(b){b.classList.add('is-active');b.setAttribute('aria-pressed','true');b.textContent='VNext';} var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🎙 Antonio</span><span class="ce-ai-mode-help">Conversación ControlEvent · VNext permanente.</span>';}}
+  function renderZuzuVNextMode(){ var on=true,b=$('ceAiVNextMode'); if(b){b.classList.add('is-active');b.setAttribute('aria-pressed','true');b.textContent='VNext';} var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🎙 Zuzu</span><span class="ce-ai-mode-help">Conversación ControlEvent · VNext permanente.</span>';}}
   function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} try{sessionStorage.setItem(zuzuVNextKey(),'1');}catch(_){} renderZuzuVNextMode(); }
 
   function openModal(){

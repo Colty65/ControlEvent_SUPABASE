@@ -18275,6 +18275,9 @@ ${capabilityCatalogTextCompact()}
 - No inventes cifras ni relaciones. Esta llamada NO responde datos factuales directamente: planifica la acción.
 ${voice?`MODO ORAL ESTRICTO:
 - Esto es una conversación hablada, no una pantalla de informes. Los datasets y tablas son MEMORIA DE TRABAJO INTERNA de CE; no se enseñan ni se mencionan mientras dure el modo oral.
+- Si el usuario pide una cifra, cantidad, importe, diferencia, lista, nombres o elementos «uno por uno/una por una», recupera esos datos AHORA. No respondas «si quieres te lo digo», «luego vamos a la cifra» ni pidas permiso de nuevo.
+- Seguimientos como «dame la cifra», «dámelo», «¿y gastos?», «¿y donaciones?», «venga, sí» heredan el objeto y la magnitud de la petición inmediatamente anterior.
+- Si pide varias magnitudes económicas del mismo evento en una sola frase (por ejemplo gastos + donaciones, o ingresos + saldo), usa event_summary con fields/requested_fields para traerlas juntas; no omitas una de ellas.
 - En CHAT responde con naturalidad y brevedad. En turnos factuales elige la operación correcta y deja que CE obtenga los hechos; la capa oral contará solo lo importante.
 - No digas «te dejo el detalle», «mira la tabla», «dataset», «filas», «columnas» ni recites campos como una ficha.
 - Prefiere una conclusión humana a una metralla de números: «estuvo bien», «quedó prácticamente cuadrado», «no quedó nada pendiente», «Colty llevó la mayor parte». Da una cifra solo cuando ayuda realmente o cuando el usuario la pregunta de forma directa.
@@ -18351,11 +18354,13 @@ function vnextP2DateRangeFromPrompt(prompt='',nowLike=''){const p=vnextP17LooseN
 
 function vnextP2RepairTranslatedCalls(calls=[],state={},userPrompt='',selectedEventId='',history=[],flowTrace=[],currentDateTime=''){
   const events=vnextP2CatalogMentions(state,userPrompt,'event'),people=vnextP2CatalogMentions(state,userPrompt,'person'),recentEvents=vnextP2RecentEvents(history),recentPeople=vnextP2RecentPeople(history),focus=vnextP119LastStructuredFocus(history),personOps=new Set(['person_profile','person_events','person_income_status','person_event_status']),eventOps=new Set(['event_income_status','event_income_lines','event_attendance','event_summary','event_scenario','event_purchases','event_donations','event_bank','event_weather','event_stores_used','event_products','event_documentation','event_management','event_liquidations']),repeatCue=vnextP2PromptRepeatCue(userPrompt),compareCue=vnextP2CompareCue(userPrompt),otherEventCue=vnextP2OtherEventCue(userPrompt),liqDetailCue=vnextP2LiquidationDetailCue(userPrompt),memorySummaryCue=vnextP2MemorySummaryCue(userPrompt),lastComparison=vnextP2LastComparisonEvents(history);let repairs=0,out=[];
+  const voicePrompt=vnextP17LooseNorm(userPrompt),economicFields=[];if(/\bingres/.test(voicePrompt))economicFields.push('income');if(/\b(?:gasto|compras?)/.test(voicePrompt))economicFields.push('purchases');if(/\bdonac/.test(voicePrompt))economicFields.push('donations');if(/\b(?:saldo|sobr|margen)/.test(voicePrompt))economicFields.push('balance');const multiEconomic=economicFields.length>=2;
   const singlePersonProfileCount=arr(calls).filter(c=>trim(c?.name)==='query_ce'&&trim(c?.arguments?.operation)==='person_profile').length;
   for(const call of arr(calls)){const callName=trim(call?.name);
     if(callName==='recall_memory'){let a=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{};if(memorySummaryCue&&trim(a.action)!=='search'&&trim(a.action)!=='list'){a.action='summarize';repairs++;}out.push({...call,arguments:a});continue;}
-    if(callName==='local_response'){const selectedMemory=vnextP1223LastSelectedMemoryEpisode(history);if(memorySummaryCue&&trim(selectedMemory?.conversation_id)){out.push({...call,name:'recall_memory',arguments:{action:'summarize',conversation_id:trim(selectedMemory.conversation_id),matched_turn_id:trim(selectedMemory.matched_turn_id)}});repairs++;continue;}const lastLiq=vnextP2LastOperationContext(history,'event_liquidations');if(liqDetailCue&&trim(lastLiq?.event)){out.push({...call,name:'query_ce',arguments:{operation:'event_liquidations',event:trim(lastLiq.event),person:trim(lastLiq.person),settlement_status:trim(lastLiq.settlement_status)||'all',detail:'full',focus_mode:'replace',focus_type:'event',focus_entities:[trim(lastLiq.event)]}});repairs++;continue;}if(otherEventCue&&lastComparison.length>=2){const ev=vnextP2OtherComparedEvent(history);if(ev){out.push({...call,name:'query_ce',arguments:{operation:'event_summary',event:ev,focus_mode:'replace',focus_type:'event',focus_entities:[ev]}});repairs++;continue;}}if(compareCue&&lastComparison.length>=2){out.push({...call,name:'query_ce',arguments:{operation:'compare_events',events:lastComparison.slice(0,2),focus_mode:'replace',focus_type:'dataset',focus_entities:lastComparison.slice(0,2)}});repairs++;continue;}out.push(call);continue;}
+    if(callName==='local_response'){const factFollow=/\b(?:dame\s+(?:la\s+)?cifra|dame\s+(?:el\s+)?numero|damelo|cuanto|cuantos|y\s+gastos|y\s+donaciones|venga\s+si)\b/.test(voicePrompt),lastFact=vnextP16LastContext(history);if(factFollow&&trim(lastFact?.operation)&&trim(lastFact?.event)){out.push({...call,name:'query_ce',arguments:{operation:trim(lastFact.operation),event:trim(lastFact.event),person:trim(lastFact.person),events:arr(lastFact.events).map(trim).filter(Boolean),requested_fields:arr(lastFact.requested_fields).map(trim).filter(Boolean),purchase_status:trim(lastFact.purchase_status),detail:'full',focus_mode:'replace',focus_type:'event',focus_entities:[trim(lastFact.event)]}});repairs++;continue;}const selectedMemory=vnextP1223LastSelectedMemoryEpisode(history);if(memorySummaryCue&&trim(selectedMemory?.conversation_id)){out.push({...call,name:'recall_memory',arguments:{action:'summarize',conversation_id:trim(selectedMemory.conversation_id),matched_turn_id:trim(selectedMemory.matched_turn_id)}});repairs++;continue;}const lastLiq=vnextP2LastOperationContext(history,'event_liquidations');if(liqDetailCue&&trim(lastLiq?.event)){out.push({...call,name:'query_ce',arguments:{operation:'event_liquidations',event:trim(lastLiq.event),person:trim(lastLiq.person),settlement_status:trim(lastLiq.settlement_status)||'all',detail:'full',focus_mode:'replace',focus_type:'event',focus_entities:[trim(lastLiq.event)]}});repairs++;continue;}if(otherEventCue&&lastComparison.length>=2){const ev=vnextP2OtherComparedEvent(history);if(ev){out.push({...call,name:'query_ce',arguments:{operation:'event_summary',event:ev,focus_mode:'replace',focus_type:'event',focus_entities:[ev]}});repairs++;continue;}}if(compareCue&&lastComparison.length>=2){out.push({...call,name:'query_ce',arguments:{operation:'compare_events',events:lastComparison.slice(0,2),focus_mode:'replace',focus_type:'dataset',focus_entities:lastComparison.slice(0,2)}});repairs++;continue;}out.push(call);continue;}
     if(callName!=='query_ce'){out.push(call);continue;}let a=(call?.arguments&&typeof call.arguments==='object')?{...call.arguments}:{},op=trim(a.operation);
+    if(multiEconomic&&op!=='compare_events'&&op!=='event_scenario'){a.operation='event_summary';a.requested_fields=economicFields.slice();op='event_summary';repairs++;}
     if(op==='person_purchases'){a.operation='person_profile';if(!arr(a.requested_fields).length)a.requested_fields=['purchases'];op='person_profile';repairs++;}
     if(trim(a.event)){const embedded=vnextP2ExtractEmbeddedArgs(a.event);if(embedded.text!==trim(a.event)){a.event=embedded.text;Object.assign(a,embedded.args);repairs++;}}
     if(repeatCue&&!events.length&&!people.length&&op&&!a.repeat){a.repeat=true;repairs++;}
@@ -18395,9 +18400,11 @@ function vnextP2NeedsNarration(results=[]){
   return false;
 }
 function vnextVoiceNumberBudget(userPrompt=''){
-  const p=vnextNorm(userPrompt);
-  if(/\b(?:cuanto|cuanta|cuantos|cuantas|importe|precio|saldo exacto|cantidad exacta|numero exacto|exactamente cuanto|exactamente cuantos)\b/.test(p))return 1;
-  if(/\b(?:porcentaje|temperatura|grados|fecha|hora|dias|dia|personas exactas|movimientos exactos)\b/.test(p))return 1;
+  const p=vnextP17LooseNorm(userPrompt);
+  if(/\b(?:todas?\s+las?\s+cifras|todos?\s+los?\s+numeros|desglose|detalle\s+completo|uno\s+por\s+uno|una\s+por\s+una|cada\s+una|cada\s+uno)\b/.test(p))return 12;
+  let metrics=0;if(/\bingres/.test(p))metrics++;if(/\b(?:gasto|compras?)/.test(p))metrics++;if(/\bdonac/.test(p))metrics++;if(/\b(?:saldo|sobr|margen)/.test(p))metrics++;if(metrics>1)return Math.min(5,metrics);
+  if(/\b(?:cifras?|numeros?|cuanto|cuanta|cuantos|cuantas|importe|precio|saldo\s+exacto|cantidad\s+exacta|numero\s+exacto|exactamente)\b/.test(p))return 2;
+  if(/\b(?:porcentaje|temperatura|grados|fecha|hora|dias|dia|personas\s+exactas|movimientos\s+exactos)\b/.test(p))return 1;
   return 0;
 }
 function vnextVoiceNumericCount(answer=''){
@@ -18459,17 +18466,23 @@ async function vnextP2RGenerateContentPlan({input='',model='',systemInstruction=
   return {payload,plan,usage};
 }
 
-// ANTONIO V3.8 · contrato oral "amigo en el bar".
+// ZUZU V3.9 · contrato oral directo: hechos primero, estilo después.
 // CE conserva todos los datos y el answer escrito completo. La boca solo da cifras
 // cuando el usuario las pide de forma explícita; el resto son conclusiones cualitativas.
 function v437VoiceNoFiguresRequested(userPrompt=''){
   const p=vnextP17LooseNorm(userPrompt);
   return /\b(?:sin\s+(?:cifras?|numeros?|importes?)|no\s+(?:me\s+)?(?:des|digas|quiero|hacen\s+falta)\s+(?:cifras?|numeros?|importes?)|en\s+prosa|solo\s+(?:una\s+)?valoracion|sin\s+detalle)\b/.test(p);
 }
+function v439VoiceDirectMetricRequest(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt);
+  const asks=/\b(?:dame|dime|quiero|queria|quisiera|pasame|sacame|cuentame\s+cuanto|cuanto|cual\s+es|cuales\s+son)\b/.test(p);
+  const metric=/\b(?:ingres\w*|recaud\w*|cobro\w*|gasto\w*|compras?|donac\w*|saldo|margen|sobr\w*|asist\w*|personas?|socios?|pendient\w*)\b/.test(p);
+  return asks&&metric;
+}
 function v438VoiceFigureMode(userPrompt=''){
   const p=vnextP17LooseNorm(userPrompt);if(v437VoiceNoFiguresRequested(p))return 'none';
-  if(/\b(?:exact[oa]s?|exactamente|desglose|desglosad[oa]|detalle\s+completo|detallad[oa]mente|todas?\s+las?\s+cifras|todos?\s+los?\s+numeros|uno\s+por\s+uno|al\s+centimo|centimos?)\b/.test(p))return 'full';
-  if(/\b(?:cifras?|numeros?|importe(?:s)?|cantidad(?:es)?|euros?|precio(?:s)?|porcentaje(?:s)?|cuanto(?:s|as)?|a\s+cuanto|saldo|grosso\s+modo|volapluma|a\s+ojo|aproximad[oa]s?|mas\s+o\s+menos)\b/.test(p))return 'brief';
+  if(/\b(?:exact[oa]s?|exactamente|desglose|desglosad[oa]|detalle\s+completo|detallad[oa]mente|todas?\s+las?\s+cifras|todos?\s+los?\s+numeros|uno\s+por\s+uno|una\s+por\s+una|uno\s+a\s+uno|una\s+a\s+una|cada\s+una|cada\s+uno|enumer(?:a|ame|arlas?|arlos?)|list(?:a|ado)\s+(?:completo|entero)|al\s+centimo|centimos?)\b/.test(p))return 'full';
+  if(/\b(?:cifras?|numeros?|numerito|importe(?:s)?|cantidad(?:es)?|euros?|precio(?:s)?|porcentaje(?:s)?|cuanto(?:s|as)?|a\s+cuanto|saldo|grosso\s+modo|volapluma|a\s+ojo|aproximad[oa]s?|mas\s+o\s+menos|dame\s+la\s+cifra|dame\s+el\s+numero)\b/.test(p)||v439VoiceDirectMetricRequest(p))return 'brief';
   return 'none';
 }
 function v437VoiceWantsFigures(userPrompt=''){return v438VoiceFigureMode(userPrompt)!=='none';}
@@ -18505,65 +18518,116 @@ function v437VoiceQualitativeBalance(f={},event='el evento'){
   const tail=[];if(pending>eps)tail.push('Eso sí, todavía queda alguna compra por rematar.');if(pendingPeople>0||incomePending>eps)tail.push('Y queda todavía algún rezaguero por pagar.');else if(!open)tail.push('Ha pagao todo el mundo.');
   return `${event}: ${lead}${tail.length?' '+tail.join(' '):''}`.trim();
 }
-function v437VoiceQueryCeQualitative(result={},decision={},state={},userPrompt=''){
-  const op=trim(result?._vnext_operation||decision?.operation),f=result?.facts||{},event=v437VoiceEventLabel(result,decision,state),p=vnextP17LooseNorm(userPrompt),asksWho=v437VoiceAsksWho(userPrompt),reg=vnextP15SocialRegister(decision),seed=`v37|${op}|${event}|${p}`;
-  if(['person_income_status','person_event_status'].includes(op)){
-    const who=vnextP14PersonSocialLabel(state,trim(f.person)||trim(decision?.person),decision?.person,'friendly'),att=trim(f.attendance_status),pending=!!f.pending;
-    if(att==='not_attending')return`${who} no viene a ${event}.`;
-    if(att==='attending'&&pending)return`${who} viene, pero todavía tiene pendiente el pago.`;
-    if(att==='attending')return`${who} viene y ya lo tiene pagao.`;
-    return pending?`${who} todavía tiene el pago de ${event} en el aire.`:`${who} tiene lo de ${event} resuelto.`;
-  }
-  if(op==='event_summary')return v437VoiceQualitativeBalance(f,event);
-  if(op==='event_income_status'){
-    const rows=arr(vnextP1Table(result,'income_status')?.rows),pending=trim(f.status)==='pending',names=rows.map(r=>vnextP1SpokenPersonLabel(state,trim(r?.Persona))).filter(Boolean);
-    if(pending&&!rows.length)return`En ${event} ha pagao todo el mundo; por ahí estamos tranquilos.`;
-    if(pending&&asksWho&&names.length)return`En ${event} todavía quedan por pagar ${vnextP15NaturalJoin(names.slice(0,10))}.`;
-    if(pending)return rows.length>=5?`En ${event} quedan todavía unos cuantos rezagueros por pagar.`:`En ${event} queda todavía algún rezaguero por pagar.`;
-    if(asksWho&&names.length)return`En ${event} ya tengo el pago de ${vnextP15NaturalJoin(names.slice(0,10))}.`;
-    return`Los ingresos de ${event} van bastante bien encaminados.`;
-  }
-  if(op==='event_income_lines')return`Los ingresos de ${event} están localizados. Si quieres nombres o cifras concretas, te los digo.`;
-  if(op==='event_attendance'){
-    const n=num(f.attendees_canonical);return n>=30?`En ${event} va a haber buena cuadrilla; pinta animado.`:n>=15?`En ${event} vamos bien de gente; hay una cuadrilla apañada.`:`En ${event} de gente vamos más justitos, pero hay grupo.`;
-  }
-  if(op==='event_purchases'){
-    const resp=trim(f.responsible)||trim(decision?.responsible),top=trim(f.top_responsible),st=trim(f.status||decision?.purchase_status),who=resp?vnextP1SpokenPersonLabel(state,resp):top?vnextP1SpokenPersonLabel(state,top):'';
-    if(resp)return st==='pending'?`${who} todavía tiene alguna compra por rematar en ${event}.`:`Lo que lleva ${who} en compras de ${event} está bastante encarrilado.`;
-    if(asksWho&&top)return`En ${event}, quien más peso lleva en las compras es ${who}.`;
-    if(st==='pending'||num(f.pending_purchase_count)>0)return`Las compras de ${event} van encaminadas, pero todavía queda alguna cosa por rematar.`;
-    return`Lo gordo de las compras de ${event} ya está hecho y la cosa va bastante ordenada.`;
-  }
-  if(op==='event_donations')return num(f.donor_count)>0?`En ${event} las donaciones nos han echado un buen cable.`:`En ${event} por donaciones no hay gran cosa registrada.`;
-  if(op==='event_bank'){
-    if(f.has_bank_reconciliation===false||!f.bank_data_available)return`El cuadre bancario de ${event} todavía no está suficientemente montado como para darlo por bueno.`;
-    const left=num(f.unlinked_movement_count);return left<=0?`El cuadre bancario de ${event} está bastante limpio; por ahí la cosa pinta bien.`:`El banco de ${event} está bastante encarrilado, aunque queda algún movimiento por justificar.`;
-  }
-  if(op==='event_weather'){
-    const mood=vnextP15WeatherMood(arr(vnextP1Table(result,'weather')?.rows));if(mood==='calor_fuerte')return`Para ${event} pinta un calor de narices; habrá que tener bebida fría y sombra.`;if(mood==='calor_fuerte_con_riesgo_de_lluvia')return`Para ${event} pinta calor fuerte y además puede caer algo; mejor tener plan B.`;if(mood==='calor')return`Para ${event} va a apretar el calor, pero nada que no arreglemos con bebida fría.`;if(mood==='lluvia')return`Para ${event} hay riesgo de lluvia; yo tendría un plan B por si acaso.`;return`Para ${event} el tiempo pinta bastante apañado.`;
-  }
-  if(op==='event_stores_used')return`En ${event} las compras están repartidas entre varias tiendas; nada raro a primera vista.`;
-  if(op==='event_products')return`En ${event} hay bastante variedad de producto y la compra está bien repartida.`;
-  if(op==='event_scenario')return num(f.adjusted_operating_balance)<0?`Con ese escenario, ${event} se nos queda un poco pegado a las costillas; tocaría apretar algo el gasto.`:`Con ese escenario, ${event} sigue respirando y no parece que haya que hacer recortes serios.`;
-  if(op==='event_liquidations')return num(f.open_settlement_count)>0?`En ${event} todavía queda alguna liquidación por cerrar.`:`En ${event} las liquidaciones están cerradas; por ahí no queda nada colgando.`;
-  if(op==='event_documentation')return num(f.missing_evidence_count)>0?`La documentación de ${event} va bastante bien, aunque queda alguna cosa por justificar o adjuntar.`:`La documentación de ${event} está bastante bien cerrada.`;
-  if(op==='event_management')return num(f.lg_pending)>0?`En ${event} todavía queda alguna tarea por rematar.`:`La parte de gestión de ${event} está prácticamente cerrada.`;
-  if(op==='person_profile'){
-    const who=vnextP14PersonSocialLabel(state,trim(f.person)||trim(decision?.person),decision?.person,'friendly');return`De ${who} tengo bastante historia por aquí. Si quieres, nos metemos en un evento concreto y te cuento lo importante.`;
-  }
-  if(op==='person_events'){
-    const who=vnextP14PersonSocialLabel(state,trim(f.person)||trim(decision?.person),decision?.person,'friendly'),rows=arr(vnextP1Table(result,'events')?.rows),names=rows.slice(0,4).map(r=>vnextP14EventSpokenLabel(state,trim(r?.Evento))).filter(Boolean);return names.length?`${who} aparece por ${vnextP15NaturalJoin(names)}. Si quieres seguimos por uno de ellos.`:`${who} aparece en varios eventos; dime cuál quieres mirar.`;
-  }
-  if(op==='compare_events'){
-    const names=arr(f.event_names).map(x=>vnextP14EventSpokenLabel(state,x)).filter(Boolean);return names.length?`He puesto ${vnextP15NaturalJoin(names)} cara a cara. Si quieres, te digo cuál salió más holgado y dónde se nota la diferencia.`:`Ya tengo los eventos comparados. Te cuento la diferencia importante sin marearte con cifras.`;
-  }
-  if(op==='events_overview')return`Tenemos bastante movimiento de eventos. Si quieres, vamos a uno concreto y te cuento cómo salió sin darte la chapa.`;
-  if(op==='derive'){
-    const label=trim(f.winner);return label?`El que sale arriba en esa comparación es ${label}. Si quieres la cifra exacta, te la doy.`:`Ya tengo el cálculo. Te doy la conclusión y, si quieres, luego vamos a la cifra exacta.`;
-  }
-  if(op==='store_purchases')return`En esa tienda hemos tenido bastante movimiento de compras. Si quieres, te digo en qué eventos se concentró.`;
-  return vnextP15Pick(seed,[`Ya lo tengo. La cosa está bastante clara; si quieres cifra o detalle, me lo pides.`,`Sí, ya lo he mirado. Te doy la idea general y dejamos los números para cuando hagan falta.`]);
+function v439VoiceMetricCues(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt),out=[];const add=x=>{if(!out.includes(x))out.push(x);};
+  if(/\b(?:ingres\w*|recaud\w*|cobrad\w*|cobro\w*|entro|entraron)\b/.test(p))add('income');
+  if(/\b(?:gasto\w*|gastamos|compras?|comprad\w*)\b/.test(p))add(/\b(?:pendient\w*|pte|por\s+comprar|queda\s+por\s+comprar|rematar\w*)\b/.test(p)?'pending':'purchases');
+  if(/\b(?:donac\w*|donado\w*)\b/.test(p))add('donations');
+  if(/\b(?:saldo|sobr|margen|resultado|quedo|queda)\b/.test(p))add('balance');
+  if(/\b(?:asist|gente|personas?|socios?)\b/.test(p))add('attendees');
+  if(/\b(?:pendient\w*|pte|por\s+comprar|queda\s+por\s+comprar|rematar\w*)\b/.test(p)&&!out.includes('pending'))add('pending');
+  return out;
 }
+function v439VoiceListCue(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt);
+  return /\b(?:uno\s+por\s+uno|una\s+por\s+una|uno\s+a\s+uno|una\s+a\s+una|cada\s+una|cada\s+uno|enumera|enumerame|lista|listado|cuales|cual\s+queda|que\s+queda|que\s+quedan|dime\s+las\s+que|dime\s+los\s+que)\b/.test(p);
+}
+function v439VoiceRoundMoney(value){return `${v26FormatPlainNumber(Math.round(num(value)),0)} euros`;}
+function v439VoiceNaturalJoin(items=[]){return vnextP15NaturalJoin(arr(items).map(trim).filter(Boolean));}
+function v439VoicePurchaseRows(result={},userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt),rows=arr(vnextP1Table(result,'purchase_lines')?.rows);
+  if(/\b(?:pendient\w*|pte|por\s+comprar|queda\s+por\s+comprar|quedan\s+por\s+comprar|rematar\w*)\b/.test(p)){
+    const pending=rows.filter(r=>/pendient/.test(vnextP17LooseNorm(r?.Tipo)));if(pending.length)return pending;
+  }
+  if(/\b(?:realizad|comprad[ao]s?|ya\s+hech)\b/.test(p)){
+    const done=rows.filter(r=>/realizad/.test(vnextP17LooseNorm(r?.Tipo)));if(done.length)return done;
+  }
+  return rows;
+}
+function v439VoicePurchaseList(result={},decision={},state={},userPrompt='',figureMode='none'){
+  const rows=v439VoicePurchaseRows(result,userPrompt),event=v437VoiceEventLabel(result,decision,state),p=vnextP17LooseNorm(userPrompt);
+  if(!rows.length)return `En ${event} no encuentro compras que encajen con eso.`;
+  const wantsAmounts=figureMode!=='none'&&/\b(?:importe|precio|euros|cuanto|cifra|numero|gasto)\b/.test(p),wantsStore=/\b(?:tienda|donde|proveedor)\b/.test(p),wantsResp=/\b(?:responsable|quien|lleva)\b/.test(p);
+  const limit=/\b(?:todas|todos|completo|una\s+por\s+una|uno\s+por\s+uno|cada\s+una|cada\s+uno)\b/.test(p)?20:12;
+  const items=rows.slice(0,limit).map(r=>{
+    let s=trim(r?.Producto)||'Compra sin nombre';
+    if(wantsAmounts&&Number.isFinite(Number(r?.Importe)))s+=` por ${v439VoiceRoundMoney(r.Importe)}`;
+    if(wantsStore&&trim(r?.Tienda))s+=` en ${trim(r.Tienda)}`;
+    if(wantsResp&&trim(r?.Responsable))s+=`, la lleva ${vnextP1SpokenPersonLabel(state,trim(r.Responsable))}`;
+    return s;
+  });
+  const tail=rows.length>items.length?` Y quedan ${rows.length-items.length} más.`:'';
+  const intro=/\b(?:pendient\w*|pte|rematar\w*|por\s+comprar)\b/.test(p)?`Lo que queda por rematar en ${event} es `:`En ${event} tengo `;
+  return `${intro}${v439VoiceNaturalJoin(items)}.${tail}`;
+}
+function v439VoiceSummaryFigures(result={},decision={},state={},userPrompt='',figureMode='brief'){
+  const f=result?.facts||{},event=v437VoiceEventLabel(result,decision,state),metrics=v439VoiceMetricCues(userPrompt),bits=[];const add=(label,v)=>{if(Number.isFinite(Number(v)))bits.push(`${label} ${v439VoiceRoundMoney(v)}`);};
+  const chosen=metrics.length?metrics:(figureMode==='full'?['income','purchases','pending','donations','balance']:['income','balance']);
+  for(const k of chosen){
+    if(k==='income')add('ingresos',f.income_total);
+    else if(k==='purchases')add('gastos realizados',f.purchases_realized);
+    else if(k==='pending')add('compras pendientes',f.purchases_pending);
+    else if(k==='donations')add('donaciones valoradas',f.donations_value);
+    else if(k==='balance')add('saldo operativo',f.operating_balance);
+    else if(k==='attendees'&&Number.isFinite(Number(f.attendees_canonical)))bits.push(`asistencia ${Math.round(num(f.attendees_canonical))} personas`);
+  }
+  const max=figureMode==='full'?8:Math.max(1,Math.min(3,bits.length));
+  return bits.length?`${event}: ${v439VoiceNaturalJoin(bits.slice(0,max))}.`:'';
+}
+function v439VoiceCompare(result={},decision={},state={},userPrompt='',figureMode='none'){
+  const rows=arr(vnextP1Table(result,'comparison')?.rows),p=vnextP17LooseNorm(userPrompt);if(rows.length<2)return'';
+  let metric='Saldo operativo';if(/\bingres/.test(p))metric='Ingresos';else if(/\b(?:gasto|compra)/.test(p))metric='Compras realizadas';else if(/\bdonac/.test(p))metric='Donaciones valoradas';else if(/\basist|gente|persona/.test(p))metric='Asistentes canónicos';
+  const sorted=rows.slice().sort((a,b)=>num(b?.[metric])-num(a?.[metric])),winner=vnextP14EventSpokenLabel(state,trim(sorted[0]?.Evento)),loser=vnextP14EventSpokenLabel(state,trim(sorted[1]?.Evento)),diff=Math.abs(num(sorted[0]?.[metric])-num(sorted[1]?.[metric]));
+  if(figureMode!=='none')return `${winner} sale por encima de ${loser} en ${metric.toLowerCase()}, con una diferencia de ${metric==='Asistentes canónicos'?`${v26FormatPlainNumber(diff,0)} personas`:v439VoiceRoundMoney(diff)}.`;
+  return `${winner} salió más holgado que ${loser}; donde más se nota en esta comparación es en ${metric.toLowerCase()}.`;
+}
+function v439VoiceExplicitAnswer(result={},decision={},state={},userPrompt='',figureMode='brief'){
+  const op=trim(result?._vnext_operation||decision?.operation),f=result?.facts||{},event=v437VoiceEventLabel(result,decision,state),p=vnextP17LooseNorm(userPrompt),listCue=v439VoiceListCue(userPrompt);
+  if(op==='event_summary')return v439VoiceSummaryFigures(result,decision,state,userPrompt,figureMode);
+  if(op==='event_purchases'){
+    if(listCue)return v439VoicePurchaseList(result,decision,state,userPrompt,figureMode);
+    const pending=/\b(?:pendient\w*|pte|rematar\w*|por\s+comprar)\b/.test(p),amount=pending?f.pending_purchase_amount:(/\b(?:realizad\w*|gast\w*|comprad\w*)\b/.test(p)?f.realized_purchase_amount:f.total_amount);
+    const label=pending?'compras pendientes':(/\b(?:realizad\w*|gast\w*|comprad\w*)\b/.test(p)?'gastos realizados':'compras');return `${event}: ${label}, ${v439VoiceRoundMoney(amount)}.`;
+  }
+  if(op==='event_donations')return `${event}: las donaciones están valoradas en ${v439VoiceRoundMoney(f.total_value??f.donations_value)}${/\b(?:cuantos|donantes)\b/.test(p)?`, de ${Math.round(num(f.donor_count))} donantes`:''}.`;
+  if(op==='event_income_status')return `${event}: ${v439VoiceRoundMoney(f.amount_total)} en los ingresos que encajan con ese estado.`;
+  if(op==='event_income_lines')return `${event}: ingresos ${v439VoiceRoundMoney(f.income_total)}.`;
+  if(op==='event_bank')return /\b(?:saldo|cierre)\b/.test(p)?`${event}: el saldo calculado es ${v439VoiceRoundMoney(f.closing_balance)}.`:`${event}: el impacto bancario es ${v439VoiceRoundMoney(f.bank_impact)}.`;
+  if(op==='event_attendance')return `${event}: ${Math.round(num(f.attendees_canonical))} asistentes.`;
+  if(op==='event_scenario')return `${event}: con ese escenario el saldo quedaría en ${v439VoiceRoundMoney(f.adjusted_operating_balance)}.`;
+  if(op==='compare_events')return v439VoiceCompare(result,decision,state,userPrompt,figureMode);
+  if(op==='derive'){
+    const value=f.value??f.result??f.amount??f.total,unit=vnextP17LooseNorm(f.unit||'');if(Number.isFinite(Number(value)))return unit.includes('eur')?`El resultado es ${v439VoiceRoundMoney(value)}.`:`El resultado es ${v26FormatPlainNumber(value,2)}${trim(f.unit)?` ${trim(f.unit)}`:''}.`;
+  }
+  return vnextP1LocalFinal(result,decision,state)?.answer||'';
+}
+function v439VoiceGroundedNoFigures(result={},decision={},state={},userPrompt='',writtenAnswer=''){
+  const op=trim(result?._vnext_operation||decision?.operation),f=result?.facts||{},event=v437VoiceEventLabel(result,decision,state),p=vnextP17LooseNorm(userPrompt),asksWho=v437VoiceAsksWho(userPrompt);
+  if(op==='event_summary')return v437VoiceQualitativeBalance(f,event);
+  if(op==='event_purchases'){
+    if(v439VoiceListCue(userPrompt))return v439VoicePurchaseList(result,decision,state,userPrompt,'none');
+    const pending=num(f.pending_purchase_count)>0||/\b(?:pendient\w*|rematar\w*|por\s+comprar)\b/.test(p);if(asksWho&&trim(f.top_responsible))return `En ${event}, quien más peso lleva en las compras es ${vnextP1SpokenPersonLabel(state,trim(f.top_responsible))}.`;
+    return pending?`En ${event} queda compra pendiente por rematar, aunque lo gordo ya está encarrilado.`:`En ${event} las compras están hechas y no queda nada pendiente por ese lado.`;
+  }
+  if(op==='event_income_status'){
+    const rows=arr(vnextP1Table(result,'income_status')?.rows),pending=trim(f.status)==='pending',names=rows.map(r=>vnextP1SpokenPersonLabel(state,trim(r?.Persona))).filter(Boolean);if(pending&&!rows.length)return `En ${event} ha pagao todo el mundo.`;if(asksWho&&names.length)return pending?`En ${event} quedan por pagar ${v439VoiceNaturalJoin(names.slice(0,10))}.`:`En ${event} ya constan ${v439VoiceNaturalJoin(names.slice(0,10))}.`;return pending?`En ${event} queda todavía algún rezaguero por pagar.`:`Los ingresos de ${event} están al día para ese estado.`;
+  }
+  if(op==='event_donations')return num(f.donor_count)>0?`En ${event} las donaciones han echado un buen cable.`:`En ${event} no tengo donaciones relevantes registradas.`;
+  if(op==='event_bank')return num(f.unlinked_movement_count)<=0?`El banco de ${event} está bien encarrilado y no veo nada colgando.`:`En el banco de ${event} todavía queda algún movimiento por justificar.`;
+  if(op==='event_attendance')return num(f.attendees_canonical)>=25?`En ${event} hay buena cuadrilla; de gente vamos bien.`:`En ${event} hay grupo, aunque no va especialmente cargado de gente.`;
+  if(op==='compare_events')return v439VoiceCompare(result,decision,state,userPrompt,'none');
+  if(['person_income_status','person_event_status'].includes(op))return vnextP15PersonStatusSpoken(result,decision,state,userPrompt);
+  if(op==='person_events'){const rows=arr(vnextP1Table(result,'events')?.rows),who=vnextP14PersonSocialLabel(state,trim(f.person)||trim(decision?.person),decision?.person,'friendly'),names=rows.slice(0,5).map(r=>vnextP14EventSpokenLabel(state,trim(r?.Evento))).filter(Boolean);return names.length?`${who} aparece por ${v439VoiceNaturalJoin(names)}.`:`De ${who} no me sale ningún evento en esta consulta.`;}
+  if(op==='person_profile'){const who=vnextP14PersonSocialLabel(state,trim(f.person)||trim(decision?.person),decision?.person,'friendly');return `De ${who} tengo actividad repartida entre eventos, con ingresos, compras o donaciones según el caso.`;}
+  if(op==='derive'){const winner=trim(f.winner);return winner?`En ese cálculo sale por encima ${winner}.`:'Ya tengo el cálculo hecho, pero aquí no tengo una conclusión fiable que decirte sin entrar en la cifra.';}
+  let local=trim(vnextP1LocalFinal(result,decision,state)?.answer||writtenAnswer);local=local.replace(/\b\d{1,3}(?:[. ]\d{3})*(?:,\d+)?\s*€?/g,'').replace(/\s{2,}/g,' ').replace(/\s+([,.;:])/g,'$1').replace(/(?:Te\s+dejo|Los\s+tienes\s+en)\b[^.]*\.?/gi,'').trim();return local||'Vale, seguimos.';
+}
+function v439VoiceEchoGuard(spoken='',userPrompt='',fallback=''){
+  const normText=s=>vnextP17LooseNorm(s).replace(/\b(?:zuzu|antonio|antonito|zuzito)\b/g,'').trim(),a=normText(spoken),b=normText(userPrompt);if(!a||!b)return spoken||fallback;
+  const aw=a.split(' ').filter(Boolean),bw=b.split(' ').filter(Boolean),same=a===b,overlap=aw.length&&bw.length?aw.filter(x=>bw.includes(x)).length/Math.max(aw.length,bw.length):0;
+  return (same||(overlap>.9&&Math.abs(aw.length-bw.length)<=2))?(fallback||'No te voy a repetir la pregunta; voy al dato.'):spoken;
+}
+
 function v437VoiceChatPolish(text=''){
   let t=v40ConversationalPolish(text,'',true);const n=vnextP17LooseNorm(t);
   if(/^pido disculpas|^mis disculpas|^lamento/.test(n))return'Vale, entendido. Vamos a hacerlo más natural.';
@@ -18573,18 +18637,17 @@ function v437VoiceAnswerFromResults(good=[],state={},userPrompt='',writtenAnswer
   const figureMode=v438VoiceFigureMode(userPrompt),wantsFigures=figureMode!=='none',parts=[];
   for(const x of arr(good)){
     const name=trim(x?.call?.name);
-    if(name==='query_ce'){
-      if(figureMode==='full')parts.push(vnextP19SpokenAnswer(x.result,x.args,state,userPrompt));
-      else if(figureMode==='brief')parts.push(v438VoiceBriefFigures(x.result,x.args,state,userPrompt)||v437VoiceQueryCeQualitative(x.result,x.args,state,userPrompt));
-      else parts.push(v437VoiceQueryCeQualitative(x.result,x.args,state,userPrompt));
-    }else if(name==='local_response')parts.push(v437VoiceChatPolish(trim(x?.result?.facts?.response)||writtenAnswer));
+    if(name==='query_ce')parts.push(figureMode==='none'?v439VoiceGroundedNoFigures(x.result,x.args,state,userPrompt,writtenAnswer):v439VoiceExplicitAnswer(x.result,x.args,state,userPrompt,figureMode));
+    else if(name==='local_response')parts.push(v437VoiceChatPolish(trim(x?.result?.facts?.response)||writtenAnswer));
   }
-  let out=[...new Set(parts.map(trim).filter(Boolean))].slice(0,figureMode==='full'?2:1).join(' ');
+  let out=[...new Set(parts.map(trim).filter(Boolean))].slice(0,figureMode==='full'?3:2).join(' ');
   if(!out)out=v437VoiceChatPolish(writtenAnswer||'Vale, seguimos.');
-  if(figureMode!=='full'&&out.length>220)out=out.slice(0,217).replace(/[,:;\s]+$/,'')+'.';
+  if(wantsFigures||v439VoiceListCue(userPrompt))out=out.replace(/\s*(?:Si quieres|Cuando quieras)[^.!?]*(?:[.!?]|$)/gi,' ').replace(/\s{2,}/g,' ').trim();
+  const fallback=parts.find(x=>trim(x)&&vnextP17LooseNorm(x)!==vnextP17LooseNorm(userPrompt))||writtenAnswer||'No he podido cerrar ese dato con seguridad.';
+  out=v439VoiceEchoGuard(out,userPrompt,fallback);
+  if(figureMode==='none'&&out.length>360)out=out.slice(0,357).replace(/[,:;\s]+$/,'')+'.';
   return {spoken:v40ConversationalPolish(out,userPrompt,true),wantsFigures,figureMode};
 }
-
 async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,externalSignal=null,conversationId=''}={}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP2Tools();
   let state=null,stateWaitMs=0,calls=0,decisionMs=0,toolMs=0,narrationMs=0,payload=null,final={title:'Zuzu',answer:'',warnings:[]},results=[],tables=[],charts=[];
@@ -18604,7 +18667,7 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
   }
   decisionMs=Date.now()-d0;
   const payloadId=trim(payload?.id);let functionCalls=vnextP2NormalizeCalls(rawCalls,conversationHistory,flowTrace);
-  const localNeedsRepair=functionCalls.some(c=>trim(c?.name)==='local_response')&&(vnextP2OtherEventCue(userPrompt)||vnextP2CompareCue(userPrompt)||vnextP2LiquidationDetailCue(userPrompt)||vnextP2MemorySummaryCue(userPrompt));
+  const localNeedsRepair=functionCalls.some(c=>trim(c?.name)==='local_response')&&(vnextP2OtherEventCue(userPrompt)||vnextP2CompareCue(userPrompt)||vnextP2LiquidationDetailCue(userPrompt)||vnextP2MemorySummaryCue(userPrompt)||(voiceConversation&&/\b(?:dame\s+(?:la\s+)?cifra|dame\s+(?:el\s+)?numero|damelo|cuanto|cuantos|y\s+gastos|y\s+donaciones|venga\s+si)\b/.test(vnextP17LooseNorm(userPrompt))));
   if(functionCalls.some(c=>trim(c?.name)==='query_ce'||trim(c?.name)==='recall_memory')||localNeedsRepair){const stForRepair=await ensureState();functionCalls=vnextP2RepairTranslatedCalls(functionCalls,stForRepair,userPrompt,selectedEventId,conversationHistory,flowTrace,clientLocalDateTime||clientNowIso);functionCalls=vnextP122NormalizeMemoryCalls(functionCalls,conversationHistory,flowTrace);}
   if(!functionCalls.length){
     const raw=trim(v261OutputText(payload)),leak=vnextP110LooksLikeInternalCall(raw);if(leak)zuzuTracePush(flowTrace,'VNEXT P2 · PROTOCOL GUARD','WARN','La única decisión imprimió protocolo interno; no se reintenta ni se expone.');
@@ -18656,7 +18719,7 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),visibleTables=voiceConversation?[]:finalTables,visibleCharts=voiceConversation?[]:charts.slice(0,8),presentationEvidence=vnextP124PresentationEvidence(visibleTables,visibleCharts);
   if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral V3.8: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan como estado interno; cifras habladas=${voiceWantsFigures?'sí, porque el usuario las pidió':'no por defecto'}.`);
   zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo voz factual=1; segunda llamada solo para resúmenes de memoria que la necesitan) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ANTONIO V3.8 · CE factual + salida oral coloquial sin cifras por defecto + fast path sin segunda narración',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ZUZU V3.9 · CE factual + respuesta oral directa y contextual + cifras/listas cuando se piden + fast path',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){

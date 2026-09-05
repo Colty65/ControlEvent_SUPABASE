@@ -921,8 +921,19 @@
       if(activePointerId!=null&&event.pointerId===activePointerId&&gesture){const dx=event.clientX-gesture.startX,dy=event.clientY-gesture.startY;if(gesture.seed&&Math.abs(dx)>30&&Math.abs(dx)>Math.abs(dy)*1.05){if(event.cancelable)event.preventDefault();const rect=svg.getBoundingClientRect(),ratio=.48+Math.min(.48,Math.abs(dx)/Math.max(1,rect.width)*1.25);renderBalanceMagnifier(pane,meta,gesture.seed.item.point,ratio);gesture.opened=true;suppressClickUntil=Date.now()+450;return;}}
       if(activePointerId==null){const sel=locate(event.clientX,event.clientY,event.pointerType||'mouse');if(sel)show(sel);else if((event.pointerType||'mouse')==='mouse')clearTransient();}
     },{passive:false});
-    const end=event=>{if(activePointerId!==event.pointerId)return;if(gesture?.opened&&event.cancelable)event.preventDefault();try{svg.releasePointerCapture(event.pointerId);}catch(_){}activePointerId=null;gesture=null;};
-    svg.addEventListener('pointerup',end,{passive:false});svg.addEventListener('pointercancel',end,{passive:false});svg.addEventListener('pointerleave',event=>{if(activePointerId==null&&(event.pointerType||'mouse')==='mouse')clearTransient();});
+    const end=event=>{
+      if(activePointerId!==event.pointerId)return;
+      const g=gesture;
+      if(g?.opened&&event.cancelable)event.preventDefault();
+      try{svg.releasePointerCapture(event.pointerId);}catch(_){}
+      activePointerId=null;gesture=null;
+      if(g?.seed&&!g.opened){
+        suppressClickUntil=Date.now()+500;
+        if(event.cancelable)event.preventDefault();
+        openBalanceMovementMedia(g.seed.item.point.movement?.id,event,meta.id);
+      }
+    };
+    svg.addEventListener('pointerup',end,{passive:false});svg.addEventListener('pointercancel',event=>{if(activePointerId!==event.pointerId)return;try{svg.releasePointerCapture(event.pointerId);}catch(_){}activePointerId=null;gesture=null;},{passive:false});svg.addEventListener('pointerleave',event=>{if(activePointerId==null&&(event.pointerType||'mouse')==='mouse')clearTransient();});
     pane.querySelectorAll('[data-ce-bank-balance-point="1"]').forEach(circle=>{circle.addEventListener('click',event=>{if(Date.now()<suppressClickUntil){stopEvent(event);return;}openBalanceMovementMedia(circle.dataset.movementId,event,meta.id);});circle.addEventListener('focus',()=>{const found=points.find(item=>String(item.point.movement?.id)===String(circle.dataset.movementId));if(found)show({item:found,cursorX:found.cx,curveY:found.cy});});circle.addEventListener('blur',()=>{if(activePointerId==null){marker?.classList.add('hidden');clearActive();resetBalanceInspector();}});});
     restoreBalanceMagnifierPane(pane,meta);
   }
@@ -1304,6 +1315,11 @@
     const manual=link?.manual===true||text(movement?.incomeAssociationMode).toUpperCase()==='MANUAL';
     return `<section class="ce-bank-accounting-panel" aria-label="Información contable"><div class="ce-bank-accounting-section-title">Información contable</div><div class="ce-bank-accounting-ticket-head"><div><span>${esc(eventInfo?.title||'Evento')}</span><strong>${esc(link?.personName||'Ingreso')}</strong></div><div class="ce-bank-accounting-total"><span>Importe contabilizado</span><strong>${money(link?.amount)}</strong></div></div><div class="ce-bank-accounting-meta"><div><span>Forma de pago</span><b>${esc(link?.paymentMethod||'Banco')}</b></div><div><span>Asociación</span><b>${manual?'Manual':'Automática'}</b></div><div><span>Conciliación</span><b>${money(justified)} de ${money(target)}</b></div></div>${accountingMovementHtml(movement)}<div class="ce-bank-income-accounting-note"><b>Comprobación visual</b><span>Contrasta el nombre y el importe contabilizado con el justificante mostrado a la derecha.</span></div></section>`;
   }
+  function bankPhotoHost(){
+    const chart=$('ceBankBalanceChartOverlay');
+    if(chart&&chart.classList.contains('visible')&&!chart.classList.contains('hidden'))return chart;
+    return $('ceBankOverlay');
+  }
   function accountingViewer({badge,title,eventInfo,leftHtml='',imageSrc='',imageAlt='',loadingLeft=false,loadingImage=false}){
     closeBankTicketPhoto();
     const viewer=document.createElement('div');
@@ -1311,7 +1327,7 @@
     const left=loadingLeft?'<section class="ce-bank-accounting-panel ce-bank-accounting-loading"><span class="ce-bank-loader"></span><b>Cargando información contable…</b></section>':leftHtml;
     const right=loadingImage?'<div class="ce-bank-photo-loading"><span class="ce-bank-loader"></span><b>Cargando justificante…</b></div>':(imageSrc?`<div class="ce-bank-accounting-image-stage"><img class="ce-bank-photo-image ce-bank-photo-accounting-image" src="${esc(imageSrc)}" alt="${esc(imageAlt||title)}"></div>`:'<div class="ce-bank-photo-empty"><b>No hay imagen adjunta.</b></div>');
     viewer.innerHTML=`<div class="ce-bank-photo-card ce-bank-photo-card-accounting" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="ce-bank-photo-head"><div><span>${esc(badge)}</span><strong>${esc(title)}</strong>${eventMediaHeader(eventInfo)}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar visor">×</button></div><div class="ce-bank-photo-accounting-grid"><div data-ce-bank-accounting-left>${left}</div><section class="ce-bank-accounting-image-panel" aria-label="Justificante"><div class="ce-bank-accounting-section-title">Justificante</div><div data-ce-bank-accounting-right>${right}</div></section></div></div>`;
-    $('ceBankOverlay')?.appendChild(viewer);
+    bankPhotoHost()?.appendChild(viewer);
     return viewer;
   }
   function closeBankTicketPhoto(){ $('ceBankTicketPhoto')?.remove(); }
@@ -1381,7 +1397,7 @@
         ?`<div class="ce-bank-photo-gallery count-${items.length}">${items.map(item=>`<figure class="ce-bank-photo-figure ${item.src?'':'without-image'}"${balanceMediaItemAttrs(item)}><figcaption><strong>${esc(item.title)}</strong><span>${esc(item.subtitle||'')}</span></figcaption>${item.src?`<img class="ce-bank-photo-image" src="${esc(item.src)}" alt="${esc(item.title)}">`:`<div class="ce-bank-photo-empty"><b>Sin imagen adjunta</b><span>${esc(item.empty||'No se ha encontrado la fotografía de este justificante.')}</span></div>`}</figure>`).join('')}</div>`
         :`<div class="ce-bank-photo-empty"><b>${esc(empty)}</b></div>`;
     viewer.innerHTML=`<div class="ce-bank-photo-card ce-bank-photo-card-gallery" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="ce-bank-photo-head"><div><span>${esc(badge)}</span><strong>${esc(title)}</strong>${caption?`<em>${esc(caption)}</em>`:''}${eventMediaHeader(eventInfo||eventDisplayData())}</div><button type="button" data-ce-bank-photo-close aria-label="Cerrar visor">×</button></div>${body}</div>`;
-    $('ceBankOverlay')?.appendChild(viewer);
+    bankPhotoHost()?.appendChild(viewer);
     return viewer;
   }
   async function openBalanceMovementMedia(movementId,event,paneId='zoom'){

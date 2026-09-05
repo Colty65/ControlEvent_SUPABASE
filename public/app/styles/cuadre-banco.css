@@ -530,7 +530,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 #ceBankOverlay .ce-bank-ticket-chip[data-ce-bank-view-ticket]{cursor:pointer!important;transition:border-color .15s ease,background .15s ease,transform .15s ease!important}
 #ceBankOverlay .ce-bank-ticket-chip[data-ce-bank-view-ticket]:hover,#ceBankOverlay .ce-bank-ticket-chip[data-ce-bank-view-ticket]:focus-visible{border-color:#43bfae!important;background:#eefcf8!important;transform:translateY(-1px)!important;outline:2px solid rgba(52,215,195,.2)!important;outline-offset:1px!important}
 #ceBankOverlay .ce-bank-ticket-chip>em{font-style:normal!important;font-size:12px!important;line-height:1!important;margin-left:2px!important}
-#ceBankOverlay .ce-bank-photo-overlay{position:absolute!important;inset:0!important;z-index:1000!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:18px!important;background:rgba(3,10,20,.78)!important;backdrop-filter:blur(7px)!important}
+#ceBankOverlay .ce-bank-photo-overlay{position:absolute!important;inset:0!important;z-index:30000!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:18px!important;background:rgba(3,10,20,.78)!important;backdrop-filter:blur(7px)!important}
 #ceBankOverlay .ce-bank-photo-card{width:min(880px,94vw)!important;max-height:92%!important;display:flex!important;flex-direction:column!important;gap:10px!important;padding:12px!important;border-radius:18px!important;background:#fff!important;box-shadow:0 28px 90px rgba(0,0,0,.45)!important}
 #ceBankOverlay .ce-bank-photo-head{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important}
 #ceBankOverlay .ce-bank-photo-head>div{display:flex!important;flex-direction:column!important;min-width:0!important}
@@ -2198,3 +2198,7 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 #ceBankOverlay .ce-bank-magnifier-point:hover,#ceBankOverlay .ce-bank-magnifier-point:focus{r:12;outline:none}
 #ceBankOverlay .ce-bank-magnifier-point-wrap text{font-size:13px;font-weight:900;fill:#496a7e;pointer-events:none}
 @media(max-width:760px){#ceBankOverlay .ce-bank-balance-pane-actions{gap:5px!important;flex-wrap:wrap!important;justify-content:flex-end!important}#ceBankOverlay .ce-bank-chart-restore,#ceBankOverlay .ce-bank-history-open{padding:5px 8px!important;font-size:9px!important}#ceBankOverlay .ce-bank-balance-magnifier{width:96%!important;bottom:6px}#ceBankOverlay .ce-bank-balance-magnifier svg{height:132px}}
+
+/* ZUZU V3.9 · visor de justificantes por encima de la gráfica temporal. */
+#ceBankOverlay #ceBankBalanceChartOverlay > .ce-bank-photo-overlay{z-index:30000!important;position:absolute!important;inset:0!important}
+#ceBankOverlay .ce-bank-balance-event-point{pointer-events:auto!important}

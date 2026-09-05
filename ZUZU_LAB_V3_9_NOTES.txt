@@ -1,0 +1,12 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.9
+
+- Nombre visible principal: ZUZU. Antonio/Antoñito se conservan como alias de llamada.
+- Se retira el generador general de frases BAR V3.8. La respuesta oral se construye a partir de hechos CE.
+- Por defecto, el resumen hablado evita metralla de cifras.
+- Si el usuario pide cifra(s), importe(s), diferencia, lista o elementos uno/una por uno/una, se responden en ese mismo turno, sin volver a pedir permiso.
+- Las peticiones de varias magnitudes del mismo evento (ej. gastos + donaciones) se reparan a event_summary para recuperar todos los hechos juntos.
+- Se añade guardia anti-eco para impedir que la respuesta sea prácticamente la misma frase del usuario.
+- En Evolución temporal del saldo, un tap/clic sobre punto rojo/verde abre el visor de justificantes; el visor se monta dentro de la gráfica abierta y con z-index superior para que no quede oculto.
+- La miniatura superior conserva acceso al visor contable grande.
+
+No se modifica la arquitectura de micro/VAD/STT/Piper ni BANK4.9 salvo el acceso visual a justificantes desde la gráfica.
