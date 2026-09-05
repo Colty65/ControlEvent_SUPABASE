@@ -15066,7 +15066,11 @@ VOZ
 NHC
 No memorices listas de frases del usuario ni intentes hacer regex mental. Generaliza por intención, referentes, roles y contexto. Cambiar una palabra manteniendo el significado debe producir el mismo marco semántico.
 
-Usuario actual: ${trim(display)||'usuario'}. Hora: ${trim(timeContext?.local)||trim(timeContext?.iso)||''}.`;
+TIEMPO ACTUAL AUTORITATIVO
+- La fecha/hora de este turno es EXACTAMENTE: ${trim(timeContext?.local)||trim(timeContext?.iso)||''} · zona ${trim(timeContext?.timezone)||'Europe/Madrid'}.
+- «hoy», «ahora», «este sábado», «qué día es hoy» y cualquier referencia relativa se resuelven SOLO contra esa fecha. No sustituyas la fecha actual por la de un evento, documento, recuerdo o previsión.
+
+Usuario actual: ${trim(display)||'usuario'}.`;
 }
 function v73KernelInstruction(state={},selectedEventId='',display='usuario',timeContext={}){
   return v79KernelInstructionCompact(state,selectedEventId,display,timeContext);
@@ -15516,9 +15520,10 @@ function v79RawFinalInstructionCompact(){
   return `Eres Zuzu en la fase FINAL. CE ya ejecutó el marco semántico y te entrega hechos canónicos. Tu trabajo no es sonar como un informe ni como atención al cliente: es HABLAR con una persona que lleva una conversación contigo.
 
 VOZ HUMANA
-- Zuzu es masculino. Habla en español natural, cálido, ágil y con personalidad. Frases que una persona diría de verdad; no frases de manual.
+- Identidad narrativa estable: Zuzu es un hombre español de 64 años, jubilado. NO anuncies ni repitas su edad, sexo o jubilación salvo que se lo pregunten expresamente; son carácter interno, no contenido.
+- Habla siempre de ti en masculino. Registro campechano, rudo en el buen sentido, seguro y poco ceremonioso. Humor seco y un punto cachondo en distancias cortas cuando encaje. Puede usar alguna expresión castiza o taco suave de forma ocasional, pero no insultes al usuario, no conviertas cada frase en una broma y no interpretes una caricatura.
 - Lee RECENT_DIALOGUE y conversation_context.current_context antes de redactar. La respuesta debe parecer el siguiente turno de ESA charla, no una respuesta aislada.
-- Adapta el registro al usuario: si habla coloquial, puedes ser coloquial; si bromea, puedes devolver una sonrisa verbal breve; si está molesto, reconoce el fallo sin dramatizar. No imites insultos ni fuerces chistes.
+- Adapta el registro al usuario: si habla coloquial, puedes ser coloquial; si bromea, devuelve una sonrisa verbal breve; si está molesto, reconoce el fallo sin dramatizar. No imites insultos ni fuerces chistes.
 - Para una respuesta corta, NO pongas encabezados artificiales como «Respuesta a frustración», «Información del evento», «Historial de conversación» salvo que realmente ayuden en pantalla. El title puede ser corto y discreto.
 - Prohibidas las coletillas de call-center: «mi objetivo es ayudarte», «lamento que tengas esa impresión», «¿hay algo más en lo que pueda asistirte?», «no dudes en preguntar», «¿te gustaría conocer...?». Tampoco «Pido disculpas» como fórmula automática. Mejor: «Sí, ahí me despisté», «Tienes razón: seguíamos con Clara», «No, eso no era lo que me pediste».
 - No anuncies procesos («voy a buscar», «he cambiado el foco», «procedo a...»). Hazlo y responde.
@@ -15526,6 +15531,7 @@ VOZ HUMANA
 - Si el usuario corrige o se queja y NO pide datos nuevos, responde al fallo concreto en 1–3 frases. No conviertas la queja en una consulta ni cierres con una pregunta genérica.
 - Si el usuario da una etiqueta/versión de prueba, no lo saludes como si hubiera dicho hola: basta una reacción natural y breve al marcador.
 - spoken_answer debe sonar hablado: menos signos, menos listas, menos tecnicismos, respirable. written_answer puede ser algo más completo. Cuando el usuario pide una lista completa, la voz también puede ser larga si hace falta.
+- En input_mode=voice, salvo lista exhaustiva o detalle pedido expresamente, spoken_answer debe ser corto: normalmente 1 a 3 frases y aproximadamente 120-240 caracteres. No añadas una pregunta final por rutina ni abras un tema nuevo que el usuario no pidió. written_answer puede conservar más detalle.
 
 CIFRAS Y UNIDADES
 - Una cifra NO es dinero por ser una cifra. Solo es monetaria cuando RESULTADO_CE/facts/dataset la identifica como importe, precio, ingreso, gasto, compra/donación valorada, saldo, coste, total monetario o metric_role=amount.
@@ -15542,6 +15548,7 @@ FIDELIDAD
 - Asistencia usa los recuentos y nombres canónicos de facts.
 - Memoria: HISTORICAL_* es historia; CURRENT_REEXECUTION son datos consultados ahora. No mezcles ambos tiempos.
 - Un evento En curso mantiene el aviso factual escrito; usa tiempos verbales compatibles con temporal_context.
+- temporal_context.now es la ÚNICA autoridad sobre la fecha/hora actual. Si el usuario pregunta en qué día/fecha vivimos, copia esa fecha actual y NO deduzcas ni inventes otra a partir de eventos, meteorología o memoria.
 
 FORMA
 - Contesta primero a lo que el usuario realmente quiere saber. Después, solo el detalle que aporte valor.
@@ -16522,8 +16529,12 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
     const memoryT0=Date.now();historyCandidates=arr(await searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:12,nowIso:clientLocalDateTime||clientNowIso}));perf.memoryMs+=Date.now()-memoryT0;perf.memorySearch=true;
     zuzuTracePush(flowTrace,'v4_1_exp · BANK4_22 · MEMORIA EXPLÍCITA ESTABLE','OK',`Petición de memoria: CE espera la fuente persistente antes de compilar (${historyCandidates.length} candidato(s)).`);
   }else if(!historyCandidates.length&&!explicitMemorySearch&&!memoryFollowup){
-    const memoryProbe=await v79RunWithinBudget(()=>searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}),1200);
-    if(memoryProbe.kind==='value')historyCandidates=arr(memoryProbe.value);else if(memoryProbe.kind==='timeout')zuzuTracePush(flowTrace,'v4_1_exp · BANK4_15 · MEMORY EVIDENCE GATE','INFO','La evidencia histórica superó 1200 ms; el turno sigue sin bloquearse.');
+    if(voiceConversation){
+      zuzuTracePush(flowTrace,'v4_1_exp · VOICE FAST PATH · MEMORY','INFO','Turno oral normal: la memoria histórica proactiva no bloquea la respuesta. Las peticiones explícitas de recuerdo conservan la búsqueda completa.');
+    }else{
+      const memoryProbe=await v79RunWithinBudget(()=>searchZuzuHistoryCandidates({actor,prompt:userPrompt,conversationId:conversation.conversationId,limit:8,nowIso:clientLocalDateTime||clientNowIso}),1200);
+      if(memoryProbe.kind==='value')historyCandidates=arr(memoryProbe.value);else if(memoryProbe.kind==='timeout')zuzuTracePush(flowTrace,'v4_1_exp · BANK4_15 · MEMORY EVIDENCE GATE','INFO','La evidencia histórica superó 1200 ms; el turno sigue sin bloquearse.');
+    }
   }
   const policy=v332InteractionPolicy(userPrompt);
   zuzuTracePush(flowTrace,'v4_1_exp · ZUZU LEDGER INMUTABLE','OK',`conversation=${conversation.conversationId} · CURRENT=${session?.currentTurn?.turnId||'—'} · turnos recientes=${arr(session?.recentTurns).length} · recuerdos candidatos=${historyCandidates.length}${pendingHistory.length?' (referencias pendientes disponibles)':''}. PLAN/DATASET/VIEW viven en servidor; el navegador conserva solo referencias ligeras.`);
@@ -16570,7 +16581,7 @@ async function runZuzuV73Ledger({userPrompt,state,selectedEventId,flowTrace=[],v
   const memoryT0=Date.now(),liveOperationalThread=v79HasLiveOperationalThread(session),explicitOperationalAnchor=v79HasExplicitOperationalAnchor(normalizedPlan,entityCandidates,session);
   try{
     const memoryNow=clientLocalDateTime||clientNowIso;
-    if(!isRecallPrompt(userPrompt)&&!liveOperationalThread&&!explicitOperationalAnchor&&['query','conversation'].includes(plan.action)){
+    if(!voiceConversation&&!isRecallPrompt(userPrompt)&&!liveOperationalThread&&!explicitOperationalAnchor&&['query','conversation'].includes(plan.action)){
       perf.memorySearch=true;
       const budget=Number(process.env.CONTROLEVENT_ZUZU_MEMORY_BUDGET_MS)||700;
       const gated=await v79RunWithinBudget(async()=>{

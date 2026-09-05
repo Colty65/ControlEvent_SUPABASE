@@ -1,0 +1,35 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.12.1 · STABLE TUNE
+Fecha: 2026-09-05
+
+BASE
+- Parte de V3.12 estable.
+- Mantiene Gemini 3.1 Flash TTS por Interactions streaming y voz Algenib.
+- Mantiene DaveFX como fallback local ya existente.
+- NO introduce Gemini Live ni modelos TTS nuevos.
+
+AJUSTES LIMITADOS
+1. Latencia oral
+   - Los turnos de voz normales no esperan búsquedas históricas proactivas antes de responder.
+   - Las peticiones explícitas de memoria siguen usando la búsqueda persistente completa.
+   - spoken_answer oral se limita normalmente a 1-3 frases / 120-240 caracteres, salvo petición detallada.
+   - Saludos y preguntas directas por la fecha se resuelven localmente sin pasar por VNext/CE.
+2. Fecha actual
+   - Preguntas directas por hoy usan el reloj del dispositivo.
+   - temporal_context.now se declara autoridad única sobre la fecha/hora actual en la presentación Gemini.
+3. Personalidad
+   - Identidad interna: hombre español de 64 años, jubilado.
+   - Habla en masculino, campechano, rudo en el buen sentido, socarrón/cachondo cuando encaja.
+   - No anuncia edad, sexo o jubilación salvo pregunta expresa; no caricaturiza ni insulta al usuario.
+4. STT fantasma
+   - Eliminado el cebado explícito de Zuzu/Zuzito/Antonio/Antoñito en el prompt STT.
+   - Microaudios ambiguos que contienen solo varios alias de wake se descartan antes de tocar la conversación.
+5. Escucha
+   - Activar Zuzu lo deja despierto.
+   - No se duerme automáticamente a los 90 s; Dormir sigue siendo manual y conserva wake semántico.
+
+PRUEBAS
+- test:zuzu-lab-v3121: 27/27 OK
+- Liquidaciones compras: 70/70 OK
+- Ejecución controlada: 76/76 OK
+- BANK4.9 manual authority: 8/8 OK
+- node --check OK en los JS modificados.

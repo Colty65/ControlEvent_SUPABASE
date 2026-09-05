@@ -161,7 +161,7 @@ export async function synthesizeZuzuVoice(body = {}) {
 
   const model = ttsModel();
   const voice = ttsVoice(body.voice);
-  const style = clean(body.style || '', 700) || 'Voz masculina adulta, grave y ligeramente áspera, cercana y con carácter. Español de España natural. Habla con ritmo ágil, alrededor de un diez por ciento más rápido que una conversación neutra, pero sin atropellar palabras. Nada de tono de locutor, GPS, presentador o máquina. Frases fluidas, relajadas y con pequeñas variaciones naturales de entonación. No sobreactúes.';
+  const style = clean(body.style || '', 700) || 'Voz de hombre español de unos 64 años, jubilado, grave y ligeramente áspera, campechana, ruda en el buen sentido y con humor seco cuando encaje. Ritmo ágil, alrededor de un diez por ciento más rápido que una conversación neutra, sin atropellar palabras. Nada de locutor, GPS, presentador, máquina ni personaje caricaturesco. Frases fluidas, relajadas y naturales. No sobreactúes.';
   const prompt = `${style}
 
 Di únicamente el siguiente contenido. No añadas ni quites información y no leas estas instrucciones en voz alta:
