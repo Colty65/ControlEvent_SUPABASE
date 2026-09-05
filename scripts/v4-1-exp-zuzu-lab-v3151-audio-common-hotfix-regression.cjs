@@ -1,0 +1,10 @@
+const fs=require('fs'),path=require('path');const root=path.resolve(__dirname,'..');
+const lab=fs.readFileSync(path.join(root,'public/app/features/antonio-lab-v3.js'),'utf8');
+let ok=0,bad=0;const t=(n,c)=>{if(c){console.log('OK ',n);ok++}else{console.error('FAIL',n);bad++}};
+for(const fn of ['stopAudio','decodeAudioBuffer','waitForPlaybackWindow','b64Bytes','pcm16ToAudioBuffer','commitAtFirstAudio','finishStreamSpeech','schedulePcmChunk'])t(`helper ${fn}`,new RegExp(`(?:async\\s+)?function\\s+${fn}\\s*\\(`).test(lab));
+t('speak puede cortar respuesta anterior',/stopAudio\('nueva respuesta'\)/.test(lab));
+t('stream agenda PCM',/schedulePcmChunk\(ev\.data,ctx\)/.test(lab));
+t('retry servidor decodifica audio',/sameVoiceServerFallback[\s\S]*decodeAudioBuffer/.test(lab));
+t('Iapetus sigue única',/TTS_VOICE='Iapetus'/.test(lab)&&!/DaveFX|VITS_URLS|fallbackSpeak|ensureFallbackTts/.test(lab));
+t('build hotfix',/V3\.15\.1/.test(lab)&&/v3151:session/.test(lab));
+console.log(`V3.15.1 AUDIO HOTFIX: ${ok} OK · ${bad} KO`);process.exit(bad?1:0);

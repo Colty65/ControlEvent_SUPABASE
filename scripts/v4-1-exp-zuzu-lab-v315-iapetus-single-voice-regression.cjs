@@ -11,6 +11,6 @@ t('sin bloqueo fatal iOS',!/Fallback local bloqueado en iOS/.test(lab));
 t('retry contabilizado',/S\.ttsFallbacks\+\+/.test(lab));
 t('diagnóstico voz única',/voiceId:TTS_VOICE/.test(lab));
 t('modelo fallback 3.1',/gemini-3\.1-flash-tts-preview/.test(voice));
-t('session clean preservado',/PERSIST_EVENT_LIMIT=220/.test(lab)&&/clearPersistedLabSession/.test(lab)&&/v315:session/.test(lab));
+t('session clean preservado',/PERSIST_EVENT_LIMIT=220/.test(lab)&&/clearPersistedLabSession/.test(lab)&&/v3151?:session/.test(lab));
 t('semantic settle preservado',/deferFragment/.test(lab)&&/Fragmentos unidos antes de consultar VNext/.test(lab));
 console.log(`RESULT ${ok}/${ok+bad}`);process.exit(bad?1:0);

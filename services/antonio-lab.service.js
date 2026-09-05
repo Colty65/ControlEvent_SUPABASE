@@ -4,7 +4,7 @@
 function clean(v,max=20000){return String(v==null?'':v).replace(/\u0000/g,'').trim().slice(0,max)}
 function geminiKey(){return process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||process.env.CONTROLEVENT_GEMINI_API_KEY||process.env.GOOGLE_GENERATIVE_AI_API_KEY||(/^(AIza)/i.test(String(process.env.OPENAI_API_KEY||''))?process.env.OPENAI_API_KEY:'')||''}
 function model(){return clean(process.env.CONTROLEVENT_ANTONIO_STT_MODEL||'gemini-3.1-flash-lite',120).replace(/^models\//i,'')}
-const BUILD='ZUZU-LAB-V3.15-IAPETUS-SINGLE-VOICE-RECOVERY';
+const BUILD='ZUZU-LAB-V3.15.1-IAPETUS-SINGLE-VOICE-RECOVERY';
 const LAB_TTS_VOICE='Iapetus';
 export function antonioLabConfig(){return {ok:true,build:BUILD,configured:Boolean(geminiKey()),provider:'Gemini STT + VNext/CE + Gemini 3.1 Flash TTS streaming (Interactions API)',sttModel:model(),ttsModel:'gemini-3.1-flash-tts-preview',voiceId:LAB_TTS_VOICE,voiceProfile:'masculina adulta, clara, natural, cercana y poco teatral',fallbackVoiceId:LAB_TTS_VOICE,wakeMode:'VAD local + wake semántico sobre transcripción',paidNewServices:0,ttsTransport:'Interactions API v1beta · stream=true',notes:'Usa la misma GEMINI_API_KEY ya existente. Iapetus queda fijada como voz única del LAB tanto en streaming como en recuperación servidor; no cambia a DaveFX.'}}
 
