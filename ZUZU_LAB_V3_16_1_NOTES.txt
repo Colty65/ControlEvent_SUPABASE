@@ -1,0 +1,24 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.16.1
+
+Objetivo: corregir el protocolo real de Gemini Live y eliminar del camino conversacional los TTS 3.1/2.5 agotados.
+
+Cambios:
+- Gemini Live 3.1 (gemini-3.1-flash-live-preview) como boca principal.
+- Gemini Live 2.5 Native Audio como único respaldo de voz.
+- El LAB ya no llama /api/zuzu-voice/synthesize ni usa gemini-2.5-flash-preview-tts / gemini-3.1-flash-tts-preview.
+- WebSocket Live: systemInstruction como Content.parts[] y texto por realtimeInput.text.
+- Token efímero de un uso, sin setup antiguo incrustado; el cliente manda el setup Live efectivo.
+- Activar Zuzu = despierto continuo hasta Dormir.
+- Fecha/hora directa desde reloj del dispositivo para consultas explícitas y clientLocalDateTime ya viaja a VNext.
+- La identidad masculina queda como regla interna gramatical; se elimina la respuesta automática «soy un hombre».
+
+Regresiones locales:
+- V3.16.1 Live protocol: 24/24
+- Liquidaciones: 70/70
+- Ejecución controlada: 76/76
+- BANK4.9 manual authority: 8/8
+
+Limitación honesta:
+- No se puede validar desde este entorno una conexión Live autenticada contra la GEMINI_API_KEY real del despliegue. Se valida el protocolo, el token con fetch simulado y las regresiones de código.
+- Si Live 3.1 falla una vez en una sesión, queda apartado hasta el siguiente logon/activación y los turnos siguientes van directos a Live 2.5; no se paga el timeout de 3.1 en cada respuesta.
+- Si la preconexión 3.1 falla al Activar, se prepara Live 2.5 inmediatamente en segundo plano.
