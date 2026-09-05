@@ -12,12 +12,15 @@ router.post('/antonio-lab/tts-stream',asyncHandler(async(req,res)=>{
   res.setHeader('Cache-Control','no-store, no-transform');
   res.setHeader('X-Accel-Buffering','no');
   res.flushHeaders?.();
-  let closed=false;req.on('close',()=>{closed=true});
+  let closed=false;const upstream=new AbortController();
+  const clientGone=()=>{if(res.writableEnded)return;closed=true;try{upstream.abort(new Error('cliente desconectado'))}catch{}};
+  res.on('close',clientGone);
   try{
-    const meta=await streamZuzuTts(text,chunk=>{if(closed||res.destroyed)return false;res.write(JSON.stringify({type:'audio',...chunk,rate:24000,channels:1,format:'s16le'})+'\n');return true});
+    if(!closed&&!res.destroyed)res.write(JSON.stringify({type:'start',transport:'interactions',model:'gemini-3.1-flash-tts-preview'})+'\n');
+    const meta=await streamZuzuTts(text,chunk=>{if(closed||res.destroyed)return false;res.write(JSON.stringify({type:'audio',...chunk,rate:24000,channels:1,format:'s16le'})+'\n');return true},{signal:upstream.signal});
     if(!closed&&!res.destroyed)res.write(JSON.stringify({type:'done',...meta,rate:24000,channels:1,format:'s16le'})+'\n');
   }catch(error){if(!closed&&!res.destroyed)res.write(JSON.stringify({type:'error',error:String(error?.message||error)})+'\n')}
-  if(!closed&&!res.destroyed)res.end();
+  if(!closed&&!res.destroyed&&!res.writableEnded)res.end();
 }));
 router.post('/antonio-lab/diagnostic-pdf',asyncHandler(async(req,res)=>{const pdf=createAntonioDiagnosticPdf(req.body||{}),stamp=new Date().toISOString().replace(/[:.]/g,'-');res.setHeader('Content-Type','application/pdf');res.setHeader('Content-Disposition',`attachment; filename="Zuzu-LAB-V3-${stamp}.pdf"`);res.setHeader('Cache-Control','no-store');res.send(pdf)}));
 export default router;

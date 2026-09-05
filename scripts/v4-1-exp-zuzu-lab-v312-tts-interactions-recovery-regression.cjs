@@ -1,0 +1,27 @@
+const fs=require('fs');
+const root=process.cwd(),read=p=>fs.readFileSync(root+'/'+p,'utf8');
+const lab=read('public/app/features/antonio-lab-v3.js');
+const svc=read('services/antonio-lab.service.js');
+const routes=read('routes/antonio-lab.routes.js');
+const html=read('public/antonio-lab.html');
+const itv=read('public/app/features/zuzu-test-console-gd.js');
+const checks=[],t=(n,p)=>checks.push([n,!!p]);
+t('build V3.12 coherente',/ZUZU-LAB-V3\.12-TTS-INTERACTIONS-STREAM-RECOVERY/.test(lab)&&/ZUZU-LAB-V3\.12-TTS-INTERACTIONS-STREAM-RECOVERY/.test(svc)&&/ZUZU LAB V3\.12/.test(html)&&/ZUZU LAB V3\.12/.test(itv));
+t('cache V312',/20260905-V312/.test(lab)&&/20260905-V312/.test(html)&&/20260905-V312/.test(itv));
+t('TTS 3.1 usa Interactions API',/v1beta\/interactions/.test(svc)&&/response_format:\{type:'audio'\}/.test(svc)&&/stream:true/.test(svc));
+t('schema de voz Interactions',/generation_config:\{speech_config:\[\{voice:ttsVoice\(\)\}\]\}/.test(svc));
+t('revision API explicita',/Api-Revision':'2026-05-20'/.test(svc));
+t('streamGenerateContent retirado del servicio LAB',!/streamGenerateContent\?alt=sse/.test(svc));
+t('parser step.delta audio',/eventType==='step\.delta'/.test(svc)&&/delta\?\.type,40\)==='audio'/.test(svc));
+t('watchdog primer audio',/CONTROLEVENT_ZUZU_TTS_FIRST_AUDIO_TIMEOUT_MS\|\|8000/.test(svc)&&/no entregó primer audio/.test(svc));
+t('timeout total acotado',/CONTROLEVENT_ZUZU_TTS_TIMEOUT_MS\|\|20000/.test(svc));
+t('NO usa req.close para matar stream',!/req\.on\('close'/.test(routes));
+t('desconexion real mira response',/res\.on\('close',clientGone\)/.test(routes)&&/res\.writableEnded/.test(routes));
+t('desconexion aborta upstream',/upstream=new AbortController/.test(routes)&&/\{signal:upstream\.signal\}/.test(routes));
+t('evento start de diagnostico',/type:'start',transport:'interactions'/.test(routes)&&/Canal TTS abierto/.test(lab));
+t('Algenib se conserva',/TTS_VOICE='Algenib'/.test(lab)&&/ttsVoice\(\).*Algenib/.test(svc));
+t('fallback DaveFX se conserva',/FALLBACK_VOICE_ID='es_ES-davefx-medium'/.test(lab)&&/fallbackSpeak/.test(lab));
+t('commit sigue al primer audio',/commitAtFirstAudio\(reply,turnId,epoch,text\)/.test(lab));
+t('barge-in sigue presente',/stopAudio\('voz del usuario detectada'\)/.test(lab));
+let ok=0;for(const [n,p] of checks){console.log(`${p?'OK':'KO'} · ${n}`);if(p)ok++;}
+console.log(`\nZUZU LAB V3.12 TTS INTERACTIONS RECOVERY: ${ok}/${checks.length}`);process.exitCode=ok===checks.length?0:1;

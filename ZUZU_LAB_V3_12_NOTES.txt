@@ -1,0 +1,48 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.12
+TTS INTERACTIONS STREAM + CLOSE FIX + FIRST-AUDIO WATCHDOG
+
+Motivo
+------
+El JSON real de 05/09/2026 demuestra que STT y VNext/CE funcionaban: había respuestas spokenAnswer,
+pero la boca quedaba indefinidamente en stage=tts, con 0 chunks, 0 s TTS y 0 primer audio.
+
+Causa 1 - bloqueo de la ruta Express
+------------------------------------
+La ruta /api/antonio-lab/tts-stream marcaba closed=true con req.on('close').
+En Node moderno, el evento close del IncomingMessage indica que la PETICION ya terminó de recibirse,
+no que el navegador haya cerrado la RESPUESTA. Resultado: la ruta podía considerar muerto al cliente
+justo después de recibir el POST, descartar los chunks y además no ejecutar res.end().
+
+Arreglo:
+- se elimina req.on('close') como detector de desconexión;
+- se usa res.on('close') y solo se considera desconexión si la respuesta no terminó;
+- al desconectarse el cliente se aborta también la petición upstream a Gemini para no dejar coste/CPU colgando.
+
+Causa 2 - transporte Gemini 3.1 TTS
+-----------------------------------
+Gemini 3.1 Flash TTS streaming se conecta por la Interactions API:
+POST /v1beta/interactions
+- model: gemini-3.1-flash-tts-preview
+- response_format: { type: 'audio' }
+- generation_config.speech_config: [{ voice: 'Algenib' }]
+- stream: true
+- Api-Revision: 2026-05-20
+
+Se elimina para este TTS 3.1 la antigua llamada models/...:streamGenerateContent?alt=sse.
+El parser acepta SSE y líneas JSON, y extrae step.delta / delta.type=audio.
+
+Antibloqueo
+-----------
+- watchdog de primer audio: 8 s por defecto (CONTROLEVENT_ZUZU_TTS_FIRST_AUDIO_TIMEOUT_MS);
+- timeout total: 20 s por defecto;
+- si no llega primer audio, el cliente recibe error y en PC pasa a DaveFX;
+- se envía un evento start inmediato para que la traza confirme que la ruta de streaming quedó abierta.
+
+No se toca
+----------
+- STT;
+- VNext/CE;
+- narrador natural;
+- memoria/commit diferido;
+- VAD/barge-in;
+- liquidaciones, banco ni resto de ControlEvent.
