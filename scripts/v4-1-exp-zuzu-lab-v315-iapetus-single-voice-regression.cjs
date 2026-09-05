@@ -1,0 +1,16 @@
+const fs=require('fs'),path=require('path');const root=path.resolve(__dirname,'..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');let ok=0,bad=0;const t=(n,c)=>{if(c){console.log('OK ',n);ok++}else{console.error('FAIL',n);bad++}};
+const lab=read('public/app/features/antonio-lab-v3.js'),svc=read('services/antonio-lab.service.js'),voice=read('services/zuzu-voice.service.js'),ui=read('public/app/features/zuzu-test-console-gd.js');
+t('build V3.15',/V3\.15|V315/.test(ui)&&/V3\.15/.test(lab));
+t('Iapetus cliente',/TTS_VOICE='Iapetus'/.test(lab));
+t('Iapetus servidor fijada',/LAB_TTS_VOICE='Iapetus'/.test(svc)&&/function ttsVoice\(\)\{return LAB_TTS_VOICE\}/.test(svc));
+t('Iapetus permitida en sintetizador general',/Iapetus/.test(voice));
+t('fallback mismo timbre servidor',/sameVoiceServerFallback/.test(lab)&&/\/api\/zuzu-voice\/synthesize/.test(lab));
+t('sin DaveFX/Piper en LAB',!/DaveFX|VITS_URLS|fallbackSpeak|ensureFallbackTts/.test(lab));
+t('sin bloqueo fatal iOS',!/Fallback local bloqueado en iOS/.test(lab));
+t('retry contabilizado',/S\.ttsFallbacks\+\+/.test(lab));
+t('diagnóstico voz única',/voiceId:TTS_VOICE/.test(lab));
+t('modelo fallback 3.1',/gemini-3\.1-flash-tts-preview/.test(voice));
+t('session clean preservado',/PERSIST_EVENT_LIMIT=220/.test(lab)&&/clearPersistedLabSession/.test(lab)&&/v315:session/.test(lab));
+t('semantic settle preservado',/deferFragment/.test(lab)&&/Fragmentos unidos antes de consultar VNext/.test(lab));
+console.log(`RESULT ${ok}/${ok+bad}`);process.exit(bad?1:0);

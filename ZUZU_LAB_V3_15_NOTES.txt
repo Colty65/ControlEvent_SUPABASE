@@ -1,0 +1,13 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.15
+
+OBJETIVO
+- Evitar cambios de voz percibidos entre Gemini y DaveFX.
+- Recuperar TTS en iPhone/PC sin cargar motor local pesado.
+
+CAMBIOS
+1. Voz única del LAB: Iapetus (descriptor oficial Google: Clear).
+2. El LAB fija Iapetus en servidor; CONTROLEVENT_ZUZU_TTS_VOICE no puede cambiarla en este laboratorio.
+3. Si Interactions streaming termina sin audio, reintento no-streaming en servidor con gemini-3.1-flash-tts-preview e Iapetus.
+4. DaveFX/Piper deja de formar parte del camino automático del LAB.
+5. El reintento conserva la misma voz y el mismo estilo; solo cambia el transporte.
+6. Se mantiene la limpieza de sesión iPhone/logon de V3.14 y el semantic settle de V3.13.

@@ -21,13 +21,13 @@ function voiceModel() {
 
 
 function ttsModel() {
-  return clean(process.env.CONTROLEVENT_ZUZU_TTS_MODEL || 'gemini-2.5-flash-preview-tts', 120).replace(/^models\//i, '');
+  return clean(process.env.CONTROLEVENT_ZUZU_TTS_MODEL || 'gemini-3.1-flash-tts-preview', 120).replace(/^models\//i, '');
 }
 
 function ttsVoice(v) {
-  const requested = clean(v || process.env.CONTROLEVENT_ZUZU_TTS_VOICE || 'Zubenelgenubi', 80);
-  const allowed = new Set(['Algenib', 'Orus', 'Gacrux', 'Charon', 'Alnilam', 'Rasalgethi', 'Zubenelgenubi']);
-  return allowed.has(requested) ? requested : 'Zubenelgenubi';
+  const requested = clean(v || process.env.CONTROLEVENT_ZUZU_TTS_VOICE || 'Iapetus', 80);
+  const allowed = new Set(['Algenib', 'Orus', 'Gacrux', 'Charon', 'Alnilam', 'Rasalgethi', 'Zubenelgenubi', 'Iapetus']);
+  return allowed.has(requested) ? requested : 'Iapetus';
 }
 
 function pcmToWavBase64(pcmBase64, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
