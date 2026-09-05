@@ -100,7 +100,9 @@
     "test:zuzu-lab-v39": "node scripts/v4-1-exp-zuzu-lab-v39-direct-voice-photo-regression.cjs",
     "test:zuzu-lab-v310": "node scripts/v4-1-exp-zuzu-lab-v310-human-time-fast-mouth-regression.cjs",
     "test:zuzu-lab-v311": "node scripts/v4-1-exp-zuzu-lab-v311-natural-streaming-voice-regression.cjs",
-    "test:zuzu-lab-v312": "node scripts/v4-1-exp-zuzu-lab-v312-tts-interactions-recovery-regression.cjs"
+    "test:zuzu-lab-v312": "node scripts/v4-1-exp-zuzu-lab-v312-tts-interactions-recovery-regression.cjs",
+    "test:zuzu-lab-v313": "node scripts/v4-1-exp-zuzu-lab-v313-semantic-settle-regression.cjs",
+    "test:zuzu-lab-v314": "node scripts/v4-1-exp-zuzu-lab-v314-ios-session-clean-voice-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

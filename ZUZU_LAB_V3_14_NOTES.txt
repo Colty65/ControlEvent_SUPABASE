@@ -1,0 +1,19 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.14
+Build: ZUZU-LAB-V3.14-IOS-SESSION-CLEAN-CASUAL-VOICE
+
+Objetivos
+- Cortar la degradación progresiva observada en iPhone.
+- Un nuevo logon inicia una sesión conversacional limpia.
+- Sustituir Algenib por una voz masculina natural pero menos fantástica/teatral.
+
+Cambios
+1. Voz principal: Zubenelgenubi (masculina, descriptor oficial Casual).
+2. Prompt TTS sobrio: conversación cotidiana, emoción contenida, sin graves forzados ni tono cinematográfico.
+3. LAB: diagnóstico limitado a 220 eventos, render limitado a 140 líneas y persistencia con debounce de 900 ms.
+4. LAB: se elimina la escritura continua en localStorage; la recuperación de una recarga usa sólo sessionStorage.
+5. Zuzu conversación: historial activo máximo 120 turnos; la API ya sigue usando sólo la ventana útil reciente.
+6. Se elimina la recuperación de conversación por localStorage que podía resucitar una sesión anterior.
+7. Salir y Login llaman resetSession: abortan petición de voz, limpian commits pendientes, interacción, contexto, conversación y almacenamiento efímero.
+8. El iframe LAB expone resetForLogout para detener micro/audio y evitar que beforeunload vuelva a guardar una sesión cerrada.
+
+No se borra la memoria histórica persistente de ControlEvent/Supabase; sólo la sesión conversacional activa del navegador.

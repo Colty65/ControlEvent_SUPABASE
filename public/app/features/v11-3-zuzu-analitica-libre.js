@@ -517,14 +517,14 @@
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); setZuzuButtonHeartbeat(false); window.__ceZuzuThinkingState=null; }
   function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v4_1_exp').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
-  var ZUZU_RUNTIME_BUILD='20260830-VNEXT-P110-GENERIC-TABLE-VIEW'; // compat: VNext P1.9
+  var ZUZU_RUNTIME_BUILD='20260905-V314-IOS-SESSION-CLEAN';
   function zuzuRuntimeBuildKey(){ return zuzuStorageKey('runtime_build'); }
   function ensureZuzuRuntimeBuild(){
     var prev='';try{prev=String(sessionStorage.getItem(zuzuRuntimeBuildKey())||'');}catch(_){ }
     if(prev===ZUZU_RUNTIME_BUILD)return;
     window.__ceZuzuConversationV26=[];window.__ceZuzuConversationContextV26=null;window.__ceZuzuUsageTotalV285=emptyZuzuUsageTotal();window.__ceLastZuzuResult=null;window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
     saveZuzuInteractionId('');saveZuzuServerConversationId('');
-    try{sessionStorage.removeItem(zuzuConversationKey());sessionStorage.removeItem(zuzuContextKey());sessionStorage.removeItem(zuzuInteractionKey());sessionStorage.removeItem(zuzuUsageTotalKey());sessionStorage.setItem(zuzuRuntimeBuildKey(),ZUZU_RUNTIME_BUILD);localStorage.removeItem(zuzuServerConversationIdKey());}catch(_){ }
+    try{sessionStorage.removeItem(zuzuConversationKey());sessionStorage.removeItem(zuzuContextKey());sessionStorage.removeItem(zuzuInteractionKey());sessionStorage.removeItem(zuzuUsageTotalKey());sessionStorage.setItem(zuzuRuntimeBuildKey(),ZUZU_RUNTIME_BUILD);localStorage.removeItem(zuzuServerConversationIdKey());localStorage.removeItem(zuzuVoiceRecoveryKey());localStorage.removeItem(zuzuVoiceRecoveryFlagKey());}catch(_){ }
   }
   function zuzuMigratedStorageValue(suffix){
     var key=zuzuStorageKey(suffix),raw='';
@@ -539,10 +539,10 @@
   function zuzuConversationKey(){ return zuzuStorageKey('conversation'); }
   function zuzuVoiceRecoveryKey(){ return zuzuStorageKey('voice_recovery_v311'); }
   function zuzuVoiceRecoveryFlagKey(){ return zuzuStorageKey('voice_recovery_active_v311'); }
-  var ZUZU_VOICE_RECOVERY_TTL=6*60*60*1000;
-  var ZUZU_LOCAL_HISTORY_LIMIT=500;
-  function zuzuVoiceRecoveryActive(){try{var t=Number(localStorage.getItem(zuzuVoiceRecoveryFlagKey())||0);return t>0&&(Date.now()-t)<ZUZU_VOICE_RECOVERY_TTL;}catch(_){return false;}}
-  function armZuzuVoiceRecovery(){try{localStorage.setItem(zuzuVoiceRecoveryFlagKey(),String(Date.now()));}catch(_){ }window.__ceZuzuVoiceRecoveryActiveV311=true;}
+  var ZUZU_VOICE_RECOVERY_TTL=2*60*60*1000;
+  var ZUZU_LOCAL_HISTORY_LIMIT=120;
+  function zuzuVoiceRecoveryActive(){return false;}
+  function armZuzuVoiceRecovery(){window.__ceZuzuVoiceRecoveryActiveV311=true;}
   function zuzuTurnNumber(turn,fallback){
     var n=Number(turn&&((turn.turnSeq!=null?turn.turnSeq:turn.seq)));return Number.isFinite(n)&&n>0?Math.trunc(n):Math.max(1,Number(fallback)||1);
   }
@@ -570,16 +570,12 @@
     if(Array.isArray(window.__ceZuzuConversationV26)) return window.__ceZuzuConversationV26;
     try{
       var raw=zuzuMigratedStorageValue('conversation'),parsed=raw?JSON.parse(raw):[];
-      if((!Array.isArray(parsed)||!parsed.length)&&zuzuVoiceRecoveryActive()){
-        try{var backRaw=localStorage.getItem(zuzuVoiceRecoveryKey())||'',back=backRaw?JSON.parse(backRaw):null;if(back&&Date.now()-Number(back.savedAt||0)<ZUZU_VOICE_RECOVERY_TTL&&Array.isArray(back.turns)){parsed=back.turns;sessionStorage.setItem(zuzuConversationKey(),JSON.stringify(parsed.slice(-ZUZU_LOCAL_HISTORY_LIMIT)));window.__ceZuzuVoiceRecoveryActiveV311=true;}}catch(_){ }
-      }
       window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-ZUZU_LOCAL_HISTORY_LIMIT):[];
     }catch(_){ window.__ceZuzuConversationV26=[]; }
     return window.__ceZuzuConversationV26;
   }
   function saveZuzuConversation(){
-    var turns=(window.__ceZuzuConversationV26||[]).slice(-ZUZU_LOCAL_HISTORY_LIMIT),raw='';try{raw=JSON.stringify(turns);sessionStorage.setItem(zuzuConversationKey(),raw);}catch(_){ }
-    if(window.__ceZuzuVoiceRecoveryActiveV311||zuzuVoiceRecoveryActive()){try{localStorage.setItem(zuzuVoiceRecoveryKey(),JSON.stringify({savedAt:Date.now(),turns:turns}));localStorage.setItem(zuzuVoiceRecoveryFlagKey(),String(Date.now()));}catch(_){ }}
+    var turns=(window.__ceZuzuConversationV26||[]).slice(-ZUZU_LOCAL_HISTORY_LIMIT);try{sessionStorage.setItem(zuzuConversationKey(),JSON.stringify(turns));}catch(_){ }
   }
   function zuzuContextKey(){ return zuzuStorageKey('context'); }
   function loadZuzuConversationContext(){
@@ -1095,6 +1091,16 @@
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceAiClear'); if(b){ clearZuzu(ev); } }, true);
   var __ceAntonioVoiceAbort=null;
   var __ceAntonioPendingVoiceCommits=new Map();
+  function resetZuzuSessionForAuth(reason){
+    try{if(__ceAntonioVoiceAbort)__ceAntonioVoiceAbort.abort();}catch(_){ }__ceAntonioVoiceAbort=null;
+    try{__ceAntonioPendingVoiceCommits.clear();}catch(_){ }
+    window.__ceZuzuConversationV26=[];window.__ceZuzuConversationContextV26=null;window.__ceZuzuUsageTotalV285=emptyZuzuUsageTotal();window.__ceLastZuzuResult=null;window.__ceZuzuLastSpokenAnswer='';window.__ceZuzuInteractionIdV261='';window.__ceZuzuVoiceRecoveryActiveV311=false;window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
+    saveZuzuInteractionId('');saveZuzuServerConversationId('');
+    try{var remove=[];for(var i=0;i<sessionStorage.length;i++){var k=sessionStorage.key(i)||'';if(/_zuzu_(?:conversation|context|interaction_id|usage_total|server_conversation_id|voice_recovery(?:_active)?_v\d+|prompt_(?:draft|last)_p\d+)/i.test(k)||/^controlevent:zuzu-lab:v\d+:session$/i.test(k))remove.push(k);}remove.forEach(function(k){sessionStorage.removeItem(k);});}catch(_){ }
+    try{var removeLocal=[];for(var j=0;j<localStorage.length;j++){var lk=localStorage.key(j)||'';if(/_zuzu_(?:voice_recovery|voice_recovery_active|server_conversation_id)/i.test(lk)||/^controlevent:zuzu-lab:v\d+:session$/i.test(lk))removeLocal.push(lk);}removeLocal.forEach(function(k){localStorage.removeItem(k);});}catch(_){ }
+    try{document.dispatchEvent(new CustomEvent('ce:zuzu-auth-session-reset',{detail:{reason:String(reason||'auth')}}));}catch(_){ }
+    return true;
+  }
   function commitAntonioVoiceData(rec){
     if(!rec||rec.committed)return rec&&rec.data;
     rec.committed=true;var data=rec.data||{},prompt=rec.prompt||'',conversationTurnNumber=rec.conversationTurnNumber||1;
@@ -1114,6 +1120,7 @@
   async function askVoiceDirect(prompt,options){
     prompt=trim(prompt); options=options||{};
     if(!prompt) throw new Error('La pregunta de voz está vacía.');
+    ensureZuzuRuntimeBuild();
     armZuzuVoiceRecovery();
     try{ if(__ceAntonioVoiceAbort) __ceAntonioVoiceAbort.abort(); }catch(_){ }
     __ceAntonioVoiceAbort=typeof AbortController!=='undefined'?new AbortController():null;
@@ -1134,5 +1141,5 @@
     if(options.deferCommit){var commitId='voice-'+Date.now()+'-'+Math.random().toString(36).slice(2,10);__ceAntonioPendingVoiceCommits.set(commitId,rec);data.voiceCommitId=commitId;if(!data.meta||typeof data.meta!=='object')data.meta={};data.meta.voiceCommitId=commitId;return data;}
     commitAntonioVoiceData(rec);return data;
   }
-  window.ControlEventV113ZuzuAnalitica={open:openModal,close:closeModal,install:tick,askVoice:askVoiceDirect,commitVoiceResponse:commitVoiceResponse,discardVoiceResponse:discardVoiceResponse,submitVoicePrompt:function(text){openModal();setTimeout(function(){var p=$('ceAiPrompt');if(p){p.value=String(text||'').trim();p.dispatchEvent(new Event('input',{bubbles:true}));}var b=$('ceAiRun');if(b)b.click();},90);}};
+  window.ControlEventV113ZuzuAnalitica={open:openModal,close:closeModal,install:tick,askVoice:askVoiceDirect,commitVoiceResponse:commitVoiceResponse,discardVoiceResponse:discardVoiceResponse,resetSession:resetZuzuSessionForAuth,submitVoicePrompt:function(text){openModal();setTimeout(function(){var p=$('ceAiPrompt');if(p){p.value=String(text||'').trim();p.dispatchEvent(new Event('input',{bubbles:true}));}var b=$('ceAiRun');if(b)b.click();},90);}};
 })();

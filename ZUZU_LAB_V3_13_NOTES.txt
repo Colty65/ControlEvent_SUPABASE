@@ -1,0 +1,26 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.13
+Build: ZUZU-LAB-V3.13-SEMANTIC-SETTLE-STREAM
+
+Origen
+- La V3.12 arregló la voz: Gemini 3.1 TTS por Interactions API entrega audio real con Algenib.
+- La prueba del 05/09/2026 mostró un problema distinto: el VAD puede separar una frase humana en varios tramos y V3.12 consultaba VNext demasiado pronto, cancelando el sentido anterior.
+
+Cambios V3.13
+1. Asentamiento semántico NHC antes de consultar VNext:
+   - Todo turno sustantivo espera una microventana (360 ms).
+   - Si ya existe otro tramo de voz capturándose/encolado, espera 620 ms y no consulta CE hasta recibirlo.
+   - Frases cortas probablemente abiertas conservan hasta 900 ms.
+   - Los fragmentos se concatenan y generan UNA sola consulta a VNext.
+2. Backchannels/vocativos breves no cancelan ni rompen un fragmento pendiente.
+3. Un wake con contenido ("Hola Zuzu, dime...") entra por el mismo asentamiento.
+4. Diagnóstico limpio por build:
+   - La recuperación tras recarga sólo restaura eventos de la misma V3.13.
+   - Ya no mezcla una V3.11/V3.12 antigua con una prueba nueva.
+5. La traza añade spokenChars y diagnosticPreviewOnly para aclarar que spokenAnswer de 500 caracteres es sólo una previsualización del diagnóstico.
+6. No se toca TTS Interactions, Algenib, DaveFX, VNext, BANK4.9, liquidaciones ni ejecución controlada.
+
+Caso real que corrige
+"Bueno... las compras están ya..., lo único que ocurre es que no se ha hecho todavía la gestión de la liquidación."
++
+"que es lo que queda pendiente."
+=> V3.13 lo trata como una sola intervención antes de consultar CE.

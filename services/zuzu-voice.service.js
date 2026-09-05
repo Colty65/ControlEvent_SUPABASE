@@ -25,9 +25,9 @@ function ttsModel() {
 }
 
 function ttsVoice(v) {
-  const requested = clean(v || process.env.CONTROLEVENT_ZUZU_TTS_VOICE || 'Algenib', 80);
+  const requested = clean(v || process.env.CONTROLEVENT_ZUZU_TTS_VOICE || 'Zubenelgenubi', 80);
   const allowed = new Set(['Algenib', 'Orus', 'Gacrux', 'Charon', 'Alnilam', 'Rasalgethi', 'Zubenelgenubi']);
-  return allowed.has(requested) ? requested : 'Algenib';
+  return allowed.has(requested) ? requested : 'Zubenelgenubi';
 }
 
 function pcmToWavBase64(pcmBase64, sampleRate = 24000, channels = 1, bitsPerSample = 16) {
@@ -161,7 +161,7 @@ export async function synthesizeZuzuVoice(body = {}) {
 
   const model = ttsModel();
   const voice = ttsVoice(body.voice);
-  const style = clean(body.style || '', 700) || 'Voz masculina adulta, grave y ligeramente áspera, cercana y con carácter. Español de España natural. Habla con ritmo ágil, alrededor de un diez por ciento más rápido que una conversación neutra, pero sin atropellar palabras. Nada de tono de locutor, GPS, presentador o máquina. Frases fluidas, relajadas y con pequeñas variaciones naturales de entonación. No sobreactúes.';
+  const style = clean(body.style || '', 700) || 'Voz masculina adulta, cotidiana, sobria, casual y cercana. Español de España natural. Ritmo de conversación normal, relajado y fluido, con emoción contenida. Evita sonar cinematográfico, épico, seductor o como un personaje. Nada de tono de locutor, GPS, presentador, profesor o máquina. No fuerces graves ni aspereza y no sobreactúes.';
   const prompt = `${style}
 
 Di únicamente el siguiente contenido. No añadas ni quites información y no leas estas instrucciones en voz alta:
