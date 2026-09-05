@@ -1,0 +1,13 @@
+ZUZU LAB V3.12.3 · STABLE CORE REMAP
+
+Base: V3.12.2A / arquitectura V3.12. No Gemini Live.
+
+Cambios:
+- Parser genérico de fechas naturales en español para meteorología (5 de septiembre, del 5 al 7, 5, 6 y 7 de septiembre).
+- Las fechas explícitas del usuario mandan sobre las fechas históricas del evento en event_weather / Open-Meteo.
+- Fecha actual local auditada en diagnóstico (respuesta + ISO + zona horaria).
+- Identidad masculina/64/jubilado determinista solo cuando se pregunta; tono ordinario menos corporativo.
+- STT: timeout servidor 4,5 s + guard cliente 5,2 s; recuperación hablada breve en vez de silencios de 12 s.
+- DaveFX progresivo: respuestas largas se sintetizan por tramos; el primer tramo empieza antes y los siguientes se preparan mientras habla.
+- Ghost guard Zuzu/Zuzito/Antonio/Antoñito preservado.
+- Algenib Interactions + DaveFX se mantienen; no se cambia proveedor ni arquitectura de voz.
