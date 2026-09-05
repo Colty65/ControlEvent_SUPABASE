@@ -1,0 +1,14 @@
+const fs=require('fs'),path=require('path');const root=path.resolve(__dirname,'..');
+const read=p=>fs.readFileSync(path.join(root,p),'utf8');let ok=0,bad=0;const t=(n,c)=>{if(c){console.log('OK ',n);ok++}else{console.error('FAIL',n);bad++}};
+const app=read('server/app.js'),routes=read('routes/zuzu-voice.routes.js'),lab=read('public/app/features/antonio-lab-v3.js'),html=read('public/antonio-lab.html'),svc=read('services/antonio-lab.service.js');
+t('server importa zuzuVoiceRoutes',/import zuzuVoiceRoutes from ['"]\.\.\/routes\/zuzu-voice\.routes\.js['"]/.test(app));
+t('server monta zuzuVoiceRoutes bajo api',/app\.use\(['"]\/api['"],\s*zuzuVoiceRoutes\)/.test(app));
+t('ruta synthesize existe',/router\.post\(['"]\/zuzu-voice\/synthesize['"]/.test(routes));
+t('cliente llama a ruta montada',/fetch\(['"]\/api\/zuzu-voice\/synthesize['"]/.test(lab));
+t('Iapetus cliente',/TTS_VOICE='Iapetus'/.test(lab));
+t('Iapetus servidor LAB fija',/LAB_TTS_VOICE='Iapetus'/.test(svc));
+t('sin DaveFX Piper LAB',!/DaveFX|VITS_URLS|fallbackSpeak|ensureFallbackTts/.test(lab));
+t('build 3.15.2 js',/V3\.15\.2/.test(lab)&&/v3152:session/.test(lab));
+t('build 3.15.2 html',/V3\.15\.2/.test(html)&&/V3152/.test(html));
+t('hotfix WebAudio preservado',/function stopAudio\s*\(/.test(lab)&&/function decodeAudioBuffer\s*\(/.test(lab)&&/function schedulePcmChunk\s*\(/.test(lab));
+console.log(`V3.15.2 RECOVERY ROUTE: ${ok} OK · ${bad} KO`);process.exit(bad?1:0);
