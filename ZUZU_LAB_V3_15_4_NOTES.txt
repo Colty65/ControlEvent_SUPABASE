@@ -1,0 +1,17 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.15.4 · IAPETUS PROGRESSIVE RECOVERY
+
+Objetivo
+- Reducir la latencia percibida cuando Gemini 3.1 Flash TTS no entrega audio y hay que usar Gemini 2.5 Flash TTS.
+
+Cambios
+- La voz sigue siendo siempre Iapetus.
+- Si Gemini 3.1 TTS termina sin audio o agota cuota, queda marcado como no disponible durante el resto de la sesión.
+- La recuperación 2.5 ya no espera a sintetizar la respuesta completa.
+- La respuesta se divide en un máximo de 3 tramos naturales.
+- Se sintetiza primero el tramo inicial corto y empieza a reproducirse inmediatamente.
+- Los tramos restantes se preparan en paralelo mientras suena el primero y se programan en WebAudio en orden.
+- Las peticiones de recuperación son abortables al interrumpir o cambiar de turno.
+- No se reincorporan DaveFX ni Piper/VITS.
+
+Motivo
+La traza V3.15.3 mostró respuestas CE de ~2.4-3.4 s, pero la recuperación TTS 2.5 tardó 8.3-16.7 s antes del primer audio en respuestas medias/largas. El cuello de botella era la síntesis completa no-streaming, no VNext/CE.
