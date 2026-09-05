@@ -1,0 +1,20 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.10
+
+Objetivo de esta versión
+- Eliminar timestamps ISO de cualquier respuesta visible/hablada durante conversación de voz.
+- Fechas escritas: formato humano local (ej. viernes 28 de agosto de 2026, 18:42).
+- Fechas habladas: formato coloquial aproximado (ej. el viernes veintiocho de agosto, sobre las seis y cuarenta de la tarde).
+- Memoria: salida oral específica para search/read, sin recitar metadatos de máquina.
+- Latencia de boca: Piper deja de sintetizar toda la respuesta antes de hablar. Divide en tramos, sintetiza el primero, empieza a hablar y prepara el siguiente mientras reproduce.
+- Se conserva VNext/CE como cerebro y Gemini Flash-Lite como STT.
+- Se conservan zoom de justificantes por puntos rojo/verde y BANK4.9.
+
+Diagnóstico nuevo
+- lastTtsMs = síntesis del primer tramo.
+- lastTtsTotalMs = suma de síntesis de la locución.
+- ttsChunks = número de tramos.
+
+No se ha cambiado
+- Arquitectura de micrófono/VAD.
+- Voz Sharvard.
+- Conciliación bancaria / Liquidaciones / P2-R.

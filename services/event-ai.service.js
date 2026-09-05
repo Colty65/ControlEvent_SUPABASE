@@ -18633,11 +18633,94 @@ function v437VoiceChatPolish(text=''){
   if(/^pido disculpas|^mis disculpas|^lamento/.test(n))return'Vale, entendido. Vamos a hacerlo más natural.';
   return t;
 }
-function v437VoiceAnswerFromResults(good=[],state={},userPrompt='',writtenAnswer=''){
+
+// ZUZU V3.10 · tiempo humano y memoria oral.
+// Un timestamp ISO nunca debe llegar tal cual a una respuesta de conversación.
+// Pantalla: fecha legible. Voz: fecha y hora dichas como una persona.
+function v440SpanishNumber(n){
+  n=Math.trunc(Number(n)||0);
+  const base=['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve'];
+  if(n>=0&&n<base.length)return base[n];
+  if(n<40)return`treinta${n===30?'':` y ${base[n-30]}`}`;
+  if(n<50)return`cuarenta${n===40?'':` y ${base[n-40]}`}`;
+  if(n<60)return`cincuenta${n===50?'':` y ${base[n-50]}`}`;
+  return String(n);
+}
+function v440DateParts(iso,timeZone='Europe/Madrid'){
+  const d=new Date(String(iso||''));if(!Number.isFinite(d.getTime()))return null;
+  const tz=trim(timeZone)||'Europe/Madrid';
+  try{
+    const parts=new Intl.DateTimeFormat('es-ES',{timeZone:tz,weekday:'long',day:'numeric',month:'long',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false}).formatToParts(d);
+    const o={};for(const x of parts)if(x.type!=='literal')o[x.type]=x.value;
+    return{date:d,weekday:o.weekday||'',day:Number(o.day),month:o.month||'',year:Number(o.year),hour:Number(o.hour),minute:Number(o.minute)};
+  }catch(_){
+    return{date:d,weekday:'',day:d.getUTCDate(),month:['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][d.getUTCMonth()],year:d.getUTCFullYear(),hour:d.getUTCHours(),minute:d.getUTCMinutes()};
+  }
+}
+function v440SpokenClock(hour,minute){
+  const h24=((Number(hour)||0)%24+24)%24,m=Math.max(0,Math.min(59,Number(minute)||0)),h12=h24%12||12,next=(h12%12)+1;
+  const period=h24<6?'de la madrugada':h24<12?'de la mañana':h24<14?'del mediodía':h24<20?'de la tarde':'de la noche';
+  const article=h12===1?'la':'las',hourWord=v440SpanishNumber(h12);
+  if(m===0)return`${article} ${hourWord} ${period}`;
+  if(m===15)return`${article} ${hourWord} y cuarto ${period}`;
+  if(m===30)return`${article} ${hourWord} y media ${period}`;
+  if(m===45)return`${next===1?'la':'las'} ${v440SpanishNumber(next)} menos cuarto ${period}`;
+  return`${article} ${hourWord} y ${v440SpanishNumber(m)} ${period}`;
+}
+function v440HumanDate(iso,{timeZone='Europe/Madrid',spoken=false,nowIso=''}={}){
+  const p=v440DateParts(iso,timeZone);if(!p)return String(iso||'');
+  if(!spoken)return`${p.weekday?p.weekday+' ':''}${p.day} de ${p.month}${p.year?` de ${p.year}`:''}, ${String(p.hour).padStart(2,'0')}:${String(p.minute).padStart(2,'0')}`;
+  const rounded=Math.round(p.minute/5)*5,hour=rounded>=60?(p.hour+1)%24:p.hour,minute=rounded>=60?0:rounded;return`el ${p.weekday?p.weekday+' ':''}${v440SpanishNumber(p.day)} de ${p.month}, sobre ${v440SpokenClock(hour,minute)}`;
+}
+function v440HumanizeMachineTime(value,{timeZone='Europe/Madrid',spoken=false,nowIso=''}={}){
+  let out=String(value==null?'':value);
+  const re=/\b20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,9})?)?(?:Z|[+-]\d{2}:\d{2})\b/g;
+  out=out.replace(re,m=>v440HumanDate(m,{timeZone,spoken,nowIso}));
+  if(spoken){
+    out=out.replace(/\s*\|\s*/g,'. ').replace(/\s*→\s*/g,', luego ').replace(/\bRef\.?\s*$/i,'').replace(/\bde el\b/gi,'del');
+    out=out.replace(/\s{2,}/g,' ').replace(/\s+([,.;:])/g,'$1').trim();
+  }
+  return out;
+}
+function v440CompactSentence(text='',max=360){
+  let t=trim(text);if(t.length<=max)return t;
+  const cut=t.slice(0,max),i=Math.max(cut.lastIndexOf('. '),cut.lastIndexOf('; '),cut.lastIndexOf(', '));
+  return`${(i>Math.floor(max*.55)?cut.slice(0,i+1):cut).replace(/[,:;\s]+$/,'')}.`;
+}
+function v440MemoryRows(result={},key=''){
+  const tables=arr(result?.tables),t=tables.find(x=>!key||trim(x?.key)===key)||tables[0];return arr(t?.rows);
+}
+function v440VoiceMemoryAnswer(result={},args={},userPrompt='',writtenAnswer='',timeZone='Europe/Madrid',nowIso=''){
+  const f=result?.facts||{},action=trim(args?.action||f.action),rows=v440MemoryRows(result,action==='search'?'memory_matches':'memory_turns');
+  if(action==='search'){
+    const q=trim(f.query||args?.query),first=rows.slice(0,2).map(r=>{
+      const when=trim(r?.Fecha)?v440HumanDate(trim(r.Fecha),{timeZone,spoken:true,nowIso}):'';
+      const title=trim(r?.Título||r?.Resumen).replace(/^Detalle de\s+/i,'');
+      return[when,title?`sobre ${title}`:''].filter(Boolean).join(', ');
+    }).filter(Boolean);
+    let out=`He encontrado varios recuerdos${q?` relacionados con ${q}`:''}.`;
+    if(first.length)out+=` El más reciente es ${first[0]}${first[1]?`; también hay otro ${first[1]}`:''}.`;
+    return v440CompactSentence(out,340);
+  }
+  if(action==='read'){
+    const dates=rows.map(r=>trim(r?.Fecha)).filter(Boolean),start=dates[0],end=dates[dates.length-1],topics=arr(f.topics).map(x=>trim(x).replace(/^Detalle de\s+/i,'')).filter(Boolean).slice(0,4);
+    let out='He abierto esa conversación.';
+    if(start)out+=` Empieza ${v440HumanDate(start,{timeZone,spoken:true,nowIso})}`;
+    if(end&&end!==start)out+=` y termina ${v440HumanDate(end,{timeZone,spoken:true,nowIso})}`;
+    out+='.';
+    if(topics.length)out+=` Hablasteis de ${v439VoiceNaturalJoin(topics)}.`;
+    return v440CompactSentence(out,360);
+  }
+  if(action==='summarize'||action==='current')return v440CompactSentence(v440HumanizeMachineTime(writtenAnswer,{timeZone,spoken:true,nowIso}),380);
+  return v440CompactSentence(v440HumanizeMachineTime(writtenAnswer,{timeZone,spoken:true,nowIso}),360);
+}
+
+function v437VoiceAnswerFromResults(good=[],state={},userPrompt='',writtenAnswer='',voiceOptions={}){
   const figureMode=v438VoiceFigureMode(userPrompt),wantsFigures=figureMode!=='none',parts=[];
   for(const x of arr(good)){
     const name=trim(x?.call?.name);
     if(name==='query_ce')parts.push(figureMode==='none'?v439VoiceGroundedNoFigures(x.result,x.args,state,userPrompt,writtenAnswer):v439VoiceExplicitAnswer(x.result,x.args,state,userPrompt,figureMode));
+    else if(name==='recall_memory')parts.push(v440VoiceMemoryAnswer(x.result,x.args,userPrompt,writtenAnswer,trim(voiceOptions?.timeZone)||'Europe/Madrid',trim(voiceOptions?.nowIso)));
     else if(name==='local_response')parts.push(v437VoiceChatPolish(trim(x?.result?.facts?.response)||writtenAnswer));
   }
   let out=[...new Set(parts.map(trim).filter(Boolean))].slice(0,figureMode==='full'?3:2).join(' ');
@@ -18648,7 +18731,7 @@ function v437VoiceAnswerFromResults(good=[],state={},userPrompt='',writtenAnswer
   if(figureMode==='none'&&out.length>360)out=out.slice(0,357).replace(/[,:;\s]+$/,'')+'.';
   return {spoken:v40ConversationalPolish(out,userPrompt,true),wantsFigures,figureMode};
 }
-async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,externalSignal=null,conversationId=''}={}){
+async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}={}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP2Tools();
   let state=null,stateWaitMs=0,calls=0,decisionMs=0,toolMs=0,narrationMs=0,payload=null,final={title:'Zuzu',answer:'',warnings:[]},results=[],tables=[],charts=[];
   const ensureState=async()=>{if(state)return state;const t=Date.now(),loaded=await statePromise;stateWaitMs+=Date.now()-t;state=attachLoggedUserFix10(loaded||{},{usuarioLogado,user,authUser,ce_acceso});return state;};
@@ -18710,16 +18793,16 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
     if(needsOptionalNarration){
       const n0=Date.now();
       try{let n;if(currentSummary)n=await vnextP122SummarizeCurrentConversation({userPrompt,model,result:currentSummary.result,flowTrace,externalSignal,voiceConversation});else if(memoryEpisodeSummary)n=await vnextP1223SummarizeMemoryEpisode({userPrompt,model,result:memoryEpisodeSummary.result,flowTrace,externalSignal,voiceConversation});else n=await vnextP2NarrateResults({userPrompt,model,results:good,flowTrace,externalSignal,voiceConversation});calls++;narrationMs=Date.now()-n0;if(trim(n?.answer))final={...final,title:currentSummary?'Resumen de la conversación':final.title,answer:trim(n.answer)};}catch(error){narrationMs=Date.now()-n0;if(currentSummary)final={...final,title:'Resumen de la conversación',answer:vnextP1221LocalConversationSummary(currentSummary.result)};zuzuTracePush(flowTrace,'VNEXT P2 · NARRACIÓN OPCIONAL','WARN',`Se conserva el cierre local: ${cleanGeminiError(error)}`);}
-    }else if(voiceConversation&&good.some(x=>trim(x?.call?.name)==='query_ce'))zuzuTracePush(flowTrace,'ANTONIO V3.7 · FAST PATH ORAL','OK','Datos factuales cerrados por CE sin segunda narración Gemini.');
+    }else if(voiceConversation&&good.some(x=>trim(x?.call?.name)==='query_ce'))zuzuTracePush(flowTrace,'ZUZU V3.10 · FAST PATH ORAL','OK','Datos factuales cerrados por CE sin segunda narración Gemini.');
   }
   if(vnextP2IdentityQuestion(userPrompt)&&results.filter(x=>x?.result).every(x=>trim(x?.call?.name)==='local_response')){const display=zuzuLoggedUserDisplayName({usuarioLogado,user,authUser,ce_acceso});final={...final,title:'Zuzu',answer:`Aquí te conozco como ${display}. No tengo base para afirmar otra identidad o relación distinta de la que consta en esta sesión.`};zuzuTracePush(flowTrace,'VNEXT P2-R · IDENTITY GROUNDING','OK',`Identidad limitada al usuario autenticado de sesión: ${display}.`);}
-  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),writtenAnswer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.';let spokenAnswer=writtenAnswer,voiceWantsFigures=false;if(voiceConversation){const oral=v437VoiceAnswerFromResults(results.filter(x=>x?.result),stForVoice,userPrompt,writtenAnswer);spokenAnswer=oral.spoken;voiceWantsFigures=oral.wantsFigures;}else{const unitGuard=v416VoiceUnitOracle(writtenAnswer,writtenAnswer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||writtenAnswer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`});spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true);}const answer=writtenAnswer,usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
+  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),rawWrittenAnswer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.',writtenAnswer=voiceConversation?v440HumanizeMachineTime(rawWrittenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:false,nowIso:clientNowIso}):rawWrittenAnswer;let spokenAnswer=writtenAnswer,voiceWantsFigures=false;if(voiceConversation){const oral=v437VoiceAnswerFromResults(results.filter(x=>x?.result),stForVoice,userPrompt,writtenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',nowIso:clientNowIso});spokenAnswer=v440HumanizeMachineTime(oral.spoken,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:true,nowIso:clientNowIso});voiceWantsFigures=oral.wantsFigures;}else{const unitGuard=v416VoiceUnitOracle(writtenAnswer,writtenAnswer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||writtenAnswer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`});spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true);}const answer=writtenAnswer,usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
   // FIX11 · En voz los datasets siguen vivos en resultContext para razonar y mantener el hilo,
   // pero NO se materializan en la UI. Hablamos; no obligamos al usuario a mirar una tabla minúscula.
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),visibleTables=voiceConversation?[]:finalTables,visibleCharts=voiceConversation?[]:charts.slice(0,8),presentationEvidence=vnextP124PresentationEvidence(visibleTables,visibleCharts);
-  if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral V3.8: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan como estado interno; cifras habladas=${voiceWantsFigures?'sí, porque el usuario las pidió':'no por defecto'}.`);
+  if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral V3.10: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan como estado interno; cifras habladas=${voiceWantsFigures?'sí, porque el usuario las pidió':'no por defecto'}.`);
   zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo voz factual=1; segunda llamada solo para resúmenes de memoria que la necesitan) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ZUZU V3.9 · CE factual + respuesta oral directa y contextual + cifras/listas cuando se piden + fast path',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ZUZU V3.10 · CE factual + tiempo humano + respuesta oral directa + cifras/listas cuando se piden + fast path',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){
