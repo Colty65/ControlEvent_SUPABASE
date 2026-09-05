@@ -4,9 +4,9 @@
 function clean(v,max=20000){return String(v==null?'':v).replace(/\u0000/g,'').trim().slice(0,max)}
 function geminiKey(){return process.env.GEMINI_API_KEY||process.env.GOOGLE_API_KEY||process.env.CONTROLEVENT_GEMINI_API_KEY||process.env.GOOGLE_GENERATIVE_AI_API_KEY||(/^(AIza)/i.test(String(process.env.OPENAI_API_KEY||''))?process.env.OPENAI_API_KEY:'')||''}
 function model(){return clean(process.env.CONTROLEVENT_ANTONIO_STT_MODEL||'gemini-3.1-flash-lite',120).replace(/^models\//i,'')}
-const BUILD='ZUZU-LAB-V3.15.2-IAPETUS-SINGLE-VOICE-RECOVERY';
+const BUILD='ZUZU-LAB-V3.15.3-IAPETUS-DUAL-MODEL-QUOTA-RECOVERY';
 const LAB_TTS_VOICE='Iapetus';
-export function antonioLabConfig(){return {ok:true,build:BUILD,configured:Boolean(geminiKey()),provider:'Gemini STT + VNext/CE + Gemini 3.1 Flash TTS streaming (Interactions API)',sttModel:model(),ttsModel:'gemini-3.1-flash-tts-preview',voiceId:LAB_TTS_VOICE,voiceProfile:'masculina adulta, clara, natural, cercana y poco teatral',fallbackVoiceId:LAB_TTS_VOICE,wakeMode:'VAD local + wake semántico sobre transcripción',paidNewServices:0,ttsTransport:'Interactions API v1beta · stream=true',notes:'Usa la misma GEMINI_API_KEY ya existente. Iapetus queda fijada como voz única del LAB tanto en streaming como en recuperación servidor; no cambia a DaveFX.'}}
+export function antonioLabConfig(){return {ok:true,build:BUILD,configured:Boolean(geminiKey()),provider:'Gemini STT + VNext/CE + Gemini 3.1 Flash TTS streaming + Gemini 2.5 Flash TTS quota recovery',sttModel:model(),ttsModel:'gemini-3.1-flash-tts-preview',voiceId:LAB_TTS_VOICE,voiceProfile:'masculina adulta, clara, natural, cercana y poco teatral',fallbackVoiceId:LAB_TTS_VOICE,recoveryTtsModel:'gemini-2.5-flash-preview-tts',wakeMode:'VAD local + wake semántico sobre transcripción',paidNewServices:0,ttsTransport:'3.1 Interactions streaming · 2.5 generateContent recuperación por cuota',notes:'Iapetus queda fijada como voz única. Si Gemini 3.1 TTS agota su cuota o no entrega audio, la recuperación usa Gemini 2.5 Flash TTS con la misma Iapetus; no cambia a DaveFX.'}}
 
 function ttsModel(){return clean(process.env.CONTROLEVENT_ZUZU_TTS_MODEL||'gemini-3.1-flash-tts-preview',120).replace(/^models\//i,'')}
 function ttsVoice(){return LAB_TTS_VOICE}

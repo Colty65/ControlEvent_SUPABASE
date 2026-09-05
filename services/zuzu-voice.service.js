@@ -21,7 +21,9 @@ function voiceModel() {
 
 
 function ttsModel() {
-  return clean(process.env.CONTROLEVENT_ZUZU_TTS_MODEL || 'gemini-3.1-flash-tts-preview', 120).replace(/^models\//i, '');
+  // Recuperacion: usa otro modelo para no compartir la cuota diaria de 3.1.
+  // La voz sigue siendo Iapetus, por lo que cambia el motor, no el timbre elegido.
+  return clean(process.env.CONTROLEVENT_ZUZU_TTS_RECOVERY_MODEL || 'gemini-2.5-flash-preview-tts', 120).replace(/^models\//i, '');
 }
 
 function ttsVoice(v) {
