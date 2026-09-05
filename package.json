@@ -98,7 +98,8 @@
     "test:antonio-lab-v36": "node scripts/v4-1-exp-antonio-lab-v36-conversation-commit-regression.cjs",
     "test:antonio-lab-v37": "node scripts/v4-1-exp-antonio-lab-v37-bar-voice-fast-regression.cjs && node scripts/v4-1-exp-antonio-lab-v37-behavior-regression.cjs",
     "test:zuzu-lab-v39": "node scripts/v4-1-exp-zuzu-lab-v39-direct-voice-photo-regression.cjs",
-    "test:zuzu-lab-v310": "node scripts/v4-1-exp-zuzu-lab-v310-human-time-fast-mouth-regression.cjs"
+    "test:zuzu-lab-v310": "node scripts/v4-1-exp-zuzu-lab-v310-human-time-fast-mouth-regression.cjs",
+    "test:zuzu-lab-v311": "node scripts/v4-1-exp-zuzu-lab-v311-natural-streaming-voice-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

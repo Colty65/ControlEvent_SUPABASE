@@ -423,6 +423,7 @@
     saveZuzuInteractionId('');
     saveZuzuServerConversationId('');
     try{ ['ControlEvent_v4_1_exp','ControlEvent_v3_0_exp','ControlEvent_'+'v30'+'_prod','ControlEvent_v29_prod','ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); sessionStorage.removeItem(v+'_zuzu_usage_total'); }); }catch(_){ }
+    try{localStorage.removeItem(zuzuVoiceRecoveryKey());localStorage.removeItem(zuzuVoiceRecoveryFlagKey());}catch(_){ }
     var r=$('ceAiResult'); if(r){ r.removeAttribute('data-ce-resume-only'); r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     updateConversationMode();
     updateConversationTrail();
@@ -536,7 +537,12 @@
     return '';
   }
   function zuzuConversationKey(){ return zuzuStorageKey('conversation'); }
+  function zuzuVoiceRecoveryKey(){ return zuzuStorageKey('voice_recovery_v311'); }
+  function zuzuVoiceRecoveryFlagKey(){ return zuzuStorageKey('voice_recovery_active_v311'); }
+  var ZUZU_VOICE_RECOVERY_TTL=6*60*60*1000;
   var ZUZU_LOCAL_HISTORY_LIMIT=500;
+  function zuzuVoiceRecoveryActive(){try{var t=Number(localStorage.getItem(zuzuVoiceRecoveryFlagKey())||0);return t>0&&(Date.now()-t)<ZUZU_VOICE_RECOVERY_TTL;}catch(_){return false;}}
+  function armZuzuVoiceRecovery(){try{localStorage.setItem(zuzuVoiceRecoveryFlagKey(),String(Date.now()));}catch(_){ }window.__ceZuzuVoiceRecoveryActiveV311=true;}
   function zuzuTurnNumber(turn,fallback){
     var n=Number(turn&&((turn.turnSeq!=null?turn.turnSeq:turn.seq)));return Number.isFinite(n)&&n>0?Math.trunc(n):Math.max(1,Number(fallback)||1);
   }
@@ -562,10 +568,19 @@
   }
   function loadZuzuConversation(){
     if(Array.isArray(window.__ceZuzuConversationV26)) return window.__ceZuzuConversationV26;
-    try{ var raw=zuzuMigratedStorageValue('conversation'); var parsed=raw?JSON.parse(raw):[]; window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-ZUZU_LOCAL_HISTORY_LIMIT):[]; }catch(_){ window.__ceZuzuConversationV26=[]; }
+    try{
+      var raw=zuzuMigratedStorageValue('conversation'),parsed=raw?JSON.parse(raw):[];
+      if((!Array.isArray(parsed)||!parsed.length)&&zuzuVoiceRecoveryActive()){
+        try{var backRaw=localStorage.getItem(zuzuVoiceRecoveryKey())||'',back=backRaw?JSON.parse(backRaw):null;if(back&&Date.now()-Number(back.savedAt||0)<ZUZU_VOICE_RECOVERY_TTL&&Array.isArray(back.turns)){parsed=back.turns;sessionStorage.setItem(zuzuConversationKey(),JSON.stringify(parsed.slice(-ZUZU_LOCAL_HISTORY_LIMIT)));window.__ceZuzuVoiceRecoveryActiveV311=true;}}catch(_){ }
+      }
+      window.__ceZuzuConversationV26=Array.isArray(parsed)?parsed.slice(-ZUZU_LOCAL_HISTORY_LIMIT):[];
+    }catch(_){ window.__ceZuzuConversationV26=[]; }
     return window.__ceZuzuConversationV26;
   }
-  function saveZuzuConversation(){ try{ sessionStorage.setItem(zuzuConversationKey(),JSON.stringify((window.__ceZuzuConversationV26||[]).slice(-ZUZU_LOCAL_HISTORY_LIMIT))); }catch(_){ } }
+  function saveZuzuConversation(){
+    var turns=(window.__ceZuzuConversationV26||[]).slice(-ZUZU_LOCAL_HISTORY_LIMIT),raw='';try{raw=JSON.stringify(turns);sessionStorage.setItem(zuzuConversationKey(),raw);}catch(_){ }
+    if(window.__ceZuzuVoiceRecoveryActiveV311||zuzuVoiceRecoveryActive()){try{localStorage.setItem(zuzuVoiceRecoveryKey(),JSON.stringify({savedAt:Date.now(),turns:turns}));localStorage.setItem(zuzuVoiceRecoveryFlagKey(),String(Date.now()));}catch(_){ }}
+  }
   function zuzuContextKey(){ return zuzuStorageKey('context'); }
   function loadZuzuConversationContext(){
     if(window.__ceZuzuConversationContextV26 && typeof window.__ceZuzuConversationContextV26==='object') return window.__ceZuzuConversationContextV26;
@@ -1099,6 +1114,7 @@
   async function askVoiceDirect(prompt,options){
     prompt=trim(prompt); options=options||{};
     if(!prompt) throw new Error('La pregunta de voz está vacía.');
+    armZuzuVoiceRecovery();
     try{ if(__ceAntonioVoiceAbort) __ceAntonioVoiceAbort.abort(); }catch(_){ }
     __ceAntonioVoiceAbort=typeof AbortController!=='undefined'?new AbortController():null;
     var controller=__ceAntonioVoiceAbort;

@@ -18731,9 +18731,65 @@ function v437VoiceAnswerFromResults(good=[],state={},userPrompt='',writtenAnswer
   if(figureMode==='none'&&out.length>360)out=out.slice(0,357).replace(/[,:;\s]+$/,'')+'.';
   return {spoken:v40ConversationalPolish(out,userPrompt,true),wantsFigures,figureMode};
 }
+// ZUZU V3.11 · el estilo oral ya no se decide con un catálogo de frases.
+// CE entrega los hechos certificados y un narrador pequeño los convierte en conversación.
+function v311VoiceNarratorModel(){return trim(process.env.CONTROLEVENT_ZUZU_VOICE_NARRATOR_MODEL||'gemini-3.1-flash-lite').replace(/^models\//i,'')||'gemini-3.1-flash-lite';}
+function v311VoiceNarratorEvidence(results=[],writtenAnswer=''){
+  const compact=arr(results).filter(x=>x?.result).slice(0,5).map(x=>({
+    tool:trim(x?.call?.name),
+    operation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),
+    result:vnextCompactResult(x.result)
+  }));
+  return {writtenAnswer:trim(writtenAnswer).slice(0,6000),results:compact};
+}
+async function v311NaturalVoiceNarrator({userPrompt='',writtenAnswer='',results=[],conversationHistory=[],flowTrace=[],externalSignal=null,timeZone='Europe/Madrid',nowIso=''}={}){
+  const apiKey=geminiKey();if(!apiKey)return'';
+  const model=v311VoiceNarratorModel(),figureMode=v438VoiceFigureMode(userPrompt),history=arr(conversationHistory).slice(-5).map((h,i)=>({turn:i+1,user:trim(h?.user).slice(0,360),zuzu:trim(h?.assistant).slice(0,520)}));
+  const evidence=v311VoiceNarratorEvidence(results,writtenAnswer);
+  const numberRule=figureMode==='full'
+    ?'El usuario ha pedido detalle o cifras: dáselas ahora y completas en la medida de lo pedido. En dinero puedes omitir céntimos salvo que los haya pedido expresamente.'
+    :figureMode==='brief'
+      ?'El usuario ha pedido una cifra o cantidad: contesta con la cifra pertinente ahora, redondeada de forma natural; no escondas el dato ni le hagas volver a pedirlo.'
+      :'El usuario NO ha pedido cifras: evita importes, recuentos y porcentajes salvo que sean imprescindibles para entender la respuesta. Describe el resultado de forma cualitativa.';
+  const input=`Estamos en una conversación HABLADA entre amigos dentro de ControlEvent. Redacta lo que Zuzu debe decir AHORA.
+
+MENSAJE ACTUAL DEL USUARIO:
+${userPrompt}
+
+HILO RECIENTE (solo para resolver referencias y tono):
+${JSON.stringify(history)}
+
+HECHOS CERTIFICADOS / RESPUESTA COMPLETA DE CE:
+${JSON.stringify(evidence)}
+
+REGLAS OBLIGATORIAS:
+- Contesta a la petición actual en este mismo turno; no prometas contar el dato después ni preguntes si quiere algo que ya ha pedido.
+- Usa únicamente los hechos certificados de arriba. Si falta un dato concreto, dilo de forma natural y breve; no inventes.
+- ${numberRule}
+- No recites nombres de campos, tablas, datasets, indicadores, IDs, JSON, timestamps ISO ni lenguaje de sistema. Las fechas y horas se cuentan como lo haría una persona.
+- Español de España, conversación cercana y espontánea. Nada de tono corporativo o de asistente de soporte.
+- No uses fórmulas tipo «Entiendo tu frustración», «Lamento la confusión», «Estoy aquí para ayudarte», «¿en qué puedo ayudarte?» salvo que de verdad sea lo único natural; si te corrigen o te insultan, corrige el contenido y sigue.
+- La longitud la marca lo que haya que contar: una frase si basta; normalmente dos o tres frases cortas; si el usuario pide una lista o detalle, da el detalle necesario. No cortes información útil por cumplir una longitud artificial.
+- Si el usuario pide algo abierto como «dame un variadito», «cuéntame algo», «qué tal van las cosas» o «dame info», NO le devuelvas otra pregunta genérica: elige de los hechos dos o tres cosas concretas que merezcan la pena y cuéntaselas.
+- Evita repetir siempre la misma estructura. Puedes empezar por «pues», «mira», «sí», «no», una conclusión directa o el dato; varía de forma natural.
+- Zuzu no es un contestador pasivo. Cuando haya una relación interesante con lo que se acaba de hablar, puedes añadir espontáneamente una observación corta, una comparación o UNA pregunta concreta que haga avanzar la charla. Hazlo solo cuando aporte algo y nunca como coletilla automática.
+- Si el usuario corrige una respuesta, no redactes una disculpa de soporte: corrige el contenido y continúa. Si te habla con tacos, no te escandalices ni cambies a tono corporativo.
+- No cierres sistemáticamente con «si quieres…», «¿en qué puedo ayudarte?» ni con una oferta de ayuda.
+- Devuelve SOLO la frase o frases que debe pronunciar Zuzu.`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,body={contents:[{role:'user',parts:[{text:input}]}],generationConfig:{temperature:.72,topP:.92,maxOutputTokens:240,thinkingConfig:{thinkingLevel:'MINIMAL'}}};
+  const started=Date.now();try{
+    const {res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_VOICE_NARRATOR_TIMEOUT_MS||3000),externalSignal);
+    if(!res.ok)throw Object.assign(new Error(payload?.error?.message||`Gemini narrador HTTP ${res.status}`),{status:res.status,details:payload});
+    let out=trim(geminiOutText(payload)).replace(/^```(?:text)?\s*/i,'').replace(/\s*```$/,'').trim();
+    out=v440HumanizeMachineTime(out,{timeZone:trim(timeZone)||'Europe/Madrid',spoken:true,nowIso});
+    if(out)zuzuTracePush(flowTrace,'ZUZU V3.11 · NARRADOR NATURAL','OK',`Narración libre y fundamentada · modelo=${model} · ${Date.now()-started} ms · cifras=${figureMode}.`);
+    return out;
+  }catch(error){zuzuTracePush(flowTrace,'ZUZU V3.11 · NARRADOR NATURAL','WARN',`Se usa el cierre factual como fallback: ${cleanGeminiError(error)}`);return'';}
+}
+
 async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}={}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP2Tools();
-  let state=null,stateWaitMs=0,calls=0,decisionMs=0,toolMs=0,narrationMs=0,payload=null,final={title:'Zuzu',answer:'',warnings:[]},results=[],tables=[],charts=[];
+  let state=null,stateWaitMs=0,calls=0,decisionMs=0,toolMs=0,narrationMs=0,voiceNarratorMs=0,payload=null,final={title:'Zuzu',answer:'',warnings:[]},results=[],tables=[],charts=[];
   const ensureState=async()=>{if(state)return state;const t=Date.now(),loaded=await statePromise;stateWaitMs+=Date.now()-t;state=attachLoggedUserFix10(loaded||{},{usuarioLogado,user,authUser,ce_acceso});return state;};
   let screenEventName='';
   if(trim(selectedEventId)){const st=await ensureState();screenEventName=trim(v26EventById(st,selectedEventId)?.titulo);}
@@ -18793,16 +18849,16 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
     if(needsOptionalNarration){
       const n0=Date.now();
       try{let n;if(currentSummary)n=await vnextP122SummarizeCurrentConversation({userPrompt,model,result:currentSummary.result,flowTrace,externalSignal,voiceConversation});else if(memoryEpisodeSummary)n=await vnextP1223SummarizeMemoryEpisode({userPrompt,model,result:memoryEpisodeSummary.result,flowTrace,externalSignal,voiceConversation});else n=await vnextP2NarrateResults({userPrompt,model,results:good,flowTrace,externalSignal,voiceConversation});calls++;narrationMs=Date.now()-n0;if(trim(n?.answer))final={...final,title:currentSummary?'Resumen de la conversación':final.title,answer:trim(n.answer)};}catch(error){narrationMs=Date.now()-n0;if(currentSummary)final={...final,title:'Resumen de la conversación',answer:vnextP1221LocalConversationSummary(currentSummary.result)};zuzuTracePush(flowTrace,'VNEXT P2 · NARRACIÓN OPCIONAL','WARN',`Se conserva el cierre local: ${cleanGeminiError(error)}`);}
-    }else if(voiceConversation&&good.some(x=>trim(x?.call?.name)==='query_ce'))zuzuTracePush(flowTrace,'ZUZU V3.10 · FAST PATH ORAL','OK','Datos factuales cerrados por CE sin segunda narración Gemini.');
+    }
   }
   if(vnextP2IdentityQuestion(userPrompt)&&results.filter(x=>x?.result).every(x=>trim(x?.call?.name)==='local_response')){const display=zuzuLoggedUserDisplayName({usuarioLogado,user,authUser,ce_acceso});final={...final,title:'Zuzu',answer:`Aquí te conozco como ${display}. No tengo base para afirmar otra identidad o relación distinta de la que consta en esta sesión.`};zuzuTracePush(flowTrace,'VNEXT P2-R · IDENTITY GROUNDING','OK',`Identidad limitada al usuario autenticado de sesión: ${display}.`);}
-  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),rawWrittenAnswer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.',writtenAnswer=voiceConversation?v440HumanizeMachineTime(rawWrittenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:false,nowIso:clientNowIso}):rawWrittenAnswer;let spokenAnswer=writtenAnswer,voiceWantsFigures=false;if(voiceConversation){const oral=v437VoiceAnswerFromResults(results.filter(x=>x?.result),stForVoice,userPrompt,writtenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',nowIso:clientNowIso});spokenAnswer=v440HumanizeMachineTime(oral.spoken,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:true,nowIso:clientNowIso});voiceWantsFigures=oral.wantsFigures;}else{const unitGuard=v416VoiceUnitOracle(writtenAnswer,writtenAnswer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||writtenAnswer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`});spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true);}const answer=writtenAnswer,usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
+  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),rawWrittenAnswer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.',writtenAnswer=voiceConversation?v440HumanizeMachineTime(rawWrittenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:false,nowIso:clientNowIso}):rawWrittenAnswer;let spokenAnswer=writtenAnswer,voiceWantsFigures=false;if(voiceConversation){voiceWantsFigures=v437VoiceWantsFigures(userPrompt);const n0=Date.now(),natural=await v311NaturalVoiceNarrator({userPrompt,writtenAnswer,results:results.filter(x=>x?.result),conversationHistory,flowTrace,externalSignal,timeZone:trim(clientTimeZone)||'Europe/Madrid',nowIso:clientNowIso});voiceNarratorMs=Date.now()-n0;if(natural){spokenAnswer=natural;calls++;}else spokenAnswer=v440HumanizeMachineTime(writtenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:true,nowIso:clientNowIso});}else{const unitGuard=v416VoiceUnitOracle(writtenAnswer,writtenAnswer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||writtenAnswer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`});spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true);}const answer=writtenAnswer,usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
   // FIX11 · En voz los datasets siguen vivos en resultContext para razonar y mantener el hilo,
   // pero NO se materializan en la UI. Hablamos; no obligamos al usuario a mirar una tabla minúscula.
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),visibleTables=voiceConversation?[]:finalTables,visibleCharts=voiceConversation?[]:charts.slice(0,8),presentationEvidence=vnextP124PresentationEvidence(visibleTables,visibleCharts);
-  if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral V3.10: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan como estado interno; cifras habladas=${voiceWantsFigures?'sí, porque el usuario las pidió':'no por defecto'}.`);
-  zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · llamadas Zuzu=${calls} (objetivo voz factual=1; segunda llamada solo para resúmenes de memoria que la necesitan) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
-  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ZUZU V3.10 · CE factual + tiempo humano + respuesta oral directa + cifras/listas cuando se piden + fast path',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,interactionCalls:calls,decisionCalls:1,narrationCalls:narrationMs>0?1:0,contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  if(voiceConversation)zuzuTracePush(flowTrace,'VNEXT P2 · VOZ SIN PANTALLA','OK',`Modo oral V3.11: ${finalTables.length} tabla(s) y ${charts.length} gráfica(s) quedan como estado interno; narrador natural=${voiceNarratorMs} ms; cifras habladas=${voiceWantsFigures?'sí, porque el usuario las pidió':'no por defecto'}.`);
+  zuzuTracePush(flowTrace,'VNEXT P2 · COSTE','OK',`total=${totalMs} ms · decisión=${decisionMs} ms · datos=${toolMs} ms · narración=${narrationMs} ms · narradorVoz=${voiceNarratorMs} ms · llamadas Zuzu=${calls} (voz: plan factual + narrador natural ligero) · contratos=${functionCalls.length} · tokens=${num(usage?.totalTokens)} · coste≈${num(usage?.costEurApprox).toFixed(6)} €.`);
+  return{ok:true,rejected:false,title:trim(final.title)||'Zuzu P2-R',answer,spokenAnswer,warnings:arr(final.warnings),charts:visibleCharts,tables:visibleTables,files:[],provider:'zuzu-vnext-p2r-minimal-planner',model,interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ZUZU V3.11 · CE factual + narrador natural ligero + tiempo humano + cifras cuando se piden',experimental:true,voiceConversation:!!voiceConversation,interactionId:'',resetInteractionId:true,spokenAnswer,resultContext,presentationEvidence,capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:results.map(x=>({tool:trim(x?.call?.name),rawArgs:x?.rawArgs||{},normalizedArgs:x?.args||{},effectiveOperation:trim(x?.result?._vnext_operation||x?.args?.operation||x?.result?.facts?.action),durationMs:num(x?.durationMs),audit:x?.capabilityAudit||null,error:trim(x?.error)})),tools:[...new Set(results.filter(x=>x.result).map(x=>trim(x?.call?.name)).filter(Boolean))],performance:{totalMs,decisionModelMs:decisionMs,stateWaitAfterModelMs:stateWaitMs,dataMs:toolMs,narrationModelMs:narrationMs,voiceNarratorMs,interactionCalls:calls,decisionCalls:1,narrationCalls:(narrationMs>0?1:0)+(voiceNarratorMs>0?1:0),contractCalls:functionCalls.length,plannerFallbackUsed,plannerPrimaryError:plannerFallbackUsed?plannerPrimaryError:''},geminiUsageEstimate:usage,debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
 }
 
 async function runZuzuVNextP13Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],previousInteractionId='',conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}){

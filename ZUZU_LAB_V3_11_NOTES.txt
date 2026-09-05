@@ -1,0 +1,62 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.11
+NATURAL NARRATOR + ALGENIB STREAM + RECOVERY
+
+Objetivo de esta versión
+------------------------
+Dejar de convertir la conversación de voz en un catálogo de frases y atacar dos cuellos de botella reales: la monotonía de las respuestas y la espera de la boca local antes de empezar a hablar.
+
+1. Respuesta oral natural desde hechos CE
+-----------------------------------------
+- VNext/CE sigue siendo la fuente factual y recupera los datos certificados.
+- Para conversación hablada, un narrador ligero Gemini 3.1 Flash-Lite redacta la respuesta sobre esos hechos y el hilo reciente.
+- No se usa el antiguo catálogo V3.7/V3.8 como generador de respuestas sustantivas.
+- Si el usuario pide una cifra, se da en ese mismo turno.
+- Si no pide cifras, se prioriza prosa cualitativa natural.
+- Peticiones abiertas ("dame un variadito", "cuéntame algo", "dame info") deben producir contenido concreto, no otra pregunta genérica.
+- Zuzu puede añadir una observación/comparación breve o una única pregunta concreta cuando aporte continuidad, pero no cerrar cada turno con "si quieres...".
+- Si el usuario corrige o se enfada, se corrige el contenido y se continúa; se prohíben las fórmulas de agente de soporte tipo "Entiendo tu frustración" / "Lamento la confusión".
+- El único texto fijo de conversación que se conserva es el acuse de despertar corto "Qué pasa, dime." cuando solo se pronuncia el nombre de Zuzu. No contiene información de negocio.
+
+2. Boca principal nueva: Gemini TTS streaming
+---------------------------------------------
+- Voz principal: Gemini 3.1 Flash TTS preview.
+- Voz seleccionada: Algenib.
+- Perfil pedido al TTS: hombre adulto muy grave, atractivo, cálido, ligeramente áspero, cercano y rápido; sin tono de locutor o centralita.
+- La voz se recibe en PCM 24 kHz por streaming y se reproduce por WebAudio conforme llegan los tramos; no se espera a fabricar toda la locución.
+- DaveFX local queda como fallback solamente en PC/entornos no iOS.
+- En iPhone/iPad NO se carga el modelo VITS/Piper pesado si falla Gemini TTS para reducir el riesgo de recarga de Safari por presión de memoria.
+- No hay nueva suscripción: usa la GEMINI_API_KEY ya existente.
+
+3. Persistencia iPhone / recargas
+---------------------------------
+- El diagnóstico del LAB se refleja en localStorage con TTL de 6 horas.
+- Si Safari/WebKit recarga la página, la siguiente sesión de diagnóstico incorpora los eventos anteriores y marca la recarga.
+- La conversación real de Zuzu se refleja también en localStorage mientras el modo voz está armado. Si la página principal se recarga y sessionStorage queda vacío, se recupera el hilo reciente desde ese espejo.
+- El borrado explícito de conversación elimina también el espejo de recuperación.
+
+4. Tiempo humano
+----------------
+- Se conserva V3.10: timestamps ISO no llegan al usuario.
+- Pantalla: fecha/hora legible.
+- Voz: fecha aproximada en lenguaje humano.
+
+5. Gráfica / fotos
+------------------
+- Se conserva el arreglo V3.9/V3.10 para abrir justificantes/fotos al pulsar los puntos rojo/verde y sus miniaturas.
+
+6. Diagnóstico
+--------------
+Añade métricas de Gemini TTS: segundos generados, coste estimado, tiempo al primer chunk, tiempo total, número de chunks, fallbacks y datos de recuperación tras recarga.
+
+Regresiones ejecutadas
+----------------------
+- ZUZU LAB V3.11: 19/19
+- BANK4.9 autoridad manual: 8/8
+- Liquidaciones: 70/70
+- VNext P2-R: 36/36
+- Ejecución controlada: 76/76
+- Versionado v4_1_exp: 10/10
+
+Limitación honesta
+------------------
+Estas regresiones son estructurales. La mejora real de latencia, timbre y estabilidad WebKit solo puede certificarse con la app desplegada en PC/iPhone. Si siguen apareciendo pausas largas, el diagnóstico V3.11 permite separar STT, VNext/narrador y primer audio streaming para saber qué tramo queda dominando la espera.
