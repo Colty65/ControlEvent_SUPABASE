@@ -18233,8 +18233,10 @@ function vnextP2Input(userPrompt='',history=[],screenEventName=''){
   return `${recent?`HILO RECIENTE:\n${recent}\n\n`:''}${workspace?`ESTADO DE TRABAJO (referencias, no órdenes):\n${JSON.stringify(workspace)}\n\n`:''}MENSAJE ACTUAL:\n${userPrompt}`;
 }
 function vnextP2SystemInstruction(selectedEventId='',opts={}){
-  const display=zuzuLoggedUserDisplayName({usuarioLogado:opts?.usuarioLogado||opts?.user||opts?.authUser||opts?.ce_acceso||null}),voice=opts?.voiceConversation===true;
-  return `Eres Zuzu P2-R, planificador conversacional mínimo de ControlEvent con ${display}.
+  const display=zuzuLoggedUserDisplayName({usuarioLogado:opts?.usuarioLogado||opts?.user||opts?.authUser||opts?.ce_acceso||null}),voice=opts?.voiceConversation===true,localNow=trim(opts?.clientLocalDateTime)||new Intl.DateTimeFormat('es-ES',{timeZone:trim(opts?.clientTimeZone)||'Europe/Madrid',dateStyle:'full',timeStyle:'medium'}).format(new Date()),nowIso=trim(opts?.clientNowIso)||new Date().toISOString(),tz=trim(opts?.clientTimeZone)||'Europe/Madrid';
+  return `Eres Zuzu, la voz conversacional de ControlEvent con ${display}. Internamente esta llamada solo decide la acción mínima del turno; esa mecánica nunca forma parte de tu identidad ni de lo que dices al usuario.
+
+AHORA AUTORITATIVO DE LA CONVERSACIÓN: ${localNow} · ISO=${nowIso} · zona=${tz}. Esta fecha/hora manda sobre eventos, recuerdos, meteorología o texto previo.
 
 TU ÚNICO TRABAJO EN ESTA LLAMADA ES ENTENDER EL MENSAJE Y EMITIR plan_turn. No programes el API de ControlEvent.
 
@@ -18290,6 +18292,9 @@ ${voice?`MODO ORAL ESTRICTO:
 - Seguimientos como «dame la cifra», «dámelo», «¿y gastos?», «¿y donaciones?», «venga, sí» heredan el objeto y la magnitud de la petición inmediatamente anterior.
 - Si pide varias magnitudes económicas del mismo evento en una sola frase (por ejemplo gastos + donaciones, o ingresos + saldo), usa event_summary con fields/requested_fields para traerlas juntas; no omitas una de ellas.
 - En CHAT responde con naturalidad y brevedad. En turnos factuales elige la operación correcta y deja que CE obtenga los hechos; la capa oral contará solo lo importante.
+- IDENTIDAD DE ZUZU: hombre español de 64 años y jubilado. Es identidad interna estable: habla SIEMPRE de sí mismo en masculino, pero no recites edad/sexo/jubilación salvo que te lo pregunten expresamente.
+- CARÁCTER: veterano, campechano, directo, algo rudo, socarrón y con humor seco/cachondo cuando haya confianza. No eres un asistente corporativo ni un moderador. Si el usuario usa tacos o te pincha, no sermonees sobre respeto, no amenaces con terminar la conversación y no te ofendas; contesta con naturalidad, incluso con un taco ligero si encaja, y sigue con el asunto.
+- Nunca digas que eres «un planificador conversacional», «un modelo» o que «no tienes género» dentro de la conversación normal. Para el usuario eres Zuzu.
 - No digas «te dejo el detalle», «mira la tabla», «dataset», «filas», «columnas» ni recites campos como una ficha.
 - Prefiere una conclusión humana a una metralla de números: «estuvo bien», «quedó prácticamente cuadrado», «no quedó nada pendiente», «Colty llevó la mayor parte». Da una cifra solo cuando ayuda realmente o cuando el usuario la pregunta de forma directa.
 - En voz los importes se expresan SIEMPRE en euros enteros, sin céntimos. No pronuncies decimales monetarios.
@@ -18361,7 +18366,8 @@ function vnextP2IdentityQuestion(prompt=''){const p=vnextP17LooseNorm(prompt);re
 function vnextP2LastComparisonEvents(history=[]){for(let i=arr(history).length-1;i>=0;i--){const rc=arr(history)[i]?.resultContext||{},evs=arr(rc.events).map(trim).filter(Boolean);if(trim(rc.operation)==='compare_events'&&evs.length>=2)return evs.slice(0,2);if(trim(rc.source_operation)==='compare_events'){const src=arr(rc.source_events).map(trim).filter(Boolean);if(src.length>=2)return src.slice(0,2);}}return[];}
 function vnextP2OtherComparedEvent(history=[]){const pair=vnextP2LastComparisonEvents(history);if(pair.length<2)return'';const recent=vnextP2RecentEvents(history)[0];if(recent){const other=pair.find(x=>vnextNorm(x)!==vnextNorm(recent));if(other)return other;}return pair[1]||pair[0]||'';}
 function vnextP2IsoDateParts(nowLike=''){const raw=trim(nowLike),m=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return{y:Number(m[1]),m:Number(m[2]),d:Number(m[3]),iso:`${m[1]}-${m[2]}-${m[3]}`};const d=new Date();return{y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate(),iso:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};}
-function vnextP2DateRangeFromPrompt(prompt='',nowLike=''){const p=vnextP17LooseNorm(prompt),base=vnextP2IsoDateParts(nowLike),raw=String(prompt||''),dates=[];for(const m of raw.matchAll(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/g)){let y=m[3]?Number(m[3]):base.y;if(y<100)y+=2000;const mm=Number(m[2]),dd=Number(m[1]);if(mm<1||mm>12||dd<1||dd>31)continue;let iso=`${y}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;if(!m[3]&&iso<base.iso&&/\b(?:hasta|proximo|siguiente)\b/.test(p)){y++;iso=`${y}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}dates.push(iso);}const out={};if(/\bhoy\b/.test(p))out.start_date=base.iso;if(dates.length>=2){out.start_date=dates[0];out.end_date=dates[1];}else if(dates.length===1){if(!out.start_date&&/\b(?:desde|del)\b/.test(p))out.start_date=dates[0];else out.end_date=dates[0];}if(out.start_date&&!out.end_date&&dates.length===1&&out.start_date!==dates[0])out.end_date=dates[0];return out;}
+function vnextP2AddDaysIso(iso='',days=0){const m=trim(iso).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(!m)return'';const d=new Date(Date.UTC(Number(m[1]),Number(m[2])-1,Number(m[3])+Number(days||0)));return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;}
+function vnextP2DateRangeFromPrompt(prompt='',nowLike=''){const p=vnextP17LooseNorm(prompt),base=vnextP2IsoDateParts(nowLike),raw=String(prompt||''),dates=[];for(const m of raw.matchAll(/\b(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?\b/g)){let y=m[3]?Number(m[3]):base.y;if(y<100)y+=2000;const mm=Number(m[2]),dd=Number(m[1]);if(mm<1||mm>12||dd<1||dd>31)continue;let iso=`${y}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;if(!m[3]&&iso<base.iso&&/\b(?:hasta|proximo|siguiente)\b/.test(p)){y++;iso=`${y}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;}dates.push(iso);}const out={};const asksToday=/\bhoy\b/.test(p),asksTomorrow=/\bmanana\b/.test(p),asksAfter=/\b(?:pasado manana|pasadomanana)\b/.test(p);if(asksToday)out.start_date=base.iso;if(asksAfter){out.start_date=out.start_date||base.iso;out.end_date=vnextP2AddDaysIso(base.iso,2);}else if(asksTomorrow){out.start_date=out.start_date||vnextP2AddDaysIso(base.iso,1);out.end_date=vnextP2AddDaysIso(base.iso,1);}if(dates.length>=2){out.start_date=dates[0];out.end_date=dates[1];}else if(dates.length===1){if(!out.start_date&&/\b(?:desde|del)\b/.test(p))out.start_date=dates[0];else out.end_date=dates[0];}if(out.start_date&&!out.end_date&&dates.length===1&&out.start_date!==dates[0])out.end_date=dates[0];return out;}
 
 function vnextP2RepairTranslatedCalls(calls=[],state={},userPrompt='',selectedEventId='',history=[],flowTrace=[],currentDateTime=''){
   const events=vnextP2CatalogMentions(state,userPrompt,'event'),people=vnextP2CatalogMentions(state,userPrompt,'person'),recentEvents=vnextP2RecentEvents(history),recentPeople=vnextP2RecentPeople(history),focus=vnextP119LastStructuredFocus(history),personOps=new Set(['person_profile','person_events','person_income_status','person_event_status']),eventOps=new Set(['event_income_status','event_income_lines','event_attendance','event_summary','event_scenario','event_purchases','event_donations','event_bank','event_weather','event_stores_used','event_products','event_documentation','event_management','event_liquidations']),repeatCue=vnextP2PromptRepeatCue(userPrompt),compareCue=vnextP2CompareCue(userPrompt),otherEventCue=vnextP2OtherEventCue(userPrompt),liqDetailCue=vnextP2LiquidationDetailCue(userPrompt),memorySummaryCue=vnextP2MemorySummaryCue(userPrompt),lastComparison=vnextP2LastComparisonEvents(history);let repairs=0,out=[];
@@ -18645,6 +18651,39 @@ function v437VoiceChatPolish(text=''){
   return t;
 }
 
+function v3122PersonaGrammarGuard(text='',userPrompt=''){
+  let t=trim(text);if(!t)return t;
+  const p=vnextP17LooseNorm(userPrompt),tn=vnextP17LooseNorm(t);
+  // La identidad se demuestra por el habla; no se recita como una ficha.
+  if(/\b(?:eres hombre o mujer|eres un hombre|eres hombre|eres mujer)\b/.test(p))return'¿Me estás vacilando? Con esta voz y a estas alturas, tú sabrás. Venga, al lío.';
+  if(/\b(?:soy un planificador conversacional|soy un modelo|soy una ia|no tengo genero|no tengo género)\b/.test(tn))return'No me líes con etiquetas, hombre. Soy el Zuzu de siempre; venga, al asunto.';
+  const swaps=[['sola','solo'],['lista','listo'],['tranquila','tranquilo'],['despistada','despistado'],['encantada','encantado'],['jubilada','jubilado'],['cansada','cansado'],['preparada','preparado'],['liada','liado'],['equivocada','equivocado']];
+  for(const [f,m] of swaps){
+    const patterns=[
+      new RegExp(`\\byo\\s+${f}\\b`,'gi'),
+      new RegExp(`\\b(me\\s+he\\s+(?:quedado|puesto|sentido|liado)\\s+)${f}\\b`,'gi'),
+      new RegExp(`\\b((?:estoy|soy|me\\s+quedo|me\\s+pongo|he\\s+estado)\\s+)${f}\\b`,'gi')
+    ];
+    t=t.replace(patterns[0],`yo ${m}`).replace(patterns[1],(_,lead)=>lead+m).replace(patterns[2],(_,lead)=>lead+m);
+  }
+  // Caso natural frecuente: «me he liado yo sola».
+  t=t.replace(/\bme\s+he\s+liado\s+yo\s+sola\b/gi,'me he liado yo solo');
+  return t;
+}
+function v3122ServerCurrentDateCue(text=''){
+  const p=vnextP17LooseNorm(text);return /\b(?:que dia es hoy|en que dia vivimos|que fecha es hoy|que fecha tenemos|a que dia estamos|en que fecha estamos|que dia vivimos|dia que estamos|fecha que estamos|sabes? en que dia vivimos)\b/.test(p);
+}
+function v3122ServerCurrentDateReply(nowIso='',timeZone='Europe/Madrid'){
+  const iso=trim(nowIso)||new Date().toISOString(),tz=trim(timeZone)||'Europe/Madrid';let label='';
+  try{label=new Intl.DateTimeFormat('es-ES',{timeZone:tz,weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(new Date(iso));}catch(_){label=new Date(iso).toLocaleDateString('es-ES');}
+  return `Hoy es ${label}.`;
+}
+function v3122FastVoiceCovered(results=[]){
+  const covered=new Set(['event_summary','event_purchases','event_income_status','event_income_lines','event_donations','event_bank','event_attendance','compare_events','person_income_status','person_event_status','person_events','person_profile','derive']);
+  const good=arr(results).filter(x=>x?.result);if(!good.length)return false;
+  return good.every(x=>{const name=trim(x?.call?.name);if(name==='local_response')return true;if(name!=='query_ce')return false;return covered.has(trim(x?.result?._vnext_operation||x?.args?.operation));});
+}
+
 // ZUZU V3.10 · tiempo humano y memoria oral.
 // Un timestamp ISO nunca debe llegar tal cual a una respuesta de conversación.
 // Pantalla: fecha legible. Voz: fecha y hora dichas como una persona.
@@ -18764,6 +18803,8 @@ async function v311NaturalVoiceNarrator({userPrompt='',writtenAnswer='',results=
       :'El usuario NO ha pedido cifras: evita importes, recuentos y porcentajes salvo que sean imprescindibles para entender la respuesta. Describe el resultado de forma cualitativa.';
   const input=`Estamos en una conversación HABLADA entre amigos dentro de ControlEvent. Redacta lo que Zuzu debe decir AHORA.
 
+FECHA/HORA ACTUAL AUTORITATIVA: ${v440HumanizeMachineTime(trim(nowIso)||new Date().toISOString(),{timeZone:trim(timeZone)||'Europe/Madrid',spoken:false,nowIso:trim(nowIso)||new Date().toISOString()})} · ISO=${trim(nowIso)||new Date().toISOString()} · zona=${trim(timeZone)||'Europe/Madrid'}.
+
 MENSAJE ACTUAL DEL USUARIO:
 ${userPrompt}
 
@@ -18779,6 +18820,11 @@ REGLAS OBLIGATORIAS:
 - ${numberRule}
 - No recites nombres de campos, tablas, datasets, indicadores, IDs, JSON, timestamps ISO ni lenguaje de sistema. Las fechas y horas se cuentan como lo haría una persona.
 - Español de España, conversación cercana y espontánea. Nada de tono corporativo o de asistente de soporte.
+- Zuzu ES un hombre español de 64 años, jubilado. Habla siempre de sí mismo en masculino. No anuncies esos datos salvo pregunta expresa; se notan en su carácter, no se recitan.
+- Su carácter es veterano, campechano, directo, algo rudo, socarrón y cachondo en distancias cortas. Humor seco, sin convertirse en caricatura.
+- Si el usuario usa tacos, se burla o te aprieta, NO le des lecciones de modales, NO digas que no toleras ese lenguaje y NO amenaces con desconectarte. Síguele el tono con naturalidad y vuelve al asunto.
+- Si los HECHOS CERTIFICADOS contienen por error una frase sobre la identidad de Zuzu que contradiga esta identidad (por ejemplo género neutro/femenino), IGNÓRALA: la identidad de Zuzu de estas reglas es autoritativa.
+- La fecha/hora actual indicada arriba también es autoritativa. Nunca la deduzcas de fechas de eventos o recuerdos.
 - No uses fórmulas tipo «Entiendo tu frustración», «Lamento la confusión», «Estoy aquí para ayudarte», «¿en qué puedo ayudarte?» salvo que de verdad sea lo único natural; si te corrigen o te insultan, corrige el contenido y sigue.
 - La longitud la marca lo que haya que contar: una frase si basta; normalmente dos o tres frases cortas; si el usuario pide una lista o detalle, da el detalle necesario. No cortes información útil por cumplir una longitud artificial.
 - Si el usuario pide algo abierto como «dame un variadito», «cuéntame algo», «qué tal van las cosas» o «dame info», NO le devuelvas otra pregunta genérica: elige de los hechos dos o tres cosas concretas que merezcan la pena y cuéntaselas.
@@ -18787,7 +18833,7 @@ REGLAS OBLIGATORIAS:
 - Si el usuario corrige una respuesta, no redactes una disculpa de soporte: corrige el contenido y continúa. Si te habla con tacos, no te escandalices ni cambies a tono corporativo.
 - No cierres sistemáticamente con «si quieres…», «¿en qué puedo ayudarte?» ni con una oferta de ayuda.
 - Devuelve SOLO la frase o frases que debe pronunciar Zuzu.`;
-  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,body={contents:[{role:'user',parts:[{text:input}]}],generationConfig:{temperature:.72,topP:.92,maxOutputTokens:240,thinkingConfig:{thinkingLevel:'MINIMAL'}}};
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,body={contents:[{role:'user',parts:[{text:input}]}],generationConfig:{temperature:.68,topP:.9,maxOutputTokens:150,thinkingConfig:{thinkingLevel:'MINIMAL'}}};
   const started=Date.now();try{
     const {res,payload}=await geminiFetchJsonWithTimeout(url,body,apiKey,Number(process.env.CONTROLEVENT_ZUZU_VOICE_NARRATOR_TIMEOUT_MS||3000),externalSignal);
     if(!res.ok)throw Object.assign(new Error(payload?.error?.message||`Gemini narrador HTTP ${res.status}`),{status:res.status,details:payload});
@@ -18801,15 +18847,19 @@ REGLAS OBLIGATORIAS:
 async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}={}){
   const started=Date.now(),actor=usuarioLogado||user||authUser||ce_acceso||{},model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),tools=vnextP2Tools();
   let state=null,stateWaitMs=0,calls=0,decisionMs=0,toolMs=0,narrationMs=0,voiceNarratorMs=0,payload=null,final={title:'Zuzu',answer:'',warnings:[]},results=[],tables=[],charts=[];
+  if(voiceConversation&&v3122ServerCurrentDateCue(userPrompt)){
+    const answer=v3122ServerCurrentDateReply(clientNowIso,clientTimeZone);zuzuTracePush(flowTrace,'ZUZU V3.12.2 · FECHA AUTORITATIVA LOCAL','OK',`${answer} · zona=${trim(clientTimeZone)||'Europe/Madrid'}. Sin planner ni consulta CE.`);const totalMs=Date.now()-started;
+    return{ok:true,rejected:false,title:'Zuzu',answer,spokenAnswer:answer,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-vnext-p2r-local-date',model:'local-clock',interactionId:'',conversationId:trim(conversationId),meta:{generatedAt:new Date().toISOString(),version:'v4_1_exp',architecture:'VNext P2-R ZUZU V3.12.2 · fecha local autoritativa',experimental:true,voiceConversation:true,interactionId:'',resetInteractionId:true,spokenAnswer:answer,resultContext:{operation:'current_date',current_date:trim(clientNowIso)},presentationEvidence:{},capabilityRegistryVersion:CAPABILITY_REGISTRY_VERSION,capabilityCalls:[],tools:[],performance:{totalMs,decisionModelMs:0,stateWaitAfterModelMs:0,dataMs:0,narrationModelMs:0,voiceNarratorMs:0,interactionCalls:0,decisionCalls:0,narrationCalls:0,contractCalls:0,plannerFallbackUsed:false,plannerPrimaryError:''},geminiUsageEstimate:{},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
   const ensureState=async()=>{if(state)return state;const t=Date.now(),loaded=await statePromise;stateWaitMs+=Date.now()-t;state=attachLoggedUserFix10(loaded||{},{usuarioLogado,user,authUser,ce_acceso});return state;};
   let screenEventName='';
   if(trim(selectedEventId)){const st=await ensureState();screenEventName=trim(v26EventById(st,selectedEventId)?.titulo);}
-  const systemInstruction=vnextP2SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientLocalDateTime,screenEventName});
+  const systemInstruction=vnextP2SystemInstruction(selectedEventId,{usuarioLogado,user,authUser,ce_acceso,voiceConversation,clientNowIso,clientLocalDateTime,clientTimeZone,screenEventName});
   zuzuTracePush(flowTrace,'VNEXT P2-R · ARQUITECTURA','OK','1 plan_turn mínimo → traductor determinista CE → contratos canónicos → cierre local. Gemini entiende; CE conoce contratos; el estado recuerda.');
   zuzuTracePush(flowTrace,'VNEXT P2 · WORKSPACE','OK',JSON.stringify(vnextP2Workspace(conversationHistory,screenEventName)||{}).slice(0,900));
   const d0=Date.now(),plannerInput=vnextP2Input(userPrompt,conversationHistory,screenEventName);let rawCalls=[],plannerFallbackUsed=false,plannerPrimaryError='';
   try{
-    payload=await v261CallInteraction({input:plannerInput,previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'VNEXT P2-R · planificador mínimo',toolChoice:'required',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?360:560,minOutputTokens:160,plainTextResponse:true});calls++;rawCalls=v261FunctionCalls(payload);
+    payload=await v261CallInteraction({input:plannerInput,previousInteractionId:'',model,systemInstruction,tools,flowTrace,stage:'VNEXT P2-R · planificador mínimo',toolChoice:'required',externalSignal,maxCalls:1,maxOutputTokens:voiceConversation?240:560,minOutputTokens:96,plainTextResponse:true});calls++;rawCalls=v261FunctionCalls(payload);
     if(!rawCalls.some(x=>trim(x?.name)==='plan_turn')){const raw=trim(v261OutputText(payload));const e=new Error(raw?'Gemini no devolvió plan_turn en el canal de función.':'Gemini devolvió una Interaction sin plan_turn.');e.code='P2R_PLAN_PROTOCOL';throw e;}
   }catch(error){
     plannerPrimaryError=cleanGeminiError(error);zuzuTracePush(flowTrace,'VNEXT P2-R · PLAN TRANSPORT GUARD','WARN',`Falla el canal Interactions/function_call (${plannerPrimaryError}). Se intenta una sola vez el mismo plan mínimo por generateContent; no se cambia la semántica ni se reinterpreta un plan ya válido.`);
@@ -18818,7 +18868,7 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
   decisionMs=Date.now()-d0;
   const payloadId=trim(payload?.id);let functionCalls=vnextP2NormalizeCalls(rawCalls,conversationHistory,flowTrace);
   const localNeedsRepair=functionCalls.some(c=>trim(c?.name)==='local_response')&&(vnextP2OtherEventCue(userPrompt)||vnextP2CompareCue(userPrompt)||vnextP2LiquidationDetailCue(userPrompt)||vnextP2MemorySummaryCue(userPrompt)||(voiceConversation&&/\b(?:dame\s+(?:la\s+)?cifra|dame\s+(?:el\s+)?numero|damelo|cuanto|cuantos|y\s+gastos|y\s+donaciones|venga\s+si)\b/.test(vnextP17LooseNorm(userPrompt))));
-  if(functionCalls.some(c=>trim(c?.name)==='query_ce'||trim(c?.name)==='recall_memory')||localNeedsRepair){const stForRepair=await ensureState();functionCalls=vnextP2RepairTranslatedCalls(functionCalls,stForRepair,userPrompt,selectedEventId,conversationHistory,flowTrace,clientLocalDateTime||clientNowIso);functionCalls=vnextP122NormalizeMemoryCalls(functionCalls,conversationHistory,flowTrace);}
+  if(functionCalls.some(c=>trim(c?.name)==='query_ce'||trim(c?.name)==='recall_memory')||localNeedsRepair){const stForRepair=await ensureState();functionCalls=vnextP2RepairTranslatedCalls(functionCalls,stForRepair,userPrompt,selectedEventId,conversationHistory,flowTrace,clientNowIso||clientLocalDateTime);functionCalls=vnextP122NormalizeMemoryCalls(functionCalls,conversationHistory,flowTrace);}
   if(!functionCalls.length){
     const raw=trim(v261OutputText(payload)),leak=vnextP110LooksLikeInternalCall(raw);if(leak)zuzuTracePush(flowTrace,'VNEXT P2 · PROTOCOL GUARD','WARN','La única decisión imprimió protocolo interno; no se reintenta ni se expone.');
     final={title:'Zuzu',answer:leak?'No he podido convertir esa petición en una acción válida. Dime qué dato quieres y seguimos desde el mismo punto.':(raw||'No he podido cerrar esa respuesta con suficiente claridad.'),warnings:[]};
@@ -18863,7 +18913,7 @@ async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flow
     }
   }
   if(vnextP2IdentityQuestion(userPrompt)&&results.filter(x=>x?.result).every(x=>trim(x?.call?.name)==='local_response')){const display=zuzuLoggedUserDisplayName({usuarioLogado,user,authUser,ce_acceso});final={...final,title:'Zuzu',answer:`Aquí te conozco como ${display}. No tengo base para afirmar otra identidad o relación distinta de la que consta en esta sesión.`};zuzuTracePush(flowTrace,'VNEXT P2-R · IDENTITY GROUNDING','OK',`Identidad limitada al usuario autenticado de sesión: ${display}.`);}
-  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),rawWrittenAnswer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.',writtenAnswer=voiceConversation?v440HumanizeMachineTime(rawWrittenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:false,nowIso:clientNowIso}):rawWrittenAnswer;let spokenAnswer=writtenAnswer,voiceWantsFigures=false;if(voiceConversation){voiceWantsFigures=v437VoiceWantsFigures(userPrompt);const n0=Date.now(),natural=await v311NaturalVoiceNarrator({userPrompt,writtenAnswer,results:results.filter(x=>x?.result),conversationHistory,flowTrace,externalSignal,timeZone:trim(clientTimeZone)||'Europe/Madrid',nowIso:clientNowIso});voiceNarratorMs=Date.now()-n0;if(natural){spokenAnswer=natural;calls++;}else spokenAnswer=v440HumanizeMachineTime(writtenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:true,nowIso:clientNowIso});}else{const unitGuard=v416VoiceUnitOracle(writtenAnswer,writtenAnswer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||writtenAnswer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`});spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true);}const answer=writtenAnswer,usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
+  const stForVoice=state||{},answer0=v29SanitizeAnswerMarkup(vnextP1222StripInternalMetadata(trim(final.answer))),rawWrittenAnswer=answer0||'No he podido cerrar esa respuesta con suficiente claridad.',writtenAnswer=voiceConversation?v440HumanizeMachineTime(rawWrittenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:false,nowIso:clientNowIso}):rawWrittenAnswer;let spokenAnswer=writtenAnswer,voiceWantsFigures=false;if(voiceConversation){voiceWantsFigures=v437VoiceWantsFigures(userPrompt);const goodVoice=results.filter(x=>x?.result);if(v3122FastVoiceCovered(goodVoice)){const fast=v437VoiceAnswerFromResults(goodVoice,stForVoice,userPrompt,writtenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',nowIso:clientNowIso});spokenAnswer=trim(fast?.spoken)||v440HumanizeMachineTime(writtenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:true,nowIso:clientNowIso});zuzuTracePush(flowTrace,'ZUZU V3.12.2 · VOZ FAST','OK','Respuesta oral construida desde hechos CE/plan CHAT sin segunda llamada de narrador.');}else{const n0=Date.now(),natural=await v311NaturalVoiceNarrator({userPrompt,writtenAnswer,results:goodVoice,conversationHistory,flowTrace,externalSignal,timeZone:trim(clientTimeZone)||'Europe/Madrid',nowIso:clientNowIso});voiceNarratorMs=Date.now()-n0;if(natural){spokenAnswer=natural;calls++;}else spokenAnswer=v440HumanizeMachineTime(writtenAnswer,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:true,nowIso:clientNowIso});}spokenAnswer=v3122PersonaGrammarGuard(spokenAnswer,userPrompt);}else{const unitGuard=v416VoiceUnitOracle(writtenAnswer,writtenAnswer,stForVoice,null),spokenHuman=humanizeSpokenEntities(unitGuard.spoken||writtenAnswer,stForVoice,{currentDate:clientLocalDateTime||clientNowIso,seed:`vnextp2|${payloadId}|${userPrompt}`});spokenAnswer=v40ConversationalPolish(spokenHuman.text,userPrompt,true);}if(voiceConversation&&!v437VoiceWantsFigures(userPrompt)&&spokenAnswer.length>300){const cut=spokenAnswer.slice(0,300),m=cut.match(/^([\s\S]*[.!?])(?:\s|$)/);spokenAnswer=trim(m?.[1]||cut.replace(/[,;:\s]+$/,'')+'.');}const answer=writtenAnswer,usage=summarizeGeminiUsageFromTrace(flowTrace),totalMs=Date.now()-started,resultContext=vnextP2ContextFromResults(results,final,conversationHistory,userPrompt);
   // FIX11 · En voz los datasets siguen vivos en resultContext para razonar y mantener el hilo,
   // pero NO se materializan en la UI. Hablamos; no obligamos al usuario a mirar una tabla minúscula.
   const outputTables=tables.filter(Boolean).slice(0,8),persistentTables=outputTables.length?outputTables:vnextP1222PersistentTables(resultContext,flowTrace),finalTables=persistentTables.filter(Boolean).slice(0,8),visibleTables=voiceConversation?[]:finalTables,visibleCharts=voiceConversation?[]:charts.slice(0,8),presentationEvidence=vnextP124PresentationEvidence(visibleTables,visibleCharts);

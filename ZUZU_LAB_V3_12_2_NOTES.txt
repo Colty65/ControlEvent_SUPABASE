@@ -1,0 +1,20 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.12.2 STABLE CORE
+Base: V3.12.1 / V3.12 estable. No Gemini Live.
+
+Cambios limitados:
+- Fecha/hora cliente autoritativa en planner y narrador; fecha directa se resuelve localmente sin Gemini.
+- Identidad oral Zuzu: hombre español 64 años, jubilado; masculino estable; campechano, rudo, socarrón, humor seco. No recita ficha salvo contexto explícito.
+- Guard final de gramática/identidad para evitar femenino, 'no tengo género' o lenguaje interno de planner/modelo.
+- Fast voice para operaciones comunes: elimina una segunda llamada de narrador Gemini cuando CE ya tiene los hechos.
+- Planner oral y narrador con presupuestos de salida menores; oral largo recortado a ~300 caracteres salvo detalle/cifras solicitadas.
+- Doble ghost guard (servidor + cliente) para microaudios que STT convierte en racimos de aliases Zuzu/Zuzito/Antonio/Antoñito.
+- Prompt STT sin cebado de nombres.
+- Nueva persistencia diagnóstica v3122: sessionStorage, máximo 220 eventos, render 140, escritura debounced, limpia claves LAB antiguas.
+- Backoff 10 min de Gemini TTS en desktop tras fallo sin audio, para evitar reintentos inútiles mientras la cuota/modelo no entrega audio.
+- Algenib + Interactions API se conserva como voz principal. DaveFX se conserva como fallback estable. iOS conserva el bloqueo del fallback pesado de V3.12.
+
+Pruebas:
+- test:zuzu-lab-v3122 32/32
+- test:liquidaciones-compras 70/70
+- test:execution-controlled 76/76
+- test:bank49-manual 8/8
