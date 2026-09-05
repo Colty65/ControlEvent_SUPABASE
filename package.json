@@ -103,7 +103,8 @@
     "test:zuzu-lab-v312": "node scripts/v4-1-exp-zuzu-lab-v312-tts-interactions-recovery-regression.cjs",
     "test:zuzu-lab-v3121": "node scripts/v4-1-exp-zuzu-lab-v3121-stable-tune-regression.cjs",
     "test:zuzu-lab-v3122": "node scripts/v4-1-exp-zuzu-lab-v3122-stable-core-regression.cjs",
-    "test:zuzu-lab-v3123": "node scripts/v4-1-exp-zuzu-lab-v3123-stable-remap-regression.cjs"
+    "test:zuzu-lab-v3123": "node scripts/v4-1-exp-zuzu-lab-v3123-stable-remap-regression.cjs",
+    "test:zuzu-lab-v3124": "node scripts/v4-1-exp-zuzu-lab-v3124-balanced-numbers-settle-regression.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

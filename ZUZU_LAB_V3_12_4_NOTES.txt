@@ -1,0 +1,12 @@
+ControlEvent v4_1_exp · ZUZU LAB V3.12.4
+
+Base: V3.12.3, sin cambiar arquitectura de voz.
+
+Cambios:
+- Cifras equilibradas: 1-3 cifras útiles por defecto en consultas factuales, salvo petición explícita sin cifras.
+- Peticiones cuantitativas explícitas amplían detalle; máximos/mínimos incluyen elemento + valor.
+- «compra de más valor / más cara / mayor importe» activa modo cuantitativo.
+- Derive MAX/MIN devuelve ganador + cifra, no solo el número desnudo.
+- Asentamiento semántico genérico: si al llegar la transcripción ya empezó otra captura, retiene y une ambas antes de UNA consulta VNext.
+- Acknowledgements breves («Muy bien», «Gracias», «Vale») no gastan una llamada VNext.
+- Se preservan fecha/meteo autoritativas, personalidad, ghost guard, STT corto y DaveFX progresivo.
