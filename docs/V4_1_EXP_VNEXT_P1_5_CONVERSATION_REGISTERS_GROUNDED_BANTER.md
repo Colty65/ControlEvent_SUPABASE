@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · VNext P1.5 · Conversation Registers + Grounded Banter
+# ControlEvent v5.0_exp · VNext P1.5 · Conversation Registers + Grounded Banter
 
 P1.5 mantiene el fast path paralelo de P1.4 (una sola Interaction IA en consultas factuales normales) y separa de forma explícita el dato escrito de su oralización social.
 

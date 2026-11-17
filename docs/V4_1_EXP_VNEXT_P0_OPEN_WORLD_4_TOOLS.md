@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · Zuzu VNext P0
+# ControlEvent v5.0_exp · Zuzu VNext P0
 
 Prototipo paralelo a BANK4_27. No sustituye el Ledger vigente.
 

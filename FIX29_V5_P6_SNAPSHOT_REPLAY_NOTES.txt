@@ -1,0 +1,60 @@
+ControlEvent v5.0_exp · FIX29 · V5 CORE P6
+============================================
+
+Objetivo
+--------
+Cerrar los 9 KO observados en la ITV C/S/O · 36 de FIX28 sin rediseñar el modelo C→S→O→R/V.
+
+Cambios funcionales
+-------------------
+1. VIEW_ONLY con reactivación/anclaje
+   - «retoma/vuelve ... y ponlo en barras/líneas» puede recuperar el C/S correspondiente y cambiar solo V.
+   - No ejecuta Gemini ni query_ce cuando el turno no modifica hechos.
+   - Un dominio factual nuevo dentro de la misma frase sigue teniendo prioridad (p.ej. compras por responsable + donut NO es VIEW_ONLY).
+
+2. Multi-O financiera explícita
+   - Banco + estado de ingresos se conservan como O independientes.
+   - Resumen + banco + ingresos se conservan como tres O independientes.
+   - Pendiente de ingreso se consulta mediante event_income_status; no se colapsa en Banco ni se deduce por diferencias.
+
+3. Replay de S por firma de operaciones
+   - Una reactivación factual compuesta localiza dentro del C la S que contiene las O solicitadas.
+   - Se reejecuta la receta de esa S para refrescar los datos y se continúa desde ahí.
+   - La selección se basa en operaciones/dominio, no en frases de ITV ni nombres concretos.
+
+4. Unión inmutable de O
+   - Nuevo helper v5MergeOperationsImmutable.
+   - Las O heredadas se clonan completas antes de incorporar nuevas O/evidencia.
+   - Una continuación aditiva no sustituye el array anterior.
+
+5. ITV C/S/O · 36
+   - Para comprobar donut de donaciones, el fixture estructural elige dinámicamente un evento que tenga donaciones si existe alguno.
+   - No se hard-codea ningún nombre de evento: se selecciona por propiedad real de los datos.
+
+NHC / hard-code
+---------------
+NO se han añadido:
+- nombres de personas;
+- nombres de eventos;
+- importes;
+- respuestas preparadas;
+- frases de la ITV dentro del runtime.
+
+Hard-code estructural JUSTIFICADO:
+- catálogo de operaciones/dominios de ControlEvent;
+- tipos de presentación;
+- vocabulario genérico de reactivación/anaphora;
+- relación semántica Banco / estado de ingresos / resumen;
+- límites técnicos ya existentes de C/S/O.
+
+Regresiones locales ejecutadas
+------------------------------
+- V5 P6 snapshot replay: 12/12 OK
+- V5 P5 O contracts: 11/11 OK
+- V5 P4 Sovereign/View: 9/9 OK
+- V5 C/S/O/R/V P3: 17/17 OK
+- Contrato ITV: OK
+- node --check event-ai.service.js: OK
+- node --check zuzu-test-lab.service.js: OK
+
+Estas regresiones son estructurales/locales. La validación real contra datos y Gemini corresponde a ejecutar de nuevo ITV C/S/O · 36.

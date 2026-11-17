@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · VOICE-NEXT 1
+ControlEvent v5.0_exp · VOICE-NEXT 1
 ====================================
 Objetivo: reconstruir desde cero la capa oral sin tocar el cerebro VNext/CE ni el resto de módulos.
 

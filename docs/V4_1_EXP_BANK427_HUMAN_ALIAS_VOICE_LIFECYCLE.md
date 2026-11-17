@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4_27
+# ControlEvent v5.0_exp · BANK4_27
 
 ## Objetivo
 Cerrar tres molestias de experiencia real sin reabrir la arquitectura semántica:

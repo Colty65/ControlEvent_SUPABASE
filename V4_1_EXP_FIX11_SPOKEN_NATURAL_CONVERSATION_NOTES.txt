@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · FIX11 · SPOKEN NATURAL CONVERSATION
+ControlEvent v5.0_exp · FIX11 · SPOKEN NATURAL CONVERSATION
 ============================================================
 
 OBJETIVO
@@ -56,7 +56,7 @@ REGRESIONES
 - P2-R: 36/36
 - Ejecución controlada: 76/76
 - Liquidaciones compras: 70/70
-- Versionado v4_1_exp: 10/10
+- Versionado v5.0_exp: 10/10
 
 NOTA LEGACY
 -----------

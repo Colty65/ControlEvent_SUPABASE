@@ -1,0 +1,39 @@
+ControlEvent v5.0_exp · FIX24 · AUDITORÍA DE HARD-CODE
+Fecha: 09/09/2026
+
+CRITERIO
+=======
+Llamo hard-code a cualquier decisión de runtime fijada en código en lugar de provenir de datos/configuración/modelo. Distingo:
+A) Hard-code de NEGOCIO/ENTIDAD: nombres de personas, eventos, importes, responsables, productos concretos. NO aceptable en el núcleo conversacional.
+B) Hard-code ESTRUCTURAL: nombres de capacidades, estados válidos, tipos de gráfica y reglas invariantes del modelo de datos. Aceptable y necesario si describe el contrato real de ControlEvent.
+C) Hard-code LINGÜÍSTICO: listas/regex de palabras para reconocer dominios. Es hard-code, aunque sea genérico. Debe ser pequeño, transparente y no contener casos de prueba ni entidades concretas.
+D) Hard-code de PRUEBAS: frases fijas dentro de ITV. Aceptable porque no interviene en el runtime y sirve para regresión reproducible.
+
+NUEVO V5 MULTI-CONTEXT (FIX24)
+===============================
+1. NO contiene nombres de personas concretas, eventos concretos, importes concretos ni respuestas preparadas para la ITV.
+2. Mantiene hasta 12 contextos lógicos recientes. El 12 es un límite técnico de memoria/tamaño de payload, no una regla de negocio. Es configurable en una fase posterior si hiciera falta.
+3. Dominios estructurales codificados: weather, bank, income, purchases, donations, attendance, comparison, summary, documentation, management, liquidations, events_overview y person. JUSTIFICADO: son capacidades reales del contrato de ControlEvent y permiten que cada contexto sea ejecutable.
+4. Estados de ingreso tratados explícitamente: Banco, Bizum, Efectivo y Pendiente. JUSTIFICADO: son estados/canales reales de los datos. La categoría Pendiente NO se deriva por resta.
+5. Tipos de gráfica: line, bar, pie, donut (y horizontalBar donde ya existía). JUSTIFICADO: son tipos soportados por el renderer.
+6. Existe un selector lingüístico determinista muy pequeño para reactivar un contexto por referencias explícitas de dominio (p. ej. banco/tiempo/compras/donaciones/asistencia). SÍ ES HARD-CODE LINGÜÍSTICO. JUSTIFICACIÓN: evita una llamada IA adicional, mantiene latencia baja y reduce cambios de foco aleatorios. NO contiene nombres propios ni frases de ITV. Si hay referencia no reconocible, se conserva el contexto activo y Gemini interpreta el turno.
+7. Las 32 frases de ITV MULTI-CONTEXTO son HARD-CODE DE PRUEBA. Están solo en zuzu-test-lab.service.js y nunca se usan para interpretar preguntas reales.
+
+HARD-CODE LEGACY QUE SIGUE EXISTIENDO FUERA DEL NUEVO NÚCLEO
+=============================================================
+La aplicación histórica contiene código anterior al V5 que no he borrado a ciegas porque también sirve a otras funciones. Lo relevante encontrado:
+
+- Ubicación meteorológica por defecto: "Villanueva de Bogas, Toledo". Está detrás de variables de entorno CONTROLEVENT_WEATHER_PLACE / WEATHER_PLACE. Es un fallback de despliegue, no una regla conversacional. JUSTIFICACIÓN PARCIAL: hoy coincide con el uso de la app; recomendable moverlo íntegramente a configuración si la app se generaliza.
+
+- Reglas canónicas de socios que mencionan el criterio "ColtyLAB" y exclusiones z_DEV/Grupo/Peña/Personas. Son reglas de negocio históricas del censo, no del nuevo motor de conversación. JUSTIFICADO solo mientras sigan siendo la definición oficial de socio canónico.
+
+- Parser legacy de donaciones contiene un fallback de responsable con nombre concreto "Colty" en varias líneas antiguas. ESTO ES HARD-CODE DE ENTIDAD Y NO LO CONSIDERO NHC-LIMPIO. No lo he eliminado en FIX24 porque afecta al parser/importación de donaciones y quitarlo sin revisar datos antiguos podría cambiar imputaciones. Debe revisarse como tarea separada y sustituirse por configuración/defaultResponsibleName obligatorio o por dato del evento.
+
+- En bloques/prompt legacy anteriores existen ejemplos con nombres/eventos concretos (Colty, Esther, Pocholo, SySA...). No están en el nuevo bloque V5 Multi-Context, pero sí siguen en código histórico que puede ser usado por rutas legacy. NO LOS CONSIDERO IDEALES. Deben inventariarse y eliminarse/generalizarse cuando confirmemos qué rutas legacy siguen activas.
+
+COMPROMISO NHC DE FIX24
+=======================
+- Ninguna frase de ITV se ha copiado al runtime.
+- Ningún nombre, importe o evento de las pruebas se ha añadido al nuevo selector/contexto.
+- Las decisiones nuevas se basan en dominios, operaciones, estados y referencias conversacionales genéricas.
+- No declaro la aplicación completa "sin hard-code": todavía existe hard-code legacy documentado arriba. Sí declaro que el NUEVO NÚCLEO MULTI-CONTEXTO no añade hard-code de negocio/entidad.

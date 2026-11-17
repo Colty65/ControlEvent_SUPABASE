@@ -1,0 +1,23 @@
+AUDITORÍA NHC · FIX36 P13
+
+NO se han añadido al runtime:
+- nombres concretos de personas de las pruebas;
+- nombres concretos de eventos;
+- importes concretos;
+- respuestas preparadas para preguntas de ITV/PDF;
+- reglas «si Carmelo...», «si Cordo...», «si Pana...», etc.
+
+HARD-CODE ESTRUCTURAL JUSTIFICADO
+1. Verbos/señales lingüísticas genéricas de replay: ejecutar, repetir, actualizar, hoy, ahora, misma consulta.
+   Motivo: clasificar el acto conversacional MEMORY→FACT sin una segunda IA.
+2. Respuestas afirmativas breves: sí/vale/ok/de acuerdo/hazlo/adelante.
+   Motivo: aceptar una sugerencia explícita de Zuzu sin reinterpretar el dominio.
+3. Tipos de vista procedentes del registro real del View Engine.
+   Motivo: capacidades técnicas del renderer, no reglas de negocio.
+4. Umbral temporal del lease multipestaña (15 s) y heartbeat (5 s).
+   Motivo: coordinación técnica entre pestañas; no afecta a datos ni semántica empresarial.
+5. Campo canónico income_pending_by_event del dossier de persona.
+   Motivo: contrato del modelo de datos para responder «pendientes de esta persona» sin usar los pendientes del evento activo.
+
+NHC
+Las entidades se resuelven desde los catálogos reales de ControlEvent. La memoria se certifica mediante evidencia textual del episodio y las consultas actuales se ejecutan contra operaciones canónicas, no contra casos concretos de prueba.

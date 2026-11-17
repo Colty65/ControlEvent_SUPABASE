@@ -1,0 +1,13 @@
+const fs=require('fs');const ai=fs.readFileSync('services/event-ai.service.js','utf8'),lab=fs.readFileSync('services/zuzu-test-lab.service.js','utf8');let ok=0,ko=0;const t=(n,c)=>{console.log((c?'OK ':'KO ')+n);c?ok++:ko++;};
+t('P5 rango meteorológico genérico',/function v5RequestedWeatherRange/.test(ai)&&/proximos\?\\s\+/.test(ai)&&/requested_dates/.test(ai));
+t('meteo impone rango después del planner',/V5 P5 · CONTRATO METEO/.test(ai)&&/start_date:trim\(range\?\.start_date\)/.test(ai));
+t('multi-O usa unión inmutable y adjunta evidence tras crear O',/function v5MergeOperationsImmutable/.test(ai)&&/same=v5MakeOperation\(a,seq,merged\.length\)/.test(ai)&&/if\(evidenceBySig\.has\(sig\)\)same\.evidence/.test(ai));
+t('router reconoce compras explícitas',/responsables\?\\s\+de\\s\+compras/.test(ai));
+t('agrupación por responsable es breakdown',/agrup\\w\*\|desglos\\w\*\|ordenad\\w\*/.test(ai));
+t('evidencia conserva by_responsible y weather',/by_responsible/.test(ai)&&/weather/.test(ai)&&/function v5CompactEvidence/.test(ai));
+t('memoria entra en O con result',/operation:'recall_memory'[\s\S]{0,180}result:mem\.result/.test(ai));
+t('ITV viewOnly omite exigencia de ejecución factual',/d\.struct36===true&&d\.viewOnly===true/.test(lab));
+t('VIEW_ONLY sigue prohibiendo CE',/VIEW_ONLY ejecutó/.test(lab));
+t('voz cita responsables en breakdown',/Por responsable:/.test(ai)&&/names\.slice\(0,7\)/.test(ai));
+t('sin entidades concretas en bloque P5',!/(Carmelo|Colty|Pocholo|FUNCION 2026)/.test(ai.slice(ai.indexOf('function v5RequestedWeatherRange'),ai.indexOf('async function v4BrainLitePlan'))));
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;

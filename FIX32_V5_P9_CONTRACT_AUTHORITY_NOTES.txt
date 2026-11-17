@@ -1,0 +1,32 @@
+ControlEvent v5.0_exp · FIX32 · V5 P9 CONTRACT AUTHORITY
+
+OBJETIVO
+Convertir la arquitectura ya diseñada en la autoridad real del runtime:
+FACTUAL CONTRACT -> C/S -> O -> VIEW CONTRACT -> R.
+Las rutas legacy pueden proponer una interpretación, pero P9 es la última autoridad antes de CE.
+
+CAMBIOS
+1. Factual Contract final
+   - Detecta el dominio factual sin dejar que una petición gráfica lo secuestre.
+   - Compras por responsable + donut => O=event_purchases, group_by=responsible; V=donut después.
+2. Dimensión semántica en S
+   - Si un S de compras estaba agrupado por responsable, continuaciones como ordenar/ranking/lista heredan esa dimensión salvo cambio explícito.
+3. Aislamiento de entidad
+   - group_by=responsible fuerza person/responsible vacíos también en C/S, no solo en args de CE.
+4. Multi-O
+   - “Y añade pendiente de ingreso” sobre C_BANK mantiene C_BANK y ejecuta O_bank + O_income_status.
+   - En C_SUMMARY, banco/ingreso se añaden sin destruir el resumen.
+5. Síntesis transversal
+   - C_SYNTHESIS exige O summary + bank + purchases + donations + attendance antes de R.
+6. Registro real de V
+   - bar, line, pie y donut salen de un único registro usado también para responder “qué gráficas puedes hacer”.
+   - dispersión/scatter no cae silenciosamente a la vista anterior: se informa de que no está disponible.
+7. Memory R
+   - pasajes de evidencia se deduplican y no se vuelca metadata interna redundante.
+8. ITV nueva
+   - ITV AUTORIDAD · 18 sustituye visualmente a la antigua batería de aislamiento en la consola.
+   - Añade herencia de dimensión y consulta de capacidades/no soportadas.
+
+RENDIMIENTO
+P9 no añade llamadas IA. La autoridad final es local y determinista.
+Los VIEW_ONLY y consultas de capacidades siguen con 0 Gemini / 0 CE.

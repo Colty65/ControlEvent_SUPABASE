@@ -1,0 +1,15 @@
+ControlEvent v5.0_exp · FIX26 · V5 C/S/O/R/V runtime hotfix
+
+CAUSA RAÍZ
+- FIX25 introdujo llamadas a v5ContextHash() para generar IDs estables de operaciones/snapshots, pero la función no quedó definida en runtime.
+- Eso provoca ReferenceError en el primer turno, impide crear C/S/O y fuerza la ruta soft-failure.
+- La ITV C/S/O se aborta por cascada: 7/36 ejecutados, 0 contextos creados.
+
+CORRECCIÓN
+- Se define v5ContextHash() como wrapper técnico de la función hash estable ya existente v61Hash().
+- No se añade semántica de negocio, nombres, eventos, importes ni frases de prueba.
+- Se cambia el cache-buster de la consola ITV a FIX26.
+- Se endurece la regresión para comprobar que v5ContextHash existe antes de v5MakeOperation.
+
+NHC
+- Este cambio es puramente técnico/estructural. No introduce hard-code funcional.

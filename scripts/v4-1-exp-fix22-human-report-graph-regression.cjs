@@ -1,0 +1,20 @@
+const fs=require('fs');
+const ai=fs.readFileSync('services/event-ai.service.js','utf8');
+const lab=fs.readFileSync('services/zuzu-test-lab.service.js','utf8');
+let ok=0,ko=0;function t(n,c){console.log((c?'OK  ':'KO  ')+n);c?ok++:ko++;}
+t('contexto conserva modo y audiencia de informe',/report_mode:trim\(last\.report_mode\).*report_audience:trim\(last\.report_audience\)/s.test(ai));
+t('semántica detecta informe para Dirección',/reportExecutive=.*direccion.*directiv/s.test(ai));
+t('seguimiento añade gráficas al mismo informe',/reportChartFollow=.*(?:esto|informe|anterior|mismo)/s.test(ai));
+t('responsables con importe se resuelven como desglose',/responsibleBreakdown=.*responsabl.*importe/s.test(ai));
+t('solo efectivo tiene respuesta compacta propia',/sem\.cashOnly&&income.*En efectivo fueron/s.test(ai));
+t('meteorología explícita tiene guardia antes del commit',/METEO DIRECTA/.test(ai));
+t('informe de Dirección elimina tablas',/report_audience.*direction.*tables=\[\]/s.test(ai));
+t('informes generan gráficas reales',/v4BrainLiteReportCharts\(good/.test(ai));
+t('informe ejecutivo usa texto propio, no volcado bruto',/Informe para Dirección/.test(ai)&&/Resumen ejecutivo/.test(ai)&&/Situación bancaria/.test(ai));
+t('texto local aplica pulido amistoso',/v4BrainLiteFriendlyText\(written,userPrompt\)/.test(ai));
+t('voz de informe no lee el dossier completo',/Te he preparado el informe/.test(ai)&&/por voz te resumo lo esencial/.test(ai));
+t('arquitectura se identifica como FIX22',/V4 BRAIN-LITE FIX22/.test(ai));
+t('ITV dura valida resumen económico',/check==='summary'/.test(lab));
+t('ITV dura invalida asistencia truncada',/lista está incompleta/.test(lab));
+t('ITV dura valida respuesta solo efectivo',/check==='cashOnly'/.test(lab));
+console.log(`\nFIX22 ${ok} OK / ${ko} KO`);process.exit(ko?1:0);

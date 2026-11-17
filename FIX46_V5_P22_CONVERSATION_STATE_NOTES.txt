@@ -1,0 +1,27 @@
+FIX46 · V5 P22 · CONVERSATION STATE
+
+Objetivo
+- Cerrar fugas de continuidad vistas en la batería manual de 26 turnos: confirmaciones cortas, volver al recuerdo, cancelar/esperar, retomar y reacciones sociales.
+- Mantener la regla soberana: Gemini decide la semántica factual; el runtime solo conserva y entrega estado conversacional estructurado, valida y ejecuta.
+
+Cambios
+1. Estado explícito entregado a Gemini:
+   - active_context
+   - memory_frame
+   - pending_action
+   - last_successful_action
+2. Confirmaciones naturales: sí, sí hazlo, vale, claro, venga, adelante, perfecto, hazlo.
+3. Retomar acción pendiente: continúa, sigue, retoma, haz lo de antes, haz eso, lo de antes.
+4. Cancelación/suspensión: espera, no espera, para, un momento, mejor no, déjalo, no lo hagas.
+   - No ejecuta CE.
+   - No destruye MEMORY_FRAME.
+   - PENDING_ACTION queda suspendida y puede retomarse.
+5. Navegación de recuerdo reconoce vuelve/vuelva/volver/retoma/regresa y recupera el último recuerdo abierto sin búsqueda nueva.
+6. Reacción social: 0 cambio de MEMORY_FRAME, PENDING_ACTION y LAST_SUCCESSFUL_ACTION.
+7. Voz/personaje: se elimina la mención de Gemini en las locuciones de recuerdo/comparación; Zuzu habla en primera persona.
+
+No se cambia
+- P16 Gemini Sovereign Contracts.
+- P18 Memory→Now sovereign execution.
+- P21 persistencia Brain-Lite.
+- Scope, datos CE, ranking de memoria o cálculos empresariales.

@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4_26
+# ControlEvent v5.0_exp · BANK4_26
 
 ## Objetivo
 

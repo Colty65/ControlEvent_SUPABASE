@@ -1,0 +1,23 @@
+const fs=require('fs');
+const path=require('path');
+const root=path.resolve(__dirname,'..');
+const ui=fs.readFileSync(path.join(root,'public/app/features/v11-3-zuzu-analitica-libre.js'),'utf8');
+const app=fs.readFileSync(path.join(root,'server/app.js'),'utf8');
+const voice=fs.readFileSync(path.join(root,'routes/zuzu-voice.routes.js'),'utf8');
+const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const pkg=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8'));
+const ps=fs.readFileSync(path.join(root,'scripts/iphone-https.ps1'),'utf8');
+let ok=0,ko=0;
+function t(n,c){if(c){console.log('OK ',n);ok++;}else{console.error('KO ',n);ko++;}}
+t('ruta STT de Zuzu registrada en Express',/import zuzuVoiceRoutes/.test(app)&&/app\.use\('\/api', zuzuVoiceRoutes\)/.test(app));
+t('botón HABLAR es principal y claro',/id="ceAiMic"[^>]*>🎙 HABLAR</.test(ui)&&/⌨ ENVIAR TEXTO/.test(ui));
+t('micro usa getUserMedia',/getUserMedia\(\{audio:/.test(ui));
+t('iPhone puede grabar audio mp4',/audio\/mp4/.test(ui)&&/cePreferredRecorderMime/.test(ui));
+t('VAD envía tras silencio',/1100/.test(ui)&&/ceStartVad/.test(ui)&&/Cuando calles, lo envío solo/.test(ui));
+t('bloquea micro inseguro fuera de localhost',/window\.isSecureContext/.test(ui)&&/npm run iphone:https/.test(ui));
+t('endpoint transcribe sigue siendo Gemini STT',/fetch\('\/api\/zuzu-voice\/transcribe'/.test(ui)&&/transcribeZuzuVoice/.test(voice));
+t('Brain-Lite conoce capacidad de voz',/CAPACIDAD DE INTERFAZ: Zuzu puede recibir voz/.test(svc));
+t('script npm iphone:https existe',pkg.scripts&&pkg.scripts['iphone:https']&&/iphone-https\.ps1/.test(pkg.scripts['iphone:https']));
+t('script crea túnel HTTPS Cloudflare',/cloudflared/.test(ps)&&/tunnel --url/.test(ps)&&/https:\/\//.test(ps));
+console.log(`\nUNIFIED MIC + IPHONE HTTPS: ${ok} OK · ${ko} KO`);
+process.exitCode=ko?1:0;

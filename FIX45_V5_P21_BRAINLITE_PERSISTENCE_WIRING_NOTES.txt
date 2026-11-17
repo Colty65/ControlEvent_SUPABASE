@@ -1,0 +1,27 @@
+FIX45 · V5 P21 · BRAIN-LITE PERSISTENCE WIRING
+
+ROOT CAUSE CONFIRMED
+- The production UI is running Brain-Lite.
+- Typed and voice VNext requests were forcing conversationId:'' instead of reusing the server conversation id already returned.
+- runZuzuBrainLiteAgent produced answers but did NOT call ensureZuzuConversation/appendZuzuTurn.
+- Therefore recent Brain-Lite conversations could answer correctly while never reaching ce_zuzu_conversations / ce_zuzu_turns.
+- This explains why MEM could not see the just-created Celes turn and why Supabase recent memory appeared to stop days earlier.
+
+FIX
+1. Brain-Lite is split into semantic core + persistence wrapper.
+2. The semantic core is unchanged and remains Gemini-sovereign.
+3. After a successful result, the wrapper:
+   - ensures/reuses the server conversation,
+   - appends the completed turn,
+   - executes the existing read-after-write verification,
+   - returns conversationId / turnId / turnSeq / persistence evidence.
+4. Typed and voice UI now send loadZuzuServerConversationId() instead of blank conversationId.
+5. Historical memory replies are stored as reference/technical memory so they do not recursively create memories of memories.
+6. MEM now shows a visible warning when the persistence-audit endpoint fails instead of silently hiding that block.
+
+ARCHITECTURAL GUARANTEE
+Persistence is AFTER the answer is decided. It does not reinterpret or modify operation, scope, event, person, filters or response. Gemini sovereignty is untouched.
+
+TEST
+P21 Brain-Lite persistence wiring: 9/9 OK.
+Syntax: OK.

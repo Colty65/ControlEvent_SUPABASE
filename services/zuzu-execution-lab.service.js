@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · ITV EJECUCIÓN CONTROLADA V1 FIX6
+/* ControlEvent v6_1-exp · ITV EJECUCIÓN CONTROLADA V1 FIX6
    Laboratorio read-only: contexto real -> Intérprete Gemini V2.3 -> traductor conceptual ->
    executor canónico CE REAL. No sustituye Zuzu, no genera respuesta narrativa y no escribe BBDD. */
 import { getState } from './state.service.js';

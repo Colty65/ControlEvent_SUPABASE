@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4.3
+# ControlEvent v5.0_exp · BANK4.3
 
 Correcciones sobre BANK4.2 tras prueba real del 27/08/2026.
 

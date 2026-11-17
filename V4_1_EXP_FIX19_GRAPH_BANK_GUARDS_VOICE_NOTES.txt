@@ -1,0 +1,17 @@
+ControlEvent v5.0_exp · FIX19
+
+1) CUADRE BANCO
+- El estado REALIZADO depende de que todos los CARGOS BANCARIOS incluidos estén justificados y los ingresos bancarios estén conciliados.
+- Un fototicket pendiente sin vínculo bancario (pago en efectivo) NO bloquea el estado del Cuadre Banco.
+- El KPI de TKxx sigue mostrando el pendiente documental (p.ej. 43/44).
+
+2) ZUZU / ITV
+- Corregidos detectores semánticos que usaban raíces con \b y no reconocían plurales/conjugaciones (compras/comprado/asistentes/responsables...).
+- Esto activa de verdad las guardias para pagos de asistentes, comprado+pendiente y resúmenes compuestos.
+
+3) GRÁFICAS
+- Brain-Lite materializa ahora la gráfica meteorológica real cuando chart=true.
+- Antes solo reenviaba result.charts, que en event_weather venía vacío: por eso nunca aparecía la gráfica aunque la petición se entendiese.
+
+4) VOZ
+- Separadores visuales se convierten en pausas y los registros comprado/pendiente se oralizan como frase.

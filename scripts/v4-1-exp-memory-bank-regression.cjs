@@ -39,12 +39,12 @@ t('recuerdo explícito no se secuestra por CURRENT actual',/CURRENT descartado c
 t('coverage crea cápsula narrativa obligatoria',/coverage_narrative_required/.test(ai)&&/cápsula mínima OBLIGATORIA/.test(ai));
 t('coverage limita documentos para token budget',/document_context\)\.length>6/.test(ai)&&/documents:docs/.test(ai));
 
-t('server version v4',/APP_VERSION = 'ControlEvent v4_1_exp'/.test(paths)&&/APP_VERSION_FILE = 'ControlEvent_v4_1_exp'/.test(paths));
-t('build v4 actualizado',/20260903-V4_1_EXP-EXECUTION-CONTROLLED-V1-FIX1/.test(paths)&&/20260903-V4_1_EXP-EXECUTION-CONTROLLED-V1-FIX1/.test(version));
-t('HTML visible v4',/<title>ControlEvent v4_1_exp<\/title>/.test(html)&&/>v4_1_exp<\/span>/.test(html));
-t('package v4',pkg.name==='controlevent-v4-1-exp'&&pkg.version==='4.1.0-exp.0');
-t('BACKUP servidor v4',/BACKUP_VERSION = 'ControlEvent v4_1_exp'/.test(exportRoutes)&&/BACKUP_VERSION_FILE = 'ControlEvent_v4_1_exp'/.test(exportRoutes));
-t('INFOEVENTO activo usa VERSION_FILE v4',/VERSION_FILE = 'ControlEvent_v4_1_exp'/.test(fs.readFileSync('public/app/features/v40-fixes.js','utf8'))&&/\$\{VERSION_FILE\}_INFOEVENTO/.test(fs.readFileSync('public/app/features/v40-fixes.js','utf8')));
+t('server version v4',/APP_VERSION = 'ControlEvent v6_1-exp'/.test(paths)&&/APP_VERSION_FILE = 'ControlEvent_v6_1-exp'/.test(paths));
+t('build v4 actualizado',/20260903-V5_1_EXP-EXECUTION-CONTROLLED-V1-FIX1/.test(paths)&&/20260903-V5_1_EXP-EXECUTION-CONTROLLED-V1-FIX1/.test(version));
+t('HTML visible v4',/<title>ControlEvent v6_1-exp<\/title>/.test(html)&&/>v5.1_exp<\/span>/.test(html));
+t('package v5.1_exp',pkg.name==='controlevent-v5-0-exp'&&pkg.version==='5.0.0-exp.0');
+t('BACKUP servidor v4',/BACKUP_VERSION = 'ControlEvent v6_1-exp'/.test(exportRoutes)&&/BACKUP_VERSION_FILE = 'ControlEvent_v6_1-exp'/.test(exportRoutes));
+t('INFOEVENTO activo usa VERSION_FILE v4',/VERSION_FILE = 'ControlEvent_v6_1-exp'/.test(fs.readFileSync('public/app/features/v40-fixes.js','utf8'))&&/\$\{VERSION_FILE\}_INFOEVENTO/.test(fs.readFileSync('public/app/features/v40-fixes.js','utf8')));
 t('versión central conserva migración desde v3',/legacyPrefixes = \[.*'ControlEvent_v3_0_exp'/.test(version));
 
 console.log(`\nV4.1_exp · MEMORY FLASHBACK + BANK TK EN CURSO · ${ok}/${total} comprobaciones OK`);

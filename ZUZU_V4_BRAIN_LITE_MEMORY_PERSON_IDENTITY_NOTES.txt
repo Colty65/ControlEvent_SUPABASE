@@ -1,0 +1,20 @@
+V4 BRAIN-LITE · MEMORY + CANONICAL PERSON IDENTITY · 2026-09-08
+
+Objetivo
+- Corregir la pérdida real de memoria histórica en expresiones naturales como "¿recuerdas...?".
+- Evitar que errores STT sobre nombres de socios (p.ej. una sílaba añadida o quitada) desvíen la consulta hacia otra palabra/topónimo.
+- Mantener NHC: no existen alias ni nombres propios hardcodeados.
+
+Cambios
+1. La detección de memoria acepta la familia verbal completa recordar/recuerdo/recuerdas/recordábamos y referencias naturales a conversaciones antiguas.
+2. Las consultas de memoria resuelven primero una posible identidad de PERSONA contra ce_personas mediante el resolver tipado existente.
+3. Si la frase completa de memoria no encuentra nada, se hace un segundo intento usando solo el nombre canónico ya validado.
+4. Los argumentos tipados person/responsible/donor de Brain-Lite pasan por identidad canónica antes de ejecutar CE.
+5. El STT recibe instrucción de no autocorregir nombres propios poco comunes hacia ciudades/provincias/palabras frecuentes.
+6. No se cambia globalmente ninguna palabra: un topónimo sigue siendo topónimo cuando la intención no es PERSONA/MEMORIA.
+
+Regresiones
+- MEMORY/CLOCK/STT/VOICE 7 OK · 0 KO
+- V4 BRAIN-LITE 21 OK · 0 KO
+- TARGET25 11 OK · 0 KO
+- MEMORY PERSON IDENTITY 6 OK · 0 KO

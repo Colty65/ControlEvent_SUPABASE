@@ -106,7 +106,7 @@ ok(lab.includes('tienda sin compras: se ha desviado al dominio persona'),'orácu
 ok(lab.includes('donations_supposed_count')&&lab.includes("toolTable(r,'donation_lines')"),'donationOracle usa contadores físicos y filas canónicas');
 
 ok(ui.includes("ITV_BUILD='20260828-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE'"),'UI exporta build BANK4_11');
-ok(html.includes('controlevent-build" content="20260828-V4_1_EXP-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE'),'build general BANK4_11');
+ok(html.includes('controlevent-build" content="20260828-V5_1_EXP-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE'),'build general BANK4_11');
 ok(html.includes('zuzu-test-console-gd.js?v=20260828-BANK411-Z1-FINAL-ORACLE-EUR-FAILSAFE'),'cache-bust BANK4_11');
 ok(!ui.includes('20260828-BANK410-Z1-CLOSURE-SAFEFASTLOCAL-EUR')&&!html.includes('20260828-BANK410-Z1-CLOSURE-SAFEFASTLOCAL-EUR'),'BANK410 no queda activo en UI/index');
 console.log(`BANK4_11 Z1 FINAL / ORACLE / EUR / FAILSAFE: ${n}/${n} OK`);

@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · Liquidaciones de Compras V1
+# ControlEvent v5.0_exp · Liquidaciones de Compras V1
 
 ## Objetivo
 
@@ -59,7 +59,7 @@ El justificante contiene evento, código de liquidación, personas, movimientos 
 
 Antes de usar el módulo hay que ejecutar una vez:
 
-`sql/ControlEvent_SQL_V4_1_EXP_LIQUIDACIONES_COMPRAS.sql`
+`sql/ControlEvent_SQL_V5_0_EXP_LIQUIDACIONES_COMPRAS.sql`
 
 Crea:
 

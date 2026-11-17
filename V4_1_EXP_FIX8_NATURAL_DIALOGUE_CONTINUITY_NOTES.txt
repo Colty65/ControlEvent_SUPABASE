@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · FIX8 · Continuidad natural P2-R
+ControlEvent v5.0_exp · FIX8 · Continuidad natural P2-R
 Fecha: 2026-09-03
 
 Origen

@@ -1,0 +1,13 @@
+V4 BRAIN-LITE TARGET25 · HUMAN CALIBRATION · 2026-09-07
+
+Objetivo: atacar estructuralmente los 4 KO / 2 WARN de la primera ejecución BRAIN-LITE REAL (22.5/30), sin hardcodear la batería.
+
+Cambios:
+1) Calibración de profundidad: visión general/resumen/panorama de un evento = BASIC. Ampliar/detalle = MEDIUM. Exhaustivo explícito = HIGH.
+2) Continuidad meteorológica: event_weather guarda weather_date en el contexto certificado. Una pregunta posterior por la fecha de ESOS datos se resuelve desde sesión (0 CE).
+3) Oráculo temporal: compara date-only; acepta 2026-09-08 y 2026-09-08T00:00:00.000Z como la misma fecha.
+4) Recovery esperado: event_not_found deja de convertirse en WARN cuando recovery.used=true y ése es el único warning.
+5) HUMAN-SAFE: si la redacción factual expone tabla/dataset/fila/columna, se reescribe como conceptos humanos sin cambiar hechos, sujetos, filtros ni cifras.
+6) La ruta BRAIN-LITE REAL, el no-commit tras fallo, VOICE-SAFE y la identidad canónica permanecen intactos.
+
+No se cambia la arquitectura ni los ejecutores CE certificados.

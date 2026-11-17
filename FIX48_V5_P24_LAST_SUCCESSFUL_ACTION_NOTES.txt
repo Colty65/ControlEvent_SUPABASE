@@ -1,0 +1,18 @@
+FIX48 · V5 P24 · LAST SUCCESSFUL ACTION AUTHORITY
+
+Objetivo
+- Cerrar el escape observado cuando, tras completar una comparación Memory→Now, expresiones como "haz lo de antes" o un "adelante" posterior a una reacción social caían al último contexto factual (p.ej. person_profile) en vez de repetir la última ACCIÓN completada.
+
+Cambios
+1. v5P22LastSuccessfulAction prioriza el objeto persistido en resultContext.conversation_state.last_successful_action.
+2. Una PENDING_ACTION completada REEXECUTE_MEMORY_NOW también puede reconstruir LAST_SUCCESSFUL_ACTION con historical_contract + current_contract.
+3. La comparación Memory→Now guarda LAST_SUCCESSFUL_ACTION como objeto durable de tipo REEXECUTE_MEMORY_NOW, no solo como operation/person/event.
+4. "haz lo de antes", "lo de antes", "otra vez", "repítelo", "como antes" y equivalentes genéricos se reconocen como referencia a la última acción exitosa.
+5. Si no existe PENDING_ACTION pero la última acción exitosa fue REEXECUTE_MEMORY_NOW, "adelante"/continuación reutiliza esa referencia histórica y vuelve a pasar por Gemini. El runtime no copia ni corrige semántica factual.
+6. La reejecución conserva la presentación de comparación Recuerdo/Hoy en vez de degradarse a un simple dossier factual.
+
+Regla de arquitectura
+- PENDING_ACTION manda si existe.
+- En ausencia de PENDING_ACTION, una referencia explícita a "lo de antes" usa LAST_SUCCESSFUL_ACTION.
+- MEMORY_FRAME y ACTIVE_CONTEXT quedan por detrás como contexto.
+- Gemini sigue siendo el único intérprete semántico factual; P24 solo aporta la referencia conversacional correcta.

@@ -1,0 +1,19 @@
+FIX39 P16 · HARD-CODE AUDIT
+
+Hard-code de negocio añadido: NINGUNO.
+No se han añadido nombres de personas, nombres de eventos, importes, preguntas ITV ni valores de BBDD.
+
+Hard-code estructural permitido:
+- nombres públicos de operaciones/capacidades de la API ControlEvent;
+- scopes canónicos: current_event, all_events, selected_events;
+- requisitos de firma (event/person/events) y compatibilidades de cada capacidad;
+- regla técnica de una reemisión Gemini si el contrato es inválido;
+- derivación técnica de event cuando Gemini ha decidido scope=current_event;
+- resolución canónica de entidades ya decididas por Gemini.
+
+PROHIBIDO POR DISEÑO
+- reinterpretar el lenguaje después de Gemini;
+- cambiar operation/scope/event/person/filtros después del freeze;
+- rescatar una persona/evento/operación legacy para sustituir la decisión;
+- transformar un contrato inválido en otro contrato mediante heurísticas JavaScript;
+- responder hechos no acreditados por operaciones ejecutadas.

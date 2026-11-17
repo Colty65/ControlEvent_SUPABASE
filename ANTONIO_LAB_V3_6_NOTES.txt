@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ANTONIO LAB V3.6 · COMMIT ON SPEAK
+ControlEvent v5.0_exp · ANTONIO LAB V3.6 · COMMIT ON SPEAK
 
 Objetivo de esta versión:
 - Un vocativo/intervención breve ("Antonio", "oye Antonio", "perdona") NO cancela una respuesta VNext que todavía no se ha oído.

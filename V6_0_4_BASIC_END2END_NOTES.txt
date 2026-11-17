@@ -1,0 +1,16 @@
+ControlEvent v6.0.8_exp · BASIC END-TO-END FIX1
+
+Objetivo: no optimizar SOBERANA30. Primero demostrar capacidad básica extremo a extremo.
+
+1) FETCH/FILTER/AGGREGATE/DERIVE/SORT_LIMIT/VISUALIZE se validan estructuralmente antes de tocar datos.
+2) FETCH vacío ya no llega al ejecutor: Gemini recibe un único reintento estructural.
+3) current_screen_event identifica el evento actual; Gemini usa su ID sin pedirlo al usuario.
+4) Nombres humanos desconocidos usan entity_resolution_overrides; nunca se piden IDs al usuario.
+5) Segunda llamada tras datos usa fase SYNTHESIS y solo permite NO_ACTION_REQUIRED.
+6) meta contiene assistant_identity=Zuzu/ControlEvent; actor y timestamp son autoritativos.
+7) Sin fallback a motores cognitivos v4/v5.
+
+Prueba recomendada, en este orden y parando al primer fallo:
+T1 Dime qué sabes de este evento.
+T2 Ahora analiza si hay algo que deba preocuparnos, no me recites cifras sin más.
+T3 ¿De qué hemos estado hablando tú y yo ahora mismo?

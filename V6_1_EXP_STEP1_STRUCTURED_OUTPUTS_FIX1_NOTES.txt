@@ -1,0 +1,16 @@
+ControlEvent v6_1-exp · STEP 1 · STRUCTURED OUTPUTS · FIX1
+
+Cambio único de este FIX:
+- La ruta cognitiva v6_1-exp deja de pedir Structured Output mediante Interactions para este paso.
+- Usa el transporte oficial Gemini generateContent v1beta con:
+  generationConfig.responseMimeType = application/json
+  generationConfig.responseJsonSchema = contrato v6_1-exp
+- El Context Packet se envía tal cual serializado a JSON. No se clasifica, corrige, limpia, completa ni reescribe antes de Gemini.
+- La salida textual de Gemini se pasa DIRECTAMENTE a JSON.parse().
+- PROHIBIDO y NO implementado: quitar ```json```, extraer JSON con regex, parseo lenient, reintento corrector, completar campos o reparar semántica después de Gemini.
+- Después del parseo solo se ejecuta validación estructural/contractual de CE; no se modifica el contenido.
+
+Motivo:
+La primera v6_1-exp recibió una salida cercada en Markdown pese a pretender Structured Output. Este FIX usa el mecanismo nativo documentado para Gemini 2.5 Flash-Lite en generateContent, que soporta Structured Outputs.
+
+La versión sigue siendo v6_1-exp porque seguimos en el PASO 1. No se avanza a v6_2-exp hasta superar esta prueba.

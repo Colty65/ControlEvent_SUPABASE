@@ -1,0 +1,53 @@
+ControlEvent v5.0_exp · FIX25 · AUDITORÍA NHC / HARD-CODE
+Fecha: 09/09/2026
+
+OBJETIVO
+========
+Implantar la jerarquía conversacional C → S → O → R/V sin añadir hard-code de negocio o de casos ITV.
+
+DEFINICIONES
+============
+C = Contexto lógico independiente dentro de la conversación.
+S = Snapshot inmutable de un punto concreto de ese contexto.
+O = Operación atómica ejecutable / evidencia factual.
+R = Bloque de respuesta que declara de qué O depende.
+V = Vista/presentación (texto, tabla, line, bar, pie, donut) construida sobre las mismas O.
+
+HARD-CODE NUEVO EN FIX25
+========================
+1. Taxonomía de dominios: bank, weather, purchases, income, donations, attendance, comparison, summary, memory, documentation, management, liquidations, person, etc.
+   TIPO: ESTRUCTURAL. JUSTIFICADO: son capacidades reales del contrato de ControlEvent. No son nombres de casos ni entidades.
+
+2. Taxonomía de vistas: text, table, line, bar, pie, donut.
+   TIPO: ESTRUCTURAL. JUSTIFICADO: son primitivas reales del renderer.
+
+3. Reglas lingüísticas genéricas de reactivación («vuelve», «retoma», «lo de», «al resumen», banco/tiempo/compras/donaciones...).
+   TIPO: HARD-CODE LINGÜÍSTICO. JUSTIFICADO con reservas: sirve únicamente para traducir lenguaje humano a un DOMINIO del catálogo, sin decidir datos ni respuestas. Evita una segunda llamada IA y mantiene latencia. No contiene nombres propios, eventos, importes ni frases de ITV.
+
+4. Regla de continuación aditiva («y», «además», «también», «añade», «incluye», «junto con»).
+   TIPO: HARD-CODE LINGÜÍSTICO ESTRUCTURAL. JUSTIFICADO: no decide qué dato es correcto; decide que una S nueva puede conservar O previas y añadir nuevas O. Las O siguen siendo las que el plan y CE ejecutan.
+
+5. Límites técnicos: hasta 12 C recientes, hasta 6 S por C y hasta 8 O por S.
+   TIPO: TÉCNICO. JUSTIFICADO para contener memoria/payload. No cambia semántica de negocio. Puede parametrizarse después.
+
+6. Mapeos de tablas canónicas a gráficas genéricas (p. ej. compras por Responsable/Importe, donaciones por Donante/Valor, economía por Indicador/Valor).
+   TIPO: ESTRUCTURAL DE PRESENTACIÓN. JUSTIFICADO: solo traduce columnas canónicas del contrato a ejes de un gráfico. No contiene entidades ni cifras concretas.
+
+7. ITV C/S/O · 36.
+   TIPO: HARD-CODE DE PRUEBA. JUSTIFICADO: las 36 frases existen exclusivamente en zuzu-test-lab.service.js y no son leídas por el runtime conversacional.
+
+LO QUE NO SE HA AÑADIDO AL NUEVO NÚCLEO
+=======================================
+- Ningún nombre de persona (Colty, Carmelo, Pocholo, etc.).
+- Ningún nombre de evento (FUNCION 2026, SySA, etc.).
+- Ningún importe concreto.
+- Ninguna pregunta exacta de ITV usada como regla de runtime.
+- Ninguna respuesta precocinada para aprobar una prueba.
+
+HARD-CODE LEGACY QUE SIGUE EXISTIENDO
+=====================================
+Se mantiene lo ya documentado en FIX24 fuera del nuevo núcleo: fallback meteorológico de despliegue, reglas históricas de socios, parser legacy con algún responsable concreto y ejemplos antiguos en prompts/rutas legacy. NO se declara la aplicación completa libre de hard-code. Esta auditoría solo certifica que el NUEVO C/S/O/R/V no añade hard-code de negocio/entidad.
+
+CRITERIO DE ACEPTACIÓN NHC
+==========================
+Una regla es aceptable si describe el contrato del sistema (dominio, estado, tipo de vista, relación entre O y R/V) y funcionaría igual con cualquier persona, evento e importe. Si una regla necesita un nombre concreto, un evento concreto, una cifra concreta o una frase exacta de prueba, se considera NHC injustificado y debe eliminarse o configurarse externamente.

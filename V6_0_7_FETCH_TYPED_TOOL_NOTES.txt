@@ -1,0 +1,8 @@
+ControlEvent v6.0.8_exp · TYPED FETCH TOOL
+
+- ce_execute_data ya no recibe un pipeline cuyo primer FETCH pueda quedar vacío.
+- La función exige fetch.entity_name (enum de entidades lógicas) y fetch.projections (minItems=1).
+- CE reconstruye mecánicamente el pipeline canónico con FETCH + steps.
+- El reintento estructural devuelve a Gemini el error sin elegir entidad ni campos por él.
+- La traza visible deja de rotular pasos v6 como v5.1_exp.
+- Sin fallback cognitivo v4/v5.

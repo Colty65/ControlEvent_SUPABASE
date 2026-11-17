@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · VNext P1.16
+# ControlEvent v5.0_exp · VNext P1.16
 ## Registro canónico de capacidades + DERIVE + mapa de causa raíz · NHC
 
 P1.16 aplica las familias detectadas por ITV P1.15 sin crear reglas por frase. La regla NHC se mantiene: el runtime nuevo describe y valida JSON, contratos, columnas y estado estructurado; no añade detectores de palabras del usuario.

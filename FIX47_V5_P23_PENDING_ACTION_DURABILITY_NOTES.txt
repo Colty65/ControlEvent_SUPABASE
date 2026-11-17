@@ -1,0 +1,17 @@
+FIX47 · V5 P23 · PENDING ACTION DURABILITY
+
+Objetivo único: que una acción propuesta por Zuzu sobreviva intacta a confirmaciones cortas, suspensión, reacciones sociales y retorno al recuerdo.
+
+Cambios principales:
+- PENDING_ACTION se serializa en cada turno y se recupera desde history; ya no se reconstruye en cada mensaje a partir del último nombre/persona.
+- Estados: pending / suspended / completed / cancelled. Un completed/cancelled bloquea la resurrección de una acción antigua.
+- "no, espera" cambia solo status a suspended. No borra MEMORY_FRAME ni LAST_SUCCESSFUL_ACTION.
+- "sí", "claro", "adelante", "vale", "hazlo" reanudan la misma acción pendiente.
+- MEMORY→NOW toma historical_contract de PENDING_ACTION antes que de pistas residuales.
+- Al completar, PENDING_ACTION queda completed y LAST_SUCCESSFUL_ACTION conserva el contrato ejecutado.
+- Si MEMORY→NOW falla, la acción queda pending con last_error para poder reintentarla; el recuerdo no se destruye.
+- Reacciones como "te estás liando" no cambian el estado.
+- Corregido un defecto real introducido en P22: v5P18GeminiMemoryNowPlan usaba dialogueState sin declararlo localmente, lo que podía abortar la reejecución antes de llamar a Gemini.
+- La voz no menciona Gemini al ofrecer repetir una consulta; Zuzu habla en primera persona.
+
+Regla arquitectónica conservada: Gemini sigue siendo el único intérprete semántico. P23 conserva el estado de la conversación; no decide qué operación factual significa una frase.

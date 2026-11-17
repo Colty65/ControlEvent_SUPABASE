@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ANTONIO LAB V3.2
+ControlEvent v5.0_exp · ANTONIO LAB V3.2
 
 Objetivo: corregir activación real del micrófono.
 - El AudioContext se crea/reanuda dentro del gesto del usuario, antes de cualquier await.

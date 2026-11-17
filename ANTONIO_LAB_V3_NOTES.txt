@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ANTONIO LAB V3 · 04/09/2026
+ControlEvent v5.0_exp · ANTONIO LAB V3 · 04/09/2026
 
 OBJETIVO
 - Probar una conversación de voz sin otro servicio de pago.

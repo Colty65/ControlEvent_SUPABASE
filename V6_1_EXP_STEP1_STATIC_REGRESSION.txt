@@ -1,0 +1,21 @@
+ControlEvent v6_1-exp · STEP 1 static regression
+
+15/15 OK
+- FETCH permitido
+- FILTER permitido
+- SORT_LIMIT permitido
+- VISUALIZE permitido
+- JOIN ausente del contrato
+- AGGREGATE ausente del contrato
+- DERIVE ausente del contrato
+- NEED_ENTITY_RESOLUTION / entity_resolution_overrides ausentes
+- provenance_evidence_ids obligatorio
+- campos events tipados
+- campos people tipados
+- System Prompt declara solo capacidades reales del Paso 1
+- System Prompt prohíbe inventar hechos/nombres/cálculos
+- Function calling deshabilitado explícitamente
+- rama activa NEED_ENTITY_RESOLUTION eliminada
+- sintaxis JS OK
+
+NOTA: regresión estática. No sustituye prueba runtime real contra Gemini/Supabase.

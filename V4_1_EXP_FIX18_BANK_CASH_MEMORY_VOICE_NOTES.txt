@@ -1,0 +1,37 @@
+ControlEvent v5.0_exp · FIX18 · Banco efectivo + memoria rápida + voz natural
+Fecha: 08/09/2026
+
+1) CUADRE BANCO
+- El estado del Cuadre Banco ya no queda incompleto por un TKxx no vinculado a movimiento bancario cuando:
+  a) todos los cargos bancarios incluidos están justificados,
+  b) los ingresos bancarios computables están conciliados, y
+  c) el importe total de TKxx pendientes coincide al céntimo con el ingreso registrado en EFECTIVO del evento.
+- El TKxx sigue visible como pendiente documental; simplemente deja de impedir que el BANCO quede REALIZADO.
+- El flujo neto bancario sigue siendo Abonos Banco - Cargos Banco; el efectivo no entra.
+
+2) BRAIN-LITE / ITV EXPRESS
+- Pagos de asistentes/socios con banco+efectivo se fuerzan a event_income_status, no event_bank ni donaciones.
+- Petición compuesta banco + ingresos + responsables garantiza event_bank + event_income_status + compras realized + pending.
+- realized/pending se preserva después de la reparación de vistas, evitando que ambas consultas acaben en pending.
+- Respuesta bancaria local expresa abonos, cargos y flujo neto explícitamente.
+- ITV turno bancario deja de esperar la cifra fija 599,86 € y valida semánticamente abonos/cargos/flujo para el evento que toque.
+- ITV turno de responsable deja de estar hardcodeado a Colty y toma el nombre de la pregunta real.
+
+3) MEMORIA Y LATENCIA
+- Una búsqueda de recuerdos exige una mención visible del tema cuando existe un término verificable.
+- Si no hay mención visible, Zuzu dice que no encuentra un recuerdo claro en vez de reconstruir datos por similitud.
+- Se elimina la Interaction de Gemini usada para narrar recuerdos recuperados; la respuesta se compone de forma determinista con el episodio recuperado.
+- Objetivo: reducir especialmente los turnos de memoria que el usuario observaba de hasta ~8 latidos.
+
+4) VOZ
+- Nueva opción por defecto: "Natural del sistema" (SpeechSynthesis español disponible en el dispositivo).
+- DaveFX y CarlFM siguen disponibles como alternativas.
+- Separadores de registros | y · se convierten en pausas/puntuación para que listas y registros no suenen encadenados.
+- DaveFX/CarlFM bajan de playbackRate 1.06 a 0.98 para una locución menos precipitada.
+- Los importes hablados siguen sin decimales; pantalla conserva céntimos.
+
+REGRESIONES RELEVANTES
+- FIX18 específico: 12/12 OK
+- V4 BRAIN-LITE: 21/21 OK
+- Responsables compras: 8/8 OK
+- Contrato ITV: OK

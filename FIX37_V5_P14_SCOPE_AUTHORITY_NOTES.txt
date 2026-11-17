@@ -1,0 +1,33 @@
+FIX37 · V5 P14 · SCOPE AUTHORITY + CLEAN FAILURE + SOCIAL ISOLATION
+
+Origen
+------
+Parte de FIX36. El PDF de 11/09/2026 mostró una regresión grave: una petición explícita de ingresos Pendiente en TODOS los eventos heredaba FUNCION 2026; tras protestar, una ruta de recuperación llegó a responder con meteorología de otro contexto.
+
+Cambios
+-------
+1. SCOPE pasa a ser parte soberana del contrato factual: current_event / all_events / selected_events.
+2. event_income_status admite scope=all_events. En ese ámbito no se hereda ni se exige event.
+3. La ejecución ALL_EVENTS recorre el catálogo real de eventos y reúne únicamente filas de ingresos por el estado solicitado, incluyendo Evento en la evidencia.
+4. El contexto C/S conserva scope. Un C all_events no se rellena automáticamente con el evento de pantalla.
+5. El context_id distingue income:all_events de income:<evento>.
+6. CURRENT_EVENT vuelve a anclarse al evento visible cuando el usuario lo pide explícitamente.
+7. Las continuaciones del hilo global heredan scope=all_events salvo cambio explícito de alcance.
+8. Un fallo factual conserva el árbol anterior, pero no utiliza otro C/S como respuesta sustituta.
+9. Las reacciones sociales/metaconversacionales puras se resuelven localmente con 0 CE y 0 cambio de C/S.
+10. Nueva batería visible ITV SCOPE · 12.
+
+NHC
+---
+No se han añadido nombres de personas, eventos, importes ni respuestas de pruebas al runtime.
+Las frases de ITV están exclusivamente en zuzu-test-lab.service.js y no participan en el runtime de Zuzu.
+
+Pruebas locales
+---------------
+P14: 12/12 OK
+P13: 13/13 OK
+P12: 10/10 OK
+P11: 14/14 OK
+P10: 13/13 OK
+P9: 12/12 OK
+Sintaxis Node: OK

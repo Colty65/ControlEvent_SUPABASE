@@ -1,0 +1,9 @@
+ZUZU LAB V3.14.2 · 2026-09-07
+
+- Corrige HTTP 400 de Interactions: tool_choice='required' se traduce al contrato nativo allowed_tools/mode=any.
+- La conversación exploratoria MADUREZ usa generateContent v1beta; deja de fallar por developer instruction en v1.
+- Un evento nombrado explícitamente que no existe ya no puede sustituirse silenciosamente por el evento activo: activa recovery_reset limpio.
+- «¿De qué fecha son esos datos del tiempo?» se responde desde el contexto temporal ya certificado, sin repetir event_weather.
+- Se mantienen fechas autoritativas para meteorología y recovery/retry limpio.
+- Tarjeta Cuadre Banco compactada: Cargos Banco + Flujo neto, sin párrafo explicativo dentro del gráfico.
+- Liquidaciones/PDF tickets se mantienen sin cambios funcionales.

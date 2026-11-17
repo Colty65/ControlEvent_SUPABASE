@@ -1,0 +1,36 @@
+ControlEvent v5.0_exp · FIX41 · V5 P18 MEMORY→NOW GEMINI SOVEREIGN
+
+OBJETIVO
+Cerrar la desviación observada al actualizar un recuerdo: una respuesta histórica sobre compras de FUNCION 2026 podía terminar ejecutándose hoy como person_profile de Cito.
+
+REGLA ARQUITECTÓNICA INVIOLABLE
+"La inteligencia debe estar en Gemini; nuestro código debe limitarse a explicarle qué puede hacer, comprobar que lo que ha decidido es legal y ejecutarlo exactamente."
+
+CAMBIO PRINCIPAL
+- Se elimina del runtime la reconstrucción local MEMORY→NOW basada en persona/eventos mencionados (v5P13MemoryReplayActionFromRows).
+- Los turnos históricos recuperados conservan internamente turn_id + plan_signature + domain + scope.
+- La ficha Recuerdo conserva memory_historical_contract.
+- Cuando el usuario dice "ejecuta hoy la misma consulta", "actualízala", "sí", etc., Gemini recibe:
+  * la pregunta histórica,
+  * la firma/plan histórico,
+  * el catálogo legal actual de capacidades,
+  * el contexto actual solo como contexto ambiental.
+- Gemini emite el contrato actual equivalente.
+- Se valida antes del FREEZE. Si es inválido, solo Gemini puede reemitirlo una vez; el runtime no lo corrige.
+- Tras FREEZE, CE ejecuta literalmente las actions congeladas.
+- Si no hay contrato histórico suficiente o Gemini no produce un contrato legal, no se ejecuta otra consulta distinta.
+- La comparación visual conserva historicalContract y currentContract para auditoría.
+
+PROTECCIÓN CLAVE
+El texto de la RESPUESTA histórica no tiene autoridad para elegir sujeto/operación/filtros. Una persona citada dentro de aquella respuesta no se convierte en person_profile salvo que la consulta histórica realmente estuviera filtrada por esa persona.
+
+PRUEBAS
+- P18 MEMORY→NOW SOVEREIGN: 14/14 OK
+- P16 GEMINI SOVEREIGN: 14/14 OK
+- P14 SCOPE: 12/12 OK
+- P17 ITV SCREEN CONTEXT: 5/5 OK
+- node --check event-ai.service.js: OK
+- node --check zuzu-capability-registry.service.js: OK
+
+REGRESIONES LEGACY
+La antigua P13 contenía expectativas de la ruta local MEMORY→NOW que se ha eliminado deliberadamente. P18 sustituye esa autoridad. No se debe restaurar el replay local solo para hacer pasar una prueba antigua.

@@ -1,0 +1,15 @@
+ControlEvent v5.3.1_exp · FAST SOVEREIGN SEMANTIC COMPILER
+
+Objetivo: reducir latencia y tokens sin devolver semántica a CE.
+
+Cambios:
+- Ventana de diálogo crudo: 3 turnos compactos.
+- Evidence Ledger: máximo 12 metadatos, sin facts_keys.
+- Se elimina del payload ordinario el catálogo completo de eventos/personas; Gemini emite el nombre entendido y CE lo resuelve mecánicamente.
+- CHAT sin acciones: Gemini entrega reply final en la misma llamada; CE lo transporta al usuario.
+- Datos nuevos + síntesis: segunda llamada mínima (FAST FINALIZER) con solo objetivo y resultados certificados frescos.
+- El finalizador no recibe historial, Thread Graph, ontology ni catálogos completos.
+- Turnos CHAT ya no contaminan el Thread activo con current_screen_event al persistir.
+- Se mantiene Thread Graph + Evidence Ledger + Lazy Evidence + Ontology 1.0.
+- Se conserva conversationId por usuario/navegador; migración v5.3 -> v5.3.1 copia claves sin borrar sesión.
+- Pestañas duplicadas siguen bifurcando conversación para evitar mezcla de hilos.

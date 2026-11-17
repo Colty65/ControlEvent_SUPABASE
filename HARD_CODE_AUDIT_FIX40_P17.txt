@@ -1,0 +1,10 @@
+FIX40 P17 · HARD-CODE AUDIT
+
+No se añade hard-code de negocio.
+No se añaden nombres de eventos, personas, importes, estados concretos de fixture ni frases de preguntas a la ruta runtime.
+
+Única modificación funcional:
+- La ITV obtiene el evento visible desde state.eventos mediante languageActiveEvent(), la misma noción genérica que ya usa el propio generador SCOPE12, y pasa su id como selectedEventId.
+
+Esto es simulación de estado UI, no interpretación lingüística ni reparación semántica.
+El runtime de producción no se modifica.

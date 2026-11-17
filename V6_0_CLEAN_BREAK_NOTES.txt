@@ -1,0 +1,10 @@
+ControlEvent v6.0.8_exp · CLEAN BREAK
+
+- runZuzuVNextUserTurn tiene una única ruta cognitiva: runZuzuV6Agent.
+- Sin Brain Lite/P2-R/V5 como fallback.
+- Si v6 falla, devuelve v6_execution_failure.
+- Gemini decide lenguaje/intención/thread/estado/pipeline.
+- CE solo valida, resuelve entidades mecánicamente y ejecuta primitivas.
+- Los helpers históricos pueden seguir físicamente en el bundle porque otros módulos/regresiones los referencian, pero la entrada Zuzu v6 no los invoca.
+- Se conservan cálculos mecánicos certificados (compactState/buildCanonicalAttendance/valueOfLine), no clasificadores semánticos.
+- Conversación del navegador se migra solo desde v5.3.2 a v6.0; no se arrastran motores cognitivos.

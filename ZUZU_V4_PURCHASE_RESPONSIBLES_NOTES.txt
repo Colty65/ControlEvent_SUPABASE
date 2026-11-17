@@ -1,0 +1,20 @@
+ControlEvent v5.0_exp · Zuzu V4 BRAIN-LITE · PURCHASE RESPONSIBLES
+
+Objetivo
+- Responder de forma nativa a preguntas de compras por responsable sin obligar a manipular tablas.
+
+Contrato CE
+- Para cada responsable del evento se calculan dos importes canónicos independientes:
+  * Comprado = compras realizadas.
+  * Pte.Compra = compras pendientes.
+- Se conservan responsables aunque uno de los dos importes sea 0,00 €.
+- Donaciones quedan fuera de este reparto.
+- La identidad del responsable se humaniza con ce_personas.
+
+Conversación
+- Ejemplo esperado: «Colty: 3.234,00 € comprado y 225,00 € pendiente; ...».
+- La tabla purchase_responsibles existe como soporte, pero solo se fuerza si el usuario pide tabla/listado/detalle explícito.
+- Preguntas con “responsable(s)” o “encargado(s)” de compras fuerzan event_breakdowns y no pueden degradarse a solo compras pendientes.
+
+Regresión nueva
+- scripts/v4-1-exp-zuzu-v4-purchase-responsibles-regression.cjs

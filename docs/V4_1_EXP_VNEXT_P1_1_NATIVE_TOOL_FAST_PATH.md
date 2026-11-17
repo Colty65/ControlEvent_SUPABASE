@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · Zuzu VNext P1.1
+# ControlEvent v5.0_exp · Zuzu VNext P1.1
 
 P1.1 corrige el fallo observado en P1.0 donde la decisión JSON podía devolver `mode=conversation` sin `answer` y la UI terminaba mostrando `Vale, seguimos.`.
 

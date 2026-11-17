@@ -1,0 +1,20 @@
+const fs=require('fs'),path=require('path'),root=path.resolve(__dirname,'..');
+const ai=fs.readFileSync(path.join(root,'services','event-ai.service.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'public','app','features','v11-3-zuzu-analitica-libre.js'),'utf8');
+const idx=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
+let ok=0,ko=0;function t(n,c){if(c){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}}
+t('P10 enmascara etiquetas de entidades antes de clasificar intención',/function v5P10MaskResolvedEntityLabels/.test(ai)&&/resolvedLabels/.test(ai));
+t('P10 autoridad de sujeto existe',/function v5P10ApplyStateAuthority/.test(ai)&&/SUBJECT AUTHORITY/.test(ai));
+t('P10 persona explícita actual reemplaza heredadas',/Sujeto explícito actual/.test(ai)&&/currentPeople\.slice\(0,8\)/.test(ai));
+t('P10 compras agrupadas limpia person y responsible',/contract\.group_by==='responsible'/.test(ai)&&/delete b\.responsible;delete b\.person/.test(ai));
+t('P10 producto explícito limpia persona obsoleta',/productTerm&&!currentPeople\.length/.test(ai)&&/b\.product_text=productTerm/.test(ai));
+t('P10 memoria conserva persona canónica para refresco',/matched_turn_id:tid,person:trim\(personHint\?\.nombre\)/.test(ai));
+t('P10 refresco de recuerdo pasa a person_profile actual',/MEMORY→FACT REFRESH/.test(ai)&&/operation:'person_profile'/.test(ai));
+t('P10 dossier/informe con gráfica puede ser VIEW_ONLY',/reportViewRef/.test(ai)&&/sem\.report&&!reportViewRef/.test(ai));
+t('P10 síntesis simple no fuerza siempre HIGH',/_synthesis_mode='cross_context';out\.response_level=/.test(ai)&&/\?'HIGH':'MEDIUM'/.test(ai));
+t('UI incluye botón ESCUCHAR',/id="ceAiReplayVoice"/.test(ui)&&/ESCUCHAR/.test(ui));
+t('Replay usa último spokenAnswer y no reconsulta',/__ceZuzuLastSpokenAnswer/.test(ui)&&/ceReplayLastSpoken/.test(ui)&&/ceSpeakLocal\(say,true\)/.test(ui));
+t('Cache de UI FIX33 o posterior',/FIX(?:3[3-4]-P(?:10|11)|35-TAB-CONVERSATION-ISOLATION|37-P14-SCOPE-AUTHORITY)/.test(idx));
+const block=ai.slice(ai.indexOf('function v5P10MaskResolvedEntityLabels'),ai.indexOf('function v5ExplicitFactualDomain'));
+t('P10 no contiene entidades/eventos/importes de negocio hard-code',!/(Carmelo|Colty|Pocholo|Esther|FUNCION 2026|SySA|6485|6154)/.test(block));
+console.log(`P10 ${ok}/${ok+ko} OK`);process.exitCode=ko?1:0;

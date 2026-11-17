@@ -1,0 +1,42 @@
+ControlEvent v5.0_exp · FIX25 · V5 CORE P3 C/S/O/R/V
+
+CAMBIO ARQUITECTÓNICO
+=====================
+- Conversación física única con múltiples Contextos lógicos C.
+- Cada C conserva hasta 6 Snapshots S inmutables.
+- Cada S conserva una o más Operaciones O ejecutadas, con ID y firma de argumentos.
+- Continuaciones aditivas pueden conservar O previas y añadir nuevas O en una nueva S.
+- Cada S declara Response Blocks R y Views V ligados por source_operation_ids.
+- La respuesta escrita y la hablada se almacenan separadamente en R.
+- Las gráficas son V de las O existentes; no crean por sí mismas un nuevo dominio factual.
+- Memory entra también como contexto lógico C=memory cuando usa la ruta Brain-Lite.
+
+ROUTER
+======
+- Prioridad conceptual: ancla explícita de reactivación > dominio mencionado > contexto activo > recencia.
+- Si se menciona un dominio nuevo que todavía no existe, se crea C nuevo; no se arrastra el dominio activo.
+- El router no contiene entidades, eventos ni importes concretos.
+
+MULTI-OPERACIÓN
+===============
+- Activa: una misma pregunta puede ejecutar O1..On.
+- Pasiva: una continuación como «y añade/también/además...» crea una S nueva que puede conservar las O anteriores y sumar nuevas O.
+- Un cambio de vista (barras/líneas/queso/donut) reutiliza la receta factual de la S y cambia V.
+
+GRÁFICAS
+========
+- Añadida materialización genérica para compras por responsable, compras por producto, donaciones por donante, economía e ingresos por situación cuando chart=true.
+- Weather y compare_events mantienen sus materializadores específicos.
+
+ITV
+===
+- Nueva: ITV C/S/O · 36.
+- Comprueba C coexistentes, S acumulados, O mínimas, IDs únicos, R presentes y V materializadas.
+- Incluye multi-operación activa y pasiva y cambios de presentación.
+
+REGRESIONES LOCALES
+===================
+- V5 C/S/O/R/V P3: 16/16 OK.
+- V5 MULTI-CONTEXT P2: 15/15 OK.
+- V4 BRAIN-LITE: 21/21 OK.
+- ZUZU ITV CONTRACT: OK.

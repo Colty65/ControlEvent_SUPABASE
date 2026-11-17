@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · Donaciones pendientes: situación Supuesta / Comprometida / Entregada. */
+/* ControlEvent v6_1-exp · Donaciones pendientes: situación Supuesta / Comprometida / Entregada. */
 (function(root){
   'use strict';
   if(root.__ceV4DonationSituationUi) return; root.__ceV4DonationSituationUi=true;

@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4_11 · cierre final Z1
+# ControlEvent v5.0_exp · BANK4_11 · cierre final Z1
 
 BANK4_11 parte de BANK4_10 y endurece el cierre Z1 tras la ITV ORACLE_ACTIVE del 28/08/2026.
 

@@ -1,0 +1,22 @@
+HARD-CODE AUDIT · FIX31 P8
+
+NUEVO HARD-CODE JUSTIFICADO
+- Reconocimiento del símbolo € exclusivamente para transformar la PRESENTACIÓN ORAL de un importe ya certificado.
+- Limpieza oral de Markdown/separadores visuales: * _ # ` | · •.
+- Reconocimiento técnico de timestamp ISO-8601 para no recitar hora/milisegundos/zona.
+- Transformación de «+ -» a una expresión pronunciable.
+- Catálogo de tipos de vista/dominios heredado de V5.
+
+NO AÑADIDO
+- nombres concretos de usuarios/personas;
+- nombres de eventos;
+- importes concretos;
+- respuestas preparadas;
+- frases de ITV como reglas de runtime;
+- reglas del tipo «si dice X persona, responde Y».
+
+ITV
+Las 18 frases de ITV RESPUESTA/VOZ viven solo en services/zuzu-test-lab.service.js y no se importan en event-ai.service.js.
+
+LEGACY
+Sigue existiendo hard-code histórico fuera de V5/P8. Esta auditoría no declara toda la aplicación NHC limpia; solo documenta lo añadido/modificado en FIX31 P8.

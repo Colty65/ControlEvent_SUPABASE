@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · Laboratorio/ITV de Zuzu.
+/* ControlEvent v6_1-exp · Laboratorio/ITV de Zuzu.
    SOLO LECTURA. Genera pruebas desde los datos REALES de ControlEvent.
    FAST no llama a Gemini. AI-SMOKE y FULL-CERT tienen presupuesto duro configurable. */
 import { getState } from './state.service.js';
@@ -139,7 +139,7 @@ function publicBatteryCase(c,mode=''){
     event:trim(c?.event),events:arr(c?.events).map(trim).filter(Boolean),person:trim(c?.person),
     expectedEvent:trim(c?.expectedEvent),expectedEvents:arr(c?.expectedEvents).map(trim).filter(Boolean),expectedPerson:trim(c?.expectedPerson),
     oracle:c?.oracle&&typeof c.oracle==='object'?c.oracle:null,requireAnswer:c?.requireAnswer!==false,validationRule,
-    engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':'',
+    engine:trim(c?.engine).toUpperCase()==='VNEXT'?'VNEXT':'',voice:c?.voice===true,brainLite:c?.brainLite===true,
     dialogue:c?.dialogue&&typeof c.dialogue==='object'?c.dialogue:null
   };
 }
@@ -150,7 +150,7 @@ function restoredHistoricalCase(raw={},mode=''){
     scenario:trim(raw?.scenario),mode:trim(mode||raw?.mode).toUpperCase(),event:trim(raw?.event||raw?.expectedEvent),
     events:arr(raw?.events).length?arr(raw.events).map(trim).filter(Boolean):arr(raw?.expectedEvents).map(trim).filter(Boolean),
     person:trim(raw?.person||raw?.expectedPerson),oracle:raw?.oracle&&typeof raw.oracle==='object'?raw.oracle:null,requireAnswer:raw?.requireAnswer!==false,
-    engine:trim(raw?.engine).toUpperCase()==='VNEXT'?'VNEXT':'',dialogue:raw?.dialogue&&typeof raw.dialogue==='object'?raw.dialogue:null
+    engine:trim(raw?.engine).toUpperCase()==='VNEXT'?'VNEXT':'',voice:raw?.voice===true,brainLite:raw?.brainLite===true,dialogue:raw?.dialogue&&typeof raw.dialogue==='object'?raw.dialogue:null
   };
   const rule=trim(raw?.validationRule);
   if(rule==='nonexistent-event') c.validate=r=>{
@@ -273,7 +273,11 @@ function p124PresentationEvidence(result={}){const m=result?.meta?.presentationE
 function p124NormalizeDialogueAssessment(assessment={},result={}){const a=(assessment&&typeof assessment==='object')?{...assessment}:{},p=p124PresentationEvidence(result),tools=arr(result?.meta?.tools);if(a.empty_promise===true&&(tools.length||p.materialized===true)){a.empty_promise=false;a.note=trim(a.note)||'Hubo ejecución/materialización estructurada; cualquier desacuerdo debe juzgarse por contenido, no como promesa vacía.';}return a;}
 function p125TargetTables(target=''){const raw=trim(target);if(!/tabla/i.test(raw))return[];const body=raw.includes('→')?raw.split('→').slice(1).join('→'):raw;return body.split('|').map(x=>trim(x.replace(/\[[^\]]*\].*$/,'').replace(/^tabla\(s\)\s*/i,'').replace(/^tabla\s*/i,''))).filter(x=>x.length>=3).slice(0,6);}
 function p125TableTitleMatch(expected='',actual=''){const e=norm(expected),a=norm(actual);if(!e||!a)return false;if(a.includes(e)||e.includes(a))return true;const toks=e.split(' ').filter(x=>x.length>=3&&!['tabla','datos','filas','columnas'].includes(x));return toks.length>0&&toks.every(t=>a.includes(t));}
-function p126DialogueArtifactGuard(userMove={},result={},assessment={}){const a={...(assessment||{})},targets=p125TargetTables(userMove?.target),p=p124PresentationEvidence(result),op=trim(result?.meta?.resultContext?.operation);if(!targets.length||!p.materialized||op==='derive')return a;const titles=arr(p.tables).map(t=>trim(t?.title||t?.key)).filter(Boolean),missing=targets.filter(t=>!titles.some(x=>p125TableTitleMatch(t,x)));if(missing.length){a.previous_coherent=false;if(userMove?.changeFocus!==true)a.focus_preserved=false;a.note=`La respuesta materializó otra tabla; faltó ${missing.slice(0,2).join(' / ')}`.slice(0,180);}return a;}
+function p126DialogueArtifactGuard(userMove={},result={},assessment={}){const a={...(assessment||{})},targets=p125TargetTables(userMove?.target),p=p124PresentationEvidence(result),op=trim(result?.meta?.resultContext?.operation),maxRows=Math.max(0,...arr(p.tables).map(t=>num(t?.rowCount)));
+  // La evidencia materializada manda sobre una inferencia textual del simulador. Si el juez dice
+  // «solo dos filas» pero la propia respuesta contiene una tabla completa, no fabricamos un KO.
+  if(p.materialized&&maxRows>2&&a.previous_coherent===false&&/(?:solo|solamente).{0,30}(?:dos|2).{0,20}(?:filas?|eventos?|registros?)|(?:dos|2).{0,20}(?:filas?|eventos?|registros?).{0,30}(?:solo|solamente)/i.test(trim(a.note))){a.previous_coherent=true;a.focus_preserved=true;a.note=`Evidencia estructurada autoritativa: tabla materializada con ${maxRows} filas; se descarta la inferencia contradictoria del simulador.`;}
+  if(!targets.length||!p.materialized||op==='derive')return a;const titles=arr(p.tables).map(t=>trim(t?.title||t?.key)).filter(Boolean),missing=targets.filter(t=>!titles.some(x=>p125TableTitleMatch(t,x)));if(missing.length){a.previous_coherent=false;if(userMove?.changeFocus!==true)a.focus_preserved=false;a.note=`La respuesta materializó otra tabla; faltó ${missing.slice(0,2).join(' / ')}`.slice(0,180);}return a;}
 function observedOutcome(c,result,usage={},extra={}){const verdict=validatePaidCase(c,result);const vnext=trim(c?.engine).toUpperCase()==='VNEXT';const diagnosis=vnext?itvDecisionDiagnosis(c,result,verdict):null;return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(result?.answer),status:verdict.status,functionalStatus:verdict.functionalStatus||verdict.status,functionalReasons:verdict.functionalReasons||verdict.reasons,performanceStatus:verdict.performanceStatus||'OK',performanceReasons:verdict.performanceReasons||[],validationReasons:verdict.reasons,usage,performance:result?.meta?.performance||{},tools:arr(result?.meta?.tools),engine:vnext?'VNEXT':'LEDGER',provider:text(result?.provider),architecture:text(result?.meta?.architecture),oracleEnabled:true,observationMode:'ORACLE_ACTIVE',serverTitle:text(result?.title),serverWarnings:arr(result?.warnings),resultContext:(result?.meta?.resultContext&&typeof result.meta.resultContext==='object')?result.meta.resultContext:null,vnextAudit:vnext?vNextAuditOf(result):null,capabilityCalls:vnext?arr(result?.meta?.capabilityCalls):[],decisionDiagnosis:diagnosis,debugTrace:arr(result?.meta?.debugTrace).slice(0,60),...ledgerAuditOf(result),...extra};}
 function technicalErrorOutcome(c,message,usage={},extra={}){return{id:c.id,group:c.group,label:c.label,prompt:c.prompt||'',expected:c.expected||'',actual:text(message),status:'KO',functionalStatus:'KO',functionalReasons:['fallo técnico/timeout'],performanceStatus:'KO',performanceReasons:['fallo técnico/timeout'],validationReasons:['fallo técnico/timeout'],usage,oracleEnabled:true,observationMode:'ORACLE_ACTIVE',decisionDiagnosis:{category:ITV_DIAG.TECH,touch:'SOFTWARE CE/INFRA',confidence:'alta',expectedCapability:itvCapabilitySignature(itvCapabilityExpectation(c)),observedCapability:'—:—',reason:'Fallo técnico/timeout antes de disponer de una ejecución certificable.'},...extra};}
 
@@ -705,7 +709,8 @@ function vItvGenericHealth(result={}){
   if(reasons.length)return{status:'KO',reasons};
   if(/Necesito una precisión|No encuentro (?:la conversación|un resultado anterior|el turno)|¿A qué .* te refieres|Which .* do you want|Could you specify/i.test(blob))reasons.push('turno aplazado por aclaración/referencia no resuelta');
   if(/(?:por|total de|valor total de)\s*\./i.test(blob))reasons.push('importe/total vacío en respuesta canónica');
-  if(warnings.length)reasons.push(`warnings CE: ${warnings.join(' | ')}`);
+  const expectedRecovery=result?.meta?.recovery?.used===true&&warnings.length&&warnings.every(w=>trim(w)==='event_not_found');
+  if(warnings.length&&!expectedRecovery)reasons.push(`warnings CE: ${warnings.join(' | ')}`);
   return{status:reasons.length?'WARN':'OK',reasons};
 }
 function vItvPerformanceHealth(result={}){
@@ -1099,6 +1104,19 @@ const TPL={
 const LANGUAGE_REACH_PROFILES={
   GOLDEN:{id:'GOLDEN',label:'GOLDEN · 110',count:110,expectedBand:'regresión fija',description:'Las mismas 110 preguntas de la referencia P1.17; los oráculos se refrescan con los datos actuales.'},
   GOLDEN_DIALOGUE:{id:'GOLDEN_DIALOGUE',label:'GOLDEN DIÁLOGO · 14',count:14,expectedBand:'continuidad fija comparable',description:'Una conversación fija de 14 turnos: mismas frases, mismo orden y mismo escenario en cada versión.'},
+  EXPRESS:{id:'EXPRESS',label:'ITV EXPRESS · 10',count:10,expectedBand:'10 turnos críticos en pocos minutos',description:'Prueba corta de verdad factual, contexto, responsables, banco, euros y continuidad.'},
+  HARD24:{id:'HARD24',label:'ITV DURA · 24',count:24,expectedBand:'24 turnos encadenados y adversariales',description:'Batería fija más dura: contexto largo, cambio de tipo de gráfica, banco, asistentes, responsables, donaciones, comparativas y retornos de foco.'},
+  MULTI32:{id:'MULTI32',label:'ITV MULTI-CONTEXTO · 32',count:32,expectedBand:'32 turnos con 4 hilos lógicos y retornos',description:'Prueba V5: crea varios contextos independientes, cambia entre ellos, vuelve a hilos antiguos y exige reejecución sin destruir los demás.'},
+  STRUCT36:{id:'STRUCT36',label:'ITV C/S/O · 36',count:36,expectedBand:'36 turnos sobre C→S→O→R/V',description:'Prueba V5 P3: valida contextos, snapshots inmutables, multi-operación activa/pasiva, respuestas y vistas sin hard-code de negocio.'},
+  ISOLATION16:{id:'ISOLATION16',label:'ITV AISLAMIENTO · 16',count:16,expectedBand:'16 turnos de fronteras C/S/O/R/V',description:'P7: fuerza cambios de dominio, entidad, vista, síntesis e identidad para detectar contaminación entre contextos.'},
+  AUTHORITY18:{id:'AUTHORITY18',label:'ITV AUTORIDAD · 18',count:18,expectedBand:'18 turnos de autoridad FACT→C/S→O→V→R',description:'P9: fuerza dominio factual frente a vista, herencia de dimensión, multi-O, síntesis y registro real de gráficas.'},
+  SCOPE12:{id:'SCOPE12',label:'ITV SCOPE · 12',count:12,expectedBand:'12 turnos sobre alcance soberano y recuperación limpia',description:'P14: alterna este evento/todos los eventos, reacciones sociales y retorno al hilo sin ejecutar un C ajeno.'},
+  SOVEREIGN30:{id:'SOVEREIGN30',label:'ITV SOBERANA · 30',count:30,expectedBand:'30 turnos adversariales sobre contrato v6, continuidad, evidencia y presentación',description:'v6_1-exp: fuerza sí/no/espera, conversación actual, evidencia, análisis, creatividad con datos, gráficas, cambios de foco y recuperación de hilos. Valida que el contrato v6 sea emitido por Gemini y que CE no use fallback cognitivo.'},
+  V61CRUSH40:{id:'V61CRUSH40',label:'ITV v6_1 CRUSH · 40',count:40,expectedBand:'40 turnos dentro del alcance real de v6_1-exp + adversariales de frontera',description:'Batería fija para cerrar v6_1-exp: FETCH/FILTER/SORT_LIMIT/VISUALIZE, continuidad, grounding, UI materializada, identidad/tiempo y rechazo limpio de JOIN/AGGREGATE/DERIVE.'},
+  RVOICE18:{id:'RVOICE18',label:'ITV RESPUESTA/VOZ · 18',count:18,expectedBand:'18 turnos sobre R escrito y oral',description:'P8: conserva el escrito factual y exige una locución pronunciable, sin Markdown, timestamps ni decimales monetarios innecesarios.'},
+  MATURITY:{id:'MATURITY',label:'MADUREZ · 24 · V3.15',count:24,expectedBand:'comparativa legacy',description:'La batería híbrida vigente ejecutada contra V3.15.'},
+  BRAINLITE:{id:'BRAINLITE',label:'MADUREZ · 24 · BRAIN-LITE TARGET25',count:24,expectedBand:'objetivo ≥22/30',description:'La misma batería híbrida de 24 turnos ejecutada por V4 BRAIN-LITE.'},
+  STRESS:{id:'STRESS',label:'CONTROL DIRIGIDO · 24',count:24,expectedBand:'≥90% antes de entregar versión',description:'Conversación fija y adversarial por la ruta de VOZ: detalle, cambios de foco, tiempo, filtros, recuperación y limpieza oral.'},
   DIALOGUE:{id:'DIALOGUE',label:'DIÁLOGO · 24',count:24,expectedBand:'continuidad adaptativa',description:'Una conversación sintética continua: cada turno nace de la respuesta real de Zuzu y del foco que haya quedado activo.'},
   BASIC:{id:'BASIC',label:'BÁSICA',count:50,expectedBand:'95–100%',description:'Preguntas simples, explícitas y de un solo objetivo.'},
   MEDIUM:{id:'MEDIUM',label:'MEDIA',count:60,expectedBand:'≈90%',description:'Continuidad corta, comparaciones, varias acciones y referencias naturales.'},
@@ -1108,6 +1126,19 @@ const LANGUAGE_REACH_PROFILES={
 function normalizeLanguageLevel(raw='BASIC'){
   const n=norm(raw).replace(/\s+/g,'');
   if(['goldendialogue','goldendialog','dialoguegolden','dialogogolden','golden14','dialog14'].includes(n))return'GOLDEN_DIALOGUE';
+  if(['express','express10','itvexpress','rapida','rapida10','quick10'].includes(n))return'EXPRESS';
+  if(['hard24','dura24','itvdura','itvdura24','stresshard24'].includes(n))return'HARD24';
+  if(['multi32','multicontexto','itvmulti','itvmulti32','multistructure','multiestructura'].includes(n))return'MULTI32';
+  if(['struct36','cso36','itvcso','estructura36','csorv','multiestructura36'].includes(n))return'STRUCT36';
+  if(['isolation16','aislamiento16','itvaislamiento','isolate16','p7isolation'].includes(n))return'ISOLATION16';
+  if(['authority18','autoridad18','itvautoridad','p9authority','contract18'].includes(n))return'AUTHORITY18';
+  if(['scope12','itvscope','alcance12','p14scope','ambito12'].includes(n))return'SCOPE12';
+  if(['sovereign30','soberana30','itvsoberana','singleturn30','v50sovereign'].includes(n))return'SOVEREIGN30';
+  if(['v61crush40','crush40','itvcrush','itvv61','v61crush','crujiente40'].includes(n))return'V61CRUSH40';
+  if(['rvoice18','respuesta18','voz18','itvvoz','itvrespuesta','oral18','p8voice'].includes(n))return'RVOICE18';
+  if(['brainlite','brainlitematurity','madurezbrainlite','v4brainlite'].includes(n))return'BRAINLITE';
+  if(['madurez','madurez24','maturity','maturity24','auto24','madurezauto'].includes(n))return'MATURITY';
+  if(['stress','stress24','qa24','control24','controldirigido'].includes(n))return'STRESS';
   if(['golden','golden110','110','fija','regresion'].includes(n))return'GOLDEN';
   if(['dialogue','dialogo','diálogo','conversation','conversacion','conversación','24'].includes(n))return'DIALOGUE';
   if(['basic','basica','facil','50'].includes(n))return'BASIC';
@@ -1155,6 +1186,330 @@ async function refreshGoldenCase(caseDef,state,cache=new Map()){
 }
 async function buildGoldenLanguageCases(state){const f=goldenFixture(),out=[],cache=new Map();for(const c of arr(f.cases))out.push(await refreshGoldenCase(c,state,cache));return out.slice(0,110);}
 
+
+async function buildExpressDialogueCases(state={}){
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},event=eventName(active)||'el evento activo';
+  const other=events.find(e=>trim(e?.id)!==trim(active?.id)&&/funcion/i.test(eventName(e)))||events.find(e=>trim(e?.id)!==trim(active?.id))||active,otherEvent=eventName(other)||event;
+  const turns=[
+    {p:`Dame un resumen económico de ${event}: ingresos, compras realizadas, compras pendientes y donaciones.`,ops:['event_summary'],level:'BASIC'},
+    {p:'Dame el detalle completo de todas las personas asistentes, sin cortar la lista.',ops:['event_attendance'],level:'MEDIUM'},
+    {p:'¿Cuánto dinero han pagado los asistentes por este evento? Separa banco y efectivo.',ops:['event_income_status'],level:'BASIC'},
+    {p:'Dame todos los responsables con cuánto han comprado y cuánto tienen pendiente.',ops:['event_purchases'],level:'MEDIUM'},
+    {p:'¿Quién ha comprado más?',ops:['event_purchases'],level:'BASIC'},
+    {p:'¿Cuánto lleva comprado exactamente y cuánto tiene pendiente?',ops:['event_purchases'],level:'BASIC'},
+    {p:'¿Cuál es el flujo neto bancario? Dame abonos banco, cargos banco y la resta; el efectivo no forma parte del flujo bancario.',ops:['event_bank'],level:'BASIC'},
+    {p:'¿De dónde sale el saldo calculado? Dame saldo inicial + flujo neto = saldo calculado.',ops:['event_bank'],level:'BASIC'},
+    {p:`Compara ${event} con ${otherEvent} y represéntalo con gráficas.`,ops:['compare_events'],level:'MEDIUM'},
+    {p:'Dame el tiempo de hoy, mañana y pasado mañana y represéntalo en una gráfica de líneas.',ops:['event_weather'],level:'MEDIUM'}
+  ];
+  return turns.map((x,i)=>({id:`express-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV EXPRESS · 10',label:`Turno crítico ${i+1}/10`,prompt:x.p,expected:'Debe responder con datos canónicos completos, conservar el contexto y materializar gráficas cuando se pidan; ningún importe escrito puede perder €.',scenario:'ITV EXPRESS BRAIN-LITE 10',mode:'FULL-CERT',engine:'VNEXT',brainLite:true,voice:true,dialogue:{adaptive:false,fixed:true,express:true,turn:i+1,total:turns.length,requiresTool:true,expectedTool:'query_ce',expectedOperations:arr(x.ops),expectedResponseLevel:trim(x.level),expectedEvent:event,voiceClean:true,mustPreserveMoneyUnit:true}}));
+}
+
+
+async function buildHard24DialogueCases(state={}){
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},event=eventName(active)||'el evento activo';
+  const other=events.find(e=>trim(e?.id)!==trim(active?.id)&&/funcion/i.test(eventName(e)))||events.find(e=>trim(e?.id)!==trim(active?.id))||active,otherEvent=eventName(other)||event;
+  const turns=[
+    {p:`Dame un resumen económico de ${event}: ingresos, compras realizadas, pendientes y donaciones.`,ops:['event_summary'],level:'BASIC',check:'summary'},
+    {p:'Dame la lista completa de asistentes, sin puntos suspensivos ni recortes.',ops:['event_attendance'],level:'MEDIUM',check:'attendance'},
+    {p:'Creo que falta alguien: revísala y vuelve a darme todos, no solo una parte.',ops:['event_attendance'],level:'MEDIUM',check:'attendance'},
+    {p:'¿Cuánto han pagado los asistentes? Separa banco y efectivo, sin mezclar donaciones.',ops:['event_income_status'],level:'BASIC',only:true},
+    {p:'De ese dinero, dime solo cuánto fue en efectivo.',ops:['event_income_status'],level:'BASIC',only:true,check:'cashOnly'},
+    {p:'Dame todos los responsables con comprado y pendiente, cada uno con sus dos importes.',ops:['event_purchases'],level:'MEDIUM',check:'bothStates'},
+    {p:'¿Quién es el que más ha comprado?',ops:['event_purchases'],level:'BASIC',check:'top'},
+    {p:'¿Y esa persona cuánto lleva comprado y cuánto pendiente?',ops:['event_purchases'],level:'BASIC',check:'leaderBoth'},
+    {p:'Ahora explícame el cuadro bancario: abonos, cargos y flujo neto; el efectivo fuera.',ops:['event_bank'],level:'BASIC',only:true,check:'bank'},
+    {p:'¿De dónde sale exactamente el saldo calculado? Quiero la operación, no el mismo resumen.',ops:['event_bank'],level:'MEDIUM',only:true,check:'balanceExplain'},
+    {p:'Dame solo la resta del flujo bancario, sin contar el efectivo.',ops:['event_bank'],level:'BASIC',only:true,check:'bank'},
+    {p:'Cambia de tema: tiempo de hoy, mañana y pasado mañana, con gráfica de líneas.',ops:['event_weather'],level:'MEDIUM',chart:'line',check:'weather3'},
+    {p:'Ahora esos mismos datos, de barras.',ops:['event_weather'],level:'BASIC',chart:'bar',check:'weather3'},
+    {p:'Y vuelve a poner exactamente esos tres días en líneas.',ops:['event_weather'],level:'BASIC',chart:'line',check:'weather3'},
+    {p:`Compara ${event} con ${otherEvent} y haz una gráfica de barras de la comparación.`,ops:['compare_events'],level:'MEDIUM',chart:'bar'},
+    {p:'La misma comparación, pero ahora en líneas; no me cambies al tiempo.',ops:['compare_events'],level:'BASIC',chart:'line'},
+    {p:'De esos dos eventos, dime cuál tuvo más ingresos y la diferencia.',ops:['compare_events'],level:'MEDIUM'},
+    {p:'Vuelve al evento que está en pantalla y dame solo su resumen económico.',ops:['event_summary'],level:'BASIC'},
+    {p:'Ahora dime las donaciones de ese evento: total, donantes y valor.',ops:['event_donations'],level:'MEDIUM'},
+    {p:'Desglosa las donaciones por donante sin cambiar de evento.',ops:['event_donations'],level:'MEDIUM'},
+    {p:'Retoma las compras: todos los responsables, comprado y pendiente.',ops:['event_purchases'],level:'MEDIUM',check:'bothStates'},
+    {p:'¿Quién de ellos va peor y por qué?',ops:['event_purchases'],level:'MEDIUM',check:'why'},
+    {p:'Júntame banco, efectivo y responsables con comprado/pendiente, sin perder ninguna parte.',ops:['event_bank','event_income_status','event_purchases'],level:'HIGH',check:'compound'},
+    {p:'Con los datos de ese último resumen, haz una gráfica de barras útil y no cambies de asunto.',ops:['event_bank','event_income_status','event_purchases'],level:'HIGH',chart:'bar',check:'compound'}
+  ];
+  return turns.map((x,i)=>({id:`hard24-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV DURA · 24',label:`Turno duro ${i+1}/24`,prompt:x.p,expected:'Debe mantener el hilo completo, usar datos canónicos, no reinterpretar referentes y obedecer exactamente el tipo de gráfica solicitado.',scenario:'ITV DURA BRAIN-LITE 24',mode:'FULL-CERT',engine:'VNEXT',brainLite:true,voice:true,dialogue:{adaptive:false,fixed:true,hard24:true,turn:i+1,total:turns.length,requiresTool:true,expectedTool:'query_ce',expectedOperations:arr(x.ops),expectedResponseLevel:trim(x.level),expectedEvent:event,expectedChartType:trim(x.chart),strictOnly:x.only===true,hardCheck:trim(x.check),voiceClean:true,mustPreserveMoneyUnit:true}}));
+}
+
+async function buildMulti32DialogueCases(state={}){
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},event=eventName(active)||'el evento activo';
+  const other=events.find(e=>trim(e?.id)!==trim(active?.id)&&/funcion/i.test(eventName(e)))||events.find(e=>trim(e?.id)!==trim(active?.id))||active,otherEvent=eventName(other)||event;
+  const turns=[
+    {p:`Dame el resumen económico de ${event}.`,ops:['event_summary'],ctx:'summary'},
+    {p:'Ahora el cuadro bancario de ese mismo evento.',ops:['event_bank'],ctx:'bank'},
+    {p:'¿De dónde sale el saldo calculado?',ops:['event_bank'],ctx:'bank',check:'balanceExplain'},
+    {p:'Cambia de tema: tiempo de hoy, mañana y pasado mañana.',ops:['event_weather'],ctx:'weather',check:'weather3'},
+    {p:'Haz una gráfica de líneas con esos mismos datos.',ops:['event_weather'],ctx:'weather',chart:'line',check:'weather3'},
+    {p:'Ahora de barras, sin cambiar los datos.',ops:['event_weather'],ctx:'weather',chart:'bar',check:'weather3'},
+    {p:'Volvamos al banco: dime solo abonos, cargos y flujo neto.',ops:['event_bank'],ctx:'bank',check:'bank'},
+    {p:'Retoma el tiempo y vuelve a poner aquellos tres días en líneas.',ops:['event_weather'],ctx:'weather',chart:'line',check:'weather3'},
+    {p:'Ahora dime todos los responsables de compras, con comprado y pendiente.',ops:['event_purchases'],ctx:'purchases',check:'bothStates'},
+    {p:'¿Quién es el que más ha comprado?',ops:['event_purchases'],ctx:'purchases',check:'top'},
+    {p:'¿Y esa persona cuánto lleva comprado y cuánto pendiente?',ops:['event_purchases'],ctx:'purchases',check:'leaderBoth'},
+    {p:`Abre otro hilo: compara ${event} con ${otherEvent}.`,ops:['compare_events'],ctx:'comparison'},
+    {p:'Haz esa comparación en barras.',ops:['compare_events'],ctx:'comparison',chart:'bar'},
+    {p:'La misma comparación ahora en líneas.',ops:['compare_events'],ctx:'comparison',chart:'line'},
+    {p:'Vuelve a compras y dime otra vez quién era el que más había comprado.',ops:['event_purchases'],ctx:'purchases',check:'top'},
+    {p:'Y ahora vuelve al banco: ¿cuál era el flujo neto?',ops:['event_bank'],ctx:'bank',check:'bank'},
+    {p:'Retoma la comparación y dime cuál de los dos eventos tuvo más ingresos.',ops:['compare_events'],ctx:'comparison'},
+    {p:'Retoma el tiempo: ¿qué día de los tres tenía la máxima más alta?',ops:['event_weather'],ctx:'weather',check:'weather3'},
+    {p:'Vuelve al resumen económico inicial del evento en pantalla.',ops:['event_summary'],ctx:'summary',check:'summary'},
+    {p:'Dentro de ese evento, dime las donaciones.',ops:['event_donations'],ctx:'donations'},
+    {p:'Desglósalas por donante.',ops:['event_donations'],ctx:'donations'},
+    {p:'Vuelve a responsables de compra; no a donaciones.',ops:['event_purchases'],ctx:'purchases',check:'bothStates'},
+    {p:'Ahora vuelve a las donaciones y dame el valor total.',ops:['event_donations'],ctx:'donations'},
+    {p:'Retoma el banco y explícame otra vez la operación del saldo.',ops:['event_bank'],ctx:'bank',check:'balanceExplain'},
+    {p:'Retoma la comparación y ponla de barras otra vez.',ops:['compare_events'],ctx:'comparison',chart:'bar'},
+    {p:'Retoma el tiempo y ponlo de barras también.',ops:['event_weather'],ctx:'weather',chart:'bar',check:'weather3'},
+    {p:'Vuelve a compras y dime comprado y pendiente del responsable que iba primero.',ops:['event_purchases'],ctx:'purchases',check:'leaderBoth'},
+    {p:'Vuelve al resumen general, no a compras.',ops:['event_summary'],ctx:'summary',check:'summary'},
+    {p:'Ahora dime cuánto hay registrado en ingresos, cuánto está recibido por banco, Bizum o efectivo y cuánto sigue pendiente de ingreso.',ops:['event_income_status'],ctx:'income',check:'incomeStates'},
+    {p:'De eso último dime solo lo pendiente de ingreso.',ops:['event_income_status'],ctx:'income',check:'pendingIncome'},
+    {p:'Vuelve al banco, sin mezclar ese pendiente de ingreso, y dame el flujo neto.',ops:['event_bank'],ctx:'bank',check:'bank'},
+    {p:'Para terminar, vuelve a la comparación anterior y hazla en líneas sin perder ninguno de los otros hilos.',ops:['compare_events'],ctx:'comparison',chart:'line'}
+  ];
+  return turns.map((x,i)=>({id:`multi32-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV MULTI-CONTEXTO · 32',label:`Turno multi ${i+1}/32`,prompt:x.p,expected:'Debe seleccionar el contexto lógico correcto, reejecutar su última consulta cuando proceda y conservar intactos los demás contextos.',scenario:'ITV V5 MULTI-CONTEXTO 32',mode:'FULL-CERT',engine:'VNEXT',brainLite:true,voice:true,dialogue:{adaptive:false,fixed:true,multi32:true,turn:i+1,total:turns.length,requiresTool:true,expectedTool:'query_ce',expectedOperations:arr(x.ops),expectedResponseLevel:'BASIC',expectedEvent:event,expectedChartType:trim(x.chart),expectedContextDomain:trim(x.ctx),hardCheck:trim(x.check),voiceClean:true,mustPreserveMoneyUnit:true}}));
+}
+
+
+async function buildStruct36DialogueCases(state={}){
+  // P6 · la carretera estructural necesita un evento con evidencia representable de donaciones;
+  // si existe, se usa para que la prueba de donut examine V de verdad y no un dataset vacío.
+  // Es selección de fixture por propiedad de datos, no hard-code de nombre/evento.
+  const eventRows=arr(state?.eventos),primaryRow=eventRows.find(e=>donationCountForEvent(state,trim(e?.id))>0)||eventRows[0],event=eventName(primaryRow),events=eventRows.map(eventName).filter(Boolean),otherEvent=events.find(x=>norm(x)!==norm(event))||event;
+  const turns=[
+    {p:`Dame el resumen económico de ${event}.`,ops:['event_summary'],ctx:'summary',minC:1,minS:1,minO:1},
+    {p:'Ahora el cuadro bancario de ese mismo evento.',ops:['event_bank'],ctx:'bank',minC:2,minS:1,minO:1},
+    {p:'¿De dónde sale el saldo calculado?',ops:['event_bank'],ctx:'bank',minC:2,minS:2,minO:1},
+    {p:'Cambia de tema: tiempo de hoy, mañana y pasado mañana.',ops:['event_weather'],ctx:'weather',minC:3,minS:1,minO:1,check:'weather3'},
+    {p:'Haz una gráfica de líneas con esos mismos datos.',ops:['event_weather'],ctx:'weather',chart:'line',minC:3,minS:2,minO:1,needView:true},
+    {p:'Ahora de barras, sin cambiar los datos.',ops:['event_weather'],ctx:'weather',chart:'bar',minC:3,minS:3,minO:1,needView:true},
+    {p:'Vuelve al banco.',ops:['event_bank'],ctx:'bank',minC:3,minS:3,minO:1},
+    {p:'Y añade también cuánto está pendiente de ingreso.',ops:['event_bank','event_income_status'],ctx:'bank',minC:3,minS:4,minO:2,accumulate:true},
+    {p:'De todo eso, dame solo el flujo bancario.',ops:['event_bank'],ctx:'bank',minC:3,minS:5,minO:1},
+    {p:'Retoma el tiempo y pon aquellos tres días en líneas.',ops:['event_weather'],ctx:'weather',chart:'line',minC:3,minS:4,minO:1,needView:true},
+    {p:'Ahora las compras por responsable, ordenadas por importe.',ops:['event_purchases'],ctx:'purchases',minC:4,minS:1,minO:1},
+    {p:'Y añade lo pendiente de cada responsable.',ops:['event_purchases'],ctx:'purchases',minC:4,minS:2,minO:2,accumulate:true},
+    {p:'Haz una gráfica de barras de esos mismos responsables.',ops:['event_purchases'],ctx:'purchases',chart:'bar',minC:4,minS:3,minO:2,needView:true},
+    {p:'Ahora un queso con los mismos datos.',ops:['event_purchases'],ctx:'purchases',chart:'pie',minC:4,minS:4,minO:2,needView:true},
+    {p:`Abre una comparación entre ${event} y ${otherEvent}.`,ops:['compare_events'],ctx:'comparison',minC:5,minS:1,minO:1},
+    {p:'Pon esa comparación en barras.',ops:['compare_events'],ctx:'comparison',chart:'bar',minC:5,minS:2,minO:1,needView:true},
+    {p:'Y la misma en líneas.',ops:['compare_events'],ctx:'comparison',chart:'line',minC:5,minS:3,minO:1,needView:true},
+    {p:'Vuelve a compras, al punto donde teníamos comprado y pendiente por responsable.',ops:['event_purchases'],ctx:'purchases',minC:5,minS:5,minO:2},
+    {p:'¿Quién va primero por importe comprado?',ops:['event_purchases'],ctx:'purchases',minC:5,minS:6,minO:1},
+    {p:'Y esa persona, comprado y pendiente.',ops:['event_purchases'],ctx:'purchases',minC:5,minS:6,minO:2,accumulate:true},
+    {p:'Retoma el banco con el pendiente de ingreso que añadimos antes.',ops:['event_bank','event_income_status'],ctx:'bank',minC:5,minS:6,minO:2},
+    {p:'Ahora las donaciones del evento.',ops:['event_donations'],ctx:'donations',minC:6,minS:1,minO:1},
+    {p:'Desglósalas por donante.',ops:['event_donations'],ctx:'donations',minC:6,minS:2,minO:1},
+    {p:'Y haz un donut con ese desglose.',ops:['event_donations'],ctx:'donations',chart:'donut',minC:6,minS:3,minO:1,needView:true},
+    {p:'Vuelve a la comparación y ponla de barras.',ops:['compare_events'],ctx:'comparison',chart:'bar',minC:6,minS:4,minO:1,needView:true},
+    {p:'Retoma el tiempo, sin tocar los demás hilos.',ops:['event_weather'],ctx:'weather',minC:6,minS:5,minO:1},
+    {p:'Vuelve al resumen económico inicial.',ops:['event_summary'],ctx:'summary',minC:6,minS:2,minO:1},
+    {p:'Y añade banco e ingresos pendientes al resumen.',ops:['event_summary','event_bank','event_income_status'],ctx:'summary',minC:6,minS:3,minO:3,accumulate:true},
+    {p:'Representa ese resumen en barras.',ops:['event_summary','event_bank','event_income_status'],ctx:'summary',chart:'bar',minC:6,minS:4,minO:3,needView:true},
+    {p:'Ahora vuelve a donaciones, solo al desglose por donante.',ops:['event_donations'],ctx:'donations',minC:6,minS:4,minO:1},
+    {p:'Retoma compras, comprado y pendiente por responsable.',ops:['event_purchases'],ctx:'purchases',minC:6,minS:6,minO:2},
+    {p:'Haz la misma vista en líneas.',ops:['event_purchases'],ctx:'purchases',chart:'line',minC:6,minS:6,minO:2,needView:true},
+    {p:'Vuelve al banco y explica el saldo.',ops:['event_bank'],ctx:'bank',minC:6,minS:6,minO:1},
+    {p:'Retoma la comparación, sin perder los demás contextos.',ops:['compare_events'],ctx:'comparison',minC:6,minS:5,minO:1},
+    {p:'Para terminar, vuelve al resumen compuesto con banco e ingresos.',ops:['event_summary','event_bank','event_income_status'],ctx:'summary',minC:6,minS:5,minO:3},
+    {p:'Y hazlo de barras, usando exactamente las operaciones de ese snapshot.',ops:['event_summary','event_bank','event_income_status'],ctx:'summary',chart:'bar',minC:6,minS:6,minO:3,needView:true}
+  ];
+  return turns.map((x,i)=>{const viewOnly=x.needView===true;return{id:`struct36-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV C/S/O · 36',label:`Turno C/S/O ${i+1}/36`,prompt:x.p,expected:'Debe resolver el turno sobre un C concreto, crear un S inmutable, conservar las O necesarias y materializar R/V sin contaminar otros contextos.',scenario:'ITV V5 C/S/O/R/V 36',mode:'FULL-CERT',engine:'VNEXT',brainLite:true,voice:true,dialogue:{adaptive:false,fixed:true,struct36:true,turn:i+1,total:turns.length,requiresTool:!viewOnly,expectedTool:viewOnly?'':'query_ce',expectedOperations:arr(x.ops),expectedResponseLevel:'BASIC',expectedEvent:event,expectedChartType:trim(x.chart),expectedContextDomain:trim(x.ctx),hardCheck:trim(x.check),minContexts:num(x.minC),minSnapshots:num(x.minS),minOperations:num(x.minO),needView:viewOnly,viewOnly,accumulate:x.accumulate===true,voiceClean:true,mustPreserveMoneyUnit:true}}});
+}
+
+
+async function buildIsolation16DialogueCases(state={}){
+  // P7 · fixture por propiedades reales: evento con compras y un responsable existente.
+  // Los nombres concretos viven solo en ITV y nunca se copian al runtime.
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},event=eventName(active),eventId=trim(active?.id),peopleById=new Map(arr(state?.personas).map(p=>[trim(p?.id),personName(p)]));
+  const rr=arr(state?.compras).find(r=>eventIdOf(r)===eventId&&trim(r?.responsableId||r?.responsable_id)&&peopleById.get(trim(r?.responsableId||r?.responsable_id))),person=rr?peopleById.get(trim(rr?.responsableId||rr?.responsable_id)):(personName(arr(state?.personas)[0])||'una persona registrada');
+  const turns=[
+    {p:`Dame el resumen económico de ${event}.`,ops:['event_summary'],ctx:'summary',check:'noLeak'},
+    {p:'Dame el tiempo de tres días.',ops:['event_weather'],ctx:'weather',check:'weather3'},
+    {p:'Ahora en líneas.',ops:['event_weather'],ctx:'weather',chart:'line',view:true},
+    {p:'Dame ahora las compras de este evento agrupadas por responsable y en donut.',ops:['event_purchases'],ctx:'purchases',chart:'donut',check:'responsibleRows'},
+    {p:`Ahora solo las compras de ${person}.`,ops:['event_purchases'],ctx:'purchases',check:'personSet',person},
+    {p:'Vuelve al tiempo, sin arrastrar ninguna persona, y ponlo en barras.',ops:['event_weather'],ctx:'weather',chart:'bar',view:true,check:'noPersonLeak'},
+    {p:'Vuelve a compras agrupadas por responsable.',ops:['event_purchases'],ctx:'purchases',check:'responsibleRowsNoPerson'},
+    {p:'Y en queso.',ops:['event_purchases'],ctx:'purchases',chart:'pie',view:true,check:'responsibleRowsNoPerson'},
+    {p:'Dime el cuadro bancario.',ops:['event_bank'],ctx:'bank',check:'noPersonLeak'},
+    {p:'Y añade el pendiente de ingreso.',ops:['event_bank','event_income_status'],ctx:'bank',check:'multiO'},
+    {p:'Vuelve al resumen inicial.',ops:['event_summary'],ctx:'summary',check:'noPersonLeak'},
+    {p:'Haz una síntesis con toda la información del evento en forma de rima, sin inventar nada.',ops:['event_summary','event_bank','event_purchases','event_donations'],ctx:'synthesis',check:'synthesis'},
+    {p:'Vuelve a compras agrupadas.',ops:['event_purchases'],ctx:'purchases',check:'responsibleRowsNoPerson'},
+    {p:'Barras.',ops:['event_purchases'],ctx:'purchases',chart:'bar',view:true,check:'viewNoFact'},
+    {p:'¿Tú sabes quién soy?',ops:[],ctx:'',check:'identity',noTool:true},
+    {p:'Retoma el tiempo de tres días en líneas.',ops:['event_weather'],ctx:'weather',chart:'line',view:true,check:'weather3'}
+  ];
+  return turns.map((x,i)=>({id:`isolation16-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV AISLAMIENTO · 16',label:`Aislamiento ${i+1}/16`,prompt:x.p,expected:'Debe respetar fronteras entre contexto, entidad, operaciones, respuesta y vista; ninguna entidad o R de otro hilo puede contaminar este turno.',scenario:'ITV V5 P7 AISLAMIENTO 16',mode:'FULL-CERT',engine:'VNEXT',brainLite:true,voice:true,dialogue:{adaptive:false,fixed:true,isolation16:true,struct36:x.noTool!==true,turn:i+1,total:turns.length,requiresTool:x.noTool!==true&&!x.view,expectedTool:x.noTool||x.view?'':'query_ce',expectedOperations:arr(x.ops),expectedResponseLevel:x.check==='synthesis'?'HIGH':'BASIC',expectedEvent:event,expectedChartType:trim(x.chart),expectedContextDomain:trim(x.ctx),hardCheck:trim(x.check),minContexts:0,minSnapshots:0,minOperations:x.view?1:arr(x.ops).length,needView:x.view===true||!!x.chart,viewOnly:x.view===true,accumulate:x.check==='multiO',expectedPerson:trim(x.person),voiceClean:true,mustPreserveMoneyUnit:true}}));
+}
+
+
+
+async function buildScope12DialogueCases(state={}){
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},event=eventName(active);
+  const turns=[
+    {p:'Busca ingresos Pendiente en todos los eventos registrados.',ops:['event_income_status'],ctx:'income',check:'allScope'},
+    {p:'Quiero la relación completa de ingresos en situación Pendiente revisando todos los eventos.',ops:['event_income_status'],ctx:'income',check:'allScope'},
+    {p:'Ahora solo en este evento.',ops:['event_income_status'],ctx:'income',check:'currentScope'},
+    {p:'Y otra vez en todos los eventos.',ops:['event_income_status'],ctx:'income',check:'allScope'},
+    {p:'Qué locura, te has quedado enganchado.',ops:[],ctx:'',check:'socialNoFact',noTool:true},
+    {p:'Dime de nuevo si hay algún ingreso Pendiente en cualquier evento.',ops:['event_income_status'],ctx:'income',check:'allScope'},
+    {p:'¿Cuántos eventos has revisado para responderme?',ops:[],ctx:'',check:'scopeFollow',noTool:true},
+    {p:'Vuelve a este evento y dime los Pendiente.',ops:['event_income_status'],ctx:'income',check:'currentScope'},
+    {p:'Ahora en otros eventos, no en este solamente.',ops:['event_income_status'],ctx:'income',check:'allScope'},
+    {p:'Y esto qué es ahora?',ops:[],ctx:'',check:'socialNoFact',noTool:true},
+    {p:'Mantén el hilo y vuelve a buscar Pendientes en todos los eventos.',ops:['event_income_status'],ctx:'income',check:'allScope'},
+    {p:'Dame el total y en qué eventos están.',ops:['event_income_status'],ctx:'income',check:'allScopeFollow'}
+  ];
+  return turns.map((x,i)=>({id:`scope12-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV SCOPE · 12',label:`Scope ${i+1}/12`,prompt:x.p,expected:'El alcance explícito manda: ALL_EVENTS nunca hereda el evento activo; una reacción social no ejecuta CE ni cambia el hilo.',scenario:'ITV V5 P14 SCOPE AUTHORITY 12',mode:'FULL-CERT',engine:'VNEXT',brainLite:true,voice:true,dialogue:{adaptive:false,fixed:true,scope12:true,struct36:x.noTool!==true,turn:i+1,total:turns.length,requiresTool:x.noTool!==true,expectedTool:x.noTool?'':'query_ce',expectedOperations:arr(x.ops),expectedResponseLevel:'BASIC',expectedEvent:x.check==='currentScope'?event:'',expectedContextDomain:trim(x.ctx),hardCheck:trim(x.check),minContexts:0,minSnapshots:0,minOperations:x.noTool?0:1,needView:false,viewOnly:false,accumulate:false,expectedPerson:'',voiceClean:true,mustPreserveMoneyUnit:true}}));
+}
+
+
+async function buildV61Crush40Cases(state={}){
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},event=eventName(active)||'el evento actual';
+  const t=[
+    ['Dime qué sabes de este evento.','direct'],
+    ['Vale, pero dime solo lo importante.','direct'],
+    ['¿Por qué dices eso?','explain'],
+    ['No, espera, me he explicado mal.','social'],
+    ['Lo que quiero saber es si el balance operativo es positivo o negativo.','direct'],
+    ['¿Cuántas personas asistieron?','direct'],
+    ['Dime la fecha de inicio y la de fin.','direct'],
+    ['¿Qué eventos están finalizados?','dataset'],
+    ['Ordénamelos por fecha de inicio.','sortAsc'],
+    ['Ahora al revés, del más reciente al más antiguo.','sortDesc'],
+    ['Muéstramelo en una tabla.','table'],
+    ['Ahora en barras usando el nombre y la valoración del evento.','visual'],
+    ['Ahora en tarta con esos mismos campos.','visual'],
+    ['Ahora en líneas con los mismos datos.','visual'],
+    ['Vuelve a tabla sin cambiar los datos.','table'],
+    ['De esos eventos, enséñame solo los que tengan SySA en el nombre.','filter'],
+    ['Ordénalos por fecha de inicio.','sortAsc'],
+    ['Resúmeme lo que ha quedado filtrado.','summary'],
+    ['Vuelve al evento que tengo en pantalla y dime su estado.','currentEvent'],
+    ['¿Y su precio?','direct'],
+    ['¿Y su balance operativo?','direct'],
+    ['¿Con ese balance puedo decir que fue un éxito?','grounded'],
+    ['El evento ha sido un éxito rotundo y cumplió todas las previsiones, ¿verdad?','grounded'],
+    ['Cruza las compras con los nombres de las personas.','unsupported'],
+    ['Calcula el ROI exacto del evento con lo que tienes.','unsupported'],
+    ['Suma todos los importes de las compras y agrúpalos por estado.','unsupported'],
+    ['Vuelve a la lista de eventos finalizados que vimos antes.','returnDataset'],
+    ['Ordénalos otra vez por fecha de inicio.','sortAsc'],
+    ['Ponlos en barras usando nombre y precio.','visual'],
+    ['Ahora en tarta, sin volver a consultar datos si ya los tienes.','visual'],
+    ['Ahora en líneas.','visual'],
+    ['Vuelve a tabla.','table'],
+    ['¿Quién eres tú?','identity'],
+    ['¿Sabes quién soy yo?','actor'],
+    ['¿Qué hora es ahora?','time'],
+    ['¿Qué día es hoy?','date'],
+    ['Hazme un resumen de todo lo que hemos visto en esta conversación.','sessionSummary'],
+    ['De todo eso, dime solo qué puedes afirmar con certeza.','groundedSummary'],
+    ['¿Y qué cosas no puedes afirmar con los datos que tienes?','limits'],
+    ['No, espera: resume en una sola frase lo esencial y no inventes nada.','oneSentence']
+  ];
+  return t.map((x,i)=>({id:`v61crush40-${String(i+1).padStart(3,'0')}`,group:'ITV v6_1 CRUSH · 40',label:`CRUSH ${i+1}/40`,prompt:x[0],expected:'Debe cumplir exclusivamente el alcance real de v6_1-exp: conversación y hechos certificados con FETCH/FILTER/SORT_LIMIT/VISUALIZE; las capacidades no disponibles se rechazan limpiamente sin romper el contrato.',scenario:'ITV V6_1 CRUSH 40',mode:'FULL-CERT',engine:'VNEXT',brainLite:false,voice:false,dialogue:{adaptive:false,fixed:true,v61crush:true,v6:true,turn:i+1,total:t.length,hardCheck:x[1],requiresTool:false,needView:x[1]==='visual',viewOnly:['visual','table','sortAsc','sortDesc'].includes(x[1]),accumulate:false,voiceClean:false,mustPreserveMoneyUnit:true}}));
+}
+
+async function buildSovereign30DialogueCases(state={}){
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},event=eventName(active),e2=eventName(events.find(e=>eventName(e)!==event)||events[1]||active),e3=eventName(events.find(e=>![event,e2].includes(eventName(e)))||events[2]||active);
+  const people=arr(state?.personas).map(personName).filter(Boolean),p1=people[0]||'Carmelo',p2=people[1]||'Cito';
+  const t=[
+    ['Dime qué sabes de este evento.',['event_summary'],'direct'],
+    ['Ahora analiza si hay algo que deba preocuparnos, no me recites cifras sin más.',['event_summary','event_bank','event_purchases','event_management'],'analytical'],
+    ['Ya que estamos con responsables de compras, mira Hitos y LG y dime si detectas una responsabilidad por encima de ellos, alguien que controle que esto se haga.',['event_purchases','event_management'],'analytical'],
+    [`Compara ingresos de ${event}, ${e2} y ${e3} y cuéntame una historia con esos datos.`,['compare_events'],'narrative'],
+    ['Utiliza esos datos y cuéntame la historia, no me vuelvas a dar una ficha técnica.',['compare_events'],'narrative'],
+    ['¿De qué hemos estado hablando tú y yo ahora mismo?',[],'summary'],
+    ['Sí.',[],'summary'],
+    ['No, espera.',[],'social'],
+    ['Vale, continúa.',[],'summary'],
+    [`Háblame de ${p1}.`,['person_profile'],'direct'],
+    [`¿Y ${p2}?`,['person_profile'],'direct'],
+    ['No, olvida eso; vuelve a lo anterior.',[],'direct'],
+    ['Te estás liando.',[],'social'],
+    ['Sigue.',[],'direct'],
+    ['Haz lo de antes.',[],'direct'],
+    ['Quiero una gráfica con estos mismos datos, en líneas.',['compare_events'],'visual'],
+    ['Ahora en queso.',['compare_events'],'visual'],
+    ['¿Qué tipos de gráfica puedes hacer?',[],'direct'],
+    ['Haz una de cada tipo disponible con estos datos.',['compare_events'],'visual'],
+    ['Ahora explícame qué conclusión sacarías tú de la evolución, no me enumeres columnas.',['compare_events'],'analytical'],
+    ['Qué respuesta más técnica; dime qué significa eso en cristiano.',[], 'analytical'],
+    ['¿Quién eres?',[], 'direct'],
+    ['¿Sabes quién soy yo?',[], 'direct'],
+    ['Qué hora es?',[], 'direct'],
+    ['Y qué día es hoy?',[], 'direct'],
+    ['No cambies de tema: vuelve a la conclusión anterior.',[], 'analytical'],
+    ['Hazme un resumen ejecutivo de todo lo que acabamos de ver.',['event_summary','event_bank','event_purchases','event_management'],'summary'],
+    ['Sí, hazlo.',[], 'summary'],
+    ['Ahora conviértelo en un relato breve para contárselo a alguien que no conoce ControlEvent.',[], 'narrative'],
+    ['Y si algo no puedes demostrar con los datos, dilo; no rellenes huecos.',[], 'analytical']
+  ];
+  return t.map((x,i)=>({id:`sovereign30-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV SOBERANA · 30',label:`Soberana ${i+1}/30`,prompt:x[0],expected:'Gemini debe interpretar el objetivo humano completo mediante el contrato v6; CE solo valida y ejecuta mecánicamente. Se evalúan continuidad, evidencia, presentación y ausencia de fallback cognitivo.',scenario:'ITV v6_1-exp CLEAN CANONICAL COGNITIVE COMPILER 30',mode:'FULL-CERT',engine:'VNEXT',brainLite:false,voice:true,dialogue:{adaptive:false,fixed:true,sovereign30:true,v6:true,turn:i+1,total:t.length,requiresTool:false,expectedTool:'',expectedOperations:[],expectedResponseLevel:'',expectedEvent:'',expectedContextDomain:'',hardCheck:x[2],semanticOracle:'SOVEREIGN30-V6-SEMANTIC-1',semanticTurn:i+1,minContexts:0,minSnapshots:0,minOperations:0,needView:x[2]==='visual',viewOnly:x[2]==='visual',accumulate:false,expectedPerson:'',voiceClean:true,mustPreserveMoneyUnit:true}}));
+}
+
+async function buildAuthority18DialogueCases(state={}){
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},event=eventName(active),eventId=trim(active?.id),peopleById=new Map(arr(state?.personas).map(p=>[trim(p?.id),personName(p)]));
+  const rr=arr(state?.compras).find(r=>eventIdOf(r)===eventId&&trim(r?.responsableId||r?.responsable_id)&&peopleById.get(trim(r?.responsableId||r?.responsable_id))),person=rr?peopleById.get(trim(rr?.responsableId||rr?.responsable_id)):(personName(arr(state?.personas)[0])||'una persona registrada');
+  const turns=[
+    {p:`Dame el resumen económico de ${event}.`,ops:['event_summary'],ctx:'summary',check:'noLeak'},
+    {p:'Dame el tiempo de tres días.',ops:['event_weather'],ctx:'weather',check:'weather3'},
+    {p:'Ahora en líneas.',ops:['event_weather'],ctx:'weather',chart:'line',view:true,check:'viewNoFact'},
+    {p:'Dame ahora las compras de este evento agrupadas por responsable y en donut.',ops:['event_purchases'],ctx:'purchases',chart:'donut',check:'responsibleRows'},
+    {p:'Ordénalas de mayor a menor importe.',ops:['event_purchases'],ctx:'purchases',check:'inheritResponsible'},
+    {p:`Ahora solo las compras de ${person}.`,ops:['event_purchases'],ctx:'purchases',check:'personSet',person},
+    {p:'Vuelve a compras agrupadas por responsable.',ops:['event_purchases'],ctx:'purchases',check:'responsibleRowsNoPerson'},
+    {p:'Dime el cuadro bancario.',ops:['event_bank'],ctx:'bank',check:'noPersonLeak'},
+    {p:'Y añade el pendiente de ingreso.',ops:['event_bank','event_income_status'],ctx:'bank',check:'multiO'},
+    {p:'Vuelve al tiempo y ponlo en barras.',ops:['event_weather'],ctx:'weather',chart:'bar',view:true,check:'viewNoFact'},
+    {p:'¿Qué tipos de gráficas eres capaz de representar?',ops:[],ctx:'',check:'viewCapabilities',noTool:true},
+    {p:'Ahora en dispersión.',ops:[],ctx:'',check:'unsupportedView',noTool:true},
+    {p:'Vuelve a compras agrupadas.',ops:['event_purchases'],ctx:'purchases',check:'responsibleRowsNoPerson'},
+    {p:'Y en queso.',ops:['event_purchases'],ctx:'purchases',chart:'pie',view:true,check:'viewNoFact'},
+    {p:'Haz una síntesis con toda la información del evento en forma de rima, sin inventar nada.',ops:['event_summary','event_bank','event_purchases','event_donations'],ctx:'synthesis',check:'synthesis'},
+    {p:'Vuelve a compras agrupadas y ordénalas otra vez por importe.',ops:['event_purchases'],ctx:'purchases',check:'inheritResponsible'},
+    {p:'¿Tú sabes quién soy?',ops:[],ctx:'',check:'identity',noTool:true},
+    {p:'Retoma el tiempo de tres días en líneas.',ops:['event_weather'],ctx:'weather',chart:'line',view:true,check:'weather3'}
+  ];
+  return turns.map((x,i)=>({id:`authority18-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV AUTORIDAD · 18',label:`Autoridad ${i+1}/18`,prompt:x.p,expected:'FACT manda sobre VIEW; C/S conserva dimensión y entidad; O mantiene evidencia; V no reconsulta; R no inventa.',scenario:'ITV V5 P9 CONTRACT AUTHORITY 18',mode:'FULL-CERT',engine:'VNEXT',brainLite:true,voice:true,dialogue:{adaptive:false,fixed:true,authority18:true,struct36:x.noTool!==true,turn:i+1,total:turns.length,requiresTool:x.noTool!==true&&!x.view,expectedTool:x.noTool||x.view?'':'query_ce',expectedOperations:arr(x.ops),expectedResponseLevel:x.check==='synthesis'?'HIGH':'BASIC',expectedEvent:event,expectedChartType:trim(x.chart),expectedContextDomain:trim(x.ctx),hardCheck:trim(x.check),minContexts:0,minSnapshots:0,minOperations:x.view?1:arr(x.ops).length,needView:x.view===true||!!x.chart,viewOnly:x.view===true,accumulate:x.check==='multiO',expectedPerson:trim(x.person),voiceClean:true,mustPreserveMoneyUnit:true}}));
+}
+
+async function buildRVoice18DialogueCases(state={}){
+  const events=arr(state?.eventos).filter(Boolean),event=eventName(events.find(e=>/funcion\s*2026/i.test(eventName(e)))||events[0])||'el evento activo';
+  const turns=[
+    {p:`Dame el resumen económico de ${event}.`,ops:['event_summary'],check:'money'},
+    {p:'Ahora el cuadro bancario de ese mismo evento.',ops:['event_bank'],check:'money'},
+    {p:'Explícame de dónde sale el saldo calculado.',ops:['event_bank'],check:'money'},
+    {p:'Dime los ingresos por banco, Bizum, efectivo y pendiente de ingreso.',ops:['event_income_status'],check:'money'},
+    {p:'Dame las compras agrupadas por responsable.',ops:['event_purchases'],check:'responsibles'},
+    {p:'Y añade lo pendiente de cada responsable.',ops:['event_purchases'],check:'responsibles'},
+    {p:'Dime el tiempo de los próximos tres días.',ops:['event_weather'],check:'weather'},
+    {p:'Haz una gráfica de líneas con esos datos.',ops:['event_weather'],view:true,chart:'line',check:'view'},
+    {p:'Ahora de barras.',ops:['event_weather'],view:true,chart:'bar',check:'view'},
+    {p:'Vuelve a compras agrupadas.',ops:['event_purchases'],check:'responsibles'},
+    {p:'Haz un queso con esos datos.',ops:['event_purchases'],view:true,chart:'pie',check:'view'},
+    {p:'Dame las donaciones desglosadas por donante.',ops:['event_donations'],check:'donors'},
+    {p:'Haz un donut con ese desglose.',ops:['event_donations'],view:true,chart:'donut',check:'view'},
+    {p:'Hazme un informe ejecutivo para Dirección.',ops:['event_summary','event_bank'],check:'report'},
+    {p:'Resúmelo por voz en lo esencial.',ops:[],noTool:true,check:'short'},
+    {p:'¿Cómo te llamas?',ops:[],noTool:true,check:'identity'},
+    {p:'¿Tú sabes quién soy?',ops:[],noTool:true,check:'identity'},
+    {p:'Vuelve al banco y dime solo el flujo neto.',ops:['event_bank'],check:'money'}
+  ];
+  return turns.map((x,i)=>({id:`rvoice18-dialogue-${String(i+1).padStart(3,'0')}`,group:'ITV RESPUESTA/VOZ · 18',label:`Respuesta/Voz ${i+1}/18`,prompt:x.p,expected:'La respuesta escrita conserva los datos exactos; spokenAnswer expresa la misma evidencia de forma natural y pronunciable, sin ruido visual.',scenario:'ITV V5 P8 RESPUESTA/VOZ 18',mode:'FULL-CERT',engine:'VNEXT',brainLite:true,voice:true,dialogue:{adaptive:false,fixed:true,rvoice18:true,turn:i+1,total:turns.length,requiresTool:x.noTool!==true&&!x.view,expectedTool:x.noTool||x.view?'':'query_ce',expectedOperations:arr(x.ops),expectedEvent:event,expectedChartType:trim(x.chart),needView:x.view===true,viewOnly:x.view===true,hardCheck:trim(x.check),voiceClean:true,mustPreserveMoneyUnit:true,maxSpokenChars:x.check==='report'?650:520}}));
+}
+
 async function buildGoldenDialogueCases(state={}){
   // ITV exclusivamente: carretera FIJA y semántica. No basta con llamar la tool correcta:
   // se comprueban también filas, columnas, orden, referentes y ausencia de protocolo interno.
@@ -1177,6 +1532,76 @@ async function buildGoldenDialogueCases(state={}){
   return turns.map((spec,i)=>({id:`golden-dialogue-${String(i+1).padStart(3,'0')}`,group:'GOLDEN DIÁLOGO FIJO',label:`Turno fijo ${i+1}`,prompt:spec.prompt,expected:'Mantener el hilo y el efecto semántico exacto del turno, sin reinterpretar ni resetear estado que el usuario no haya pedido.',scenario:'ITV GOLDEN DIALOGUE P2-R',mode:'FULL-CERT',engine:'VNEXT',dialogue:{adaptive:false,fixed:true,turn:i+1,total:turns.length,requiresTool:spec.requiresTool!==false,expectedNoTool:spec.noTool===true,changeFocus:spec.changeFocus===true,expectedTool:trim(spec.tool),expectedOperations:arr(spec.operations),expectedActions:arr(spec.actions),expectedRowCount:Number.isFinite(Number(spec.rowCount))?Number(spec.rowCount):null,expectedColumns:arr(spec.expectedColumns),forbiddenColumns:arr(spec.forbiddenColumns),expectedSort:spec.sort||null,expectedEntities:arr(spec.entities),expectedPersons:arr(spec.persons),personOperation:trim(spec.personOperation),semantic:trim(spec.semantic),requiredValues:arr(spec.requiredValues),forbidResetFilters:spec.forbidResetFilters===true,mustMention:arr(spec.mustMention),forbidProtocol:spec.forbidProtocol===true}}));
 }
 
+function itvMadridIsoDate(offsetDays=0){
+  const d=new Date(Date.now()+Number(offsetDays||0)*86400000),parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Madrid',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d),o={};for(const x of parts)if(x.type!=='literal')o[x.type]=x.value;return `${o.year}-${o.month}-${o.day}`;
+}
+function buildStressDialogueCases(state={}){
+  const events=arr(state?.eventos).filter(e=>eventName(e)),active=languageActiveEvent(events)||events[0]||{},other=events.find(e=>trim(e?.id)!==trim(active?.id))||active,e1=eventName(active)||'el evento activo',e2=eventName(other)||e1;
+  const peopleById=new Map(arr(state?.personas).map(p=>[trim(p?.id),personName(p)])),responsibleRow=arr(state?.compras).find(r=>eventIdOf(r)===trim(active?.id)&&trim(r?.responsableId||r?.responsable_id)&&peopleById.get(trim(r?.responsableId||r?.responsable_id))),person=responsibleRow?peopleById.get(trim(responsibleRow?.responsableId||responsibleRow?.responsable_id)):(personName(arr(state?.personas)[0])||'una persona registrada');
+  const turns=[
+    {p:`Dame una visión general de ${e1}; no me escondas lo importante.`,ops:['event_summary'],level:'BASIC'},
+    {p:'Amplíamelo un poco: quiero más contexto, no simplemente repetir las mismas cifras.',ops:['event_summary'],level:'MEDIUM'},
+    {p:'Ahora céntrate en las compras.',ops:['event_purchases'],level:'BASIC',clean:true},
+    {p:'Dame más detalle de esas compras, pero háblame limpio: productos importantes y cifras útiles, no códigos ni fechas de cada línea.',ops:['event_purchases'],level:'MEDIUM',clean:true,maxSpoken:1500},
+    {p:'¿Cuántas compras están pendientes y de quién son?',ops:['event_purchases'],level:'BASIC',args:{purchase_status:'pending'},clean:true},
+    {p:`Quiero solo las compras responsabilidad de ${person} en este evento.`,ops:['event_purchases'],level:'BASIC',args:{responsible:person},clean:true},
+    {p:'Cambia a donaciones y dame lo esencial.',ops:['event_donations'],level:'BASIC',clean:true},
+    {p:'Ahora dame más detalle de las donaciones, sin volver a soltarme el mismo resumen.',ops:['event_donations'],level:'MEDIUM',clean:true},
+    {p:'¿Qué documentación y justificantes tenemos de este evento?',ops:['event_documentation'],level:'BASIC'},
+    {p:'¿Y el Cuadre Banco cómo está? Explícame lo importante.',ops:['event_bank'],level:'BASIC'},
+    {p:'¿Qué hitos y líneas de gestión quedan por hacer?',ops:['event_management'],level:'BASIC'},
+    {p:'¿Cómo van las liquidaciones?',ops:['event_liquidations'],level:'BASIC'},
+    {p:'¿Qué día es mañana?',noTool:true,temporal:'tomorrow'},
+    {p:'Dame el tiempo de ese día para el evento que estamos hablando.',ops:['event_weather'],level:'BASIC',temporal:'tomorrow',clean:true},
+    {p:'¿De qué fecha son exactamente esos datos del tiempo?',noTool:true,mustNotContradictTomorrow:true},
+    {p:`Cambia de foco a ${e2} y dame un resumen.`,ops:['event_summary'],level:'BASIC',event:e2},
+    {p:'Ahora sus compras, solo lo esencial.',ops:['event_purchases'],level:'BASIC',event:e2,clean:true},
+    {p:`Vuelve a ${e1} y dime sus donaciones.`,ops:['event_donations'],level:'BASIC',event:e1},
+    {p:`Compárame ${e1} y ${e2}, pero solo con magnitudes equivalentes.`,ops:['compare_events'],level:'BASIC'},
+    {p:'Volvamos al primero: dame otra vez las compras pendientes, sin arrastrar el segundo evento.',ops:['event_purchases'],level:'BASIC',args:{purchase_status:'pending'},event:e1},
+    {p:'Eso está mal. No quiero que arrastres ese intento al siguiente turno.',recovery:true},
+    {p:`Sitúate de nuevo en ${e1} y dame una visión general.`,ops:['event_summary'],level:'BASIC',event:e1},
+    {p:'Dame el tiempo de mañana de un evento que se llama EVENTO_INEXISTENTE_QA.',recovery:true},
+    {p:'Vuelve a intentarlo.',retry:true,notEcho:true}
+  ];
+  return turns.map((x,i)=>({id:`stress-dialogue-${String(i+1).padStart(3,'0')}`,group:'MADUREZ · VOZ FIJA',label:`Madurez ${i+1}/24`,prompt:x.p,expected:'Resolver el turno con seguridad, respetar el foco/filtros y no exponer ruido técnico.',scenario:'ITV MADUREZ VOZ P2-R 24',mode:'FULL-CERT',engine:'VNEXT',voice:true,dialogue:{adaptive:false,fixed:true,stress:true,turn:i+1,total:turns.length,requiresTool:x.noTool?false:!x.recovery&&!x.retry,expectedNoTool:x.noTool===true,expectedTool:x.ops?.length?'query_ce':'',expectedOperations:arr(x.ops),expectedResponseLevel:trim(x.level),expectedArgs:x.args||null,expectedEvent:trim(x.event),voiceClean:x.clean===true,maxSpokenChars:Number(x.maxSpoken)||0,expectedRecovery:x.recovery===true,expectedRetry:x.retry===true,notEcho:x.notEcho===true,temporal:trim(x.temporal),mustNotContradictTomorrow:x.mustNotContradictTomorrow===true}}));
+}
+
+function buildMaturityHybridCases(state={},seed=1){
+  // 14 turnos dirigidos + 10 turnos exploratorios. La parte exploratoria NO contiene
+  // una lista de preguntas: solo un arranque abierto; desde el segundo turno el usuario
+  // sintético decide qué decir leyendo la respuesta y artefactos reales de Zuzu.
+  const stress=buildStressDialogueCases(state);
+  const picked=[0,1,2,3,4,5,7,8,9,12,13,14,22,23].map(i=>stress[i]).filter(Boolean);
+  const dimensions=[
+    ['reliability','depth'],['depth'],['reliability','voice'],['depth','voice'],
+    ['reliability','context'],['reliability','context','voice'],['depth'],['reliability'],
+    ['reliability'],['context'],['reliability','context','voice'],['context'],['recovery'],['recovery','context']
+  ];
+  const directed=picked.map((c,i)=>({
+    ...c,
+    id:`maturity-directed-${String(i+1).padStart(3,'0')}`,
+    group:'MADUREZ · CONTROL DIRIGIDO',
+    label:`Control dirigido ${i+1}/14`,
+    scenario:'ITV MADUREZ CONTROL DIRIGIDO',
+    dialogue:{...(c.dialogue||{}),turn:i+1,total:14,maturityHybrid:true,maturitySection:'directed',maturityDimensions:dimensions[i]||['reliability']}
+  }));
+  const events=shuffled(arr(state?.eventos).map(eventName).filter(Boolean),seed,'maturity-events'),people=shuffled(arr(state?.personas).map(personName).filter(Boolean),seed,'maturity-people');
+  const e1=events[0]||'el evento activo',p1=people[0]||'una persona conocida';
+  const mission=`No tienes una lista de pruebas que completar ni un orden de temas. Compórtate como una persona que entra en ControlEvent sin haber preparado preguntas. Empieza con curiosidad y, a partir de ahí, déjate llevar EXCLUSIVAMENTE por lo que Zuzu vaya respondiendo y mostrando. Si algo te interesa, profundiza; si algo suena raro, duda o corrige; si una respuesta abre otro tema, puedes seguirlo; si te aburres, cambia de asunto; si más tarde te acuerdas de algo anterior, vuelve a ello. Puedes usar elipsis, "eso", "lo de antes", pequeñas erratas, cambios de opinión o humor normal. No intentes cubrir compras, banco, documentos ni ningún checklist porque sí. La conversación debe parecer espontánea. Si Zuzu se mete en un jardín, no la rescates: reacciona como usuario y comprueba si sale sola.`;
+  const exploratory=[];
+  for(let i=1;i<=10;i++)exploratory.push({
+    id:`maturity-explore-${String(i).padStart(3,'0')}`,
+    group:'MADUREZ · CONVERSACIÓN LIBRE',
+    label:`Exploración libre ${i}/10`,
+    prompt:i===1?'Estoy un poco sin ideas. Mira lo que tienes en ControlEvent y cuéntame algo que te parezca interesante; ya iremos tirando del hilo.':'[mensaje NO prefijado: lo genera el usuario sintético leyendo la respuesta anterior]',
+    expected:'Conversación espontánea: responder con seguridad, conservar el hilo cuando proceda y adaptarse a lo que vaya surgiendo sin guion previo.',
+    scenario:'ITV MADUREZ CONVERSACION LIBRE',mode:'FULL-CERT',engine:'VNEXT',voice:true,
+    dialogue:{adaptive:true,maturityHybrid:true,maturitySection:'exploratory',maturityDimensions:['exploration','context','voice'],freeExplore:true,turn:i,total:10,mission,seed:String(seed),anchors:{people:[p1],events:[e1]}}
+  });
+  return [...directed,...exploratory];
+}
+
 function buildAdaptiveDialogueCases(state={},seed=1){
   const people=shuffled(arr(state?.personas).map(personName).filter(Boolean),seed,'dialogue-people'),events=shuffled(arr(state?.eventos).map(eventName).filter(Boolean),seed,'dialogue-events'),p1=people[0]||'una persona conocida',p2=people[1]||p1,e1=events[0]||'el evento activo',e2=events[1]||e1;
   const mission=`Mantén UNA sola conversación larga y humana con Zuzu. El único arranque fijado será una búsqueda histórica alrededor de ${p1}; desde ahí NO sigas un guion de preguntas. Cada siguiente turno debe decidirse después de leer la respuesta real de Zuzu y continuar, corregir, aclarar, bromear o cambiar de rumbo como haría una persona. Durante la charla intenta, solo cuando el hilo lo permita, trabajar varios turnos sobre un mismo objeto/tabla (incluye alguna exclusión/filtro de filas y su recuperación, columnas, orden o resumen), resolver alguna aclaración, hacer al menos un cambio deliberado de foco hacia algo como ${e1} o ${p2}, y volver a un asunto anterior si resulta natural. No hay orden obligatorio ni frase preparada para esas acciones. Si Zuzu abre un foco inesperado, síguelo antes de decidir el turno siguiente. Si se equivoca, corrígelo dentro de la misma conversación; nunca reinicies para que el test salga bien. Usa a veces elipsis, referencias como “ese/lo de antes/y ahora”, coloquialismos o pequeñas erratas. Al acercarte al final, pide un resumen solo si encaja con lo que realmente se haya hablado.`;
@@ -1187,6 +1612,19 @@ async function buildLanguageReachCases(state,rawLevel='BASIC',seed=1){
   const level=normalizeLanguageLevel(rawLevel),profile=LANGUAGE_REACH_PROFILES[level];
   if(level==='GOLDEN')return buildGoldenLanguageCases(state);
   if(level==='GOLDEN_DIALOGUE')return buildGoldenDialogueCases(state);
+  if(level==='EXPRESS')return buildExpressDialogueCases(state);
+  if(level==='HARD24')return buildHard24DialogueCases(state);
+  if(level==='MULTI32')return buildMulti32DialogueCases(state);
+  if(level==='STRUCT36')return buildStruct36DialogueCases(state);
+  if(level==='ISOLATION16')return buildIsolation16DialogueCases(state);
+  if(level==='AUTHORITY18')return buildAuthority18DialogueCases(state);
+  if(level==='SCOPE12')return buildScope12DialogueCases(state);
+  if(level==='SOVEREIGN30')return buildSovereign30DialogueCases(state);
+  if(level==='V61CRUSH40')return buildV61Crush40Cases(state);
+  if(level==='RVOICE18')return buildRVoice18DialogueCases(state);
+  if(level==='MATURITY')return buildMaturityHybridCases(state,seed).map(c=>({...c,brainLite:false}));
+  if(level==='BRAINLITE')return buildMaturityHybridCases(state,seed).map(c=>({...c,id:c.id.replace('maturity-','brainlite-'),group:c.group.replace('MADUREZ','BRAIN-LITE'),scenario:c.scenario.replace('MADUREZ','BRAIN-LITE'),brainLite:true}));
+  if(level==='STRESS')return buildStressDialogueCases(state);
   if(level==='DIALOGUE')return buildAdaptiveDialogueCases(state,seed);
   const chosen=chooseEvents(state,seed),events=arr(chosen.events),people=choosePeople(state,seed).people,stores=shuffled(arr(state?.tiendas).filter(x=>trim(x?.nombre)),seed,'lang-stores');
   const active=languageActiveEvent(events),activeName=eventName(active),catalogs=['events','people','products','stores'];
@@ -1386,8 +1824,9 @@ async function buildLanguageReachCases(state,rawLevel='BASIC',seed=1){
 }
 
 export async function previewZuzuLanguageBattery({level='BASIC',seed}={}){
-  const state=await getItvState(),normalizedLevel=normalizeLanguageLevel(level),normalizedSeed=['GOLDEN','GOLDEN_DIALOGUE'].includes(normalizedLevel)?(normalizedLevel==='GOLDEN'?0x117110:0x200014):normalizeSeed(seed),profile=LANGUAGE_REACH_PROFILES[normalizedLevel],cases=await buildLanguageReachCases(state,normalizedLevel,normalizedSeed),golden=normalizedLevel==='GOLDEN',goldenDialogue=normalizedLevel==='GOLDEN_DIALOGUE',dialogue=normalizedLevel==='DIALOGUE';
-  return{ok:true,replayContractVersion:4,source:'language',batteryCode:golden?'GOLDEN-P117-110':goldenDialogue?'GOLDEN-DIALOG-P2R-14':dialogue?'DIALOGUE-P2R-24':`LANG-${normalizedLevel}-${profile.count}`,languageProfile:{...profile,goldenFixed:golden||goldenDialogue},generatedAt:nowIso(),seed:normalizedSeed,dataCounts:batteryDataCounts(state),tests:{FAST:0,'AI-SMOKE':0,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':[],'FULL-CERT':cases.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'FULL-CERT':{turns:cases.length,costEurRange:`hasta ~${(profile.count*(dialogue?0.05:0.025)).toFixed(2).replace('.',',')} € según modelo/tokens`,hardCapSuggested:round(profile.count*(dialogue?0.05:0.025),2)}},notes:[golden?'GOLDEN 110: prompts y escenarios congelados desde P1.17; los oráculos se recalculan con el estado actual de CE.':goldenDialogue?'GOLDEN DIÁLOGO 14: conversación fija P2-R; mismas frases y mismo orden para comparar versiones sin cambiar de carretera.':dialogue?'DIÁLOGO P2-R: solo el primer mensaje es semilla; los siguientes los genera un usuario sintético leyendo la respuesta real y los artefactos visibles de Zuzu.':`Batería de alcance ${profile.label}: ${profile.count} preguntas.`,`Expectativa de partida: ${profile.expectedBand}.`,profile.description,'NHC: estas frases viven exclusivamente en ITV; no añaden reglas lingüísticas al runtime de Zuzu.',dialogue?'Cada turno adaptativo usa dos papeles IA separados: Zuzu + simulador ITV. Sus llamadas y costes se informan por separado.':'FULL-CERT ejecuta expresamente el motor VNext y conserva el historial visible dentro de cada escenario.','P2-R separa coste/llamadas de Zuzu del simulador de laboratorio.']};
+  const state=await getItvState(),normalizedLevel=normalizeLanguageLevel(level),normalizedSeed=['GOLDEN','GOLDEN_DIALOGUE','EXPRESS','HARD24','MULTI32','STRUCT36','ISOLATION16','AUTHORITY18','SCOPE12','SOVEREIGN30','V61CRUSH40','RVOICE18','STRESS'].includes(normalizedLevel)?(normalizedLevel==='GOLDEN'?0x117110:normalizedLevel==='GOLDEN_DIALOGUE'?0x200014:normalizedLevel==='EXPRESS'?0x160010:normalizedLevel==='HARD24'?0x240024:normalizedLevel==='MULTI32'?0x320032:normalizedLevel==='STRUCT36'?0x360036:normalizedLevel==='ISOLATION16'?0x160071:normalizedLevel==='AUTHORITY18'?0x180091:normalizedLevel==='SCOPE12'?0x120014:normalizedLevel==='SOVEREIGN30'?0x500030:normalizedLevel==='V61CRUSH40'?0x610040:normalizedLevel==='RVOICE18'?0x180081:0x314024):normalizeSeed(seed),profile=LANGUAGE_REACH_PROFILES[normalizedLevel],cases=await buildLanguageReachCases(state,normalizedLevel,normalizedSeed),golden=normalizedLevel==='GOLDEN',goldenDialogue=normalizedLevel==='GOLDEN_DIALOGUE',express=normalizedLevel==='EXPRESS',hard24=normalizedLevel==='HARD24',multi32=normalizedLevel==='MULTI32',struct36=normalizedLevel==='STRUCT36',isolation16=normalizedLevel==='ISOLATION16',authority18=normalizedLevel==='AUTHORITY18',scope12=normalizedLevel==='SCOPE12',sovereign30=normalizedLevel==='SOVEREIGN30',v61crush40=normalizedLevel==='V61CRUSH40',rvoice18=normalizedLevel==='RVOICE18',maturity=normalizedLevel==='MATURITY'||normalizedLevel==='BRAINLITE',brainLite=normalizedLevel==='BRAINLITE'||hard24||multi32||struct36||isolation16||authority18||scope12||rvoice18,stress=normalizedLevel==='STRESS',dialogue=normalizedLevel==='DIALOGUE';
+  const adaptive=maturity||dialogue,voiceDialogue=maturity||stress;
+  return{ok:true,replayContractVersion:5,source:'language',batteryCode:golden?'GOLDEN-P117-110':goldenDialogue?'GOLDEN-DIALOG-P2R-14':express?'ITV-EXPRESS-BRAINLITE-10':hard24?'ITV-DURA-BRAINLITE-24':multi32?'ITV-MULTI-CONTEXT-V5-32':struct36?'ITV-CSORV-V5-36':isolation16?'ITV-ISOLATION-V5-P7-16':scope12?'ITV-SCOPE-V5-P14-12':sovereign30?'ITV-SOVEREIGN-V6.0.4-SEMANTIC-30':v61crush40?'ITV-V6_1-CRUSH-40':rvoice18?'ITV-RVOICE-V5-P8-18':brainLite?'MADUREZ-HYBRID-BRAINLITE-24':maturity?'MADUREZ-HYBRID-P2R-24':stress?'CONTROL-VOICE-P2R-24':dialogue?'DIALOGUE-P2R-24':`LANG-${normalizedLevel}-${profile.count}`,languageProfile:{...profile,goldenFixed:golden||goldenDialogue||express||hard24||multi32||struct36||isolation16||scope12||sovereign30||v61crush40||rvoice18||stress,stressVoice:voiceDialogue,hybridMaturity:maturity,brainLite,directedTurns:maturity?14:0,exploratoryTurns:maturity?10:0,scoreScale:maturity?'0-30':''},generatedAt:nowIso(),seed:normalizedSeed,dataCounts:batteryDataCounts(state),tests:{FAST:0,'AI-SMOKE':0,'FULL-CERT':cases.length},cases:{FAST:[],'AI-SMOKE':[],'FULL-CERT':cases.map(c=>publicBatteryCase(c,'FULL-CERT'))},estimated:{'FULL-CERT':{turns:cases.length,costEurRange:`hasta ~${(profile.count*((adaptive||stress)?0.05:0.025)).toFixed(2).replace('.',',')} € según modelo/tokens`,hardCapSuggested:round(profile.count*((adaptive||stress)?0.05:0.025),2)}},notes:[golden?'GOLDEN 110: prompts y escenarios congelados desde P1.17; los oráculos se recalculan con los datos actuales.':goldenDialogue?'GOLDEN DIÁLOGO 14: conversación fija P2-R; mismas frases y mismo orden para comparar versiones sin cambiar de carretera.':express?'ITV EXPRESS 10: solo diez turnos críticos para detectar rápidamente mezcla de ingresos/compras/donaciones, pérdida de contexto, responsables, banco y unidades monetarias.':hard24?'ITV DURA 24: conversación fija y adversarial que fuerza cambios de foco y de tipo de gráfica, retornos, banco, responsables, asistentes, donaciones y consultas compuestas.':multi32?'ITV MULTI-CONTEXTO 32: cuatro o más hilos lógicos conviven y se reactivan sin destruirse; prueba reejecución, presentación y estados de ingreso.':struct36?'ITV C/S/O 36: valida C→S→O→R/V, replay de snapshots compuestos, multi-operación activa/pasiva y vistas sobre evidencia representable.':isolation16?'ITV AISLAMIENTO 16: comprueba fronteras P7 entre C, entidades, O, R, V, síntesis e identidad de sesión sin reglas de negocio hard-codeadas.':scope12?'ITV SCOPE 12: alcance explícito ALL_EVENTS/CURRENT_EVENT y reacciones sociales sin contaminar el hilo.':sovereign30?'ITV SOBERANA 30: prueba adversarial del contrato v6; Gemini interpreta y CE valida/ejecuta sin fallback cognitivo. La batería conserva las mismas 30 frases para comparar continuidad entre versiones.':v61crush40?'ITV v6_1 CRUSH 40: batería fija de aceptación para v6_1-exp; solo prueba capacidades realmente implementadas y tres fronteras no disponibles que deben rechazarse limpiamente.':rvoice18?'ITV RESPUESTA/VOZ 18: P8 comprueba que la pantalla conserve precisión y que la locución sea una salida independiente, limpia y pronunciable.':maturity?'MADUREZ híbrida: 14 turnos dirigidos comprueban fallos conocidos y 10 turnos nacen dinámicamente de lo que Zuzu acaba de contestar; esas 10 preguntas no existen antes de empezar la conversación.':dialogue?'DIÁLOGO P2-R: solo el primer mensaje es semilla; los siguientes los genera un usuario sintético leyendo la respuesta real y los artefactos visibles de Zuzu.':`Batería de alcance ${profile.label}: ${profile.count} preguntas.`,`Expectativa de partida: ${profile.expectedBand}.`,profile.description,'NHC: estas frases viven exclusivamente en ITV; no añaden reglas lingüísticas al runtime de Zuzu.',adaptive?'Los turnos adaptativos usan dos papeles IA separados: Zuzu + simulador ITV. Sus llamadas y costes se informan por separado.':'FULL-CERT ejecuta expresamente el motor VNext y conserva el historial visible dentro de cada escenario.','P2-R separa coste/llamadas de Zuzu del simulador de laboratorio.']};
 }
 
 async function buildAiSmokeCases(state,max=40,seed=1){
@@ -1718,11 +2157,12 @@ export async function runZuzuTestCase({mode='AI-SMOKE',caseId='',conversationSta
 
 function p2GoldenDialogueAssessment(caseDef={},result={}){
   const d=caseDef?.dialogue||{};if(d?.fixed!==true)return null;
-  const calls=arr(result?.meta?.capabilityCalls),tools=arr(result?.meta?.tools).map(trim).filter(Boolean),reasons=[],wantedTool=trim(d.expectedTool),wantedOps=arr(d.expectedOperations).map(trim).filter(Boolean),wantedActions=arr(d.expectedActions).map(trim).filter(Boolean);
-  if(d.requiresTool===true&&!tools.length)reasons.push('el turno fijo requería una acción factual y no hubo tool');
-  if(d.expectedNoTool===true&&tools.length)reasons.push(`el turno fijo debía resolverse desde el estado de sesión, sin tool; observadas ${tools.join(', ')}`);
-  if(wantedTool&&!tools.includes(wantedTool))reasons.push(`tool esperada ${wantedTool}; observadas ${tools.join(', ')||'ninguna'}`);
-  if(wantedOps.length){const got=[...new Set(calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)).map(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)).filter(Boolean))];if(!got.some(x=>wantedOps.includes(x)))reasons.push(`operación esperada ${wantedOps.join('|')}; observadas ${got.join('|')||'ninguna'}`);}
+  const calls=arr(result?.meta?.capabilityCalls),tools=arr(result?.meta?.tools).map(trim).filter(Boolean),reasons=[],wantedTool=trim(d.expectedTool),wantedOps=arr(d.expectedOperations).map(trim).filter(Boolean),wantedActions=arr(d.expectedActions).map(trim).filter(Boolean),isV6Sovereign=d.sovereign30===true&&/^v6\./i.test(trim(result?.meta?.version));
+  if(!isV6Sovereign&&caseDef?.brainLite===true&&result?.meta?.brainLite!==true)reasons.push('ITV: el caso BRAIN-LITE no fue ejecutado por BRAIN-LITE');
+  if(!isV6Sovereign&&d.requiresTool===true&&!tools.length)reasons.push('el turno fijo requería una acción factual y no hubo tool');
+  if(!isV6Sovereign&&d.expectedNoTool===true&&tools.length)reasons.push(`el turno fijo debía resolverse desde el estado de sesión, sin tool; observadas ${tools.join(', ')}`);
+  if(!isV6Sovereign&&wantedTool&&!tools.includes(wantedTool)&&!(d.struct36===true&&d.viewOnly===true))reasons.push(`tool esperada ${wantedTool}; observadas ${tools.join(', ')||'ninguna'}`);
+  if(!isV6Sovereign&&wantedOps.length&&!(d.struct36===true&&d.viewOnly===true)){const got=[...new Set(calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)).map(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)).filter(Boolean))];if(d.express===true){for(const want of wantedOps)if(!got.includes(want))reasons.push(`ITV EXPRESS: falta operación ${want}; observadas ${got.join('|')||'ninguna'}`);}else if(!got.some(x=>wantedOps.includes(x)))reasons.push(`operación esperada ${wantedOps.join('|')}; observadas ${got.join('|')||'ninguna'}`);}
   if(wantedActions.length){const got=[...new Set(calls.filter(x=>trim(x?.tool)==='recall_memory'&&!trim(x?.error)).map(x=>trim(x?.normalizedArgs?.action||x?.rawArgs?.action)).filter(Boolean))];if(!got.some(x=>wantedActions.includes(x)))reasons.push(`acción de memoria esperada ${wantedActions.join('|')}; observadas ${got.join('|')||'ninguna'}`);}
   if(trim(d.semantic)==='memory_summary'){
     const memorySummary=calls.some(x=>trim(x?.tool)==='recall_memory'&&!trim(x?.error)&&trim(x?.normalizedArgs?.action||x?.rawArgs?.action)==='summarize');
@@ -1740,15 +2180,320 @@ function p2GoldenDialogueAssessment(caseDef={},result={}){
   for(const entity of arr(d.expectedEntities).map(trim).filter(Boolean))if(!ctxEntities.some(x=>norm(x)===norm(entity)))reasons.push(`referente esperado no conservado: ${entity}`);
   const personOp=trim(d.personOperation)||'person_events',personCalls=calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)&&trim(x?.effectiveOperation||x?.normalizedArgs?.operation)==personOp).map(x=>trim(x?.normalizedArgs?.person||x?.rawArgs?.person)).filter(Boolean);
   for(const person of arr(d.expectedPersons).map(trim).filter(Boolean))if(!personCalls.some(x=>norm(x)===norm(person)))reasons.push(`faltó ejecutar ${personOp} para ${person}`);
-  const answer=trim(result?.answer);for(const term of arr(d.mustMention).map(trim).filter(Boolean))if(!norm(answer).includes(norm(term)))reasons.push(`el resumen no menciona ${term}`);
+  const answer=trim(result?.answer),spoken=trim(result?.spokenAnswer||result?.meta?.spokenAnswer||answer);for(const term of arr(d.mustMention).map(trim).filter(Boolean))if(!norm(answer).includes(norm(term)))reasons.push(`el resumen no menciona ${term}`);
   if(d.forbidProtocol===true&&/(?:query_ce|recall_memory|resolve_entity|search_documents)\s*\(|default_api|function_call|dataset_id/i.test(answer))reasons.push('la respuesta expone protocolo interno');
+  if(d.stress===true){
+    const meta=result?.meta||{},rc=meta?.resultContext||{},stressCalls=calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error));
+    if(trim(d.expectedResponseLevel)&&trim(meta.responseLevel)!==trim(d.expectedResponseLevel))reasons.push(`nivel esperado ${trim(d.expectedResponseLevel)}; observado ${trim(meta.responseLevel)||'—'}`);
+    if(d.expectedRecovery===true&&meta?.recovery?.used!==true)reasons.push('se esperaba recovery limpio y no se activó');
+    if(d.expectedRetry===true&&meta?.retry?.used!==true)reasons.push('«Vuelve a intentarlo» no reactivó la petición descartada');
+    if(d.notEcho===true&&norm(spoken)===norm(caseDef?.prompt))reasons.push('el reintento se limitó a repetir literalmente «Vuelve a intentarlo»');
+    if(d.expectedEvent){const got=trim(rc.event)||stressCalls.map(x=>trim(x?.normalizedArgs?.event||x?.rawArgs?.event)).find(Boolean)||'';if(got&&norm(got)!==norm(d.expectedEvent))reasons.push(`evento esperado ${d.expectedEvent}; observado ${got}`);}
+    if(d.expectedArgs&&typeof d.expectedArgs==='object')for(const [k,v] of Object.entries(d.expectedArgs)){const got=stressCalls.map(x=>x?.normalizedArgs?.[k]??x?.rawArgs?.[k]).find(x=>x!==undefined&&x!==null&&String(x)!=='');if(v&&norm(got)!==norm(v))reasons.push(`filtro ${k} esperado «${v}»; observado «${got??'—'}»`);}
+    if(d.voiceClean===true){if(/\b20\d{2}-\d{2}-\d{2}(?:T\d{2}:\d{2})?/i.test(spoken))reasons.push('la voz contiene fecha ISO larga');if(/\bTK\s*\d+/i.test(spoken)&&!/\b(?:ticket|tk\d*)\b/i.test(caseDef?.prompt||''))reasons.push('la voz recita TKxx no pedido');if(/\d+[.,]\d+\s*(?:€|euros?|%|por ciento|°C|grados?)/i.test(spoken))reasons.push('la voz conserva decimales en una magnitud');if(/\b(?:dataset|filas?|columnas?|te dejo el detalle)\b/i.test(spoken))reasons.push('la voz expone lenguaje de interfaz');}
+    if(Number(d.maxSpokenChars)>0&&spoken.length>Number(d.maxSpokenChars))reasons.push(`locución demasiado larga: ${spoken.length} caracteres > ${Number(d.maxSpokenChars)}`);
+    if(trim(d.temporal)==='tomorrow'){const expected=itvMadridIsoDate(1),wx=stressCalls.find(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation)==='event_weather');if(wx){const a=wx.normalizedArgs||wx.rawArgs||{},dateOnly=v=>trim(v).slice(0,10),start=dateOnly(a.start_date),end=dateOnly(a.end_date)||start;if(start!==expected||end!==expected)reasons.push(`meteorología de mañana debía usar ${expected}; observó ${trim(a.start_date)||'—'} → ${trim(a.end_date)||'—'}`);}else if(trim(rc.operation)==='tomorrow_date'&&trim(rc.date)&&trim(rc.date)!==expected)reasons.push(`fecha de mañana incorrecta: ${trim(rc.date)} != ${expected}`);}
+    if(d.mustNotContradictTomorrow===true){const expected=itvMadridIsoDate(1),old=/\b20\d{2}-\d{2}-\d{2}\b/g,dates=(spoken.match(old)||[]);if(dates.some(x=>x!==expected))reasons.push(`la respuesta temporal menciona fecha incompatible con mañana (${expected}): ${dates.join(', ')}`);}
+  }
+
+  if(d.rvoice18===true){
+    const calls=arr(result?.meta?.capabilityCalls),goodCalls=calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),check=trim(d.hardCheck),charts=arr(result?.charts);
+    if(/[\*_#`]/.test(spoken)||/\|/.test(spoken))reasons.push('ITV R/VOZ: spokenAnswer conserva marcas visuales/Markdown');
+    if(/\b20\d{2}-\d{2}-\d{2}T\d{2}:\d{2}/i.test(spoken))reasons.push('ITV R/VOZ: spokenAnswer recita timestamp ISO');
+    if(/-?\d[\d.]*,\d{1,2}\s*(?:€|euros?)/i.test(spoken))reasons.push('ITV R/VOZ: importe monetario oral conserva decimales');
+    if(/\b(?:dataset|columnas?|filas?|json|query_ce|event_[a-z_]+)\b/i.test(spoken))reasons.push('ITV R/VOZ: spokenAnswer expone lenguaje técnico interno');
+    if(/\+\s*-|más\s+menos/i.test(spoken))reasons.push('ITV R/VOZ: locución usa construcción matemática poco natural «más menos»');
+    if(Number(d.maxSpokenChars)>0&&spoken.length>Number(d.maxSpokenChars))reasons.push(`ITV R/VOZ: locución demasiado larga ${spoken.length}>${Number(d.maxSpokenChars)}`);
+    if(d.mustPreserveMoneyUnit===true&&/\d/.test(answer)&&/(?:ingres|compr|banco|saldo|importe|donaci|efectivo|pendient)/i.test(answer)&&/\d+[.,]\d{2}/.test(answer)&&!/€/.test(answer))reasons.push('ITV R/VOZ: el escrito perdió el símbolo €');
+    if(check==='responsibles'&&!/(?:colty|responsable|comprado|pendiente)/i.test(spoken)&&/responsable/i.test(caseDef?.prompt||''))reasons.push('ITV R/VOZ: la locución no responde verbalmente sobre responsables');
+    if(check==='view'&&goodCalls.length)reasons.push('ITV R/VOZ: un cambio exclusivo de vista reconsultó datos');
+    if(check==='view'&&trim(d.expectedChartType)&&!charts.some(ch=>trim(ch?.type)===trim(d.expectedChartType)))reasons.push(`ITV R/VOZ: no materializó gráfica ${trim(d.expectedChartType)}`);
+  }
+  if(d.hard24===true){
+    const turn=Number(d.turn)||0,goodCalls=calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),ops=goodCalls.map(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)),charts=arr(result?.charts),tables=arr(result?.tables),purchaseCalls=goodCalls.filter(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)==='event_purchases'),statuses=purchaseCalls.map(x=>trim(x?.normalizedArgs?.purchase_status||x?.rawArgs?.purchase_status||x?.normalizedArgs?.status||x?.rawArgs?.status)),euroCount=(answer.match(/€/g)||[]).length;
+    if(/top[_ -]?buyer/i.test(answer)||goodCalls.some(x=>/top[_ -]?buyer/i.test(String(x?.normalizedArgs?.responsible||x?.rawArgs?.responsible||''))))reasons.push('ITV DURA: top_buyer se ha tratado como persona/resultado visible');
+    if(goodCalls.some(x=>/^(?:todos?|todas?|cada|all)$/i.test(trim(x?.normalizedArgs?.responsible||x?.rawArgs?.responsible))))reasons.push('ITV DURA: un cuantificador se ha convertido en nombre de responsable');
+    if(/(?:…|\.\.\.)/.test(answer)&&trim(d.hardCheck)==='attendance')reasons.push('ITV DURA: lista completa truncada');
+    if(d.strictOnly===true){const wanted=arr(d.expectedOperations).map(trim).filter(Boolean);if(ops.some(op=>!wanted.includes(op)))reasons.push(`ITV DURA: se cambió de dominio; esperaba solo ${wanted.join('|')}, observadas ${ops.join('|')||'ninguna'}`);}
+    if(trim(d.expectedChartType)){
+      const want=trim(d.expectedChartType),types=charts.map(c=>trim(c?.type)).filter(Boolean);
+      if(!types.includes(want))reasons.push(`ITV DURA: pidió gráfica ${want} y materializó ${types.join('|')||'ninguna'}`);
+    }
+    const check=trim(d.hardCheck);
+    if(check==='summary'){
+      if(!/ingres/i.test(answer)||!/compr/i.test(answer)||!/donaci/i.test(answer)||euroCount<3)reasons.push('ITV DURA: el resumen económico perdió magnitudes esenciales');
+    }
+    if(check==='attendance'){
+      const at=tables.find(t=>trim(t?.key)==='attendance'),rows=arr(at?.rows),names=rows.map(r=>trim(r?.Persona||r?.Asistente)).filter(Boolean);
+      if(rows.length&&names.some(n=>!norm(answer).includes(norm(n))))reasons.push('ITV DURA: faltan asistentes de la tabla canónica');
+      if(/truncated\s*:\s*true|incomplet/i.test(answer))reasons.push('ITV DURA: reconoce que la lista está incompleta');
+    }
+    if(check==='cashOnly'){
+      if(!/efectivo/i.test(answer)||/lista|registros figuran|importe de esas filas/i.test(answer))reasons.push('ITV DURA: pidió solo efectivo y recibió un listado/resumen ajeno');
+      if(euroCount!==1)reasons.push('ITV DURA: la respuesta de efectivo debía contener una sola cifra monetaria');
+    }
+    if(check==='bothStates'&&(!statuses.includes('realized')||!statuses.includes('pending')))reasons.push('ITV DURA: comprado + pendiente no consultó ambos estados');
+    if(check==='top'&&(/0[,\.]00\s*€/.test(answer)||!/(?:quien mas|más ha comprado|es quien)/i.test(answer)))reasons.push('ITV DURA: no resolvió el mayor comprador');
+    if(check==='leaderBoth'){
+      if(!statuses.includes('realized')||!statuses.includes('pending'))reasons.push('ITV DURA: seguimiento del líder perdió comprado o pendiente');
+      if(!trim(result?.meta?.resultContext?.person))reasons.push('ITV DURA: seguimiento perdió la persona foco');
+      if(euroCount<2)reasons.push('ITV DURA: faltan los dos importes del líder');
+    }
+    if(check==='bank'&&(!/abonos?\s+banco/i.test(answer)||!/cargos?\s+banco/i.test(answer)||!/flujo\s+neto\s+bancario/i.test(answer)))reasons.push('ITV DURA: faltan abonos/cargos/flujo bancario');
+    if(check==='balanceExplain'&&(!/saldo\s+inicial/i.test(answer)||!/(?:flujo\s+neto|impacto)/i.test(answer)||!/saldo\s+(?:calculado|final)/i.test(answer)))reasons.push('ITV DURA: no explica el cálculo del saldo');
+    if(check==='weather3'){
+      const wt=tables.find(t=>trim(t?.key)==='weather');if(wt&&arr(wt.rows).length<3)reasons.push('ITV DURA: perdió parte del rango meteorológico de tres días');
+      if(!ops.includes('event_weather'))reasons.push(`ITV DURA: la continuación gráfica abandonó meteorología; observadas ${ops.join('|')||'ninguna'}`);
+    }
+    if(check==='why'&&!/(?:porque|por que|motivo|pendiente|comprad)/i.test(answer))reasons.push('ITV DURA: no explica por qué ese responsable va peor');
+    if(check==='compound'){
+      for(const want of ['event_bank','event_income_status','event_purchases'])if(!ops.includes(want))reasons.push(`ITV DURA: resumen compuesto perdió ${want}`);
+      if(euroCount<4)reasons.push('ITV DURA: resumen compuesto demasiado incompleto');
+    }
+  }
+  if(d.multi32===true){
+    const goodCalls=calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),ops=goodCalls.map(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)),charts=arr(result?.charts),rc=result?.meta?.resultContext||{},frame=rc.frame||rc,contexts=arr(frame?.contexts),wantCtx=trim(d.expectedContextDomain),activeId=trim(frame?.active_context_id),active=contexts.find(c=>trim(c?.context_id)===activeId)||frame;
+    if(wantCtx&&trim(active?.domain)!==wantCtx)reasons.push(`ITV MULTI: contexto esperado ${wantCtx}; activo ${trim(active?.domain)||'—'}`);
+    const wanted=arr(d.expectedOperations).map(trim).filter(Boolean);if(wanted.length&&!wanted.some(x=>ops.includes(x)))reasons.push(`ITV MULTI: operación esperada ${wanted.join('|')}; observadas ${ops.join('|')||'ninguna'}`);
+    if(Number(d.turn)>=12&&contexts.length<3)reasons.push(`ITV MULTI: deberían coexistir al menos 3 contextos y solo hay ${contexts.length}`);
+    if(Number(d.turn)>=20&&contexts.length<4)reasons.push(`ITV MULTI: deberían coexistir al menos 4 contextos y solo hay ${contexts.length}`);
+    if(trim(d.expectedChartType)){const types=charts.map(c=>trim(c?.type)).filter(Boolean);if(!types.includes(trim(d.expectedChartType)))reasons.push(`ITV MULTI: pidió gráfica ${trim(d.expectedChartType)} y materializó ${types.join('|')||'ninguna'}`);}
+    const check=trim(d.hardCheck),euroCount=(answer.match(/€/g)||[]).length;
+    if(check==='summary'&&(!/ingres/i.test(answer)||!/compr/i.test(answer)||!/donaci/i.test(answer)||euroCount<3))reasons.push('ITV MULTI: resumen económico incompleto');
+    if(check==='bank'&&(!/abonos?\s+banco/i.test(answer)||!/cargos?\s+banco/i.test(answer)||!/flujo\s+neto/i.test(answer)))reasons.push('ITV MULTI: respuesta bancaria incompleta');
+    if(check==='balanceExplain'&&(!/saldo\s+inicial/i.test(answer)||!/(?:impacto|flujo\s+neto)/i.test(answer)))reasons.push('ITV MULTI: no explica el saldo');
+    if(check==='bothStates'){const sts=goodCalls.filter(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation)==='event_purchases').map(x=>trim(x?.normalizedArgs?.purchase_status||x?.rawArgs?.purchase_status));if(!sts.includes('realized')||!sts.includes('pending'))reasons.push('ITV MULTI: comprado+pendiente perdió un estado');}
+    if(check==='weather3'){const wt=arr(result?.tables).find(t=>trim(t?.key)==='weather');if(wt&&arr(wt.rows).length<3)reasons.push('ITV MULTI: rango de tres días incompleto');}
+    if(check==='incomeStates'){for(const word of ['banco','pendient'])if(!new RegExp(word,'i').test(answer))reasons.push(`ITV MULTI: faltó estado de ingreso ${word}`);}
+    if(check==='pendingIncome'&&!/pendient/i.test(answer))reasons.push('ITV MULTI: no respondió el pendiente de ingreso');
+  }
+
+  if(d.struct36===true){
+    const goodCalls=calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),ops=goodCalls.map(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)),rc=result?.meta?.resultContext||{},frame=rc.frame||rc,contexts=arr(frame?.contexts),activeId=trim(frame?.active_context_id),active=contexts.find(c=>trim(c?.context_id)===activeId)||frame,snapshots=arr(active?.snapshots),activeSnapshot=snapshots.find(x=>trim(x?.snapshot_id)===trim(active?.active_snapshot_id||frame?.active_snapshot_id))||snapshots[snapshots.length-1]||{},sops=arr(activeSnapshot?.operations),rblocks=arr(activeSnapshot?.response_blocks),views=arr(activeSnapshot?.views),wantCtx=trim(d.expectedContextDomain);
+    if(wantCtx&&trim(active?.domain)!==wantCtx)reasons.push(`ITV C/S/O: contexto esperado ${wantCtx}; activo ${trim(active?.domain)||'—'}`);
+    if(wantCtx&&trim(activeSnapshot?.domain)&&trim(activeSnapshot.domain)!==wantCtx)reasons.push(`ITV C/S/O: S soberano esperaba dominio ${wantCtx}; snapshot ${trim(activeSnapshot.domain)}`);
+    if(d.viewOnly===true&&goodCalls.length)reasons.push(`ITV C/S/O: VIEW_ONLY ejecutó ${goodCalls.length} operación(es) factual(es); debían ser 0`);
+    if(contexts.length<num(d.minContexts))reasons.push(`ITV C/S/O: se esperaban al menos ${num(d.minContexts)} contextos C y hay ${contexts.length}`);
+    if(snapshots.length<num(d.minSnapshots))reasons.push(`ITV C/S/O: en C=${wantCtx||active?.domain||'—'} se esperaban al menos ${num(d.minSnapshots)} snapshots S y hay ${snapshots.length}`);
+    if(sops.length<num(d.minOperations))reasons.push(`ITV C/S/O: el S activo debía conservar al menos ${num(d.minOperations)} operaciones O y tiene ${sops.length}`);
+    if(!rblocks.length)reasons.push('ITV C/S/O: el S activo no contiene bloques R de respuesta');
+    const wanted=arr(d.expectedOperations).map(trim).filter(Boolean),snapshotOps=sops.map(o=>trim(o?.operation||o?.args?.operation));for(const op of wanted)if(!snapshotOps.includes(op)&&!ops.includes(op))reasons.push(`ITV C/S/O: falta la operación ${op} en el S activo`);
+    if(d.needView===true){const types=views.map(v=>trim(v?.type)).filter(Boolean),want=trim(d.expectedChartType);if(want&&!types.includes(want))reasons.push(`ITV C/S/O: vista V esperada ${want}; vistas ${types.join('|')||'ninguna'}`);if(want&&!arr(result?.charts).some(ch=>trim(ch?.type)===want))reasons.push(`ITV C/S/O: la vista ${want} existe en estructura pero no se materializó como gráfica real`);}
+    if(d.accumulate===true&&num(d.minOperations)>1&&sops.length<num(d.minOperations))reasons.push('ITV C/S/O: continuación pasiva perdió operaciones anteriores en lugar de acumularlas');
+    if(trim(d.hardCheck)==='weather3'){const ev=sops.find(o=>trim(o?.operation)==='event_weather')?.evidence,wt=arr(ev?.tables).find(t=>trim(t?.key)==='weather');if(!wt||arr(wt.rows).length<3)reasons.push('ITV C/S/O: O_weather no conserva los tres días pedidos');}
+    const ids=sops.map(o=>trim(o?.operation_id)).filter(Boolean);if(ids.length!==new Set(ids).size)reasons.push('ITV C/S/O: IDs O duplicados dentro del snapshot');
+    if(snapshots.length>1){const idsS=snapshots.map(x=>trim(x?.snapshot_id)).filter(Boolean);if(idsS.length!==new Set(idsS).size)reasons.push('ITV C/S/O: IDs S duplicados dentro del contexto');}
+  }
+
+  if(d.isolation16===true){
+    const calls=arr(result?.meta?.capabilityCalls),goodCalls=calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),rc=result?.meta?.resultContext||{},frame=rc.frame||rc,contexts=arr(frame?.contexts),active=contexts.find(c=>trim(c?.context_id)===trim(frame?.active_context_id))||frame,snap=arr(active?.snapshots).find(x=>trim(x?.snapshot_id)===trim(active?.active_snapshot_id||frame?.active_snapshot_id))||arr(active?.snapshots).slice(-1)[0]||{},sops=arr(snap?.operations),check=trim(d.hardCheck),answer=trim(result?.answer),person=trim(d.expectedPerson);
+    const personInActive=trim(snap?.person||active?.person||active?.responsible),purchaseRows=arr(sops.find(o=>trim(o?.operation)==='event_purchases')?.evidence?.tables).find(t=>trim(t?.key)==='by_responsible')?.rows||[];
+    if(check==='noPersonLeak'&&personInActive)reasons.push(`ITV AISLAMIENTO: entidad filtró al contexto ${trim(active?.domain)}: ${personInActive}`);
+    if(check==='personSet'&&person&&norm(personInActive)!==norm(person))reasons.push(`ITV AISLAMIENTO: no fijó persona esperada ${person}; activa ${personInActive||'—'}`);
+    if(check==='responsibleRows'&&!arr(purchaseRows).length)reasons.push('ITV AISLAMIENTO: compras agrupadas no conserva filas por responsable en O');
+    if(check==='responsibleRowsNoPerson'){if(personInActive)reasons.push(`ITV AISLAMIENTO: compras agrupadas heredó persona ${personInActive}`);if(!arr(purchaseRows).length)reasons.push('ITV AISLAMIENTO: compras agrupadas perdió dataset por responsable');}
+    if(check==='multiO'){const os=sops.map(o=>trim(o?.operation));for(const op of ['event_bank','event_income_status'])if(!os.includes(op))reasons.push(`ITV AISLAMIENTO: multi-O perdió ${op}`);}
+    if(check==='viewNoFact'&&goodCalls.length)reasons.push('ITV AISLAMIENTO: cambio exclusivo de V reejecutó hechos');
+    if(check==='identity'){if(!/identificad|conozco|llamas|usuario/i.test(answer))reasons.push('ITV AISLAMIENTO: identidad de SESSION no respondió desde la sesión');if(goodCalls.length)reasons.push('ITV AISLAMIENTO: identidad de SESSION consultó CE');}
+    if(check==='synthesis'){const os=sops.map(o=>trim(o?.operation));if(trim(active?.domain)!=='synthesis')reasons.push(`ITV AISLAMIENTO: síntesis no creó C_SYNTHESIS; activo=${trim(active?.domain)||'—'}`);if(new Set(os).size<4)reasons.push(`ITV AISLAMIENTO: síntesis transversal solo conserva ${new Set(os).size} O`);}
+  }
+  if(d.authority18===true){
+    const cc=arr(result?.meta?.capabilityCalls),goodCalls=cc.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),rc=result?.meta?.resultContext||{},frame=rc.frame||rc,contexts=arr(frame?.contexts),active=contexts.find(c=>trim(c?.context_id)===trim(frame?.active_context_id))||frame,snap=arr(active?.snapshots).find(x=>trim(x?.snapshot_id)===trim(active?.active_snapshot_id||frame?.active_snapshot_id))||arr(active?.snapshots).slice(-1)[0]||{},sops=arr(snap?.operations),check=trim(d.hardCheck),answer=trim(result?.answer),person=trim(d.expectedPerson);
+    const personInActive=trim(snap?.person||active?.person||active?.responsible),purchaseOp=sops.find(o=>trim(o?.operation)==='event_purchases'),purchaseRows=arr(purchaseOp?.evidence?.tables).find(t=>trim(t?.key)==='by_responsible')?.rows||[];
+    if(check==='noPersonLeak'&&personInActive)reasons.push(`ITV AUTORIDAD: entidad filtró al contexto ${trim(active?.domain)}: ${personInActive}`);
+    if(check==='personSet'&&person&&norm(personInActive)!==norm(person))reasons.push(`ITV AUTORIDAD: no fijó persona esperada ${person}; activa ${personInActive||'—'}`);
+    if(check==='responsibleRows'&&!arr(purchaseRows).length)reasons.push('ITV AUTORIDAD: FACT purchases+group_by responsable no produjo dataset por responsable');
+    if(check==='responsibleRowsNoPerson'){if(personInActive)reasons.push(`ITV AUTORIDAD: group_by responsable heredó persona ${personInActive}`);if(!arr(purchaseRows).length)reasons.push('ITV AUTORIDAD: group_by responsable perdió dataset');}
+    if(check==='inheritResponsible'){if(trim(purchaseOp?.args?.group_by)!=='responsible')reasons.push('ITV AUTORIDAD: S no heredó dimension=responsible');if(personInActive)reasons.push(`ITV AUTORIDAD: dimensión colectiva conserva persona ${personInActive}`);if(!arr(purchaseRows).length)reasons.push('ITV AUTORIDAD: dimensión heredada no conserva evidencia por responsable');}
+    if(check==='multiO'){const os=sops.map(o=>trim(o?.operation));for(const op of ['event_bank','event_income_status'])if(!os.includes(op))reasons.push(`ITV AUTORIDAD: multi-O perdió ${op}`);if(trim(active?.domain)!=='bank')reasons.push(`ITV AUTORIDAD: añadir ingreso cambió C soberano a ${trim(active?.domain)||'—'}`);}
+    if(check==='viewNoFact'&&goodCalls.length)reasons.push('ITV AUTORIDAD: VIEW_ONLY reejecutó hechos');
+    if(check==='viewCapabilities'){if(goodCalls.length)reasons.push('ITV AUTORIDAD: consulta de capacidades de V consultó CE');if(!/(barras|líneas|lineas).*(queso|donut)|(queso|donut).*(barras|líneas|lineas)/i.test(answer))reasons.push('ITV AUTORIDAD: registro de V no enumeró capacidades reales');}
+    if(check==='unsupportedView'){if(goodCalls.length)reasons.push('ITV AUTORIDAD: vista no soportada consultó CE');if(!/no tengo|no.*disponible|puedo hacerlo/i.test(answer))reasons.push('ITV AUTORIDAD: vista no soportada cayó silenciosamente a otra V');}
+    if(check==='identity'){if(!/identificad|conozco|llamas|usuario/i.test(answer))reasons.push('ITV AUTORIDAD: identidad de SESSION no respondió desde sesión');if(goodCalls.length)reasons.push('ITV AUTORIDAD: identidad consultó CE');}
+    if(check==='synthesis'){const os=sops.map(o=>trim(o?.operation));if(trim(active?.domain)!=='synthesis')reasons.push(`ITV AUTORIDAD: síntesis no creó C_SYNTHESIS; activo=${trim(active?.domain)||'—'}`);for(const op of ['event_summary','event_bank','event_purchases','event_donations'])if(!os.includes(op))reasons.push(`ITV AUTORIDAD: síntesis perdió ${op}`);}
+  }
+  if(d.sovereign30===true){
+    const dec=result?.meta?.sovereignDecision||{},status=trim(dec?.execution_intent?.status),check=trim(d.hardCheck),answer=trim(result?.answer),version=trim(result?.meta?.version),provider=trim(result?.provider),warnings=arr(result?.warnings).map(trim).filter(Boolean),charts=arr(result?.charts);
+    if(/^v6\./i.test(version)){
+      if(warnings.includes('v6_execution_failure')||/clean-failure/i.test(provider))reasons.push(`ITV SOBERANA v6: fallo de ejecución del contrato (${warnings.filter(x=>x!=='v6_execution_failure').join(' | ')||'sin detalle'}).`);
+      if(!['NO_ACTION_REQUIRED','EXECUTE_UI','EXECUTE_DATA','NEED_MATERIALS','NEED_ENTITY_RESOLUTION'].includes(status))reasons.push(`ITV SOBERANA v6: execution_intent.status ausente o inválido (${status||'—'}).`);
+      if(!trim(dec?.thread_mutation?.action)||!['MAINTAIN','SWITCH','OPEN_NEW','CLOSE'].includes(trim(dec?.thread_mutation?.action)))reasons.push('ITV SOBERANA v6: thread_mutation.action ausente o inválido.');
+      const semanticTurn=Number(d.semanticTurn||d.turn)||0,threadAction=trim(dec?.thread_mutation?.action),tablesV6=arr(result?.tables),materialRows=tablesV6.reduce((n,t)=>n+arr(t?.rows).length,0),materialCols=tablesV6.reduce((n,t)=>n+arr(t?.columns).length,0),low=answer.toLowerCase();
+      const emptyPromise=/^(?:de acuerdo[,.:; ]*)?(?:continuar[eé]|seguir[eé]|lo har[eé]|voy a (?:continuar|seguir)|volviendo|claro[,.:; ]*aqu[ií] tienes|por supuesto[,.:; ]*aqu[ií] tienes)[.!:]?$/i.test(answer)||(/(?:continuar[eé]|seguir[eé]|lo har[eé]|te voy a contar|aqu[ií] tienes (?:un )?(?:resumen|relato|gr[aá]fica))/i.test(answer)&&answer.length<120);
+      const forgot=/he olvidado|no recuerdo|sobre qu[eé] te gustar[ií]a|no tengo (?:acceso|informaci[oó]n).*anterior/i.test(answer);
+      const denial=/no tengo acceso|no tengo la capacidad|no dispongo de (?:la )?(?:capacidad|informaci[oó]n)|mi funci[oó]n es/i.test(answer);
+      const concreteSession=/(?:Cuotas|MUNDIAL|Sierra|Grupo 23|Hitos|\bLG\b|€|\b\d+[.,]?\d*\b)/i.test(answer);
+      if(check==='visual'&&!charts.length)reasons.push('ITV SOBERANA v6: petición visual sin gráfica materializada.');
+      if(check==='visual'&&charts.length&&(materialRows===0||materialCols===0))reasons.push(`ITV SOBERANA v6: gráfica materializada sin datos útiles (filas=${materialRows}, columnas=${materialCols}).`);
+      if(check==='narrative'&&/he comparado|te dejo la comparacion|comparativa de eventos/i.test(answer)&&!/historia|era|mientras|aquel|entonces|paso|pasó/i.test(answer))reasons.push('ITV SOBERANA v6: pidió narración y recibió ficha/comparativa técnica.');
+      if(check==='analytical'&&/\b\d+\s+hitos?.*\d+\s+tareas?/i.test(answer)&&!/por tanto|significa|conclu|supervis|control|indica|parece|evidencia|no puedo afirmar/i.test(answer))reasons.push('ITV SOBERANA v6: pidió análisis y recibió solo recuento técnico.');
+      if(/gemini/i.test(answer))reasons.push('ITV SOBERANA v6: Zuzu mencionó Gemini al usuario.');
+      // Oráculo semántico por turno: valida efecto real, no solo JSON/contrato.
+      if(semanticTurn===6&&answer.length<90)reasons.push('ITV SOBERANA v6: el resumen de conversación es demasiado vacío para acreditar memoria del hilo.');
+      if(semanticTurn===7&&(norm(answer)===norm(caseDef?.prompt)||answer.length<25))reasons.push('ITV SOBERANA v6: «Sí» no produjo ninguna continuación/confirmación útil; eco conversacional vacío.');
+      if(semanticTurn===8&&/(?:continuar[eé]|sigo|seguir[eé])/i.test(answer))reasons.push('ITV SOBERANA v6: «No, espera» no detuvo la acción anterior.');
+      if(semanticTurn===9&&(emptyPromise||answer.length<60))reasons.push('ITV SOBERANA v6: «continúa» fue aceptado verbalmente pero no continuó el contenido.');
+      if(semanticTurn===11&&/(?:concreta|a cu[aá]l|cu[aá]l.*refieres|necesito.*aclar)/i.test(answer))reasons.push('ITV SOBERANA v6: referente explícito del turno 11 terminó en aclaración en lugar de resolución/consulta.');
+      if(semanticTurn===12&&(forgot||(threadAction!=='SWITCH'&&answer.length<70)))reasons.push('ITV SOBERANA v6: «vuelve a lo anterior» no recuperó el hilo previo.');
+      if(semanticTurn===13&&forgot)reasons.push('ITV SOBERANA v6: ante la protesta del usuario abandonó el contexto en vez de corregirse dentro del hilo.');
+      if((semanticTurn===14||semanticTurn===15)&&(forgot||emptyPromise||answer.length<60))reasons.push(`ITV SOBERANA v6: turno ${semanticTurn} pidió reanudar/repetir y no produjo contenido sustantivo.`);
+      if(semanticTurn===17&&charts.length&&(materialRows===0||materialCols===0))reasons.push('ITV SOBERANA v6: «ahora en queso» creó una vista vacía; no reutilizó una evidencia con datos.');
+      if(semanticTurn===18){const kinds=[/tabla/i,/barras?/i,/(?:tarta|queso|pie)/i,/(?:l[ií]neas?|line)/i,/(?:kpi|indicador)/i,/(?:timeline|l[ií]nea de tiempo)/i,/(?:kanban|tablero)/i].filter(rx=>rx.test(answer)).length;if(kinds<4)reasons.push(`ITV SOBERANA v6: catálogo de gráficas incompleto; solo acredita ${kinds} tipos.`);}
+      if(semanticTurn===21&&(denial||answer.length<70))reasons.push('ITV SOBERANA v6: «dímelo en cristiano» no reformuló la conclusión previa en lenguaje llano.');
+      if(semanticTurn===22&&!/(?:\bZuzu\b|ControlEvent)/i.test(answer))reasons.push('ITV SOBERANA v6: identidad incorrecta; debe presentarse como Zuzu/ControlEvent, no como asistente IA genérico.');
+      if(semanticTurn===23&&/(?:no tengo acceso a tu informaci[oó]n|no s[eé] qui[eé]n eres|no puedo saber qui[eé]n eres)/i.test(answer))reasons.push('ITV SOBERANA v6: negó identidad del actor pese a recibir actor en el Context Packet.');
+      if(semanticTurn===24&&(denial||!/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/.test(answer)))reasons.push('ITV SOBERANA v6: no respondió la hora desde meta.timestamp.');
+      if(semanticTurn===25&&(denial||!/(?:\b20\d{2}\b|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i.test(answer)))reasons.push('ITV SOBERANA v6: no respondió la fecha desde meta.timestamp.');
+      if(semanticTurn===26&&(forgot||emptyPromise||answer.length<70||threadAction!=='SWITCH'))reasons.push('ITV SOBERANA v6: «vuelve a la conclusión anterior» no restauró y expresó la conclusión previa.');
+      if(semanticTurn===28&&(emptyPromise||answer.length<140||!concreteSession))reasons.push('ITV SOBERANA v6: «sí, hazlo» anunció un resumen pero no entregó un resumen ejecutivo con hechos de la sesión.');
+      if(semanticTurn===29&&(/te voy a contar/i.test(answer)||answer.length<150||!concreteSession))reasons.push('ITV SOBERANA v6: pidió un relato y recibió una introducción/promesa sin hechos concretos de la sesión.');
+      if(semanticTurn===30&&(!concreteSession||!/(?:no (?:puedo|podemos) (?:demostrar|confirmar|afirmar)|no dispongo|si .*no .*datos|sin datos|no .*respald)/i.test(answer)))reasons.push('ITV SOBERANA v6: cierre anti-alucinación genérico; no conserva hechos concretos ni explicita límites de evidencia.');
+    }else{
+      const mode=trim(dec?.response_goal?.mode),goal=trim(dec?.user_goal),legacyCalls=arr(result?.meta?.capabilityCalls).filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),expected=arr(d.expectedOperations),observed=legacyCalls.map(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)).filter(Boolean);
+      if(!trim(dec?.turn_type))reasons.push('ITV SOBERANA: falta sovereignDecision.turn_type; posible ruta local.');
+      if(!goal)reasons.push('ITV SOBERANA: Gemini no declaró user_goal.');
+      if(check&&mode!==check&&!(check==='direct'&&mode==='memory'))reasons.push(`ITV SOBERANA: response_goal esperado ${check}; observado ${mode||'—'}`);
+      for(const op of expected)if(!observed.includes(op))reasons.push(`ITV SOBERANA: faltó operación ${op}; observadas ${observed.join('|')||'ninguna'}`);
+      if(!expected.length&&legacyCalls.length&&['social','summary','direct'].includes(check))reasons.push('ITV SOBERANA: turno conversacional ejecutó CE sin pedirlo.');
+    }
+  }
+  if(d.v61crush===true){
+    const dec=result?.meta?.sovereignDecision||{},status=trim(dec?.execution_intent?.status),check=trim(d.hardCheck),answer=trim(result?.answer),warnings=arr(result?.warnings).map(trim).filter(Boolean),charts=arr(result?.charts),tables=arr(result?.tables),rc=result?.meta?.resultContext||{},store=rc?.evidence_store||{},tg=rc?.threads_graph||{},activeThread=arr(tg?.threads).find(x=>trim(x?.id)===trim(tg?.active_thread_id))||{},eid=trim(activeThread?.last_evidence_id),ev=store?.[eid]||{},backing=arr(ev?.backing_rows).length?arr(ev.backing_rows):arr(ev?.rows);
+    if(warnings.includes('v6_execution_failure')||/failure/i.test(trim(result?.provider)))reasons.push(`ITV v6_1 CRUSH: fallo de ejecución (${warnings.filter(x=>x!=='v6_execution_failure').join(' | ')||'sin detalle'}).`);
+    if(!['NO_ACTION_REQUIRED','EXECUTE_UI','EXECUTE_DATA','NEED_MATERIALS'].includes(status))reasons.push(`ITV v6_1 CRUSH: estado contractual inválido ${status||'—'}.`);
+    if(/gemini/i.test(answer))reasons.push('ITV v6_1 CRUSH: Zuzu expone Gemini al usuario.');
+    if(!answer||/ruta v6 no ha podido cerrar/i.test(answer))reasons.push('ITV v6_1 CRUSH: respuesta vacía o fallo técnico visible.');
+    const rowVal=(r,k)=>Array.isArray(r)?null:r?.[k];
+    // El usuario ve la tabla materializada. Para certificar SORT se valida primero ESA tabla,
+    // no una evidencia activa potencialmente anterior; solo si no existe se usa evidence_store.
+    const sortTable=tables.find(t=>arr(t?.columns).map(trim).includes('start_date')&&arr(t?.rows).length),sortRows=sortTable?arr(sortTable.rows):backing;
+    const dates=sortRows.map(r=>String(rowVal(r,'start_date')||'')).filter(Boolean);
+    const dateNum=x=>{const m=String(x).match(/^(\d{4})-(\d{2})-(\d{2})|^(\d{2})\/(\d{2})\/(\d{4})/);if(!m)return NaN;return m[1]?Date.UTC(+m[1],+m[2]-1,+m[3]):Date.UTC(+m[6],+m[5]-1,+m[4]);};
+    if(check==='sortAsc'&&dates.length>1){const nums=dates.map(dateNum);if(nums.some(Number.isNaN)||nums.some((v,i)=>i&&v<nums[i-1]))reasons.push('ITV v6_1 CRUSH: orden ascendente por start_date incorrecto o no verificable en la tabla materializada.');}
+    if(check==='sortDesc'&&dates.length>1){const nums=dates.map(dateNum);if(nums.some(Number.isNaN)||nums.some((v,i)=>i&&v>nums[i-1]))reasons.push('ITV v6_1 CRUSH: orden descendente por start_date incorrecto o no verificable en la tabla materializada.');}
+    if(check==='table'&&(!tables.length||!tables.some(t=>arr(t?.rows).length)))reasons.push('ITV v6_1 CRUSH: pidió tabla y no hubo tabla materializada con filas.');
+    if(check==='visual'){
+      if(!charts.length)reasons.push('ITV v6_1 CRUSH: pidió gráfica y no hubo gráfica materializada.');
+      for(const ch of charts){if(!arr(ch?.labels).length||!arr(ch?.values).length||arr(ch.labels).length!==arr(ch.values).length)reasons.push('ITV v6_1 CRUSH: gráfica sin labels/values reales y alineados.');if(arr(ch?.values).some(v=>!Number.isFinite(Number(v))))reasons.push('ITV v6_1 CRUSH: gráfica contiene valores no numéricos.');}
+    }
+    if(check==='unsupported'){
+      if(status!=='NO_ACTION_REQUIRED')reasons.push(`ITV v6_1 CRUSH: capacidad fuera de alcance no cerró en NO_ACTION_REQUIRED (${status||'—'}).`);
+      if(!/(?:no (?:puedo|est[aá] disponible|dispongo)|no.*disponible|a[uú]n no|capacidad.*no)/i.test(answer))reasons.push('ITV v6_1 CRUSH: capacidad no disponible no se explicó limpiamente.');
+    }
+    if(check==='grounded'&&/(?:fue|ha sido|es) (?:un )?(?:éxito|exitoso)|éxito rotundo|cumpli[oó] (?:todas )?las previsiones/i.test(answer)&&!/(?:no puedo|no se puede|no dispongo|no tengo|no.*determinar|faltan|sin .*datos|no.*afirmar)/i.test(answer))reasons.push('ITV v6_1 CRUSH: convirtió hechos parciales en conclusión cualitativa no certificada.');
+    if(check==='identity'&&!/(?:\bZuzu\b|ControlEvent)/i.test(answer))reasons.push('ITV v6_1 CRUSH: identidad de Zuzu incorrecta.');
+    const actorName=trim(rc?.actor_snapshot?.name),screen=rc?.current_screen_event_snapshot||{},screenId=trim(screen?.id),screenName=trim(screen?.name),turn=Number(d?.turn)||0;
+    if(check==='actor'){
+      if(/(?:no s[eé] qui[eé]n eres|no tengo.*informaci[oó]n.*ti)/i.test(answer))reasons.push('ITV v6_1 CRUSH: negó el actor recibido en Context Packet.');
+      if(actorName&&!norm(answer).includes(norm(actorName)))reasons.push(`ITV v6_1 CRUSH: preguntó por el usuario pero no respondió con actor.name (${actorName}).`);
+      if(/^(?:soy|me llamo)\s+zuzu\b/i.test(answer)&&(!actorName||!norm(answer).includes(norm(actorName))))reasons.push('ITV v6_1 CRUSH: confundió la identidad del usuario con la identidad de Zuzu.');
+    }
+    // Continuidad del referente: los turnos 19-21 de esta batería vuelven explícitamente al evento de pantalla.
+    if(turn===19&&screenName&&!norm(answer).includes(norm(screenName)))reasons.push(`ITV v6_1 CRUSH: no volvió al current_screen_event (${screenName}).`);
+    if((turn===20||turn===21)&&screenId){const activeRows=arr(ev?.backing_rows).length?arr(ev.backing_rows):arr(ev?.rows),ids=[...new Set(activeRows.map(r=>trim(r?.id)).filter(Boolean))];if(ids.length&&!ids.includes(screenId))reasons.push(`ITV v6_1 CRUSH: perdió el referente del evento de pantalla; evidencia activa=${ids.join('|')} esperado=${screenId}.`);if(screenName&&/(?:SySA|FUNCION|Cuotas|MUNDIAL|Visita|Jornada|Barbacoa|Semana Santa)/i.test(answer)&&!norm(answer).includes(norm(screenName)))reasons.push(`ITV v6_1 CRUSH: la respuesta nominal del turno ${turn} cambió de evento; esperado ${screenName}.`);}
+    if(check==='time'&&!/\b(?:[01]?\d|2[0-3]):[0-5]\d\b/.test(answer))reasons.push('ITV v6_1 CRUSH: no respondió la hora desde meta.timestamp.');
+    if(check==='date'&&!/(?:\b20\d{2}\b|enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i.test(answer))reasons.push('ITV v6_1 CRUSH: no respondió la fecha desde meta.timestamp.');
+    if(check==='sessionSummary'){
+      if(answer.length<140)reasons.push('ITV v6_1 CRUSH: resumen de sesión demasiado pobre.');
+      const themes=[/eventos? finaliz/i,/SySA/i,/(?:precio|balance|saldo)/i,/(?:gr[aá]fic|tabla|barras|tarta|l[ií]neas)/i,/(?:JOIN|ROI|agreg|cruzar|limitaci[oó]n)/i].filter(rx=>rx.test(answer)).length;
+      if(themes<3)reasons.push(`ITV v6_1 CRUSH: resumen de sesión perdió demasiados temas certificados (${themes}/5 bloques).`);
+    }
+    if(check==='groundedSummary'){
+      const factual=/(?:SySA|FUNCION|Cuotas|MUNDIAL|€|balance|precio|finaliz|fecha|asist)/i.test(answer);
+      if(!factual)reasons.push('ITV v6_1 CRUSH: resumen de certezas omitió los hechos de negocio certificados y quedó en metadatos/identidad.');
+    }
+    if(check==='limits'&&!/(?:no puedo|no.*afirmar|no dispongo|faltan|sin .*datos|no.*demostrar|no.*confirmar)/i.test(answer))reasons.push('ITV v6_1 CRUSH: no explicitó límites de evidencia.');
+    if(check==='oneSentence'){if(answer.split(/[.!?]+/).filter(x=>trim(x)).length>2)reasons.push('ITV v6_1 CRUSH: pidió una frase y respondió con varias.');if(!/(?:SySA|FUNCION|Cuotas|MUNDIAL|€|balance|precio|finaliz|evento)/i.test(answer))reasons.push('ITV v6_1 CRUSH: la frase final perdió todo hecho sustantivo de la conversación.');}
+    if(check==='filter'&&tables.length&&tables.some(t=>arr(t?.rows).some(r=>{const n=Array.isArray(r)?String(r[0]||''):String(r?.name||'');return n&&!/sysa/i.test(n);})))reasons.push('ITV v6_1 CRUSH: filtro SySA dejó filas ajenas.');
+  }
+  if(d.scope12===true){
+    const cc=arr(result?.meta?.capabilityCalls),goodCalls=cc.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),rc=result?.meta?.resultContext||{},check=trim(d.hardCheck),answer=trim(result?.answer),incomeCall=goodCalls.find(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)==='event_income_status'),args=incomeCall?.normalizedArgs||incomeCall?.rawArgs||{};
+    if(check==='allScope'||check==='allScopeFollow'){
+      if(trim(args?.scope)!=='all_events')reasons.push(`ITV SCOPE: esperaba scope=all_events; observado ${trim(args?.scope)||'—'}`);
+      if(trim(args?.event))reasons.push(`ITV SCOPE: ALL_EVENTS heredó evento ${trim(args.event)}`);
+      if(!/revisad|eventos|pendient/i.test(answer))reasons.push('ITV SCOPE: la respuesta global no acredita revisión multi-evento');
+    }
+    if(check==='currentScope'&&incomeCall&&trim(args?.scope)==='all_events')reasons.push('ITV SCOPE: CURRENT_EVENT quedó atrapado en ALL_EVENTS');
+    if(check==='socialNoFact'&&goodCalls.length)reasons.push('ITV SCOPE: reacción social ejecutó CE');
+  }
+  if(d.express===true){
+    const turn=Number(d.turn)||0,goodCalls=calls.filter(x=>trim(x?.tool)==='query_ce'&&!trim(x?.error)),ops=goodCalls.map(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)),purchaseCalls=goodCalls.filter(x=>trim(x?.effectiveOperation||x?.normalizedArgs?.operation||x?.rawArgs?.operation)==='event_purchases'),statuses=purchaseCalls.map(x=>trim(x?.normalizedArgs?.purchase_status||x?.rawArgs?.purchase_status)),euroCount=(answer.match(/€/g)||[]).length,charts=arr(result?.charts),tables=arr(result?.tables);
+    if(/top[_ -]?buyer/i.test(answer)||goodCalls.some(x=>/top[_ -]?buyer/i.test(String(x?.normalizedArgs?.responsible||x?.rawArgs?.responsible||''))))reasons.push('ITV EXPRESS: top_buyer se ha tratado como persona/resultado visible');
+    if(/\b\d+(?:[.,]\d+)?\s*(?:euros?)\b/i.test(answer)&&!/€/.test(answer))reasons.push('ITV EXPRESS: importe escrito sin símbolo €');
+    if(turn===2){
+      if(ops.length!==1||ops[0]!=='event_attendance')reasons.push(`ITV EXPRESS: detalle de asistentes debe usar event_attendance; observadas ${ops.join('|')||'ninguna'}`);
+      if(/(?:…|\.\.\.)/.test(answer))reasons.push('ITV EXPRESS: la lista de asistentes aparece truncada');
+      const at=tables.find(t=>trim(t?.key)==='attendance'),rows=arr(at?.rows),names=rows.map(r=>trim(r?.Persona||r?.Asistente)).filter(Boolean);
+      if(rows.length&&names.some(n=>!norm(answer).includes(norm(n))))reasons.push('ITV EXPRESS: no aparecen todos los asistentes de la tabla canónica');
+    }
+    if(turn===3&&(!ops.includes('event_income_status')||ops.some(op=>op!=='event_income_status')))reasons.push(`ITV EXPRESS: pagos de asistentes deben usar solo event_income_status; observadas ${ops.join('|')||'ninguna'}`);
+    if(turn===4){
+      if(!statuses.includes('realized')||!statuses.includes('pending'))reasons.push('ITV EXPRESS: comprado + pendiente no consultó ambos estados');
+      if(goodCalls.some(x=>/^(?:todos?|todas?|cada|all)$/i.test(trim(x?.normalizedArgs?.responsible||x?.rawArgs?.responsible))))reasons.push('ITV EXPRESS: «todos» se ha tratado como nombre de responsable');
+      if(euroCount<4)reasons.push('ITV EXPRESS: no se devolvió el desglose por varios responsables');
+    }
+    if(turn===5){if(/0[,\.]00\s*€/.test(answer)||!/(?:quien mas|más ha comprado|es quien)/i.test(answer))reasons.push('ITV EXPRESS: no resolvió realmente quién ha comprado más');}
+    if(turn===6){
+      if(!statuses.includes('realized')||!statuses.includes('pending'))reasons.push('ITV EXPRESS: el seguimiento del líder no consultó comprado y pendiente');
+      if(!trim(result?.meta?.resultContext?.person))reasons.push('ITV EXPRESS: el seguimiento del líder perdió la persona foco');
+      if(euroCount<2)reasons.push('ITV EXPRESS: faltan comprado y pendiente del líder');
+    }
+    if(turn===7){
+      if(ops.length!==1||ops[0]!=='event_bank')reasons.push(`ITV EXPRESS: consulta bancaria debe ejecutar solo event_bank; observadas ${ops.join('|')||'ninguna'}`);
+      if(!/abonos?\s+banco/i.test(answer)||!/cargos?\s+banco/i.test(answer)||!/flujo\s+neto\s+bancario/i.test(answer)||euroCount<3)reasons.push('ITV EXPRESS: faltan abonos, cargos o flujo neto bancario');
+    }
+    if(turn===8){
+      if(ops.length!==1||ops[0]!=='event_bank')reasons.push(`ITV EXPRESS: explicación del saldo debe permanecer en event_bank; observadas ${ops.join('|')||'ninguna'}`);
+      if(!/saldo\s+inicial/i.test(answer)||!/(?:flujo\s+neto|impacto)/i.test(answer)||!/saldo\s+(?:calculado|final)/i.test(answer)||euroCount<3)reasons.push('ITV EXPRESS: no explica saldo inicial + impacto/flujo = saldo calculado');
+    }
+    if(turn===9){
+      if(!ops.includes('compare_events'))reasons.push(`ITV EXPRESS: comparativa perdió compare_events; observadas ${ops.join('|')||'ninguna'}`);
+      if(!charts.length)reasons.push('ITV EXPRESS: la comparativa pidió gráficas y no materializó ninguna');
+    }
+    if(turn===10){
+      if(!ops.includes('event_weather'))reasons.push(`ITV EXPRESS: meteorología perdió event_weather; observadas ${ops.join('|')||'ninguna'}`);
+      if(!charts.some(c=>trim(c?.type)==='line'))reasons.push('ITV EXPRESS: meteorología pidió gráfica de líneas y no la materializó');
+      const wt=tables.find(t=>trim(t?.key)==='weather');if(wt&&arr(wt.rows).length<3)reasons.push('ITV EXPRESS: meteorología no conserva hoy, mañana y pasado mañana');
+    }
+  }
   const coherent=!reasons.length;return{previous_coherent:coherent,focus_preserved:coherent,empty_promise:false,note:coherent?'GOLDEN fija: efecto semántico esperado verificado.':reasons.join(' · '),reasons};
+}
+
+function p315HumanQualityReasons(result={},prompt=''){
+  const answer=trim(result?.answer),spoken=trim(result?.spokenAnswer||result?.meta?.spokenAnswer||answer),p=norm(prompt),reasons=[];
+  const both=`${answer}\n${spoken}`;
+  if(/\b(?:dataset|filas?|columnas?|source_operation|query_ce|table_key|view_current)\b/i.test(both))reasons.push('calidad humana: expone lenguaje interno/de interfaz');
+  if(/\b(?:te dejo el detalle|te dejo la tabla|mantengo (?:el )?(?:dataset|conjunto)|los datos de origen no se han modificado)\b/i.test(both))reasons.push('calidad humana: describe el mecanismo en vez de contestar');
+  if(/\bno he podido cerrar (?:esa consulta|ese dato|esa respuesta)\b/i.test(both))reasons.push('calidad humana: salida de fallo visible al usuario');
+  const wantsDetail=/\b(?:mas detalle|más detalle|amplia|amplí|detall|profund|mas contexto|más contexto)\b/i.test(prompt||'');
+  if(wantsDetail&&!/\bno (?:tenemos|hay) mas detalle\b/i.test(p)&&answer.length<180)reasons.push('calidad humana: pidió ampliar y la respuesta sigue siendo superficial');
+  const wantsNames=/\b(?:cuales|cuáles|quienes|quiénes|nombres?|que son esas|qué son esas|dime cuales|dime cuáles|muestr|enseñ)\b/i.test(prompt||'');
+  if(wantsNames&&/\b(?:hay|mantengo|conserv|tengo)\b/i.test(answer)&&!/[,:;]/.test(answer)&&answer.length<220)reasons.push('calidad humana: afirma que tiene elementos pero no identifica cuáles');
+  if(result?.provider==='zuzu-vnext-p2-soft-failure')reasons.push('calidad humana: el turno terminó en soft-failure');
+  if(result?.meta?.performance?.plannerFallbackUsed===true)reasons.push('arquitectura: el planner principal necesitó fallback');
+  return [...new Set(reasons)];
+}
+function p314MaturityVoiceReasons(result={},prompt=''){
+  const spoken=trim(result?.spokenAnswer||result?.meta?.spokenAnswer||result?.answer),reasons=[];
+  if(!spoken)return ['la locución quedó vacía'];
+  if(/\b20\d{2}-\d{2}-\d{2}(?:T\d{2}:\d{2})?/i.test(spoken))reasons.push('la voz contiene fecha ISO larga');
+  if(/\bTK\s*\d+/i.test(spoken)&&!/\b(?:ticket|tk\d*)\b/i.test(prompt||''))reasons.push('la voz recita TKxx no pedido');
+  if(/\d+[.,]\d+\s*(?:€|euros?|%|por ciento|°C|grados?)/i.test(spoken))reasons.push('la voz conserva decimales en una magnitud');
+  if(/\b(?:dataset|filas?|columnas?|te dejo el detalle|source_operation|query_ce)\b/i.test(spoken))reasons.push('la voz expone lenguaje técnico/de interfaz');
+  if(spoken.length>1500)reasons.push(`locución demasiado larga para conversación: ${spoken.length} caracteres`);
+  return reasons;
 }
 
 async function runItvPaidTurn({caseDef,state,actor,conversationState,signal,fullCert=false}){
   const useVNext=trim(caseDef?.engine).toUpperCase()==='VNEXT';
   const cs=fullCert?safeConversationState(conversationState):{conversationId:'',previousInteractionId:'',history:[],scenario:''};
-  const common={prompt:caseDef.prompt,stateOverride:state,usuarioLogado:actor,conversationHistory:fullCert?cs.history:[],conversationTurnNumber:fullCert?cs.history.length+1:1,externalSignal:signal};
+  // FIX40 · La ITV debe simular un navegador real: siempre existe un evento visible cuando
+  // la aplicación lo tiene seleccionado. No es interpretación semántica ni reparación del
+  // contrato de Gemini; es estado de interfaz de entrada, igual que selectedEventId en producción.
+  // Así, si Gemini decide scope=current_event, el ejecutor puede resolver técnicamente ese scope.
+  const screenEvent=languageActiveEvent(arr(state?.eventos).filter(e=>eventName(e)))||arr(state?.eventos)[0]||null;
+  const selectedEventId=trim(screenEvent?.id);
+  const common={prompt:caseDef.prompt,stateOverride:state,selectedEventId,usuarioLogado:actor,conversationHistory:fullCert?cs.history:[],conversationTurnNumber:fullCert?cs.history.length+1:1,externalSignal:signal,voiceConversation:caseDef?.voice===true,brainLite:caseDef?.brainLite===true,clientNowIso:new Date().toISOString(),clientLocalDateTime:new Date().toISOString(),clientTimeZone:'Europe/Madrid'};
   if(useVNext){
     return runZuzuVNextUserTurn({...common,conversationId:'',previousInteractionId:fullCert?cs.previousInteractionId:''});
   }
@@ -1778,8 +2523,8 @@ export async function runSavedZuzuTestCase({mode='AI-SMOKE',savedCase={},convers
     else if(timed.error){r=technicalErrorOutcome(c,timed.error?.message||String(timed.error),{calls:1,tokens:0,costEur:reserve},{scenario:c.scenario});nextConversationState={conversationId:'',previousInteractionId:'',history:[],scenario:trim(c.scenario),dialogueNext:null,dialogueMission:mission,dialogueTurn:turnNo};}
     else{
       const result=timed.value,u=usageOf(result),zuzuMs=num(result?.meta?.performance?.totalMs);r=observedOutcome(c,result,u,{scenario:c.scenario,historicalExact:true});const presentationEvidence=p124PresentationEvidence(result),hist=cs.history.slice(-29);hist.push({user:c.prompt,assistant:trim(result?.answer).slice(0,1200),assistantTail:trim(result?.answer).slice(-900),title:trim(result?.title),provider:trim(result?.provider),selectedEventId:'',pendingAction:result?.meta?.pendingAction||null,resultContext:result?.meta?.resultContext||null,presentationEvidence,tools:arr(result?.meta?.tools)});let next=null,simulatorMs=0,simulatorUsage={};
-      if(adaptive){next=await generateZuzuItvDialogueUserTurn({mission,conversationHistory:hist,turnNumber:turnNo+1,seed:c?.dialogue?.seed||'',externalSignal:signal});simulatorMs=num(next?.durationMs);simulatorUsage=next?.usage||{};const assess=p126DialogueArtifactGuard(userMove,result,p124NormalizeDialogueAssessment(next?.assessment||{},result)),reasons=[];next={...next,assessment:assess};if(assess.empty_promise===true)reasons.push('promesa vacía: Zuzu anunció acción pero no la ejecutó');if(assess.previous_coherent===false)reasons.push(trim(assess.note)||'el usuario sintético detecta respuesta incoherente con el hilo');if(assess.focus_preserved===false&&userMove?.changeFocus!==true)reasons.push('pérdida de foco/objeto activo');if(userMove?.requiresTool===true&&!arr(result?.meta?.tools).length)reasons.push('el movimiento requería acción factual y no hubo tool');if(reasons.length){r.status='KO';r.functionalStatus='KO';r.functionalReasons=[...arr(r.functionalReasons),...reasons];r.validationReasons=[...arr(r.validationReasons),...reasons];}r.dialogue={turn:turnNo,userMove:{move:userMove?.move,requiresTool:userMove?.requiresTool===true,changeFocus:userMove?.changeFocus===true,target:trim(userMove?.target)},assessment:assess,nextUtterance:trim(next?.utterance),mission};}
-      else if(c?.dialogue?.fixed===true){const assess=p2GoldenDialogueAssessment(c,result),reasons=arr(assess?.reasons);if(reasons.length){r.status='KO';r.functionalStatus='KO';r.functionalReasons=[...arr(r.functionalReasons),...reasons];r.validationReasons=[...arr(r.validationReasons),...reasons];}r.dialogue={turn:turnNo,userMove:{move:'golden_fixed',requiresTool:c?.dialogue?.requiresTool===true,changeFocus:c?.dialogue?.changeFocus===true,target:''},assessment:assess,nextUtterance:'',mission:'GOLDEN DIÁLOGO P2 · carretera fija'};}
+      if(adaptive){next=await generateZuzuItvDialogueUserTurn({mission,conversationHistory:hist,turnNumber:turnNo+1,seed:c?.dialogue?.seed||'',externalSignal:signal});simulatorMs=num(next?.durationMs);simulatorUsage=next?.usage||{};const assess=p126DialogueArtifactGuard(userMove,result,p124NormalizeDialogueAssessment(next?.assessment||{},result)),reasons=[];next={...next,assessment:assess};if(assess.empty_promise===true)reasons.push('promesa vacía: Zuzu anunció acción pero no la ejecutó');if(assess.previous_coherent===false)reasons.push(trim(assess.note)||'el usuario sintético detecta respuesta incoherente con el hilo');if(assess.focus_preserved===false&&userMove?.changeFocus!==true)reasons.push('pérdida de foco/objeto activo');if(userMove?.requiresTool===true&&!arr(result?.meta?.tools).length)reasons.push('el movimiento requería acción factual y no hubo tool');if(c?.dialogue?.maturityHybrid===true&&c?.voice===true){reasons.push(...p314MaturityVoiceReasons(result,c.prompt));reasons.push(...p315HumanQualityReasons(result,c.prompt));}if(reasons.length){r.status='KO';r.functionalStatus='KO';r.functionalReasons=[...arr(r.functionalReasons),...reasons];r.validationReasons=[...arr(r.validationReasons),...reasons];}r.dialogue={turn:turnNo,userMove:{move:userMove?.move,requiresTool:userMove?.requiresTool===true,changeFocus:userMove?.changeFocus===true,target:trim(userMove?.target)},assessment:assess,nextUtterance:trim(next?.utterance),mission,maturityHybrid:c?.dialogue?.maturityHybrid===true,maturitySection:trim(c?.dialogue?.maturitySection),maturityDimensions:arr(c?.dialogue?.maturityDimensions)};}
+      else if(c?.dialogue?.fixed===true){const assess=p2GoldenDialogueAssessment(c,result),reasons=arr(assess?.reasons);if(c?.dialogue?.maturityHybrid===true&&c?.voice===true)reasons.push(...p315HumanQualityReasons(result,c.prompt));if(reasons.length){r.status='KO';r.functionalStatus='KO';r.functionalReasons=[...arr(r.functionalReasons),...reasons];r.validationReasons=[...arr(r.validationReasons),...reasons];}r.dialogue={turn:turnNo,userMove:{move:'golden_fixed',requiresTool:c?.dialogue?.requiresTool===true,changeFocus:c?.dialogue?.changeFocus===true,target:''},assessment:assess,nextUtterance:'',mission:c?.dialogue?.maturityHybrid===true?'MADUREZ · control dirigido':'GOLDEN DIÁLOGO P2 · carretera fija',maturityHybrid:c?.dialogue?.maturityHybrid===true,maturitySection:trim(c?.dialogue?.maturitySection),maturityDimensions:arr(c?.dialogue?.maturityDimensions)};}
       if(adaptive||c?.dialogue?.fixed===true){r.zuzuUsage={...u};r.simulatorUsage={...simulatorUsage};r.presentationEvidence=presentationEvidence;r.labUsage={calls:num(u.calls)+num(simulatorUsage.calls),tokens:num(u.tokens)+num(simulatorUsage.totalTokens||simulatorUsage.tokens),costEur:round(num(u.costEur)+num(simulatorUsage.costEurApprox||simulatorUsage.costEur),6),zuzuCalls:num(u.calls),simulatorCalls:num(simulatorUsage.calls),zuzuTokens:num(u.tokens),simulatorTokens:num(simulatorUsage.totalTokens||simulatorUsage.tokens),zuzuCostEur:round(num(u.costEur),6),simulatorCostEur:round(num(simulatorUsage.costEurApprox||simulatorUsage.costEur),6)};r.usage={...u};}
       r.dialogueRuntime={zuzuMs:zuzuMs||num(r?.performance?.totalMs),simulatorMs,wallMs:0,decisionModelMs:num(result?.meta?.performance?.decisionModelMs),dataMs:num(result?.meta?.performance?.dataMs),narrationMs:num(result?.meta?.performance?.narrationModelMs),zuzuCalls:num(u?.calls),simulatorCalls:num(simulatorUsage?.calls),presentationTables:num(presentationEvidence?.tableCount),presentationCharts:num(presentationEvidence?.chartCount)};
       nextConversationState={conversationId:trim(result?.conversationId||result?.meta?.conversationId||cs.conversationId).slice(0,160),previousInteractionId:(result?.meta?.resetInteractionId===true?'':trim(result?.interactionId||result?.meta?.interactionId||'').slice(0,500)),history:hist,scenario:trim(c.scenario),dialogueNext:next,dialogueMission:mission,dialogueTurn:turnNo};

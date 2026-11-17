@@ -1,0 +1,15 @@
+const fs=require('fs');const ai=fs.readFileSync('services/event-ai.service.js','utf8'),lab=fs.readFileSync('services/zuzu-test-lab.service.js','utf8'),ui=fs.readFileSync('public/app/features/zuzu-test-console-gd.js','utf8');let ok=0,ko=0;const t=(n,c)=>{console.log((c?'OK ':'KO ')+n);c?ok++:ko++;};
+t('P8 separa contrato oral del escrito',/function v5P8SpokenContract/.test(ai)&&/v5P8SpokenFromEvidence/.test(ai));
+t('P8 moneda oral redondea y verbaliza euros',/function v5P8SpokenMoney/.test(ai)&&/Math\.round\(v\)/.test(ai)&&/euro/.test(ai));
+t('P8 elimina Markdown visual',/replace\(\/\[\*_#`\]\+\/g/.test(ai));
+t('P8 limpia timestamp ISO',/timestamp de máquina/.test(ai)&&/20\\d\{2\}-\\d\{2\}-\\d\{2\}/.test(ai));
+t('P8 evita más menos',/Evitar construcciones de calculadora/.test(ai)&&/más menos/.test(ai));
+t('P8 Brain-Lite usa salida oral contractual',/spoken=v5P8SpokenFromEvidence/.test(ai)&&/spoken=v5P8SpokenContract/.test(ai));
+t('P8 escrito sigue independiente',/let written=trim\(composed\?\.answer\)/.test(ai)&&/written=v29SanitizeAnswerMarkup/.test(ai));
+t('ITV RVOICE18 registrada',/RVOICE18/.test(lab)&&/buildRVoice18DialogueCases/.test(lab));
+t('ITV P8 valida markdown/timestamp/decimales',/ITV R\/VOZ: spokenAnswer conserva marcas visuales/.test(lab)&&/importe monetario oral conserva decimales/.test(lab));
+t('ITV P8 valida VIEW sin reconsulta',/ITV R\/VOZ: un cambio exclusivo de vista reconsultó datos/.test(lab));
+t('botón P8 visible',/ITV RESPUESTA\/VOZ · 18/.test(ui));
+const block=ai.slice(ai.indexOf('function v5P8SpokenMoney'),ai.indexOf('async function runZuzuBrainLiteAgent'));
+t('P8 sin entidades/eventos/importes hard-code',!/(Carmelo|Colty|Pocholo|Esther|FUNCION 2026|SySA|6485|6154)/.test(block));
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;

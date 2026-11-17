@@ -1,0 +1,19 @@
+ControlEvent v6.0.10_exp · CONVERSATION-FIRST
+
+Objetivo: validar conversación antes de gráficas, voz y rendimiento.
+
+Prueba manual sugerida (texto, sin gráficos):
+1. Dime qué sabes de este evento.
+2. Explícamelo como si se lo contaras a un socio, no como una ficha.
+3. ¿Qué conclusión sacarías tú de esos datos?
+4. No, espera.
+5. Vale, sigue con lo que ibas diciendo.
+6. ¿De qué hemos estado hablando?
+7. Cambiemos un momento: ¿quién eres?
+8. ¿Y sabes quién soy yo?
+9. ¿Qué hora y qué día es?
+10. Vuelve a lo del evento.
+11. Dímelo en cristiano, en dos frases.
+12. Ahora hazme un resumen de toda esta conversación.
+
+Criterio: no valen ecos (“sí”, “continuaré”), promesas sin contenido, negar actor/meta disponibles, ni pedir que se repita contexto visible.

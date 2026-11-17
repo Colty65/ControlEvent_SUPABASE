@@ -1,0 +1,12 @@
+AUDITORÍA HARD-CODE · FIX35 P12
+
+Hard-code de negocio añadido: NINGUNO.
+No se añaden nombres de personas, eventos, productos, importes ni frases de ITV.
+
+Constantes técnicas justificadas:
+- nombre del slot de sessionStorage del ID de conversación física;
+- nombre del canal BroadcastChannel;
+- lista de sufijos técnicos que se clonan al bifurcar una pestaña: conversation, context, usage_total, prompt_draft, prompt_last y runtime_build;
+- interaction_id y server_conversation_id se excluyen deliberadamente del clon para impedir concurrencia cruzada.
+
+Estas constantes describen el mecanismo de persistencia, no decisiones funcionales ni respuestas de Zuzu.

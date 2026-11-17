@@ -1,0 +1,11 @@
+const fs=require('fs'),path=require('path');
+const R=path.resolve(__dirname,'..'),read=p=>fs.readFileSync(path.join(R,p),'utf8');
+const ui=read('public/app/features/v24-cuadre-banco.js'),svc=read('services/bank-reconciliation.service.js');
+let ok=0,ko=0;const t=(n,c)=>{if(c){ok++;console.log('OK ',n)}else{ko++;console.error('KO ',n)}};
+t('Cargos se calculan solo desde movimientos bancarios negativos incluidos',/expense:cents\(sorted\.filter\(row => row\.included && row\.amount < 0\)/.test(svc)||/expense:cents\(included\.filter\(row=>num\(row\.eventAppliedAmount\?\?row\.amount\)<0\)/.test(svc));
+t('UI dice Cargos Banco',ui.includes('<b>Cargos Banco</b>'));
+t('UI no llama Cargos a secas a esa magnitud',!ui.includes('<b>Cargos</b>'));
+t('UI compacta el flujo sin mezclarlo con saldo actual',ui.includes('Flujo neto ${money(economicVariation)}')&&!ui.includes('No equivale al SALDO ACTUAL del evento:'));
+t('UI renombra variación como Flujo neto',ui.includes('Flujo neto'));
+t('importe sigue siendo dato bancario original, no se maquilla',ui.includes('${money(s.expense)}'));
+console.log(`\nBANK V3.14.2 CARGOS SEMÁNTICOS: ${ok} OK · ${ko} KO`);process.exit(ko?1:0);

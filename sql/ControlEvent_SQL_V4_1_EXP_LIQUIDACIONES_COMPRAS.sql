@@ -1,4 +1,4 @@
--- ControlEvent v4_1_exp · LIQUIDACIONES DE COMPRAS · V1
+-- ControlEvent v5.0_exp · LIQUIDACIONES DE COMPRAS · V1
 -- Ejecutar una vez en Supabase SQL Editor. Es idempotente y puede repetirse.
 -- No crea ningún vínculo de conciliación bancaria: solo consulta ce_bank_ticket_links desde la aplicación.
 

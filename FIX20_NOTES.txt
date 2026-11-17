@@ -1,0 +1,30 @@
+ControlEvent v5.0_exp · FIX20
+
+1. EVENTO FINALIZADO = SOLO LECTURA COMPLETA
+- Cuadre Banco, evolución temporal e histórico siguen siendo navegables en Finalizado.
+- Buscar, ordenar, paginar, Ver movimientos, cerrar ventanas y abrir miniaturas permanecen activos.
+- Altas, bajas y modificaciones siguen bloqueadas por el modo readOnly/mutationBlocked del módulo.
+- Optimización específica: las vistas bancarias pesadas ya no recorren todo su DOM en cada click/tecla; solo se desbloquean contenedor y controles de consulta.
+
+2. GLOBO INICIAL
+- Actualizado Control del evento / IA Zuzu / Operativa con el texto solicitado.
+
+3. ZUZU
+- «Todos los responsables» deja de interpretarse como un responsable llamado "todos".
+- Detalle de asistentes devuelve la lista completa, sin corte a 12 nombres.
+- Preguntas sobre el origen del saldo calculado explican saldo inicial + impacto/flujo = saldo calculado.
+- Gráficas: continuidad estructural para meteorología y comparativas; si Gemini no conserva la acción, se sintetiza desde el último contexto certificado.
+- Comparativas materializan gráficas de barras reales.
+- Demostración explícita de gráfica devuelve una gráfica real local.
+- Identidad: Zuzu = asistente de ControlEvent; no inventa "Zuzenberg" u otras plataformas.
+- Cuando el compositor local ya cubre la pregunta, no se antepone el resumen genérico del módulo.
+
+4. ITV EXPRESS 10
+- Rediseñada para examinar los fallos manuales reales: asistentes completos, ingresos banco/efectivo, responsables, líder y continuidad, banco, explicación de saldo, comparativa con gráficas y meteorología con gráfica de líneas.
+- Ya no se considera suficiente aprobar una batería estrecha que no examine las gráficas.
+
+REGRESIONES
+- FIX20: 20/20 OK
+- BRAIN-LITE: 21/21 OK
+- PURCHASE RESPONSIBLES: 8/8 OK
+- ZUZU ITV CONTRACT: OK

@@ -1,4 +1,4 @@
-# v4_1_exp · BANK4_13 · MEMORY CONTINUITY / FEEDBACK / VOICE
+# v5.0_exp · BANK4_13 · MEMORY CONTINUITY / FEEDBACK / VOICE
 
 ## Motivo
 La prueba del 29/08/2026 confirma que BANK4_12 cerró el contrato de `ce_reference`, pero destapa fallos alrededor del recuerdo: pérdida del sujeto humano en una continuación elíptica, presentación IA después de un KO de ejecución, una confirmación de memoria demasiado permisiva con frases que empiezan por «sí», ausencia de un índice real de recuerdos y quejas del usuario interpretadas como reejecución de datos.

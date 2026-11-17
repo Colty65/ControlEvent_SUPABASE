@@ -1,0 +1,22 @@
+HARD-CODE AUDIT · FIX38 P15 CLEAN AUTHORITY
+
+NUEVO HARD-CODE DE NEGOCIO: NINGUNO.
+
+JUSTIFICADO / ESTRUCTURAL
+- enum intent DATA/CHAT
+- enum response_level BASIC/MEDIUM/HIGH
+- enum scope current_event/all_events/selected_events
+- lista de operaciones que requieren un objetivo de evento o scope
+- códigos internos CLEAN_CONTRACT_*
+
+NO SE HAN AÑADIDO
+- personas concretas
+- eventos concretos
+- importes concretos
+- respuestas precocinadas para ITV
+- correcciones semánticas posteriores a Gemini
+
+LEGACY
+Se han eliminado físicamente del runtime los cuatro mutadores que todavía podían reescribir la decisión
+después de Gemini: v4BrainLitePlanStructuralGuard, v4BrainLiteArgs, v5P9ApplyContract y
+v5P10ApplyStateAuthority.

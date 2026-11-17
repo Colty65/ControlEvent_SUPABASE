@@ -1,0 +1,15 @@
+const fs=require('fs');const path=require('path');const {pathToFileURL}=require('url');
+(async()=>{let ok=0,ko=0;const t=(n,c)=>{console.log(`${c?'OK':'KO'} ${n}`);c?ok++:ko++;};
+const root=path.resolve(__dirname,'..');const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+t('version activa 6.0.4',svc.includes("version:'v6_1-exp'")&&svc.includes("provider:'zuzu-v6.0.4-clean-canonical-compiler'"));
+t('identidad Zuzu estructurada',svc.includes("assistant_identity:{name:'Zuzu',product:'ControlEvent'}"));
+t('fase synthesis separada',svc.includes("runtimePhase:'SYNTHESIS'")&&svc.includes("runtimePhase:'SYNTHESIS'")&&svc.includes("ce_no_action"));
+t('synthesis no reejecuta datos',/enum:\['NO_ACTION_REQUIRED'\]/.test(svc));
+t('FETCH estricto antes de ejecución',svc.includes('FETCH requiere entity_name lógico válido')&&svc.includes('FETCH ${entity} requiere projections no vacío'));
+t('current_screen_event es identificador estructurado',svc.includes("current_screen_event:current?{id:trim(current.id),name:trim(current.titulo||current.nombre)}:null"));
+t('sin petición de IDs al usuario',svc.includes('NO pidas IDs al usuario. Usa entity_resolution_overrides'));
+t('sin fallback cognitivo',svc.includes('V6 · FALLO SIN FALLBACK')&&!svc.slice(svc.indexOf('export async function runZuzuVNextUserTurn(input={}){'),svc.indexOf('function vnextP125ExtractDialogueJson')).includes('runZuzuVNextP'));
+t('validador llama v6ValidatePipeline en EXECUTE_DATA',svc.includes("v6ValidatePipeline(pipe);"));
+t('validator FETCH comprueba entidad/projections/campos',svc.includes('FETCH requiere entity_name lógico válido')&&svc.includes('requiere projections no vacío')&&svc.includes('projection fuera de ontología'));
+t('contexto incluye actor y timestamp autoritativos',svc.includes("actor:{id:trim(actor?.id||actor?.user_id)")&&svc.includes("timestamp:trim(clientNowIso)||new Date().toISOString()"));
+console.log(`\nv6.0.4 basic end2end: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;})();

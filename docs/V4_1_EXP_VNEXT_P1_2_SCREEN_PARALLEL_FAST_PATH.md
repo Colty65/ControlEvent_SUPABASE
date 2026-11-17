@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · Zuzu VNext P1.2
+# ControlEvent v5.0_exp · Zuzu VNext P1.2
 
 P1.2 parte de P1.1 y corrige el fallo visual observado en PC: el backend VNext devolvía tablas V26 con filas como objetos, mientras `tableHtml()` esperaba arrays y ejecutaba `r.map()`. El resultado factual quedaba correctamente archivado/PDF, pero la pantalla terminaba en `r.map is not a function`.
 

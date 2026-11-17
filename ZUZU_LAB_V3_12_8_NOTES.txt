@@ -1,0 +1,10 @@
+ControlEvent v5.0_exp · ZUZU LAB V3.12.8 · ACTIVE DIRECT + DAVEFX
+
+- Corrige la ruta real de voz: analyzeEventPrompt intenta CE determinista antes del Ledger y cae a P2-R solo si hace falta.
+- Compras pendientes ya no se ejecutan como realized en v29.
+- Respuestas de compras pendientes distinguen recuento, responsables y detalle fila a fila.
+- Donantes: si se piden nombres o qué donó cada uno, se enumeran desde datos canónicos.
+- DaveFX masculino local es voz principal en PC. TTS de pago bloqueado (410).
+- Nunca selecciona automáticamente una voz femenina.
+- Coste visible desglosado: STT USD + cerebro EUR + TTS 0.
+- Conversación básica fuera de demo: «dime»/«sigue»/saludos/quejas breves se resuelven localmente, sin llamar al cerebro ni crear bucles de «Hola / dime».

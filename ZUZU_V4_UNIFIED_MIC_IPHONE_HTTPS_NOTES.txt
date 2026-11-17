@@ -1,0 +1,17 @@
+ControlEvent v5.0_exp · ZUZU V4 BRAIN-LITE · UNIFIED MIC + IPHONE HTTPS
+
+1. Causa raíz del micro en la ventana unificada: el cliente llamaba a /api/zuzu-voice/transcribe pero server/app.js no montaba zuzu-voice.routes.js. Resultado: el botón podía grabar, pero la transcripción no llegaba al backend.
+2. Se registra zuzuVoiceRoutes bajo /api.
+3. Botón principal claro: 🎙 HABLAR. El envío escrito pasa a ⌨ ENVIAR TEXTO.
+4. VAD local: tras detectar voz y ~1.1 s de silencio, termina y envía automáticamente. También permite ⏹ TERMINAR manualmente.
+5. Compatibilidad de grabación: audio/mp4 primero para Safari/iPhone; WebM/Opus para Chrome/PC; el backend ya acepta ambos.
+6. Si la página no está en contexto seguro, el botón explica que el iPhone necesita HTTPS.
+7. Nuevo comando Windows: npm run iphone:https
+   - arranca ControlEvent si no está ya arrancado;
+   - descarga cloudflared.exe la primera vez;
+   - crea un túnel HTTPS temporal hacia http://localhost:3030;
+   - muestra una URL https://*.trycloudflare.com que se abre en Safari del iPhone;
+   - no requiere instalar certificados en el iPhone.
+8. Hay que dejar abierta la ventana de PowerShell mientras se use el túnel.
+9. Brain-Lite sabe ahora que la interfaz sí dispone de micrófono + DaveFX, para no contestar falsamente que es solo texto.
+10. No se modifica la arquitectura factual BRAIN-LITE ni sus reglas TARGET25.

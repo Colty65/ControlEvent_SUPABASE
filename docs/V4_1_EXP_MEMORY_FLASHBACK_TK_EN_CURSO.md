@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · MEMORY FLASHBACK + TK En curso
+# ControlEvent v5.0_exp · MEMORY FLASHBACK + TK En curso
 
 Fecha: 27/08/2026
 
@@ -31,7 +31,7 @@ Fecha: 27/08/2026
 - Se mantienen límites de arrays/contexto para no disparar consumo de tokens.
 
 ## Versión
-- Identidad activa: `v4_1_exp` / `ControlEvent v4_1_exp` / `ControlEvent_v4_1_exp`.
-- `package.json`: `controlevent-v4-1-exp`, `4.0.0-exp.0`.
-- INFOEVENTO, BACKUP, servidor, cliente, PWA, trazas, nombres de descarga y claves activas migrados a v4_1_exp.
+- Identidad activa: `v5.0_exp` / `ControlEvent v5.0_exp` / `ControlEvent_v5.0_exp`.
+- `package.json`: `controlevent-v5-0-exp`, `4.0.0-exp.0`.
+- INFOEVENTO, BACKUP, servidor, cliente, PWA, trazas, nombres de descarga y claves activas migrados a v5.0_exp.
 - Se conserva reconocimiento de claves v3 únicamente como compatibilidad de migración/limpieza, nunca como versión activa.

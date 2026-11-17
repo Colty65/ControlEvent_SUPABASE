@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · VNext P1.4 · Peña Friend + Compare Charts
+# ControlEvent v5.0_exp · VNext P1.4 · Peña Friend + Compare Charts
 
 P1.4 conserva el fast path de P1.3 y sube un nivel la conversación oral: Zuzu habla desde la posición de un amigo de la Peña, no como un lector de columnas. La pantalla conserva precisión y la voz puede usar Nombre hablado, motes, asistencia, estado de ingreso y Nombre hablado del evento para construir frases sociales sin una segunda llamada IA.
 

@@ -1,0 +1,74 @@
+{
+  "ontology_version": "CE-ONTOLOGY-1.0",
+  "principles": {
+    "physical_storage_hidden": true,
+    "language_interpretation": "gemini",
+    "canonical_metrics_owner": "ControlEvent",
+    "relations_owner": "ControlEvent"
+  },
+  "entities": {
+    "events": {
+      "description": "Eventos gestionados por ControlEvent"
+    },
+    "people": {
+      "description": "Personas, socios, responsables y asistentes"
+    },
+    "purchases": {
+      "description": "Compras y gastos asociados a eventos"
+    },
+    "donations": {
+      "description": "Donaciones asociadas a eventos"
+    },
+    "incomes": {
+      "description": "Ingresos y aportaciones"
+    },
+    "bank": {
+      "description": "Movimientos y cuadre bancario"
+    },
+    "management": {
+      "description": "Hitos y tareas LG"
+    },
+    "documents": {
+      "description": "Documentos y justificantes"
+    },
+    "attendance": {
+      "description": "Asistencia canónica"
+    },
+    "weather": {
+      "description": "Meteorología asociada a fecha/evento"
+    }
+  },
+  "canonical_metrics": [
+    "saldo_operativo",
+    "valoracion_evento",
+    "asistencia_real",
+    "compras_realizadas",
+    "compras_pendientes",
+    "ingresos",
+    "donaciones_valoradas"
+  ],
+  "transitional_backend_adapters": [
+    "event_summary",
+    "event_bank",
+    "event_purchases",
+    "event_management",
+    "event_donations",
+    "event_documentation",
+    "event_liquidations",
+    "event_weather",
+    "event_income_status",
+    "event_attendance",
+    "person_profile",
+    "compare_events",
+    "events_overview"
+  ],
+  "future_primitives": [
+    "FETCH_COLLECTION",
+    "FILTER",
+    "AGGREGATE",
+    "DERIVE",
+    "JOIN",
+    "SORT_LIMIT",
+    "VISUALIZE"
+  ]
+}

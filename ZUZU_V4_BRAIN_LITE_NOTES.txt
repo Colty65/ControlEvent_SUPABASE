@@ -1,0 +1,23 @@
+ZUZU V4 BRAIN-LITE
+==================
+Objetivo: romper con la acumulación de P2-R/authority/repairs en la ruta oral.
+
+Ruta oral nueva:
+Usuario -> Gemini (plan JSON mínimo) -> ControlEvent (ejecución canónica) -> Gemini (redacción) -> DaveFX.
+
+Principios:
+- Gemini es el único intérprete lingüístico del turno.
+- CE no vuelve a interpretar castellano; valida/ejecuta operaciones y entidades.
+- BASIC/MEDIUM/HIGH son niveles de presentación, no arquitecturas distintas.
+- El contexto nuevo solo se publica cuando hay al menos una ejecución factual correcta.
+- Si el turno falla, se conserva el último contexto bueno y no se guarda un dataset fallido.
+- V3.15 sigue disponible en ITV para comparación.
+- Nueva batería: MADUREZ · 24 · BRAIN-LITE usa exactamente el generador híbrido 14+10 de la batería legacy.
+
+Validación local estructural:
+- V4 BRAIN-LITE: 12/12
+- VNEXT P2-R legacy: 36/36
+- V3.15 HUMAN QA legacy: 16/16
+- Liquidaciones: 74/74
+
+La nota 0-30 real solo debe tomarse de una ejecución contra Producción; no se infla por estos tests locales.

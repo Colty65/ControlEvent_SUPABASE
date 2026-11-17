@@ -1,0 +1,21 @@
+ControlEvent v6_1-exp · PASO 1 · STRUCTURED OUTPUTS
+
+BASE
+- Parte de v6.0.10_exp CONVERSATION-FIRST.
+- No incorpora las capas experimentales de v6.0.11-v6.0.15.
+
+CAMBIO ÚNICO DE ARQUITECTURA
+- Se retira function calling ce_* de la decisión v6 activa.
+- Gemini Interactions recibe response_format JSON + schema.
+- La salida se parsea como JSON y CE vuelve a validarla con v6ValidateContract antes de ejecutar.
+- Se elimina el reintento estructural del contrato: una salida inválida falla de forma explícita.
+- Context Packet, ejecución de datos, Threads/Evidence y flujo de 1/2 llamadas se mantienen como en v6.0.10 salvo el transporte contractual.
+
+NO INCLUIDO TODAVÍA
+- Context Caching / Context Packet mínimo (v6_2-exp).
+- Nuevo motor relacional/joins (v6_3-exp).
+- Fast Path UI nuevo (v6_4-exp).
+- Protocolo nuevo de entidades por tokens (v6_5-exp).
+
+PRUEBA ESTÁTICA
+- scripts/v6-1-structured-output-regression.cjs

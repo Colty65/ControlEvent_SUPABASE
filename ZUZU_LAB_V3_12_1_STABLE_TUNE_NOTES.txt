@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ZUZU LAB V3.12.1 · STABLE TUNE
+ControlEvent v5.0_exp · ZUZU LAB V3.12.1 · STABLE TUNE
 Fecha: 2026-09-05
 
 BASE

@@ -1,0 +1,21 @@
+const fs=require('fs'),path=require('path');const root=path.resolve(__dirname,'..');
+const ai=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const lab=fs.readFileSync(path.join(root,'services/zuzu-test-lab.service.js'),'utf8');
+const ui=fs.readFileSync(path.join(root,'public/app/features/zuzu-test-console-gd.js'),'utf8');
+const zuzu=fs.readFileSync(path.join(root,'public/app/features/v11-3-zuzu-analitica-libre.js'),'utf8');
+let ok=0,ko=0;function t(n,c){(c?ok++:ko++);console.log((c?'OK  ':'KO  ')+n)}
+t('guardia banco fuerza event_bank',/Dominio bancario explícito → event_bank único/.test(ai));
+t('pagos asistentes se separan de donaciones',/Pago\/aportación de asistentes → ingresos/.test(ai));
+t('comprado+pendiente genera ambos estados',/purchase_status:'realized'[\s\S]{0,120}purchase_status:'pending'/.test(ai));
+t('top buyer no se usa como nombre',/_aggregate='top_responsible'/.test(ai)&&/es quien más ha comprado/.test(ai));
+t('contexto conserva responsable',/responsible:trim\(last\.responsible\|\|last\.person\)/.test(ai));
+t('meteo conserva rango y chart',/resultContext\.start_date/.test(ai)&&/resultContext\.chart_type/.test(ai)&&/chartFollow/.test(ai));
+t('Brain-Lite devuelve charts CE',/const tables=.*charts=good\.flatMap/.test(ai));
+t('ITV EXPRESS exige todas operaciones',/ITV EXPRESS: falta operación/.test(lab));
+t('ITV EXPRESS rechaza top_buyer',/top_buyer se ha tratado como persona/.test(lab));
+t('ITV EXPRESS valida banco exclusivo',/consulta bancaria debe ejecutar solo event_bank/.test(lab));
+t('ITV deja mínimo 300px resultados',/\.zt-results\{[^}]*min-height:300px/.test(ui));
+t('ITV resultados tienen scroll ratón',/overflow-y:scroll!important/.test(ui));
+t('botones baterías compactos',/\.zt-language-btn\{[^}]*height:29px/.test(ui)&&/\.zt-language-btn small\{display:none/.test(ui));
+t('latencia cliente click→visible instrumentada',/clientClickToVisibleMs/.test(zuzu)&&/clientFetchRoundTripMs/.test(zuzu));
+console.log(`FIX17 STRICT EXPRESS/UI: ${ok} OK · ${ko} KO`);process.exit(ko?1:0);

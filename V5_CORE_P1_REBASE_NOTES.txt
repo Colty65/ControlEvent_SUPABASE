@@ -1,0 +1,26 @@
+ControlEvent v5.0_exp · V5 CORE P1 · REBASE CONVERSACIONAL
+
+Objetivo de esta fase:
+1) continuidad de conversación antes que nuevas funciones;
+2) datos canónicos y respuesta completa;
+3) separar salida escrita y salida hablada;
+4) conservar la latencia de una sola IA ordinaria.
+
+Cambios estructurales:
+- Nuevo Conversation Frame persistente: evento conversacional, evento en pantalla, persona/responsable, dominio, rango temporal, comparación, informe, presentación y receta exacta de las últimas consultas.
+- El contexto ya no se reduce a la ÚLTIMA acción ejecutada de un turno compuesto. Se conserva la operación primaria y la receta de todas las acciones certificadas.
+- Una petición de gráfica posterior reutiliza la receta factual certificada y solo cambia la presentación/tipo de gráfica. No reinterpreta el dominio desde cero.
+- Compositor específico de resumen económico: ya no puede quedar sustituido por el último bloque de compras/responsables.
+- Comprado+pendiente se resuelve antes que el desglose simple por responsable.
+- Efectivo: si las formas de pago no etiquetan explícitamente efectivo pero total > banco, el efectivo se deriva como total - banco.
+- Memoria: el episodio seleccionado debe contener literalmente el tema/persona buscado antes de afirmar que se recuerda.
+- Se elimina la muletilla automática “Mira,”.
+- Salida hablada independiente: informes, listas largas y tablas se resumen oralmente sin leer Markdown, asteriscos, tablas o timestamps.
+
+Pruebas locales:
+- V4 BRAIN-LITE: 21/21 OK
+- Contrato ITV: OK
+- V5 CORE P1: 12/12 OK
+
+Importante:
+Esta fase NO pretende certificar todavía toda la funcionalidad de gráficas ni todos los dominios. Es el primer corte de arquitectura para estabilizar continuidad y respuesta. La siguiente fase debe convertir la ITV en un examen del Conversation Frame y de la respuesta oral/escrita, no solo de la tool ejecutada.

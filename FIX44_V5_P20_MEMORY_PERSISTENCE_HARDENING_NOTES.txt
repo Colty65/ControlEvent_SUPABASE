@@ -1,0 +1,38 @@
+ControlEvent v5.0_exp · FIX44 · V5 P20 MEMORY PERSISTENCE HARDENING
+
+Objetivo único de esta versión:
+- blindar WRITE de ce_zuzu_conversations y ce_zuzu_turns;
+- impedir éxito silencioso si la persistencia principal falla;
+- verificar cada turno con read-after-write;
+- exponer diagnóstico de persistencia real ordenando conversaciones por updated_at y turnos por created_at.
+
+Cambios:
+1. Las escrituras CORE de conversación y turno ya no caen a ce_meta si falta/falla la tabla. La memoria histórica exige las tablas persistentes reales.
+2. Cada append verifica después de guardar:
+   - conversación existente,
+   - turno existente,
+   - current_turn_id,
+   - current_seq,
+   - conversation_id del turno,
+   - seq,
+   - prompt,
+   - respuesta.
+   Si algo no coincide, lanza ZUZU_PERSISTENCE_VERIFY_FAILED y el turno no se considera guardado correctamente.
+3. Nuevo diagnóstico POST /api/event-ai/persistence/audit.
+   - conversaciones por updated_at DESC;
+   - turnos por created_at DESC;
+   - último turno real;
+   - última conversación actualizada;
+   - turnos observados en las últimas 24 h.
+4. El botón MEM muestra ahora también el bloque "Persistencia BBDD".
+
+Aclaración importante sobre la consulta SQL manual:
+created_at de ce_zuzu_conversations indica cuándo nació la conversación. Si una conversación continúa durante varios días, created_at NO cambia. Para saber actividad reciente hay que mirar updated_at o ce_zuzu_turns.created_at.
+
+Esta versión NO modifica:
+- Gemini Sovereign;
+- Scope;
+- Memory ranking;
+- clasificación recallable;
+- gráficos;
+- voz/personaje.

@@ -1,0 +1,11 @@
+ControlEvent v6.0.8_exp · ITV SOBERANA semantic oracle
+
+- No cambia la arquitectura cognitiva v6.
+- Endurece SOBERANA30 para validar efecto semántico real por turno.
+- Rechaza ecos/promesas vacías (Sí->Sí, continuaré, volviendo...).
+- Rechaza pérdida de hilo en vuelve/sigue/haz lo de antes.
+- Rechaza identidad genérica, negación de actor y negación de fecha/hora disponibles en Context Packet.
+- Rechaza gráficos vacíos aunque exista objeto chart.
+- Rechaza catálogo visual incompleto.
+- Rechaza resúmenes/relatos anunciados pero no entregados.
+- ITV contractVersion=6 y builds ya no llevan V5/BRAINLITE.

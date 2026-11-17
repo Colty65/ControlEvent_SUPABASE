@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · FIX6
+ControlEvent v5.0_exp · FIX6
 
 1. FIX5 confirmó Banco: el KO de la batería pasó a exec-22 (resumen de recuerdo).
 2. MEMORY/read queda reservado a abrir/leer un episodio. Con un recuerdo ya seleccionado, resumir/sintetizar/extraer ideas usa MEMORY/summarize.

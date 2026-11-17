@@ -2,13 +2,51 @@
   "version": 2,
   "functions": {
     "api/index.js": {
-      "maxDuration": 60,
-      "includeFiles": "public/**"
+      "maxDuration": 60
     }
   },
   "routes": [
-    { "src": "/api/(.*)", "dest": "/api/index.js" },
-    { "src": "/vendor/exceljs.min.js", "dest": "/api/index.js" },
-    { "src": "/(.*)", "dest": "/api/index.js" }
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js",
+      "headers": {
+        "Cache-Control": "no-store"
+      }
+    },
+    {
+      "src": "/vendor/(.*)",
+      "dest": "/public/vendor/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
+      }
+    },
+    {
+      "src": "/(.*\\.(?:js|css|mjs|json|webmanifest|png|jpg|jpeg|webp|gif|svg|ico|woff|woff2|ttf|map))$",
+      "dest": "/public/$1",
+      "headers": {
+        "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400"
+      }
+    },
+    {
+      "src": "/(.*\\.html)$",
+      "dest": "/public/$1",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
+    },
+    {
+      "src": "/",
+      "dest": "/public/index.html",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/index.html",
+      "headers": {
+        "Cache-Control": "no-cache"
+      }
+    }
   ]
 }

@@ -1,0 +1,38 @@
+ControlEvent v5.0_exp · FIX35 · V5 P12 · TAB / USER CONVERSATION ISOLATION
+Fecha: 10/09/2026
+
+OBJETIVO
+Asegurar que el árbol conversacional de Zuzu (C→S→O→R/V), su historial local, su Interaction y su conversationId de servidor no puedan ser compartidos accidentalmente por dos conversaciones físicas simultáneas.
+
+DISEÑO
+1. Cada pestaña dispone de un conversationSessionId persistido en sessionStorage.
+2. Todas las claves Zuzu quedan namespaced por: versión + usuario autenticado + conversationSessionId.
+3. Dos dispositivos no comparten estado local porque cada navegador genera su propio conversationSessionId.
+4. Dos pestañas abiertas normalmente obtienen sessionStorage independiente y, por tanto, IDs distintos.
+5. Caso especial: los navegadores pueden DUPLICAR una pestaña copiando sessionStorage. Se utiliza BroadcastChannel solo como detector de colisión entre pestañas vivas:
+   - la pestaña nueva sondea el conversationSessionId heredado;
+   - si otra pestaña viva responde que ya lo usa, la nueva pestaña genera otro ID;
+   - copia el historial/contexto local como rama inicial;
+   - NO copia interaction_id ni server_conversation_id.
+   A partir de ese instante las dos ramas son totalmente independientes.
+6. Una recarga normal conserva el mismo ID: si no existe otra pestaña viva con ese ID no se bifurca.
+
+AISLAMIENTO DE USUARIO
+El namespace incluye un hash local de la identificación/nombre autenticado. Si otro usuario inicia sesión en la misma pestaña, no ve ni continúa el estado conversacional del anterior.
+
+LOCALSTORAGE
+El espejo de recuperación de voz sigue usando localStorage porque debe sobrevivir a ciertas recargas, pero ahora su clave también incluye usuario + conversationSessionId. Por tanto una pestaña ya no puede recuperar el espejo de otra.
+
+MIGRACIÓN
+Se elimina el barrido antiguo que buscaba cualquier clave terminada en _zuzu_<suffix>. Ese barrido podía capturar el estado equivocado en un entorno multipestaña.
+Solo se permite migrar una vez desde la clave legacy EXACTA de la versión activa.
+
+COMPORTAMIENTO ESPERADO
+- PC pestaña A: conversación A.
+- PC pestaña B: conversación B.
+- pestaña duplicada de A: nace como rama clonada, pero el siguiente turno ya es independiente.
+- iPhone/Android: conversaciones locales independientes.
+- ninguna pestaña debe poder escribir en el C/S/O/R/V de otra.
+
+NO SE IMPLEMENTA AÚN
+No hay sincronización multi-dispositivo ni botón «continuar en otro dispositivo». Eso requeriría persistir el árbol por conversation_id en backend y resolver concurrencia, y no es necesario para el objetivo actual.

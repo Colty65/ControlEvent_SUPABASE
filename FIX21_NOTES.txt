@@ -1,0 +1,28 @@
+ControlEvent v5.0_exp · FIX21
+
+1) FINALIZADO = solo lectura de datos, NO interfaz deshabilitada.
+   - Eliminada la capa global que parcheaba prototypes/disabled/readOnly y capturaba eventos.
+   - Corregida la capa legacy v22.9 que segundos después volvía a deshabilitar todos los controles.
+   - Se mantienen bloqueadas mutaciones mediante isLocked()/mutationBlocked() y acciones explícitas de escritura.
+   - Consulta histórica, evolución, miniaturas, X, búsquedas, scroll e ITV deben seguir operativos en finalizados.
+
+2) Globo inicial.
+   - Contenido actualizado según solicitud y cache-bust FIX21.
+
+3) Zuzu gráficas.
+   - chart_type explícito: line/bar/pie/donut.
+   - "de barras" o "en líneas" se consideran continuación del último dataset gráfico.
+   - Meteorología y comparativas conservan datos/rango al cambiar solo el tipo de gráfica.
+
+4) ITV DURA · 24.
+   - Nueva batería fija, más larga y adversarial.
+   - Incluye línea -> barras -> líneas, comparativa -> cambio de gráfica, retornos de foco,
+     banco, asistentes, responsables, donaciones y resumen compuesto.
+   - Valida el tipo real de gráfica materializada, no solo que exista una respuesta.
+
+Regresiones ejecutadas:
+- FIX21 específico: 18/18 OK
+- BRAIN-LITE: 21/21 OK
+- Contrato ITV: OK
+- BANK4.8 magnifier legacy: 16 OK / 2 KO por expectativas estáticas antiguas de cabecera/cache,
+  no por el comportamiento de lupa; no se cuenta como cerrado.

@@ -1,0 +1,20 @@
+AUDITORÍA HARD-CODE · FIX33 / V5 P10
+
+HARD-CODE DE NEGOCIO AÑADIDO: NINGUNO.
+No se añaden nombres de personas, nombres de eventos, importes, fechas de un evento concreto ni respuestas preparadas para la ITV.
+
+HARD-CODE ESTRUCTURAL/LINGÜÍSTICO JUSTIFICADO:
+1. Nombres de operaciones y dominios existentes (person_profile, event_purchases, etc.): forman parte del contrato técnico de ControlEvent.
+2. Dimensiones canónicas como responsible/product: son parte del esquema de consulta y presentación.
+3. Verbos genéricos de continuidad/actualización/olvido/ordenación: sirven para clasificar la relación entre turnos, no para contestar un caso concreto.
+4. Marcadores genéricos de informe/dossier y tipos de vista: forman parte del contrato de presentación.
+5. Límites de seguridad existentes para número de personas/operaciones/contextos: son límites técnicos, no reglas de negocio.
+6. Conversión «yo» -> display name de sesión SOLO si coincide con una persona canónica: usa identidad de sesión + catálogo de datos; no contiene una identidad escrita en código.
+
+MECANISMO NHC CLAVE DE P10:
+- Los nombres de entidades resueltos se ENMASCARAN antes del análisis léxico. El runtime no necesita saber qué nombre concreto es; evita que el contenido textual de un nombre canónico gobierne la intención.
+- La persona/producto actual se resuelve desde los catálogos de estado, no desde listas de nombres codificadas.
+- El botón ESCUCHAR solo reproduce spokenAnswer ya producido; no contiene texto de respuestas.
+
+HARD-CODE LEGACY:
+Esta auditoría se refiere a lo añadido/modificado por P10. No certifica como NHC limpio todo el código histórico de ControlEvent. Siguen pudiendo existir reglas/examples legacy identificados en auditorías anteriores fuera de este bloque.

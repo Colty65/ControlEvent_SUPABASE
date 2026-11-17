@@ -1,0 +1,18 @@
+ControlEvent v5.0_exp · FIX28 · V5 CORE P5
+
+Objetivo: ejecutar correctamente el modelo C→S→O→R/V sin añadir hard-code de negocio.
+
+CAMBIOS
+1. O multi-operación: corregido el merge inmutable que podía escribir evidence sobre una O inexistente (undefined.evidence).
+2. Router: un dominio factual explícito (compras, banco, tiempo, etc.) tiene prioridad sobre una petición de vista incluida en la misma frase.
+3. Meteorología: contrato genérico de rango. Reconoce fechas explícitas, intervalos por varias fechas y «próximos N días»; la O recibe start_date/end_date completos.
+4. Compras por responsable: «agrupado/desglosado/ordenado por responsable» se reconoce como desglose real, no como total general.
+5. Evidencia O: se conserva la tabla by_responsible/weather necesaria para vistas posteriores. Memoria puede conservar evidencia compacta para continuaciones verificables.
+6. ITV C/S/O: VIEW_ONLY ya no exige una operación ejecutada en el turno; exige que la operación exista heredada en el snapshot y que no se reconsulte CE.
+7. Velocidad: se mantiene Context Paging y VIEW_ONLY local (0 Gemini / 0 CE).
+
+NHC / HARD-CODE
+- No se añaden personas, eventos, importes ni respuestas de prueba al runtime.
+- Hard-code justificado: taxonomía genérica de dominios, tipos de vista, campos canónicos de datos y expresiones temporales genéricas (fechas / N días).
+- Las preguntas de ITV permanecen solo en la batería de pruebas.
+8. Voz: cuando la pregunta pide compras por responsable, la locución cita responsables e importes (hasta 7) en vez de limitarse al total general; la respuesta escrita permanece completa.

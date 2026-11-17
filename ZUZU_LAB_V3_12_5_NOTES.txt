@@ -1,0 +1,33 @@
+ControlEvent v5.0_exp · ZUZU LAB V3.12.5 · FACTS FIRST / NEUTRAL
+Fecha: 2026-09-06
+
+Base:
+- V3.12.4 estable.
+- Se conserva localhost + Supabase real + Gemini real.
+- Se conserva COST FIX de Vercel: estáticos fuera de la Function; /api/* en backend.
+- Sin Gemini Live. Se conserva TTS streaming por Interactions API y DaveFX solo como respaldo.
+
+Cambios V3.12.5:
+1. Voz principal Iapetus con instrucción de prosodia masculina española neutra, clara, sobria y directa.
+   Sin tono zalamero, cómplice, de vendedor, locutor o personaje que presume de saberlo todo.
+2. Política FACTS FIRST: primero dato recuperado; humor/personaje solo si aporta y nunca sustituye información.
+3. Eliminadas muletillas asistenciales: «qué memoria la tuya», «tranquilo, hombre», «aquí me tienes», «te echo una mano», «me pongo las pilas».
+4. Cifras equilibradas:
+   - resumen factual normal: hasta 5 KPI núcleo cuando existen;
+   - máximos/mínimos: elemento + valor;
+   - «todo lujo de detalles / cifras completas»: sin tope artificial, con economía, asistencia, gestión, documentos/justificantes si se piden.
+5. event_documentation cubierto en voz: ingresos con/sin justificante, tickets con/sin imagen, documentos con/sin adjunto.
+6. Corrección oral genérica y autoritativa: «X no, Y», «será Y», «quise decir Y». Se aplica a planner, llamadas y respuesta final.
+   No existe hardcode Cordo/Córdoba ni Nines/Inés.
+7. Resolución de personas permite candidato único de 4 letras a distancia 1, para errores STT cortos, solo en contexto de personas.
+8. recall_memory usa salida determinista cuando está disponible: evita una segunda llamada de narración.
+9. Feedback puro sin petición («das vueltas», etc.) se resuelve localmente y no gasta una llamada de planner.
+10. Identidad de usuario «¿cómo me llamo yo?» se resuelve desde identidad autenticada.
+11. Fecha/meteo, ghost guard y asentamiento de frase partida de V3.12.4 se conservan.
+
+Regresiones:
+- V3.12.5 FACTS-FIRST/NEUTRAL: 29/29 OK.
+- Liquidaciones compras: 70/70 OK.
+- Ejecución controlada: 76/76 OK.
+- BANK4.9 manual authority: 8/8 OK.
+12. Arranque localhost V3.12.5 libera automáticamente el puerto configurado antes de iniciar para evitar EADDRINUSE por un servidor anterior.

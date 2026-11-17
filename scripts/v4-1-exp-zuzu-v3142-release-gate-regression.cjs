@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path');
+const root=path.resolve(__dirname,'..');
+const svc=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const lab=fs.readFileSync(path.join(root,'public/app/features/antonio-lab-v3.js'),'utf8');
+const itv=fs.readFileSync(path.join(root,'public/app/features/zuzu-test-console-gd.js'),'utf8');
+const bank=fs.readFileSync(path.join(root,'public/app/features/v24-cuadre-banco.js'),'utf8');
+let ok=0,ko=0;const t=(n,c)=>{if(c){ok++;console.log('OK ',n)}else{ko++;console.error('KO ',n)}};
+t('Interactions required se normaliza a allowed_tools any',svc.includes("toolChoice==='required'?{allowed_tools:{mode:'any',tools:toolNames}}"));
+t('planner P2R conserva plan_turn tipado',svc.includes("name:'plan_turn'")&&svc.includes('VNEXT P2-R · planificador mínimo'));
+t('simulador libre usa generateContent v1beta',svc.includes('ITV P1.26 · usuario sintético adaptativo · v1beta')&&svc.includes('generativelanguage.googleapis.com/v1beta/models'));
+t('simulador no usa Interactions v1 en bloque libre',!svc.includes("systemInstruction:'Simula un usuario humano para una prueba de continuidad. Evalúa también los artefactos estructurados materializados. Devuelve solo el JSON solicitado.',tools:[]"));
+t('evento explícito inexistente no puede heredarse',svc.includes('v3142UnknownExplicitEvent')&&svc.includes('Prohibido sustituirlo por el evento activo'));
+t('recovery de evento inexistente conserva retry_request',svc.includes("retry_request:retryRequest")&&svc.includes("reason:'event_not_found'"));
+t('fecha de meteo se contesta desde contexto sin nueva query',svc.includes('ZUZU V3.14.2 · FECHA DE LA METEO DESDE CONTEXTO')&&svc.includes("operation:'weather_date_follow'"));
+t('UI banco compacta explicación',bank.includes('Flujo neto ${money(economicVariation)}')&&!bank.includes('No equivale al SALDO ACTUAL del evento:'));
+t('build LAB V3.14.2',lab.includes('V3.14.2'));
+t('build ITV V3142',itv.includes('V3142-MATURITY-HYBRID-VOICE-NHC'));
+console.log(`\nV3.14.2 RELEASE GATE: ${ok} OK · ${ko} KO`);process.exit(ko?1:0);

@@ -1,0 +1,19 @@
+FIX43 · V5 P19 · MEMORY AUDIT BUTTON HOTFIX
+
+Problema encontrado
+- FIX42 pintaba correctamente el botón 🧠 MEM.
+- La función runMemoryAudit() existía y el endpoint POST /api/event-ai/memory/audit también.
+- Pero openModal() no enlazaba #ceAiMemoryAudit con runMemoryAudit().
+- Resultado: el botón aparecía pero al pulsarlo no ejecutaba nada.
+
+Corrección
+- En openModal() se añade un único binding explícito:
+  ceAiMemoryAudit.onclick -> runMemoryAudit()
+- No se modifica el runtime conversacional, Gemini Sovereign, memoria, ranking ni persistencia.
+- Se actualiza el cache-buster del JS para evitar que el navegador conserve FIX42.
+
+Prueba manual
+1. Abrir Zuzu.
+2. Escribir Carmelo en el prompt.
+3. Pulsar 🧠 MEM.
+4. Debe aparecer la tarjeta “Auditoría de memoria · Carmelo”.

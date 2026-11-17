@@ -39,4 +39,4 @@ t('caso multievento previo 94/120 sigue pendiente',x.diff===26&&!x.closed);
 x=status(-120,[89,5,26]);
 t('caso multievento previo 94+26 sigue cerrando exacto',x.diff===0&&x.closed);
 
-console.log(`\nv4.1_exp BANK2 · ${ok}/${total} comprobaciones OK`);if(ok!==total)process.exit(1);
+console.log(`\nv5.1_exp BANK2 · ${ok}/${total} comprobaciones OK`);if(ok!==total)process.exit(1);

@@ -1,0 +1,13 @@
+FIX45 P21 HARD-CODE AUDIT
+
+No business hard-code added.
+No person, event, amount, product or ITV phrase is used to make persistence decisions.
+
+New constants/logic are purely infrastructural:
+- reuse server conversation id,
+- append successful Brain-Lite turns to the existing ledger,
+- map already-executed result metadata into a storage projection,
+- mark historical recall replies as non-recursive memory,
+- surface persistence audit failures.
+
+The storage projection records the already-decided contract; it never changes semantic execution.

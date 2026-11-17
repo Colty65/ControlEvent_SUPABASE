@@ -19,7 +19,7 @@ t('no existe deformación global',!bank.includes('balanceSpreadX')&&!bank.includ
 t('wire no reescribe path principal',!/function wireBalancePane[\s\S]*?setAttribute\('d'/.test(bank));
 t('lupa CSS independiente',css.includes('.ce-bank-balance-magnifier{position:absolute'));
 t('puntos lupa grandes',css.includes('.ce-bank-magnifier-point')&&css.includes('r:12'));
-t('cache JS BANK48',html.includes('v24-cuadre-banco.js?v=20260902-V4_1_EXP-BANK48-MAGNIFIER-STABLE'));
-t('cache CSS BANK48',html.includes('cuadre-banco.css?v=20260902-V4_1_EXP-BANK48-MAGNIFIER-STABLE'));
+t('cache JS BANK48',html.includes('v24-cuadre-banco.js?v=20260902-V5_1_EXP-BANK48-MAGNIFIER-STABLE'));
+t('cache CSS BANK48',html.includes('cuadre-banco.css?v=20260902-V5_1_EXP-BANK48-MAGNIFIER-STABLE'));
 t('package registra BANK48 lupa',pkg.scripts?.['test:bank48-magnifier']==='node scripts/v4-1-exp-bank48-magnifier-regression.cjs');
 console.log(`BANK4.8 MAGNIFIER: ${ok} OK · ${bad} KO`);process.exitCode=bad?1:0;

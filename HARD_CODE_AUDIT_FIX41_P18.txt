@@ -1,0 +1,15 @@
+HARD-CODE AUDIT · FIX41 P18
+
+No se han añadido nombres concretos de personas, eventos, tiendas, productos, importes ni preguntas de las pruebas al runtime.
+
+Constantes/heurísticas justificadas:
+1. Vocabulario genérico de continuidad MEMORY→NOW: ejecutar/repetir/actualizar/misma consulta/hoy/ahora/sí/vale/hazlo.
+2. Esquema y catálogo de capacidades de ControlEvent: son la API que Gemini debe conocer.
+3. Regla estructural: la respuesta histórica no es autoridad semántica para formar el contrato actual; la pregunta/plan_signature histórica sí lo son.
+4. Una única reemisión Gemini cuando el contrato MEMORY→NOW es ilegal.
+5. Derivación técnica de current_event a partir del evento visible, igual que en P16/P17; no es reinterpretación semántica.
+
+Eliminado por considerarse semanticamente peligroso:
+- v5P13MemoryReplayActionFromRows: infería person_profile a partir de persona mencionada en el recuerdo y podía machacar la consulta histórica real.
+
+Norma: ninguna capa posterior a Gemini puede cambiar operation, scope, event, person, responsible, filtros o vista del contrato congelado.

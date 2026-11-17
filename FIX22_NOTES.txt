@@ -1,0 +1,21 @@
+ControlEvent v5.0_exp · FIX22
+
+Objetivo:
+- Hacer la conversación de Zuzu menos mecánica sin volver a aumentar la latencia ordinaria.
+- Mantener el dataset/contexto al pedir una gráfica después de haber pedido los datos.
+- Dar tratamiento específico a informes: Dirección = ejecutivo y visual; socios/detallado = más completo.
+- Corregir varios falsos OK detectados en ITV DURA 24.
+
+Cambios principales:
+1. Contexto persistente de informe: report_mode, report_audience y report_event.
+2. "Añade gráficas a esto" conserva el informe y el evento, no salta a otro dominio.
+3. Informes para Dirección: texto ejecutivo + gráficas; no vuelca tablas extensas salvo petición expresa.
+4. Informes detallados: conserva tablas y añade gráficas reales.
+5. Guardias explícitas para meteorología y seguimiento gráfico.
+6. "Responsables de compras y qué importe manejó cada uno" devuelve desglose por responsable.
+7. "Solo cuánto fue en efectivo" devuelve una única cifra pertinente.
+8. Pulido local de redacción para reducir frases mecánicas y evitar otra llamada IA ordinaria.
+9. Locución de informes: resumen oral, no lectura literal del dossier completo.
+10. ITV DURA endurecida: valida resumen económico, truncamiento de asistentes y respuesta solo efectivo.
+
+Regresión específica FIX22: 15/15 OK.

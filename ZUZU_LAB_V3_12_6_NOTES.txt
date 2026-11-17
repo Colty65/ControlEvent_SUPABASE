@@ -1,0 +1,25 @@
+ZUZU LAB V3.12.6 · FAITHFUL ANSWER
+
+Base: V3.12.5 + LOCAL/Vercel COST FIX. No Live. No cambio de transporte TTS.
+
+Objetivo del cambio:
+- Reducir la intervención de la capa oral: por defecto la voz conserva el cierre factual escrito.
+- Cuando el usuario pide una lista/campo concreto, extraer exactamente ese detalle de las tablas CE.
+- No repetir el mismo agregado cuando el usuario acaba de pedir otro detalle.
+- No cortar respuestas factuales por un límite global de 300 caracteres.
+- Mantener el texto escrito como fuente autoritativa y completa; la voz no puede saber más que el escrito.
+- TTS Iapetus con prosodia más llana/seca, sin sonrisa audible ni tono cómplice.
+
+Correcciones verificadas:
+- event_donations: ¿quiénes son?, nombres, personas, uno por uno -> tabla donors.
+- Si se piden cifras por donante, nombre + valor + total.
+- La respuesta escrita conserva el detalle solicitado.
+- Liquidaciones, tiempo, gestión, productos y tiendas pasan por fast path factual sin segundo narrador.
+- Anti-repeat semántico: no repite una respuesta casi idéntica cuando se pidió detalle/lista.
+
+Regresiones:
+- V3.12.6: 22/22
+- Liquidaciones: 70/70
+- Ejecución controlada: 76/76
+- BANK manual: 8/8
+- Local/Vercel COST: 18/18

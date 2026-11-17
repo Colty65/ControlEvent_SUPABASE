@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · VNext P1.21
+# ControlEvent v5.0_exp · VNext P1.21
 
 ## Objetivo
 Cerrar las cinco familias residuales detectadas por GOLDEN 110 en P1.20.1 (101 OK / 9 KO) sin añadir hard-code lingüístico ni nuevas capacidades empresariales.

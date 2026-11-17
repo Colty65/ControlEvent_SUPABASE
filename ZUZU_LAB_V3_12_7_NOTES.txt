@@ -1,0 +1,27 @@
+ControlEvent v5.0_exp · ZUZU LAB V3.12.7 · DIRECT DATA + LOCAL TTS
+
+Objetivo:
+- dejar de pagar Gemini TTS por cada segundo de respuesta;
+- eliminar la segunda redacción oral que podía mutilar la respuesta factual;
+- corregir el caso reproducido de COMPRAS PENDIENTES + RESPONSABLES.
+
+Cambios:
+1. TTS Gemini desactivado en ZUZU LAB. El endpoint /api/antonio-lab/tts-stream responde 410.
+2. La voz usa speechSynthesis del navegador/sistema operativo (es-ES preferente). Coste TTS por uso: 0.
+3. Si el navegador no tiene voz local, la respuesta queda completa en pantalla y NO se recurre a TTS de pago.
+4. En modo voz, spokenAnswer deriva directamente de answer. No hay segundo narrador Gemini.
+5. Peticiones explícitas de compras pendientes/realizadas fuerzan purchase_status antes de ejecutar CE.
+6. Respuestas específicas de compras pueden devolver recuento, importe, responsables y detalle producto a producto según lo pedido.
+7. Protestas cortas sin nueva petición se resuelven localmente para evitar llamadas inútiles.
+8. Se conserva el COST FIX de Vercel y el servidor localhost real contra Supabase/Gemini.
+
+Regresiones ejecutadas:
+- V3.12.7 direct data + local TTS: 21/21.
+- Liquidaciones compras: 70/70.
+- Execution Controlled: 76/76.
+- BANK4.9 manual authority: 8/8.
+- Local/Vercel cost fix: 18/18.
+
+NHC:
+- No se han hardcodeado personas/productos/eventos reales para resolver compras pendientes.
+- Las reglas de estado y de detalle se aplican semánticamente a cualquier evento.

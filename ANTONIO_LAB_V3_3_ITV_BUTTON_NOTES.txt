@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ANTONIO LAB V3.3 · acceso dentro de ITV
+ControlEvent v5.0_exp · ANTONIO LAB V3.3 · acceso dentro de ITV
 
 - Eliminado el botón/micrófono Antonio del menú principal.
 - Añadido botón 🎙️ ANTONIO dentro de la cabecera de ITV Zuzu.

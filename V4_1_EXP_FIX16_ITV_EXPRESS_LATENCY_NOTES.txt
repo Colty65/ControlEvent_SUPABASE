@@ -1,0 +1,23 @@
+ControlEvent v5.0_exp · FIX16 · ITV EXPRESS + LATENCIA
+
+1) Hallazgo principal de latencia
+- BRAIN-LITE esperaba la carga completa de estado Supabase antes de empezar a interpretar.
+- En cada consulta factual hacía normalmente: 1 llamada IA para interpretar + 1 llamada IA para redactar + 1 llamada IA adicional para voz (porque la ventana unificada marca voiceConversation=true incluso al escribir).
+- Eso explica la sensación de batch y varios latidos antes de ver una respuesta.
+
+2) FAST-CLOSE
+- Consultas BASIC/MEDIUM: 1 sola llamada IA (interpretación).
+- ControlEvent consulta/calcula y compone la respuesta factual localmente.
+- spokenAnswer se genera localmente sobre esa misma verdad: 0 llamadas IA adicionales.
+- Solo HIGH conserva una segunda llamada IA para redacción exhaustiva.
+
+3) Instrumentación
+La traza BRAIN-LITE informa ahora: estado Supabase, plan IA, datos CE, redacción IA y voz local, además del total. Esto permite localizar la latencia real por turno.
+
+4) ITV EXPRESS · 10
+Nueva batería de 10 turnos en PRUEBAS ZUZU para revisar en pocos minutos: resumen económico, ingresos banco/efectivo, responsables realizado/pendiente, continuidad de sujeto, flujo neto bancario, consulta combinada y cierre contextual.
+
+5) Regresiones
+- V4 BRAIN-LITE: 21/21 OK.
+- PURCHASE RESPONSIBLES: 8/8 OK.
+- El script FIX10 GROUNDED CONTINUITY conserva un KO técnico heredado del harness (vnextP16LastContext no definido en el VM aislado); no procede de FIX16 y no se ha ocultado.

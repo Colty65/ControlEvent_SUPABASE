@@ -1,3 +1,4 @@
-import app from '../server/app.js';
+import { createApp } from '../server/app.js';
 
-export default app;
+// Producción Vercel: SOLO API. Los HTML/JS/CSS/imágenes se sirven como estáticos.
+export default createApp({ serveFrontend: false });

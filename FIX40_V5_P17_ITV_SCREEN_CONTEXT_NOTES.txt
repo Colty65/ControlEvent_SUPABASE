@@ -1,0 +1,15 @@
+FIX40 · V5 P17 · ITV SCREEN CONTEXT REALISM
+
+Hallazgo de la ITV SCOPE tras FIX39:
+- 10/12 turnos pasan.
+- Los únicos KO son los dos turnos scope=current_event.
+- Gemini conserva operation=event_income_status, pero no se ejecuta porque la ITV llamaba a Zuzu sin selectedEventId.
+
+Corrección:
+- La ITV FULL-CERT simula ahora el mismo estado de entrada que la aplicación real: un selectedEventId visible derivado del evento activo del fixture.
+- No se toca la ruta semántica de producción.
+- No se corrige ni reescribe ninguna decisión de Gemini.
+- scope=current_event sigue significando exactamente lo que decidió Gemini; el executor únicamente resuelve el ID de pantalla a su nombre canónico.
+
+Regla arquitectónica preservada:
+LA INTELIGENCIA ESTÁ EN GEMINI. EL SOFTWARE DESCRIBE CAPACIDADES, VALIDA Y EJECUTA EXACTAMENTE EL CONTRATO.

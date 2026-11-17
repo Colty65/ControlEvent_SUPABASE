@@ -1,0 +1,23 @@
+const fs=require('fs');
+let ok=0,ko=0;function t(n,v){if(v){ok++;console.log('OK',n)}else{ko++;console.error('KO',n)}}
+const ev=fs.readFileSync('services/event-ai.service.js','utf8');
+const ver=fs.readFileSync('public/app/version.js','utf8');
+const paths=fs.readFileSync('server/paths.js','utf8');
+const itv=fs.readFileSync('public/app/features/zuzu-test-console-gd.js','utf8');
+const hard=fs.readFileSync('public/app/features/v4-1-exp-version-hardlock.js','utf8');
+const hard2=fs.readFileSync('public/app/features/v18-11-10-final-hardlock.js','utf8');
+const backup=fs.readFileSync('public/modules/excel/backup.js','utf8');
+const exp=fs.readFileSync('routes/export.routes.js','utf8');
+const lab1=fs.readFileSync('public/app/features/zuzu-execution-lab-gd.js','utf8');
+const lab2=fs.readFileSync('public/app/features/zuzu-interpreter-lab-gd.js','utf8');
+t('parser v6 usa extractor existente',ev.includes("const txt=v261OutputText(payload).trim()")&&!ev.includes('v261AssistantTexts(payload)'));
+t('version central 6.0.1',ver.includes("VERSION = 'v6_1-exp'")&&ver.includes("VERSION_FILE = 'ControlEvent_v6_1-exp'"));
+t('backend version 6.0.1',paths.includes("APP_VERSION_LABEL = 'v6_1-exp'")&&paths.includes("APP_VERSION_FILE = 'ControlEvent_v6_1-exp'"));
+t('hardlock final 6.0.1',hard.includes("LABEL='v6_1-exp'")&&hard.includes("FILE='ControlEvent_v6_1-exp'"));
+t('hardlock secundario 6.0.1',hard2.includes("VERSION_LABEL='v6_1-exp'")&&hard2.includes("VERSION_FILE='ControlEvent_v6_1-exp'"));
+t('ITV nombre externo 6.0.1',itv.includes("return 'v6_1-exp';")&&itv.includes('`${itvFilePrefix()}_ITV_Zuzu_'));
+t('BACKUP cliente 6.0.1',backup.includes("BACKUP_VERSION_FILE = 'ControlEvent_v6_1-exp'"));
+t('BACKUP servidor 6.0.1',exp.includes("BACKUP_VERSION_FILE = 'ControlEvent_v6_1-exp'"));
+t('laboratorios ITV externos 6.0.1',lab1.includes('ControlEvent_v6_1-exp_ITV_Zuzu_')&&lab2.includes('ControlEvent_v6_1-exp_ITV_Zuzu_'));
+t('migracion conserva v6.0 y v5.3.2',ver.includes("'ControlEvent_v6.0_exp'")&&ver.includes("'ControlEvent_v5.3.2_exp'"));
+console.log(`\nv6.0.4 runtime/version: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;

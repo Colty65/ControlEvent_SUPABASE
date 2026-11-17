@@ -1,0 +1,46 @@
+ControlEvent v5.0_exp · FIX14 · 2026-09-08
+
+CAMBIOS SOLICITADOS
+
+1) FLUJO NETO DEL CUADRE BANCO
+- Corregido: Flujo neto = Abonos Banco - Cargos Banco.
+- Los abonos en efectivo se siguen mostrando como información del evento, pero NO alteran el impacto de la cuenta bancaria.
+- La corrección se aplica tanto en servicio de conciliación como en la tarjeta visual.
+
+2) PROMPT DE ZUZU / SALTO A GRÁFICAS
+- El textarea intercepta también pointer/mouse/touch/select/click, no solo teclado.
+- Seleccionar texto de derecha a izquierda ya no debe propagar el gesto hacia listeners globales de GRÁFICAS.
+- Tras enviar una pregunta, el prompt queda marcado como "ya enviado". Al volver a poner foco se vacía automáticamente.
+- Al pulsar HABLAR también se vacía inmediatamente el prompt ya enviado.
+- Un borrador nuevo que todavía no se ha enviado NO se borra por recuperar foco.
+
+3) VOZ
+- Cambio de voz por defecto: CarlFM.
+- Migración única desde DaveFX a CarlFM; después el selector sigue respetando la elección manual del usuario.
+- Contrato monetario oral reforzado de forma determinista: importes hablados sin decimales, truncando céntimos hacia cero y diciendo "euros".
+- La pantalla conserva el importe exacto; se refuerza además la instrucción de que cada importe escrito lleve el símbolo €.
+
+4) PDF DE ZUZU
+- La traza técnica queda DESMARCADA por defecto: era la principal fuente de PDFs innecesariamente pesados/complejos.
+- El PDF normal conserva texto, tablas y gráficas.
+- La impresión espera a document.fonts.ready cuando existe y aumenta ligeramente la espera antes de abrir la impresión, para evitar capturas incompletas.
+- Se mantiene la guardia P1.23 que evita reducir una conversación larga a un único turno.
+
+5) RESPONSABLES / COMPRAS
+- Se conserva la ruta estructurada existente que agrupa compras realizadas y pendientes por responsable.
+- La regresión específica PURCHASE RESPONSIBLES pasa 8/8.
+
+6) NHC
+- Estos cambios no añaden frases de prueba, nombres propios ni reglas lingüísticas para interpretar preguntas.
+- Las nuevas reglas son de: semántica contable, eventos DOM, unidad monetaria, selector de voz y exportación PDF.
+- P1.18 mantiene su test NHC runtime OK para prompts GOLDEN.
+- P1.23 mantiene su test NHC específico OK.
+- Hay KOs heredados en varias suites antiguas por desalineación de builds/registro/provider/cache y un test de voz que referencia un fichero eliminado (v22-voz3-zuzu.js). No se maquillan como OK.
+
+PRUEBAS EJECUTADAS
+- BANK V3.14.2 CARGOS SEMÁNTICOS: 6/6 OK.
+- PURCHASE RESPONSIBLES: 8/8 OK.
+- V4 BRAIN-LITE: 21/21 OK.
+- P1.18: test NHC runtime OK, con otros KOs heredados de registro/build.
+- P1.23: test NHC específico OK, con 6 KOs heredados ajenos a este FIX.
+- P1.27: núcleo funcional de contenido visible OK, con 4 KOs heredados de build/cache/export naming.

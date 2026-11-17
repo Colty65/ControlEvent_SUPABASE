@@ -1,0 +1,34 @@
+ControlEvent v5.0_exp · FIX39 · V5 P16 GEMINI SOVEREIGN + CAPABILITY CONTRACT REGISTRY
+
+NORMA DE ARQUITECTURA (INVIOLABLE)
+La inteligencia semántica la pone Gemini. El runtime de ControlEvent se limita a:
+1) explicar a Gemini las capacidades y contratos legales disponibles;
+2) validar que la decisión devuelta es legal SIN cambiarla;
+3) si es ilegal, pedir a GEMINI una única reemisión corregida (el runtime no corrige semántica);
+4) congelar el contrato válido;
+5) ejecutar exactamente ese contrato, permitiendo solo derivaciones técnicas explícitamente documentadas (p.ej. resolver el nombre canónico ya decidido o obtener el evento visible cuando scope=current_event);
+6) presentar únicamente evidencia producida por la ejecución.
+
+NUEVO CAPABILITY CONTRACT REGISTRY
+- cleanCapabilityContractCatalogText(): catálogo legible por Gemini de firmas legales.
+- validateCleanDecisionContract(): validación pura, sin mutación.
+- event_income_status admite explícitamente:
+  * scope=all_events + event ausente
+  * scope=current_event + event opcional (se deriva técnicamente de pantalla)
+  * event concreto sin scope
+- scope=all_events + event concreto es inválido.
+
+REPARACIÓN DE CONTRATO
+Si Gemini produce un contrato inválido, no existe repair JavaScript de operation/scope/event/person.
+Se hace como máximo una segunda llamada a Gemini con:
+- plan inválido,
+- errores del validador,
+- catálogo de capacidades.
+Si vuelve a ser inválido, no se ejecuta nada y no hay commit.
+
+INVARIANTE DE TRAZA
+DECISION GEMINI -> VALIDACION -> FREEZE -> EXECUTION ARGS.
+El contrato congelado no se modifica. Las únicas diferencias permitidas en execution_args son metadatos técnicos (_user_prompt) y resolución canónica/derivación current_event documentada.
+
+NOTA SOBRE RUTAS LOCALES
+Las rutas locales de UI/social/view/memory-navigation pueden evitar una llamada Gemini solo cuando NO crean una nueva decisión factual. No tienen autoridad para crear/cambiar operation, scope, event, person ni filtros de una O factual.

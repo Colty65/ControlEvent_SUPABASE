@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · FIX9
+ControlEvent v5.0_exp · FIX9
 P2-R REENTRY / REPEAT / MEMORY / DATASETS
 
 Origen de esta revisión
@@ -66,7 +66,7 @@ Regresiones relevantes
 - P2-R Minimal Planner:               36/36
 - Ejecución Controlada:               76/76
 - Liquidaciones Compras:              70/70
-- Versionado v4_1_exp:                10/10
+- Versionado v5.0_exp:                10/10
 
 No se ha reabierto la arquitectura semántica general ni se han añadido frases
 hard-codeadas de la conversación. Los cambios actúan sobre estado estructurado,

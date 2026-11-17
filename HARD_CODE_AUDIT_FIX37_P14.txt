@@ -1,0 +1,17 @@
+HARD-CODE AUDIT · FIX37 P14
+
+HARD-CODE DE NEGOCIO NUEVO: NINGUNO.
+
+Hard-code estructural/lingüístico añadido y justificación:
+- scope enum: current_event, all_events, selected_events. Justificado: son estados técnicos del contrato de alcance.
+- vocabulario genérico de alcance: expresiones equivalentes a todos/otros/cualquier evento y este/evento actual. Justificado: normalización lingüística; no contiene entidades de negocio.
+- vocabulario de reacción social: frases genéricas de protesta/metaconversación. Justificado: separar CHAT/SOCIAL de DATA para impedir que una reacción ejecute una O factual. No decide datos ni dominios empresariales.
+- procesamiento en lotes de 8 eventos en ALL_EVENTS. Justificado: límite técnico para evitar un Promise.all excesivamente grande; no cambia la semántica.
+- ITV SCOPE · 12: contiene prompts fijos exclusivamente de prueba. No se usa en runtime ni como regla de interpretación.
+
+No añadido:
+- nombres de eventos concretos;
+- nombres de personas;
+- importes;
+- respuestas prefabricadas para casos empresariales;
+- condiciones específicas para hacer pasar la ITV.

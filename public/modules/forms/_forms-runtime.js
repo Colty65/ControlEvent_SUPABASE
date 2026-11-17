@@ -1,4 +1,4 @@
-// ControlEvent v4_1_exp - Runtime no intrusivo para formularios principales.
+// ControlEvent v6_1-exp - Runtime no intrusivo para formularios principales.
 // No sustituye acciones legacy: sólo lee formularios, valida y diagnostica.
 // v27.7: diagnóstico menos ruidoso y alineado con IDs reales de la UI.
 

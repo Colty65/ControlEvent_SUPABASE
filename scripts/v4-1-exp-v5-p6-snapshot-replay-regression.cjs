@@ -1,0 +1,14 @@
+const fs=require('fs');const ai=fs.readFileSync('services/event-ai.service.js','utf8'),lab=fs.readFileSync('services/zuzu-test-lab.service.js','utf8');let ok=0,ko=0;const t=(n,c)=>{console.log((c?'OK ':'KO ')+n);c?ok++:ko++;};
+t('P6 firma de operaciones pedidas',/function v5ExpectedOperationSetFromPrompt/.test(ai)&&/event_summary/.test(ai)&&/event_bank/.test(ai)&&/event_income_status/.test(ai));
+t('P6 selección de snapshot por firma',/function v5BestSnapshotForOperations/.test(ai)&&/wanted\.every\(op=>set\.has\(op\)\)/.test(ai));
+t('P6 replay reejecuta snapshot para refrescar',/V5 P6 · REPLAY DE SNAPSHOT/.test(ai)&&/actions=arr\(snap\.operations\)\.map\(o=>\(\{\.\.\.o\.args\}\)\)/.test(ai));
+t('multi-O banco + ingresos no se colapsa',/V5 P6 · MULTI-O FINANCIERA/.test(ai)&&/event_bank'.*event_income_status/s.test(ai));
+t('resumen compuesto conserva summary + bank + income',/operation:'event_summary'[\s\S]{0,180}operation:'event_bank'[\s\S]{0,180}operation:'event_income_status'/.test(ai));
+t('unión inmutable de O conserva evidencia',/function v5MergeOperationsImmutable/.test(ai)&&/v5CloneOperation/.test(ai)&&/evidenceBySig/.test(ai));
+t('VIEW_ONLY admite reactivación/anaphora',/sig\.reopen\|\|!!sig\.anchor_domain\|\|anaphoric/.test(ai));
+t('VIEW_ONLY rechaza nuevo breakdown factual',/factualModifier=sem\.responsibleBreakdown/.test(ai));
+t('ITV estructural elige fixture con donaciones por propiedad',/donationCountForEvent\(state,trim\(e\?\.id\)\)>0/.test(lab));
+t('ITV no hard-codea nombre de evento para fixture',!/FUNCION 2026/.test(lab.slice(lab.indexOf('async function buildStruct36DialogueCases'),lab.indexOf('async function buildGoldenDialogueCases'))));
+t('arquitectura P6/P7 conserva snapshot replay',/V5 CORE P7/.test(ai)&&/REPLAY DE SNAPSHOT/.test(ai));
+t('sin entidades concretas en helpers P6',!/(Carmelo|Colty|Pocholo|Esther)/.test(ai.slice(ai.indexOf('function v5ExpectedOperationSetFromPrompt'),ai.indexOf('function v5FrameAfterTurn'))));
+console.log(`TOTAL ${ok+ko} · OK ${ok} · KO ${ko}`);process.exitCode=ko?1:0;

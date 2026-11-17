@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · VNext P1.23
+# ControlEvent v5.0_exp · VNext P1.23
 ## Dialogue State Authority + ITV conversacional adaptativa + guardia PDF · NHC
 
 ### Motivo

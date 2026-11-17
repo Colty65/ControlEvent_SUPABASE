@@ -1,0 +1,26 @@
+V4 BRAIN-LITE REAL ROUTE
+========================
+
+Hallazgo raíz:
+La primera batería etiquetada como BRAIN-LITE no ejecutó BRAIN-LITE. publicBatteryCase() eliminaba el flag brainLite antes de guardar/ejecutar el caso. Por eso el JSON mostraba languageProfile.brainLite=true pero provider/architecture de V3.15.
+
+Cambios:
+1. El flag brainLite se conserva en manifest y replay histórico.
+2. La ITV invalida cualquier caso BRAIN-LITE cuyo resultado no tenga meta.brainLite=true.
+3. BRAIN-LITE exporta capabilityCalls reales para que el oráculo compruebe operaciones/filtros ejecutados.
+4. Reparación estructural: compare_events sin dos eventos concretos se convierte en events_overview; las claves obligatorias solo se heredan del último contexto certificado.
+5. Los errores de contrato/args quedan dentro del turno y no rompen el agente.
+6. Retry de evento inexistente reejecuta literalmente la petición descartada y nunca cae al evento activo.
+7. Frontera VOICE-SAFE única después del narrador: fechas ISO a fecha humana, dinero entero truncado, temperaturas/porcentajes sin decimales, limpieza de lenguaje interno.
+8. Commit del contexto solo tras CE válido.
+
+Regresiones:
+- BRAIN-LITE REAL ROUTE: 21/21
+- P2-R legacy: 36/36
+- Liquidaciones: 74/74
+- Cargos Banco: 6/6
+- Sintaxis JS modificados: OK
+
+Prueba de producción requerida:
+Ejecutar MADUREZ · 24 · BRAIN-LITE REAL / FULL-CERT.
+El JSON válido debe mostrar simultáneamente languageProfile.brainLite=true y meta.brainLite=true / architecture V4 BRAIN-LITE en los turnos ejecutados.

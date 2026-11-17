@@ -1,0 +1,13 @@
+ControlEvent v5.3_exp · SOVEREIGN SEMANTIC COMPILER
+
+Arquitectura activa:
+- Gemini es el único intérprete de lenguaje humano.
+- Contexto por turno: Session + Thread Graph + Evidence Ledger (metadatos) + 4 turnos recientes + Ontology 1.0.
+- Lazy Evidence: Gemini puede solicitar required_materials por ID; CE materializa solo esas evidencias y reconsulta Gemini.
+- Thread Graph persistido en resultContext; soporta asuntos ACTIVE/SUSPENDED sin regex local.
+- Idioma de conversación explícito y persistente por usuario+pestaña+conversación. Español (España) por defecto. Cambiable en mitad del hilo sin reinicio.
+- Navegador: conserva conversationId servidor e historial entre recargas/builds; pestañas duplicadas bifurcan la sesión técnica y clonan solo el punto de partida.
+- Ontología lógica oculta Supabase físico y mantiene métricas canónicas en CE.
+- Adaptadores event_* se conservan temporalmente como backend canónico mientras se migra al motor de primitivas generales.
+
+No se han eliminado todas las funciones legacy del repositorio. La garantía se refiere a la ruta v5.3 activa.

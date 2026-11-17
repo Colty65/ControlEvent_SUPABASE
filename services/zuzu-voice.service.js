@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · FIX29 · Transcripción de voz CE
+/* ControlEvent v6_1-exp · FIX29 · Transcripción de voz CE
    Fallback independiente de Web Speech: recibe un fragmento corto de audio y
    devuelve únicamente la transcripción. Reutiliza la clave Gemini ya existente. */
 
@@ -99,7 +99,7 @@ export async function transcribeZuzuVoice(body = {}) {
     ? 'Transcribe exactamente el habla inteligible de este audio en español. No respondas. Además indica wake=true si el hablante está llamando claramente a Zuzu (por ejemplo Hola Zuzu, Oye Zuzu o una pronunciación/transcripción cercana del nombre). Si el comienzo del saludo queda ligeramente recortado por la captura pero se oye con claridad que la persona llama a Zuzu, también usa wake=true. Devuelve SOLO JSON válido: {"text":"transcripción","wake":true|false}. Si no hay habla inteligible, text vacío y wake=false.'
     : mode === 'barge'
       ? 'Este audio se graba mientras Zuzu está hablando por el altavoz. Ignora la propia voz sintética de Zuzu y cualquier eco. Devuelve text SOLO si oyes a una persona intentando cortar claramente a Zuzu con una orden como Perdona Zuzu, Para Zuzu, Zuzu para, Calla Zuzu, Espera Zuzu, Corta Zuzu o una variante inequívoca. Si después de la orden la persona continúa hablando, conserva también esa continuación. Si no hay una interrupción humana inequívoca, devuelve text vacío. No respondas. SOLO JSON válido: {"text":"..."}.'
-      : 'Transcribe exactamente la pregunta o frase hablada de este audio en español. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No respondas a la pregunta. Devuelve SOLO JSON válido con esta forma: {"text":"transcripción"}. Si no hay habla inteligible, usa texto vacío.';
+      : 'Transcribe exactamente la pregunta o frase hablada de este audio en español. Conserva nombres propios, cifras y referencias como TK01, SySA o Zuzu. No autocorrijas un nombre propio poco común convirtiéndolo en una ciudad, provincia o palabra más frecuente: si oyes un nombre corto, conserva la forma fonética más literal posible. No respondas a la pregunta. Devuelve SOLO JSON válido con esta forma: {"text":"transcripción"}. Si no hay habla inteligible, usa texto vacío.';
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const controller = new AbortController();

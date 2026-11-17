@@ -1,0 +1,11 @@
+HARD-CODE AUDIT · FIX47 P23
+
+No se han añadido nombres de personas, eventos, importes ni preguntas concretas de las pruebas al runtime.
+
+Constantes añadidas/retocadas y justificación:
+- Estados técnicos de una acción: pending, suspended, completed, cancelled. Son estados de máquina, no negocio.
+- Vocabulario conversacional genérico de confirmación/cancelación/reacción (sí, vale, adelante, espera, te estás liando...). Solo clasifica el acto de diálogo; no el dominio factual ni sus parámetros.
+- Tipo técnico REEXECUTE_MEMORY_NOW: identifica una acción pendiente ya propuesta; el historical_contract procede del recuerdo certificado y la semántica actual la decide Gemini.
+
+No existe una regla del tipo "si aparece Carmelo/Emiliano/Ernesto/Cito => haz X".
+No se modifica operation/event/person/scope después del contrato de Gemini.

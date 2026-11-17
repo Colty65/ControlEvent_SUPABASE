@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4.2 · Donaciones pendientes y Responsables
+# ControlEvent v5.0_exp · BANK4.2 · Donaciones pendientes y Responsables
 
 ## Paso obligatorio de BBDD
 Antes de probar la versión, ejecutar **una sola vez** en Supabase SQL Editor:

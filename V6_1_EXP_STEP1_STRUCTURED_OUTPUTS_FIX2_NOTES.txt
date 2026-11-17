@@ -1,0 +1,28 @@
+ControlEvent v6_1-exp · STEP 1 · STRUCTURED OUTPUTS · FIX2
+
+Objetivo único de este FIX:
+1) Mantener Structured Outputs nativo sin limpiar, reparar ni reescribir la salida Gemini.
+2) Hacer que el responseJsonSchema describa de verdad el contrato que luego valida CE.
+3) Recuperar la opción PDF "Incluir traza técnica" guardando en el índice local la traza exacta ya renderizada del turno.
+
+Cambio contractual:
+- El schema anterior permitía pipeline.params como object libre. Gemini podía producir FETCH con params incompletos y CE lo rechazaba después.
+- El schema ahora usa anyOf (soportado por Gemini Structured Outputs) para discriminar cada primitiva: FETCH, FILTER, JOIN, AGGREGATE, DERIVE, SORT_LIMIT y VISUALIZE.
+- FETCH.entity_name está restringido por enum a las entidades de la ontología.
+- projections tiene minItems=1 y enum de campos lógicos.
+- El contrato superior también usa anyOf para los cinco estados y fuerza la forma compatible de cada estado.
+
+Regla de no manipulación:
+Gemini -> texto exacto -> JSON.parse -> validación CE.
+NO fences stripper.
+NO regex de reparación.
+NO extracción de llaves.
+NO relleno de campos.
+NO reintento corrector.
+
+PDF:
+- Al archivar cada turno, CE guarda archiveTraceHtml = traceHtml(data).
+- Si el usuario marca "Incluir traza técnica", el PDF puede usar esa traza aunque la recuperación posterior del turno en servidor no devuelva debugTrace.
+- No se altera el contenido de Gemini; solo se conserva la traza técnica de CE.
+
+No se avanza a v6_2-exp. Seguimos en PASO 1.

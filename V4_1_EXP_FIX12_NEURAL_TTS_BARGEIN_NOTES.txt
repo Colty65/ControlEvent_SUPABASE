@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · FIX12 · Zuzu neural TTS + barge-in
+ControlEvent v5.0_exp · FIX12 · Zuzu neural TTS + barge-in
 
 OBJETIVO
 - Recuperar interrupción oral mientras Zuzu habla.

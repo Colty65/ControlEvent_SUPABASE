@@ -1,6 +1,6 @@
 # VNext P1.22.3 · Canonical Columns + Summary Sources + Persistent Artifact · NHC
 
-ControlEvent v4_1_exp · VNext P1.22.3 · CANONICAL COLUMNS + SUMMARY SOURCES + PERSISTENT ARTIFACT · NHC
+ControlEvent v5.0_exp · VNext P1.22.3 · CANONICAL COLUMNS + SUMMARY SOURCES + PERSISTENT ARTIFACT · NHC
 
 Objetivo: cerrar el escritorio de trabajo sin interpretar castellano en CE.
 

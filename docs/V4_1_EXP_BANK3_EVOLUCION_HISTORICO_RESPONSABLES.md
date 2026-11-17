@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK3
+# ControlEvent v5.0_exp · BANK3
 
 ## Evolución temporal del saldo
 - Cabecera estable en PC: el inspector del punto y las miniaturas ya no cambian la altura ni desplazan las gráficas.
@@ -21,4 +21,4 @@
 ## Compatibilidad
 - Sin SQL nuevo.
 - Conserva BANK2 y RAW14W multievento.
-- Conserva MEMORY FLASHBACK y EVENT COVERAGE de v4_1_exp.
+- Conserva MEMORY FLASHBACK y EVENT COVERAGE de v5.0_exp.

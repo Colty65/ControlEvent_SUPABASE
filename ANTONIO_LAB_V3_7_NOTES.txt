@@ -1,4 +1,4 @@
-CONTROL EVENT v4_1_exp · ANTONIO LAB V3.7 · BAR VOICE FAST
+CONTROL EVENT v5.0_exp · ANTONIO LAB V3.7 · BAR VOICE FAST
 
 - Conversación oral por defecto en prosa cualitativa: sin cifras salvo petición explícita.
 - El answer escrito conserva el detalle completo; spokenAnswer es la versión de bar/peña.

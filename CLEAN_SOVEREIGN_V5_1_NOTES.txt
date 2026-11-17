@@ -1,0 +1,29 @@
+ControlEvent v6.0.10_exp · CLEAN SOVEREIGN
+Fecha: 2026-09-11
+
+OBJETIVO
+Cortar la interpretación lingüística local de ControlEvent antes y después de Gemini en la ruta soberana de Zuzu.
+
+CAMBIOS ESTRUCTURALES
+1. El selector de contexto ya no recibe ni analiza el prompt. Gemini recibe el contexto activo certificado y el libro de contextos como hechos.
+2. El commit posterior ya no vuelve a analizar el texto del usuario para decidir dominio, continuidad, acumulación, presentación o sujeto.
+3. La ejecución del contrato congelado ya no recibe _user_prompt. Las capas de datos reciben únicamente el contrato emitido por Gemini y datos canónicos.
+4. Se elimina de la ruta soberana activa el uso de v5PromptRouteSignals, v4BrainLitePromptSemantics, v5ExplicitFactualDomain, v5ContinuationAddsOperations, v5P11AllViewsCue, v5ChartRequestOnly y v4BrainLiteComposeLocal.
+5. Las gráficas se materializan exclusivamente cuando el contrato de Gemini lleva chart=true y el chart_type decidido por Gemini.
+6. El texto factual local no vuelve a decidir intención. La síntesis analítica/narrativa se hace con Gemini según response_goal/requires_synthesis.
+7. La voz local deja de mirar el prompt original para decidir contenido; solo transforma la respuesta ya decidida.
+8. JSON inválido del planner no se repara con regex. Se marca inválido y Gemini debe reemitir un contrato válido antes del freeze.
+9. Se añade ACTOR_CANONICO como hecho de sesión para que Gemini pueda resolver preguntas de identidad sin hard-code lingüístico.
+10. Nueva regresión scripts/v5-1-clean-sovereignty-regression.cjs: bloquea reintroducción de clasificadores locales en la ruta soberana.
+
+PRINCIPIO
+CE aporta hechos, estado, catálogos, resolución canónica y ejecución. Gemini interpreta lenguaje humano y decide intención, referencia, continuidad, acciones y presentación.
+
+VALIDACIONES REALIZADAS
+- node --check services/event-ai.service.js: OK
+- v5-1-clean-sovereignty-regression: 14/14 OK
+- single-sovereign-turn regression: OK
+- P16 Gemini sovereign contract regression: OK
+
+NOTA
+No se han añadido reglas específicas para los 30 casos de ITV ni frases concretas para hacer pasar la batería. La siguiente ITV puede empeorar inicialmente; el objetivo de esta versión es eliminar el techo arquitectónico y medir la capacidad real de Gemini sin ayudas semánticas locales.

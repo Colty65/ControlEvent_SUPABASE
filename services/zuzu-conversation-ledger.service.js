@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · RAW14T · Zuzu Memory Core + semilla de Experiencia CE.
+/* ControlEvent v6_1-exp · RAW14T · Zuzu Memory Core + semilla de Experiencia CE.
    Persistencia server-side, inmutable por turno. El navegador conserva solo conversation_id.
    MEMORIA HISTÓRICA: fuente única = tablas persistentes ce_zuzu_conversations/ce_zuzu_turns.
    ce_meta puede seguir sirviendo al ledger técnico de compatibilidad, pero NUNCA aporta recuerdos. */
@@ -53,6 +53,32 @@ function publicView(r={}){return{viewId:trim(r.view_id),conversationId:trim(r.co
 async function tableGetConversation(id){const {data,error}=await db().from(T_CONV).select('*').eq('conversation_id',id).maybeSingle();if(error)throw error;return data?publicConversation(data):null;}
 async function tableEnsureConversation(row){const {data,error}=await db().from(T_CONV).upsert(row,{onConflict:'conversation_id'}).select('*').single();if(error)throw error;return publicConversation(data);}
 async function tableGetTurn(id){const {data,error}=await db().from(T_TURN).select('*').eq('turn_id',id).maybeSingle();if(error)throw error;return data?publicTurn(data):null;}
+async function strictInsertTurn(row){
+  const {data,error}=await db().from(T_TURN).insert(row).select('*').single();
+  if(error)throw Object.assign(new Error(`Zuzu persistence WRITE turn failed: ${error.message||error}`),{code:'ZUZU_PERSISTENCE_WRITE_TURN',cause:error});
+  return publicTurn(data);
+}
+async function strictEnsureConversation(row){
+  const {data,error}=await db().from(T_CONV).upsert(row,{onConflict:'conversation_id'}).select('*').single();
+  if(error)throw Object.assign(new Error(`Zuzu persistence WRITE conversation failed: ${error.message||error}`),{code:'ZUZU_PERSISTENCE_WRITE_CONVERSATION',cause:error});
+  return publicConversation(data);
+}
+async function verifyCorePersistence({conversationId='',turnId='',seq=0,userPrompt='',answer=''}={}){
+  const [conv,turn]=await Promise.all([tableGetConversation(conversationId),tableGetTurn(turnId)]);
+  const reasons=[];
+  if(!conv)reasons.push('conversation_missing_after_write');
+  if(!turn)reasons.push('turn_missing_after_write');
+  if(conv&&trim(conv.currentTurnId)!==trim(turnId))reasons.push('conversation_current_turn_mismatch');
+  if(conv&&Number(conv.currentSeq)!==Number(seq))reasons.push('conversation_seq_mismatch');
+  if(turn&&trim(turn.conversationId)!==trim(conversationId))reasons.push('turn_conversation_mismatch');
+  if(turn&&Number(turn.seq)!==Number(seq))reasons.push('turn_seq_mismatch');
+  if(turn&&trim(turn.userPrompt)!==trim(userPrompt))reasons.push('turn_prompt_mismatch');
+  if(turn&&trim(turn.answer)!==trim(answer))reasons.push('turn_answer_mismatch');
+  if(reasons.length){
+    const e=new Error(`Zuzu persistence VERIFY failed: ${reasons.join(', ')}`);e.code='ZUZU_PERSISTENCE_VERIFY_FAILED';e.reasons=reasons;throw e;
+  }
+  return{ok:true,backend:'supabase',verifiedAt:now(),conversationId:trim(conversationId),turnId:trim(turnId),seq:Number(seq)||0,conversationCreatedAt:trim(conv?.createdAt),conversationUpdatedAt:trim(conv?.updatedAt),turnCreatedAt:trim(turn?.createdAt)};
+}
 async function tableListTurns(convId,limit=500){const {data,error}=await db().from(T_TURN).select('*').eq('conversation_id',convId).order('seq',{ascending:false}).limit(Math.max(1,Math.min(1000,Number(limit)||500)));if(error)throw error;return arr(data).map(publicTurn).sort((a,b)=>a.seq-b.seq);}
 async function tableGetDataset(id,{includeRows=true}={}){
   if(!id)return null;
@@ -112,7 +138,7 @@ export async function ensureZuzuConversation({conversationId='',actor={},selecte
   // reutiliza el campo status ya existente en ce_zuzu_conversations.
   await classifyPreviousActiveConversations(uid,id);
   const stamp=now(),row={conversation_id:id,user_id:uid,user_name:actorName(actor),title:trim(title)||'Conversación Zuzu',created_at:stamp,updated_at:stamp,current_seq:0,current_turn_id:'',selected_event_id:trim(selectedEventId),status:'active'};
-  return withFallback(()=>tableEnsureConversation(row),async()=>{await metaSet(mkey('conversation',id),row);return publicConversation(row);});
+  return strictEnsureConversation(row);
 }
 
 export async function getZuzuConversationSession({conversationId='',actor={},includeRows=true,recentLimit=10}={}){
@@ -143,16 +169,17 @@ export async function appendZuzuTurn({conversation,actor={},userPrompt='',action
   if(dataset){datasetId=datasetId||newDatasetId(conv.conversationId,seq);const drow={dataset_id:datasetId,conversation_id:conv.conversationId,source_turn_id:turnId,domain:trim(dataset.domain),scope:dataset.scope||{},row_count:Number(dataset.rowCount)||arr(dataset.rows).length,columns:arr(dataset.columns),rows:arr(dataset.rows),facts:dataset.facts||{},provenance:dataset.provenance||{},fingerprint:trim(dataset.fingerprint)||fingerprint({domain:dataset.domain,scope:dataset.scope,rows:dataset.rows}),created_at:stamp};await withFallback(async()=>{const {error}=await db().from(T_DATA).insert(drow);if(error)throw error;},()=>metaSet(mkey('dataset',datasetId),drow));}
   if(view){viewId=viewId||newViewId(conv.conversationId,seq);const vrow={view_id:viewId,conversation_id:conv.conversationId,dataset_id:trim(view.datasetId)||datasetId,source_turn_id:turnId,visible_fields:arr(view.visibleFields),sort:arr(view.sort),row_filters:arr(view.rowFilters),group_by:arr(view.groupBy),metrics:arr(view.metrics),row_limit:view.rowLimit==null?null:Number(view.rowLimit),presentation:view.presentation||{},title:trim(view.title),created_at:stamp};await withFallback(async()=>{const {error}=await db().from(T_VIEW).insert(vrow);if(error)throw error;},()=>metaSet(mkey('view',viewId),vrow));}
   const trow={turn_id:turnId,conversation_id:conv.conversationId,seq,user_prompt:trim(userPrompt),action_type:trim(actionType),gemini_plan:clone(geminiPlan)||{},normalized_plan:clone(normalizedPlan)||{},execution:{...(clone(execution)||{}),selected_event_id:trim(selectedEventId)},dataset_id:datasetId,view_id:viewId,parent_turn_id:trim(parentTurnId),referenced_turn_id:trim(referencedTurnId),status:trim(status)||'OK',title:trim(title),answer:trim(answer),created_at:stamp};
-  await withFallback(async()=>{const {error}=await db().from(T_TURN).insert(trow);if(error)throw error;},()=>metaSet(mkey('turn',turnId),trow));
+  await strictInsertTurn(trow);
   const crow={conversation_id:conv.conversationId,user_id:uid,user_name:actorName(actor),title:trim(conv.title)||'Conversación Zuzu',created_at:trim(conv.createdAt)||stamp,updated_at:stamp,current_seq:seq,current_turn_id:turnId,selected_event_id:trim(selectedEventId),status:'active'};
-  let savedConv=await withFallback(()=>tableEnsureConversation(crow),async()=>{await metaSet(mkey('conversation',conv.conversationId),crow);return publicConversation(crow);});
+  let savedConv=await strictEnsureConversation(crow);
   const rawTurn=publicTurn(trow),memory=memoryProjectionForTurn(rawTurn);
   await persistTurnMemoryProjection(rawTurn.turnId,memory);
   const savedTurn={...rawTurn,memoryRecallable:memory.recallable,memoryQuality:memory.quality,memorySummary:memory.summary,memoryEntities:memory.entities,memoryPlanSignature:memory.planSignature,memoryKind:memory.kind,memoryVisibility:memory.visibility||'private',memoryExperienceSignature:memory.experienceSignature||{}};
   await updateHistoryIndex({conversation:savedConv,turn:savedTurn,actor,memory});
   const episode=await updateConversationMemoryProjection({conversation:savedConv,turn:savedTurn,actor,memory});
   if(episode)savedConv={...savedConv,memorySummary:episode.conversation_summary,memoryMainTopics:episode.main_topics,memoryMainEntities:episode.main_entities,memoryRecallableTurns:episode.recallable_turns};
-  return{conversation:savedConv,turn:savedTurn,datasetId,viewId};
+  const persistence=await verifyCorePersistence({conversationId:conv.conversationId,turnId,seq,userPrompt,answer});
+  return{conversation:savedConv,turn:savedTurn,datasetId,viewId,persistence};
 }
 
 function semanticTagsFromTurn(turn={}){
@@ -306,6 +333,22 @@ async function updateConversationMemoryProjection({conversation,turn,actor,memor
     if(error)throw error;
   }catch(error){if(!isMissingColumn(error)&&!isMissingTable(error))throw error;}
   return episode;
+}
+
+export async function diagnoseZuzuPersistence({actor={},limit=20}={}){
+  const uid=actorId(actor);if(!uid)throw Object.assign(new Error('Usuario no identificado para diagnosticar persistencia Zuzu.'),{status:401});
+  const safeLimit=Math.max(1,Math.min(100,Number(limit)||20));
+  const {data:convs,error:ce}=await db().from(T_CONV).select('conversation_id,user_id,user_name,created_at,updated_at,current_seq,current_turn_id,status').eq('user_id',uid).order('updated_at',{ascending:false}).limit(safeLimit);
+  if(ce)throw ce;
+  const ids=arr(convs).map(x=>trim(x.conversation_id)).filter(Boolean);
+  let turns=[];
+  if(ids.length){
+    const {data,error}=await db().from(T_TURN).select('turn_id,conversation_id,seq,user_prompt,action_type,status,created_at,memory_recallable,memory_quality,memory_kind').in('conversation_id',ids).order('created_at',{ascending:false}).limit(Math.max(100,safeLimit*20));
+    if(error)throw error;turns=arr(data);
+  }
+  const latestConversation=arr(convs)[0]||null,latestTurn=turns[0]||null;
+  const cutoff=Date.now()-24*3600*1000,recent24h=turns.filter(t=>{const ms=Date.parse(t.created_at);return Number.isFinite(ms)&&ms>=cutoff;});
+  return{ok:true,userId:uid,checkedAt:now(),conversationCountSample:arr(convs).length,turnCountSample:turns.length,latestConversation,latestTurn,recent24hCount:recent24h.length,recent24h:recent24h.slice(0,25),note:'Conversaciones se ordenan por updated_at; turnos por created_at. created_at de conversación no cambia al continuar una conversación existente.'};
 }
 
 const STOP=new Set('ahora antes despues luego este esta esto esa ese esos esas aquel aquella aquellos aquellas te acuerdas recuerdas recordar hablamos conversacion conversaciones sobre cosa cosas algo aquello volver vuelve dame dime lo la los las un una unos unas de del al en y o que me nos se si por para con ya fue era es son estuvimos estaba estaban hoy ayer anteayer ultimamente recientemente poco minutos minuto horas hora rato semana semanas mes meses ano anos dia dias manana tarde noche'.split(' '));
@@ -578,6 +621,30 @@ export async function readZuzuMemoryEpisode({conversationId='',actor={},matchedT
     main_entities:arr(episode?.main_entities).length?arr(episode.main_entities):arr(conversation.memoryMainEntities),
     recallable_turns:memoryTurns.length,matched_turn_id:trim(matchedTurnId),turns:memoryTurns
   };
+}
+
+
+export async function diagnoseZuzuMemory({actor={},query='',conversationId='',nowIso='',limit=80}={}){
+  const uid=actorId(actor),q=trim(query),current=trim(conversationId);if(!uid)return{ok:false,error:'Usuario no identificado.',query:q,rows:[]};
+  let convs=[],turnRows=[];
+  try{
+    const cr=await db().from(T_CONV).select('conversation_id,user_id,user_name,title,created_at,updated_at,status,memory_summary,memory_main_topics,memory_main_entities,memory_recallable_turns').eq('user_id',uid).order('updated_at',{ascending:false}).limit(300);
+    if(cr.error)throw cr.error;convs=arr(cr.data);
+    const ids=convs.map(x=>trim(x.conversation_id)).filter(Boolean);if(!ids.length)return{ok:true,query:q,currentConversationId:current,summary:{conversations:0,turns:0,matchingTurns:0,recallable:0,currentConversationMatches:0},rows:[]};
+    const tr=await db().from(T_TURN).select('turn_id,conversation_id,seq,user_prompt,action_type,normalized_plan,execution,status,title,answer,created_at,memory_recallable,memory_quality,memory_summary,memory_entities,memory_plan_signature,memory_kind').in('conversation_id',ids).order('created_at',{ascending:false}).limit(3000);
+    if(tr.error)throw tr.error;turnRows=arr(tr.data);
+  }catch(error){if(isMissingTable(error))return{ok:false,error:'Las tablas de memoria no están disponibles.',query:q,rows:[]};throw error;}
+  const convMap=new Map(convs.map(x=>[trim(x.conversation_id),publicConversation(x)])),needleTokens=tokens(q),rows=[];
+  for(const raw of turnRows){
+    const turn=publicTurn(raw),conv=convMap.get(turn.conversationId)||{},hay=`${turn.userPrompt||''} ${turn.title||''} ${turn.answer||''} ${turn.memorySummary||''} ${JSON.stringify(turn.memoryEntities||[])} ${JSON.stringify(turn.memoryPlanSignature||{})}`;
+    const lexical=q?tokenHitScore(needleTokens,hay,1):0,exact=q?norm(hay).includes(norm(q)):false;if(q&&!exact&&lexical<=0)continue;
+    const recomputed=memoryProjectionForTurn(turn),stored={recallable:turn.memoryRecallable,quality:turn.memoryQuality,summary:turn.memorySummary,entities:turn.memoryEntities,planSignature:turn.memoryPlanSignature,kind:turn.memoryKind},effective=recomputed.recallable?recomputed:stored;
+    const item=memoryItemFromTurn(conv,turn,effective),score=q?historyScore(q,item):0;
+    rows.push({created_at:turn.createdAt,conversation_id:turn.conversationId,turn_id:turn.turnId,seq:turn.seq,current_conversation:turn.conversationId===current,conversation_status:trim(conv.status)||'active',stored:true,memory_recallable:turn.memoryRecallable===true,effective_recallable:effective?.recallable===true,memory_quality:Number(effective?.quality||turn.memoryQuality)||0,memory_kind:trim(effective?.kind||turn.memoryKind),prompt:turn.userPrompt,title:turn.title,answer_preview:clip(turn.answer,260),memory_summary:trim(effective?.summary||turn.memorySummary),entities:arr(effective?.entities||turn.memoryEntities),plan_signature:effective?.planSignature||turn.memoryPlanSignature||{},lexical_score:Number(lexical.toFixed(3)),ranking_score:Number(score.toFixed(3)),exact_match:exact});
+  }
+  rows.sort((a,b)=>b.ranking_score-a.ranking_score||text(b.created_at).localeCompare(text(a.created_at)));rows.forEach((r,i)=>r.rank=i+1);
+  const capped=rows.slice(0,Math.max(1,Math.min(300,Number(limit)||80)));
+  return{ok:true,query:q,currentConversationId:current,nowIso:trim(nowIso),summary:{conversations:convs.length,turns:turnRows.length,matchingTurns:rows.length,recallable:rows.filter(x=>x.effective_recallable).length,currentConversationMatches:rows.filter(x=>x.current_conversation).length,newestMatch:rows.map(x=>x.created_at).filter(Boolean).sort().reverse()[0]||''},rows:capped};
 }
 
 export async function listZuzuConversations({actor={},limit=40}={}){

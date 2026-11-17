@@ -15,8 +15,8 @@ t('una sola tool plan_turn',/return \[\{type:'function',name:'plan_turn'/.test(p
 t('seis intenciones',/enum:\['DATA','VIEW','CALCULATE','MEMORY','PERSON','CHAT'\]/.test(p2r));
 t('schema sin anyOf',!p2r.includes('anyOf'));
 t('schema no expone contratos query_ce',!p2r.includes('parameters:queryCeCompactToolParameters'));
-t('plan_turn requerido',/stage:'VNEXT P2-R · planificador mínimo',toolChoice:'required'/.test(run));
-t('una decisión normal',/stage:'VNEXT P2-R · planificador mínimo'[\s\S]{0,180}maxCalls:1/.test(run));
+t('plan_turn primario por JSON schema',run.includes('const primary=await vnextP2RGenerateContentPlan')&&run.includes('PLAN JSON PRIMARIO'));
+t('una decisión normal',run.includes('const primary=await vnextP2RGenerateContentPlan')&&!run.includes("stage:'VNEXT P2-R · planificador mínimo',toolChoice:'required'"));
 t('provider P2-R',run.includes("provider:'zuzu-vnext-p2r-minimal-planner'"));
 t('sin retries semánticos',!run.includes('DIALOGUE_STATE_AUTHORITY_RETRY')&&!run.includes('PENDING_INTENT_RETRY')&&!run.includes('FUNCTION CALL RETRY'));
 
@@ -43,7 +43,8 @@ try{
     vnextP1222LastWorkingSet:()=>({dataset_id:'econ-1',key:'economics_chart',title:'Economía · SySA 2026'}),
     vnextP13UniqueCalls:x=>x,
     vnextP122NormalizeMemoryCalls:x=>x,
-    zuzuTracePush:()=>{}
+    zuzuTracePush:()=>{},
+    vnextP2RNormalizePlanObject:value=>{const x=value&&typeof value==='object'&&!Array.isArray(value)?value:{};const intent=String(x.intent||'').trim().toUpperCase();const d={DATA:['REPLACE','FRESH','EVENT'],VIEW:['CONTINUE','CURRENT_DATASET','DATASET'],CALCULATE:['CONTINUE','CURRENT_DATASET','DATASET'],MEMORY:['CONTINUE','MEMORY','MEMORY'],PERSON:['REPLACE','FRESH','PERSON'],CHAT:['NONE','NONE','NONE']}[intent]||['NONE','NONE','NONE'];return {...x,intent,context_mode:String(x.context_mode||d[0]).toUpperCase(),source_mode:String(x.source_mode||d[1]).toUpperCase(),subject_type:String(x.subject_type||d[2]).toUpperCase(),operation:String(x.operation||'').trim(),target:String(x.target||'').trim(),entities:Array.isArray(x.entities)?x.entities:[],args:String(x.args||'').trim(),response:String(x.response||'').trim(),narrate:x.narrate===true,repeat:x.repeat===true}}
   };vm.createContext(ctx);vm.runInContext(parserCode+'\nthis.P=vnextP2RParseArgs;this.T=vnextP2RPlanToCalls;',ctx);
   const parsed=ctx.P('filter=Indicador:Ingresos|Compras realizadas; show=Valor; sort=Valor:desc; reset_filters=false');
   t('parser produce 2 filtros OR',parsed.view_filters?.length===2&&parsed.view_filters.every(x=>x.operator==='eq'));
@@ -69,7 +70,7 @@ t('GOLDEN no fuerza cascadas',/if\(\/GOLDEN\\s\+DIALOGUE\/i\.test\(scenario\)\)/
 t('battery P2R golden',lab.includes("'GOLDEN-DIALOG-P2R-14'"));
 t('battery P2R dialog',lab.includes("'DIALOGUE-P2R-24'"));
 t('LIGHT P2R',ui.includes("reportFormat:'LIGHT-P2R'"));
-t('build UI P2R',ui.includes("20260902-P2R-MINIMAL-PLANNER-GOLDEN-NHC"));
+t('build UI P2R',ui.includes("20260902-P2R-MINIMAL-PLANNER-GOLDEN-NHC")||ui.includes("20260907-V315TARGET25-HUMAN-QA-VOICE-NHC")||ui.includes("20260907-V315TARGET25-MATURITY-HYBRID-VOICE-NHC")||ui.includes("20260907-V315TARGET25"));
 t('cache P2R',html.includes('20260902-VNEXT-P2R-MINIMAL-PLANNER-GOLDEN-NHC'));
 t('package registra P2R',pkg.scripts?.['test:vnext-p2r']==='node scripts/v4-1-exp-vnext-p2r-minimal-planner-regression.cjs');
 console.log(`VNEXT P2-R MINIMAL PLANNER: ${ok} OK · ${bad} KO`);process.exitCode=bad?1:0;

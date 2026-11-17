@@ -1,0 +1,27 @@
+ControlEvent v5.0_exp · FIX24 · V5 CORE P2 · MULTI-CONTEXT
+
+OBJETIVO PRIORITARIO
+Continuidad conversacional antes que añadir nuevas capacidades.
+
+CAMBIOS
+- Sustituye el frame único por un libro de contextos lógicos coexistentes.
+- Cada contexto conserva dominio, sujeto, evento(s), persona, filtros relevantes, receta ejecutable (last_query_actions), presentación y secuencia de uso.
+- El turno trabaja contra UN contexto principal. Los demás permanecen intactos.
+- Al volver a banco/tiempo/compras/donaciones/comparación se reactiva el contexto lógico más reciente de ese dominio.
+- Las continuaciones de presentación (gráfica, barras, líneas...) reutilizan la receta del contexto seleccionado y no reconstruyen el tema desde cero.
+- Se conservan hasta 12 contextos recientes por sesión visible.
+
+INGRESOS
+- Banco, Bizum, Efectivo y Pendiente se leen como estados/canales explícitos.
+- Se elimina la regla errónea de inferir efectivo = total - banco.
+- El total registrado puede incluir Pendiente; "recibido" suma solo Banco + Bizum + Efectivo.
+- Las respuestas de pagos mencionan Pendiente cuando existe.
+
+ITV
+- Nueva batería: ITV MULTI-CONTEXTO · 32.
+- Crea y alterna hilos de resumen, banco, meteorología, compras, comparación, donaciones e ingresos.
+- Retoma hilos antiguos después de varios cambios de tema.
+- Comprueba contexto activo, coexistencia de contextos, tipo de gráfica, operaciones y estados de ingreso.
+
+HARD-CODE
+Ver HARD_CODE_AUDIT_FIX24.txt. El nuevo core no incluye nombres/importe/eventos de prueba. Sí usa un vocabulario genérico mínimo para seleccionar dominios explícitos; está declarado y justificado en la auditoría.

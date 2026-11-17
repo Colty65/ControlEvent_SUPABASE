@@ -1,0 +1,17 @@
+const fs=require('node:fs'), vm=require('node:vm'),assert=require('node:assert/strict');
+const file=fs.readFileSync('services/event-ai.service.js','utf8');
+const start=file.indexOf('function v6ExecutePipeline('),end=file.indexOf('\nfunction v6ChartSpec(',start);
+assert(start>=0&&end>start);
+const src=file.slice(start,end);
+const scope={arr:x=>Array.isArray(x)?x:[],trim:x=>String(x??'').trim(),v6Ontology:()=>({entities:{purchases:{fields:['id','event_id','status','amount']}}}),v6Rows:()=>[],v6ProjectRows:(rows,cols)=>rows.map(r=>Object.fromEntries((cols.length?cols:Object.keys(r)).map(k=>[k,r[k]]))),v6Filter:(rows,p)=>rows.filter(r=>(p.conditions||[]).every(c=>String(r[c.field])===String(c.value))),v6SortRows:(rows,p)=>rows.slice(0,p.limit||rows.length)};
+vm.createContext(scope);vm.runInContext(src,scope);
+const state={purchases:Array.from({length:1153},(_,i)=>({id:String(i),event_id:i<1000?'OLD':'CURRENT',status:i%2?'REALIZED':'PENDING',amount:10}))};
+scope.v6Rows=(_,entity)=>state.purchases;
+const fetch={primitive:'FETCH',params:{entity_name:'purchases',projections:['id','event_id','status','amount']}};
+const onlyPlanned={primitive:'FILTER',params:{logical_operator:'AND',conditions:[{field:'status',operator:'EQUALS',value:'PENDING'}]}};
+let result=scope.v6ExecutePipeline({},[fetch,onlyPlanned],{selectedEventId:'EMPTY'});assert.equal(result.rows.length,0);
+result=scope.v6ExecutePipeline({},[fetch,onlyPlanned],{selectedEventId:'CURRENT'});assert.equal(result.rows.length,77);
+result=scope.v6ExecutePipeline({},[fetch,{primitive:'FILTER',params:{conditions:[{field:'event_id',operator:'EQUALS',value:'OLD'},{field:'status',operator:'EQUALS',value:'PENDING'}]}}],{selectedEventId:'CURRENT'});assert.equal(result.rows.length,500);
+const prompt=file.slice(file.indexOf('async function v61CallStrictStructuredOutput'),file.indexOf('async function v6GeminiDecision'));
+assert(prompt.includes('localeInstruction')&&prompt.includes('scopeInstruction'));
+console.log('OK 4/4: empty active event, scoped current event, explicit other event, Spanish contract instructions');

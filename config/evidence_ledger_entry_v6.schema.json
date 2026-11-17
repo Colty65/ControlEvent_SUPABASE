@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org",
+  "title": "ControlEventEvidenceLedgerEntryV6",
+  "type": "object",
+  "required": [
+    "id",
+    "ontology_version",
+    "schema",
+    "semantic_summary",
+    "key_facts"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "ontology_version": {
+      "type": "string"
+    },
+    "schema": {
+      "type": "object",
+      "required": [
+        "columns",
+        "row_count"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "semantic_summary": {
+      "type": "string"
+    },
+    "key_facts": {
+      "type": "object",
+      "patternProperties": {
+        "^[a-z_0-9]+$": {
+          "type": [
+            "string",
+            "number",
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

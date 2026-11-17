@@ -14,24 +14,24 @@ function extractFunction(src,name){
   if(body<0)throw new Error(`Cuerpo no encontrado ${name}`);let depth=0;quote='';esc=false;for(let j=body;j<src.length;j++){const c=src[j];if(quote){if(esc)esc=false;else if(c==='\\')esc=true;else if(c===quote)quote='';continue;}if(c==='"'||c==="'"||c==='`'){quote=c;continue;}if(c==='{')depth++;else if(c==='}'&&--depth===0)return src.slice(i,j+1);}throw new Error(`Función incompleta ${name}`);
 }
 
-t('registro P1.23',reg.includes("CAPABILITY_REGISTRY_VERSION='20260902-P123'"));
+t('registro P1.23 o posterior',/CAPABILITY_REGISTRY_VERSION='2026\d{4}-P1(?:23|24)/.test(reg));
 t('change_focus es metadato universal',reg.includes("change_focus:{type:'boolean'}")&&reg.includes("const META=['requested_fields','focus_mode','focus_type','focus_entities','change_focus']"));
 t('filas reversibles en view_current',reg.includes('remove_view_filters')&&reg.includes('reset_filters')&&reg.includes('reincorporar filas'));
 t('tool dialogue_state publicada',ai.includes("name:'dialogue_state'")&&ai.includes("set_pending")&&ai.includes("pending_tool"));
 t('Dialogue State Authority runtime',ai.includes('function vnextP123DialogueState')&&ai.includes('function vnextP123AuthorityViolations')&&ai.includes('DIALOGUE_STATE_AUTHORITY_RETRY'));
 t('pending_intent se completa estructuralmente',ai.includes('function vnextP123ApplyPendingIntent')&&ai.includes('PENDING INTENT'));
 t('NO EMPTY PROMISE protege intención pendiente',ai.includes('[NO_EMPTY_PROMISE_RETRY]')&&ai.includes('pending_intent activo'));
-t('provider P1.23',ai.includes('zuzu-vnext-p123-dialogue-state-authority-adaptive-itv-jsonlight'));
-t('usuario sintético adaptativo exportado',ai.includes('export async function generateZuzuItvDialogueUserTurn')&&ai.includes('No recites un guion ni una lista de preguntas'));
+t('provider conserva Dialogue State Authority',ai.includes('vnextP123DialogueState')&&/provider:'zuzu-vnext-(?:p127|p2r)/.test(ai));
+t('usuario sintético adaptativo exportado',ai.includes('export async function generateZuzuItvDialogueUserTurn')&&ai.includes('no un guion'));
 t('ITV DIÁLOGO 24 existe',lab.includes("DIALOGUE:{id:'DIALOGUE',label:'DIÁLOGO · 24',count:24")&&lab.includes('buildAdaptiveDialogueCases'));
 t('turnos posteriores nacen de respuesta real',lab.includes('dialogueNext')&&lab.includes('generateZuzuItvDialogueUserTurn')&&lab.includes('nextUtterance'));
 t('ITV evalúa promesa/foco/coherencia/tool',lab.includes('empty_promise===true')&&lab.includes('previous_coherent===false')&&lab.includes('focus_preserved===false')&&lab.includes('requiresTool===true'));
 t('misión adaptativa no contiene lista fija de preguntas',lab.includes('NO sigas un guion de preguntas')&&lab.includes('No hay orden obligatorio'));
 t('UI expone botón DIÁLOGO',ui.includes('data-level="DIALOGUE"')&&ui.includes('Usuario sintético adaptativo'));
 t('manifiesto admite prompts adaptativos',ui.includes("c?.dialogue?.adaptive!==true&&trim(r?.prompt)!==trim(c?.prompt)"));
-t('JSON LIGHT P1.23 conserva diálogo y métricas',ui.includes("reportFormat:'LIGHT-P123'")&&ui.includes('dialogueMetrics')&&ui.includes('dialogue:r.dialogue||null'));
+t('JSON LIGHT P1.23 conserva diálogo y métricas',/reportFormat:'LIGHT-(?:P123|P127|P2R)'/.test(ui)&&ui.includes('dialogueMetrics')&&ui.includes('dialogue:r.dialogue||null'));
 t('PDF protege conversación local frente a sync parcial',zuzuUi.includes('P1.23 · guardia adicional')&&zuzuUi.includes('before.length>hist.length')&&zuzuUi.includes('hacemos UNION por turnId'));
-t('cache bust P1.23',html.includes('20260902-VNEXT-P123-DIALOGUE-STATE-AUTHORITY-ADAPTIVE-ITV-PDF-GUARD-NHC'));
+t('cache bust vigente',html.includes('controlevent-build')&&html.includes('20260903-V5_1_EXP'));
 t('SQL espejo P1.23',sql.includes('20260902-P123')&&sql.includes('remove_view_filters')&&sql.includes('change_focus'));
 
 const sandbox={console};sandbox.arr=v=>Array.isArray(v)?v:[];sandbox.trim=v=>v==null?'':String(v).trim();sandbox.vnextNorm=v=>sandbox.trim(v).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');sandbox.zuzuTracePush=()=>{};

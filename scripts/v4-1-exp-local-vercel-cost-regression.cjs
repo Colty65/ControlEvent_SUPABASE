@@ -1,0 +1,25 @@
+const fs=require('fs'), path=require('path');
+const root=path.resolve(__dirname,'..');
+let ok=0,ko=0;
+function t(name,cond){if(cond){ok++;console.log('OK',name)}else{ko++;console.error('KO',name)}}
+const vercel=JSON.parse(fs.readFileSync(path.join(root,'vercel.json'),'utf8'));
+const routes=vercel.routes||[];
+const api=routes.find(r=>r.src==='/api/(.*)');
+t('API sigue entrando en api/index.js',api?.dest==='/api/index.js');
+t('No hay catch-all hacia api/index.js',!routes.some(r=>r.src==='/((.*))'&&r.dest==='/api/index.js') && !routes.some(r=>r.src==='/(.*)'&&r.dest==='/api/index.js'));
+t('SPA catch-all es index.html estatico',routes.some(r=>r.src==='/(.*)'&&r.dest==='/public/index.html'));
+t('Raiz es index.html estatico',routes.some(r=>r.src==='/'&&r.dest==='/public/index.html'));
+t('Vendor ExcelJS es estatico',routes.some(r=>r.src==='/vendor/(.*)'&&r.dest==='/public/vendor/$1'));
+t('Assets con extension son estaticos',routes.some(r=>String(r.dest)==='/public/$1'&&String(r.src).includes('js|css')));
+t('Function ya no incluye public/**',!vercel.functions?.['api/index.js']?.includeFiles);
+const apiIndex=fs.readFileSync(path.join(root,'api/index.js'),'utf8');
+t('Vercel crea app API-only',/createApp\(\{\s*serveFrontend:\s*false\s*\}\)/.test(apiIndex));
+const dev=fs.readFileSync(path.join(root,'scripts/dev-server-supabase.js'),'utf8');
+t('Local crea frontend+API',/createApp\(\{\s*serveFrontend:\s*true\s*\}\)/.test(dev));
+const app=fs.readFileSync(path.join(root,'server/app.js'),'utf8');
+t('App soporta serveFrontend',/createApp\(\{\s*serveFrontend\s*=\s*true\s*\}/.test(app));
+t('Fallback SPA solo cuando sirve frontend',/if \(serveFrontend\) app\.get\('\*'/.test(app));
+t('ExcelJS fisico existe en public',fs.existsSync(path.join(root,'public/vendor/exceljs.min.js')));
+t('index.html fisico existe en public',fs.existsSync(path.join(root,'public/index.html')));
+for(const f of ['00_CONFIGURAR_LOCAL.bat','01_ARRANCAR_CONTROLEVENT_LOCAL.bat','02_PARAR_CONTROLEVENT_LOCAL.bat','LEEME_LOCAL_Y_COSTE.txt','scripts/local-preflight.cjs']) t('Existe '+f,fs.existsSync(path.join(root,f)));
+console.log(`RESULTADO ${ok}/${ok+ko} OK`); process.exitCode=ko?1:0;

@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4_22 · MEMORY STATE MACHINE
+# ControlEvent v5.0_exp · BANK4_22 · MEMORY STATE MACHINE
 
 ## Motivo
 BANK4_21 logró recuperar el primer episodio, pero los follow-ups de memoria seguían dependiendo de que el Semantic Core inventase correctamente `reference_action` y distinguiese `memory_index` de `recall_episode`. La prueba real del 29/08/2026 mostró fallos en `sí, recuérdamelo`, `¿qué me dijiste entonces?`, `conversación completa`, `última conversación`, `¿de qué hablamos?` y `vuelve a la primera`.

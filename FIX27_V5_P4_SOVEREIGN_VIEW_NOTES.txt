@@ -1,0 +1,53 @@
+ControlEvent v5.0_exp · FIX27 · V5 CORE P4
+
+OBJETIVO
+- C manda sobre el tema; S sobre el estado semántico; O solo aporta hechos; R redacta; V representa.
+- Eliminar el comportamiento donde una O secundaria cambiaba el C/S.
+- Las peticiones VIEW_ONLY no vuelven a Gemini ni ejecutan query_ce.
+- Reducir el contexto enviado al planner sin perder los hilos C/S/O.
+
+CAMBIOS
+1) S soberano
+- El dominio del nuevo snapshot se fija por la operación principal / intención principal.
+- Una operación secundaria no puede convertir un SUMMARY en PURCHASES/DONATIONS, etc.
+
+2) IDs S
+- snapshot_id usa context hash + secuencia + ordinal; no depende del contenido repetido.
+- Se evita que snapshots equivalentes produzcan IDs duplicados.
+
+3) Evidence por O
+- Cada O guarda evidencia compacta: facts y solo tablas útiles para reutilización/presentación.
+- No se guarda el resultado bruto completo.
+
+4) VIEW ENGINE local
+- 'gráfica', 'de barras', 'de líneas', 'donut', 'queso', etc. sobre el S actual: 0 Gemini, 0 CE.
+- Se genera V desde la evidencia de O y se crea un S nuevo de presentación, conservando las mismas O.
+
+5) Context paging
+- Gemini recibe solo el C/S relevante + índice compacto de los otros C.
+- No se envían todos los frames/evidencias completos en HISTORIAL_RECIENTE.
+
+6) Weather 3 días
+- 'hoy, mañana y pasado mañana' se impone como rango explícito de 3 días antes de ejecutar event_weather.
+
+7) ITV C/S/O 36
+- Los turnos que son solo cambio de vista ya no esperan query_ce.
+- Nueva invariante: VIEW_ONLY => 0 operaciones factuales.
+- Nueva invariante: S.domain debe coincidir con el dominio esperado.
+- Weather3 comprueba que la evidencia O_weather contenga 3 filas/días.
+
+NHC / HARD-CODE
+Añadido y justificado:
+- Taxonomía de dominios y vistas ya existente.
+- Reconocimiento lingüístico genérico de VIEW_ONLY.
+- Mapeo de tablas canónicas a dimensiones/métricas para poder dibujar sin IA.
+- Límite compacto de evidencia (filas) y de contextos, por rendimiento.
+No añadido:
+- nombres de personas, eventos o importes;
+- respuestas para casos de ITV;
+- reglas ligadas a FUNCION 2026, Colty, Pocholo, Carmelo, etc.
+
+REGRESIONES
+- V5 P4: 9/9 OK.
+- V5 C/S/O/R/V P3: 17/17 OK.
+- FIX18 legacy: 11/12; el único KO es una expectativa antigua de ITV responsable turno 8, no una regresión P4.

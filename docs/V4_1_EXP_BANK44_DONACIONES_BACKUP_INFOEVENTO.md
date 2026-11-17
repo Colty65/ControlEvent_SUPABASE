@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4.4
+# ControlEvent v5.0_exp · BANK4.4
 
 Correcciones de la prueba del 27/08/2026:
 

@@ -1,0 +1,961 @@
+  const actions=arr(c?.last_query_actions).map(x=>({...x}));if(!actions.length&&trim(c?.operation))actions.push({operation:trim(c.operation),event:trim(c.event),events:arr(c.events),person:trim(c.person),responsible:trim(c.responsible),purchase_status:trim(c.purchase_status),start_date:trim(c.start_date),end_date:trim(c.end_date),chart:c.chart===true,chart_type:trim(c.chart_type)});
+  const ops=actions.filter(a=>trim(a.operation)).map((a,i)=>v5MakeOperation(a,seq||num(c.last_used_seq)||1,i));
+  if(!ops.length)return null;
+  const chart=actions.some(a=>a.chart===true)||c.chart===true,ct=trim(actions.find(a=>a.chart===true)?.chart_type)||trim(c.chart_type);
+  return{snapshot_id:`s_${v5ContextHash(c.context_id||v5ContextKey(c)).slice(0,6)}_${seq||num(c.last_used_seq)||1}_1`,parent_snapshot_id:'',created_seq:seq||num(c.last_used_seq)||1,operations:ops,response_blocks:v5ResponseBlocksFromOperations(ops),views:v5ViewFromOperations(ops,chart,ct),presentation:{chart,chart_type:ct},event:trim(c.event),events:arr(c.events),person:trim(c.person||c.responsible),responsible:trim(c.responsible||c.person),donor:trim(c.donor),domain:trim(c.domain)||v5ContextDomainFromOperation(c.operation),answer_shape:trim(c.last_answer_shape)};
+}
+function v5EnsureContextShape(c={},screen='',seq=0){
+  const out={...v5BlankFrame(screen),...c,contexts:undefined,snapshots:arr(c?.snapshots).map(x=>({...x,operations:arr(x?.operations).map(o=>({...o,args:{...(o?.args||{})}})),response_blocks:arr(x?.response_blocks).map(r=>({...r,source_operation_ids:arr(r?.source_operation_ids)})),views:arr(x?.views).map(v=>({...v,source_operation_ids:arr(v?.source_operation_ids)}))}))};
+  if(!out.context_id)out.context_id=v5ContextKey(out);
+  if(!out.snapshots.length){const legacy=v5LegacySnapshotFromContext(out,seq||num(out.last_used_seq));if(legacy){out.snapshots=[legacy];out.active_snapshot_id=legacy.snapshot_id;}}
+  if(!trim(out.active_snapshot_id)&&out.snapshots.length)out.active_snapshot_id=trim(out.snapshots[out.snapshots.length-1].snapshot_id);
+  return out;
+}
+function v5ActiveSnapshot(c={}){const ss=arr(c?.snapshots);return ss.find(x=>trim(x.snapshot_id)===trim(c?.active_snapshot_id))||ss[ss.length-1]||null;}
+function v5ProjectSnapshotToLegacy(c={}){
+  const s=v5ActiveSnapshot(c);if(!s)return c;const actions=arr(s.operations).map(o=>({...o.args})),primary=actions[0]||{};
+  return{...c,event:trim(s.event)||trim(primary.event)||trim(c.event),events:arr(s.events).length?arr(s.events):arr(primary.events||c.events),person:trim(s.person),responsible:trim(s.responsible||s.person),donor:trim(s.donor),operation:trim(primary.operation)||trim(c.operation),last_query_actions:actions,last_data_operation:actions.length>1?'compound':trim(primary.operation)||trim(c.last_data_operation),last_data_event:trim(primary.event)||trim(s.event)||trim(c.last_data_event),last_data_events:arr(primary.events).length?arr(primary.events):arr(c.last_data_events),last_data_start_date:trim(primary.start_date)||trim(c.last_data_start_date),last_data_end_date:trim(primary.end_date)||trim(primary.start_date)||trim(c.last_data_end_date),start_date:trim(primary.start_date)||trim(c.start_date),end_date:trim(primary.end_date)||trim(primary.start_date)||trim(c.end_date),chart:s.presentation?.chart===true,chart_type:trim(s.presentation?.chart_type)||trim(c.chart_type),last_answer_shape:trim(s.answer_shape)||trim(c.last_answer_shape)};
+}
+function v5BlankFrame(screen=''){
+  return{screen_event:screen,context_id:'',domain:'',event:'',events:[],person:'',responsible:'',donor:'',operation:'',purchase_status:'',table_key:'',weather_date:'',start_date:'',end_date:'',chart:false,chart_type:'',report_mode:'',report_audience:'',report_event:'',last_query_actions:[],last_data_operation:'',last_data_event:'',last_data_events:[],last_data_start_date:'',last_data_end_date:'',last_presentation_kind:'',last_answer_shape:'',last_used_seq:0,snapshots:[],active_snapshot_id:'',contexts:[],active_context_id:'',route_domain:''};
+}
+function v5ConversationBookFromHistory(history=[],state={},selectedEventId=''){
+  const screen=trim(v26EventById(state,selectedEventId)?.titulo||v26EventById(state,selectedEventId)?.nombre||''),byId=new Map();let active='',seq=0;
+  const put=(raw)=>{const c=v5EnsureContextShape(raw,screen,Math.max(1,num(raw?.last_used_seq)||seq));if(trim(c.context_id)){const prev=byId.get(c.context_id);if(prev){const mergedSnaps=[...arr(prev.snapshots),...arr(c.snapshots)].reduce((acc,x)=>{if(!acc.some(y=>trim(y.snapshot_id)===trim(x.snapshot_id)))acc.push(x);return acc;},[]).sort((a,b)=>num(a.created_seq)-num(b.created_seq)).slice(-6);byId.set(c.context_id,{...prev,...c,snapshots:mergedSnaps,active_snapshot_id:trim(c.active_snapshot_id)||trim(prev.active_snapshot_id)});}else byId.set(c.context_id,c);}};
+  for(const turn of arr(history)){
+    const rc=turn?.resultContext;if(!rc||typeof rc!=='object')continue;const src=(rc.frame&&typeof rc.frame==='object')?rc.frame:rc;seq++;
+    if(arr(src?.contexts).length){for(const c0 of arr(src.contexts))put(c0);if(trim(src.active_context_id))active=trim(src.active_context_id);continue;}
+    const legacy=v5EnsureContextShape({...src,domain:trim(src.domain)||v5ContextDomainFromOperation(src.operation),context_id:trim(src.context_id)||v5ContextKey(src),last_used_seq:seq},screen,seq);if(legacy.operation||legacy.last_query_actions.length){put(legacy);active=legacy.context_id;}
+  }
+  const contexts=[...byId.values()].map(v5ProjectSnapshotToLegacy).sort((a,b)=>num(a.last_used_seq)-num(b.last_used_seq)).slice(-12);if(!contexts.some(c=>c.context_id===active))active=trim(contexts[contexts.length-1]?.context_id);
+  return{screen_event:screen,active_context_id:active,contexts,seq:Math.max(seq,...contexts.map(c=>num(c.last_used_seq)))};
+}
+function v5PromptRouteSignals(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt),sem=v4BrainLitePromptSemantics(userPrompt),domains=[];
+  const add=d=>{if(d&&!domains.includes(d))domains.push(d);};
+  if(/\b(?:recuerd\w*|conversacion\w*\s+(?:anterior|pasad\w*)|hablamos?\s+(?:antes|hace))\b/.test(p))add('memory');
+  // P5 · taxonomía explícita de dominio. Son conceptos funcionales de ControlEvent, no frases ITV.
+  // Un objeto factual escrito por el usuario manda sobre la presentación y sobre el C activo.
+  if(sem.explicitWeather||/\b(?:tiempo|meteorolog\w*|prevision|temperatur\w*|lluvia)\b/.test(p))add('weather');
+  if(sem.explicitCompare||/\bcomparaci\w*|comparar|compara\b/.test(p))add('comparison');
+  if(sem.bank||/\b(?:banco|bancari\w*|cuadre|abonos?|cargos?|flujo\s+neto|saldo\s+calculad\w*)\b/.test(p))add('bank');
+  if(sem.donation||/\b(?:donacion\w*|donante\w*|donad\w*)\b/.test(p))add('donations');
+  if(sem.attendanceAll||/\basistenc\w*\b/.test(p))add('attendance');
+  if(sem.purchase||sem.responsibleBreakdown||sem.topResponsible||/\b(?:compras?|comprad\w*|gastad\w*|responsables?\s+de\s+compras?)\b/.test(p))add('purchases');
+  if(sem.attendeeIncome||sem.income)add('income');if(sem.summary)add('summary');
+  const presentation=sem.chartFollow||/\b(?:barras?|lineas?|líneas?|donut|queso|tarta|graf\w*)\b/.test(p),reopen=/\b(?:vuelve|volvamos|retoma|retomemos|antes|aquell\w*|lo\s+de|por\s+donde\s+iba|por\s+dónde\s+iba)\b/.test(p);
+  // Ancla conversacional: «vuelve/retoma/al resumen/al banco/a las compras...». Es taxonomía
+  // de dominios, no frases de caso ni entidades. Si existe, manda sobre menciones accesorias.
+  const anchors=[
+    ['memory',/\b(?:vuelve|retoma|volvamos|al|a\s+la)\b.{0,24}\b(?:recuerdo|conversacion\s+anterior)\b/],
+    ['comparison',/\b(?:vuelve|retoma|volvamos|a\s+la|la\s+misma)\b.{0,24}\bcomparaci\w*\b/],
+    ['summary',/\b(?:vuelve|retoma|volvamos|al|a\s+ese)\b.{0,24}\bresumen\b|\b(?:añade|suma|incluye)\b.{0,40}\bal\s+resumen\b/],
+    ['bank',/\b(?:vuelve|retoma|volvamos|al)\b.{0,24}\b(?:banco|cuadre|saldo)\b/],
+    ['weather',/\b(?:vuelve|retoma|volvamos|al)\b.{0,24}\b(?:tiempo|meteorolog|prevision)\b/],
+    ['purchases',/\b(?:vuelve|retoma|volvamos|a\s+las?)\b.{0,24}\b(?:compras?|responsables?)\b/],
+    ['donations',/\b(?:vuelve|retoma|volvamos|a\s+las?)\b.{0,24}\bdonacion\w*\b/],
+    ['income',/\b(?:vuelve|retoma|volvamos|a\s+los?)\b.{0,24}\bingres\w*\b/]
+  ];
+  let anchor_domain='';for(const [d,re] of anchors)if(re.test(p)){anchor_domain=d;break;}
+  return{domain:anchor_domain||domains[0]||'',domains,anchor_domain,presentation,reopen,chart_type:sem.chartType||''};
+}
+function v5SelectContextFromBook(book={},userPrompt=''){
+  const list=arr(book.contexts),sig=v5PromptRouteSignals(userPrompt),active=list.find(c=>trim(c.context_id)===trim(book.active_context_id))||null;if(!list.length)return sig.domain?{...v5BlankFrame(book.screen_event),domain:sig.domain,event:trim(book.screen_event),route_domain:sig.domain,context_id:''}:null;
+  let best=null,bestScore=-1e9;
+  for(const c of list){
+    let score=0,d=trim(c.domain);if(sig.anchor_domain&&d===sig.anchor_domain)score+=140;else if(sig.domains.includes(d))score+=100;
+    if(trim(c.context_id)===trim(book.active_context_id))score+=sig.domains.length?20:60;
+    score+=Math.min(25,num(c.last_used_seq));
+    if(sig.presentation&&trim(c.context_id)===trim(book.active_context_id))score+=35;
+    if(score>bestScore){bestScore=score;best=c;}
+  }
+  if(sig.domain&&!list.some(c=>trim(c.domain)===sig.domain)&&!sig.anchor_domain)return{...v5BlankFrame(book.screen_event),domain:sig.domain,event:trim(active?.event)||trim(book.screen_event),route_domain:sig.domain,context_id:''};
+  return best||active||list[list.length-1]||null;
+}
+function v5ConversationFrameFromHistory(history=[],state={},selectedEventId='',userPrompt=''){
+  const book=v5ConversationBookFromHistory(history,state,selectedEventId),chosen=v5SelectContextFromBook(book,userPrompt),frame={...v5BlankFrame(book.screen_event),...(chosen||{})};
+  frame.screen_event=book.screen_event;frame.contexts=book.contexts.map(c=>({...c,contexts:undefined}));frame.active_context_id=trim(chosen?.context_id||book.active_context_id);if(!frame.event&&trim(frame.scope)!=='all_events')frame.event=book.screen_event;return v5ProjectSnapshotToLegacy(frame);
+}
+function v4BrainLiteContext(history=[],state={},selectedEventId='',userPrompt=''){
+  const f=v5ConversationFrameFromHistory(history,state,selectedEventId,userPrompt);
+  return{...f,event:trim(f.scope)==='all_events'?'':(trim(f.event)||trim(f.screen_event)),scope:trim(f.scope),events:arr(f.events),person:trim(f.person||f.responsible),responsible:trim(f.responsible||f.person),donor:trim(f.donor)};
+}
+function v5ContinuationAddsOperations(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt);return /^\s*(?:y\b|ademas\b|además\b|tambien\b|también\b|añade\b|anade\b|suma\b|incluye\b)/.test(p)||/\b(?:tambien|también|ademas|además|junto\s+con|ademas\s+de|además\s+de)\b/.test(p);
+}
+// V5 P6 · firma semántica de una S. No contiene frases ITV ni entidades concretas: deriva
+// exclusivamente de los dominios funcionales que el usuario pide en el turno.
+function v5ExpectedOperationSetFromPrompt(userPrompt=''){
+  const sem=v4BrainLitePromptSemantics(userPrompt),out=[];const add=op=>{if(op&&!out.includes(op))out.push(op);};
+  if(sem.summary)add('event_summary');if(sem.bank)add('event_bank');if(sem.income&&(/\bingres\w*\b|\bpendiente\s+de\s+ingreso\b|\bbizum\b|\bpagad\w*\b|\baportad\w*\b/.test(vnextP17LooseNorm(userPrompt))))add('event_income_status');
+  if(sem.purchase)add('event_purchases');if(sem.donation)add('event_donations');if(sem.explicitWeather)add('event_weather');if(sem.explicitCompare)add('compare_events');if(sem.attendanceAll)add('event_attendance');
+  return out;
+}
+function v5BestSnapshotForOperations(frame={},wantedOps=[]){
+  const wanted=[...new Set(arr(wantedOps).map(trim).filter(Boolean))];if(!wanted.length)return null;const ss=arr(frame?.snapshots);let best=null,bestScore=-1e9;
+  for(const s of ss){const ops=arr(s?.operations).map(o=>trim(o?.operation||o?.args?.operation)).filter(Boolean),set=new Set(ops);if(!wanted.every(op=>set.has(op)))continue;let score=wanted.length*100-Math.max(0,ops.length-wanted.length)*8+num(s?.created_seq);
+    if(wanted.includes('event_purchases')){const pst=new Set(arr(s?.operations).filter(o=>trim(o?.operation)==='event_purchases').map(o=>trim(o?.args?.purchase_status)).filter(Boolean));const sem=v4BrainLitePromptSemantics(frame?._route_prompt||'');if(sem.pending&&sem.realized&&pst.has('pending')&&pst.has('realized'))score+=40;}
+    if(score>bestScore){bestScore=score;best=s;}
+  }return best;
+}
+function v5CloneOperation(o={}){return{...o,args:{...(o?.args||{})},evidence:o?.evidence?{...o.evidence,tables:arr(o.evidence.tables).map(t=>({...t,rows:arr(t.rows).map(r=>({...r}))})),charts:arr(o.evidence.charts).map(c=>({...c,labels:arr(c.labels),values:arr(c.values),series:arr(c.series).map(x=>({...x,values:arr(x.values)}))}))}:undefined};}
+function v5MergeOperationsImmutable(prevOps=[],newArgs=[],evidenceBySig=new Map(),seq=0){
+  const merged=arr(prevOps).map(v5CloneOperation);for(const a0 of arr(newArgs)){const a={...a0},sig=v5OperationSignature(a);let same=merged.find(o=>trim(o.signature)===sig);if(!same){same=v5MakeOperation(a,seq,merged.length);merged.push(same);}else{same.args={...same.args,...a};same.signature=v5OperationSignature(same.args);}if(evidenceBySig.has(sig))same.evidence=evidenceBySig.get(sig);}
+  return merged.slice(-8);
+}
+function v5FrameAfterTurn(prev={},plan={},good=[],resultContext={},userPrompt=''){
+  const executed=good.map(x=>({...x.args})),primary=executed[0]||{},bookContexts=arr(prev?.contexts).map(c=>v5EnsureContextShape({...c,contexts:undefined},trim(prev?.screen_event),num(c?.last_used_seq))),book=new Map(bookContexts.filter(c=>trim(c.context_id)).map(c=>[trim(c.context_id),c]));
+  const route=v5PromptRouteSignals(userPrompt),base=v5EnsureContextShape({...v5BlankFrame(trim(prev?.screen_event)),...prev,contexts:undefined},trim(prev?.screen_event),num(prev?.last_used_seq)),primaryDomain=v5ContextDomainFromOperation(trim(primary.operation)||trim(resultContext?.operation)||trim(base.operation)),domain=trim(plan?._context_domain)||route.anchor_domain||primaryDomain||route.domain||trim(resultContext?.domain)||trim(base.domain);
+  let subject={...base,domain};
+  // P7 · aislamiento de entidad por C. Un cambio de dominio no hereda persona/donante del C anterior.
+  if(trim(base.domain)&&trim(base.domain)!==trim(domain)){subject.person='';subject.responsible='';subject.donor='';}
+  if(trim(primary.scope)||trim(resultContext?.scope))subject.scope=trim(primary.scope||resultContext.scope);if(trim(subject.scope)==='all_events')subject.event='';else if(trim(primary.event))subject.event=trim(primary.event);if(arr(primary.events).length)subject.events=arr(primary.events).map(trim).filter(Boolean);if(trim(resultContext?.person||resultContext?.responsible)){subject.person=trim(resultContext.person||resultContext.responsible);subject.responsible=trim(resultContext.responsible||resultContext.person);}if(trim(resultContext?.donor))subject.donor=trim(resultContext.donor);
+  // P9: una agregación por responsable es un dataset COLECTIVO. Ninguna persona individual
+  // puede permanecer en C/S aunque una ruta legacy la conserve en resultContext.
+  if(executed.some(a=>trim(a?.operation)==='event_purchases'&&trim(a?.group_by)==='responsible')){subject.person='';subject.responsible='';}
+  subject.operation=trim(primary.operation)||trim(resultContext?.operation)||subject.operation;subject.purchase_status=trim(resultContext?.purchase_status)||trim(primary.purchase_status)||subject.purchase_status;subject.context_id=v5ContextKey(subject);
+  let target=book.get(subject.context_id);if(!target&&trim(prev?.active_context_id)&&book.has(trim(prev.active_context_id))&&trim(book.get(trim(prev.active_context_id))?.domain)===domain)target=book.get(trim(prev.active_context_id));
+  if(!target)target=v5EnsureContextShape({...subject,context_id:subject.context_id,snapshots:[],active_snapshot_id:''},trim(prev?.screen_event),0);
+  const previousSnapshot=v5ActiveSnapshot(target),seq=Math.max(num(prev?.last_used_seq),...bookContexts.map(c=>num(c.last_used_seq)))+1;
+  let opArgs=executed.slice(0,8),prevOps=arr(previousSnapshot?.operations);
+  const evidenceBySig=new Map(good.map(x=>[v5OperationSignature(x.args),v5CompactEvidence(x.result)]));
+  const presentationOnly=route.presentation&&opArgs.length&&prevOps.length&&opArgs.every(a=>prevOps.some(o=>v5OperationSignature(o.args)===v5OperationSignature(a)));
+  if((v5ContinuationAddsOperations(userPrompt)||presentationOnly)&&prevOps.length){
+    var operations=v5MergeOperationsImmutable(prevOps,opArgs,evidenceBySig,seq);opArgs=[];
+  }else var operations=opArgs.map((a,i)=>{const old=prevOps.find(o=>o.signature===v5OperationSignature(a)),o=v5MakeOperation(a,seq,i,old?.operation_id||'');o.evidence=evidenceBySig.get(o.signature);return o;});
+  const chart=executed.some(a=>a.chart===true)||resultContext?.chart===true||route.presentation,chartType=trim(executed.find(a=>a.chart===true)?.chart_type)||trim(resultContext?.chart_type)||route.chart_type||trim(previousSnapshot?.presentation?.chart_type);
+  const snapshot={snapshot_id:`s_${v5ContextHash(target.context_id||subject.context_id).slice(0,6)}_${seq}_${arr(target.snapshots).length+1}`,parent_snapshot_id:trim(previousSnapshot?.snapshot_id),created_seq:seq,domain,event:trim(subject.event),events:arr(subject.events),person:trim(subject.person),responsible:trim(subject.responsible),donor:trim(subject.donor),operations,response_blocks:v5ResponseBlocksFromOperations(operations),views:v5ViewFromOperations(operations,chart,chartType),presentation:{chart,chart_type:chartType},answer_shape:trim(plan?._report_mode)?'report':(chart?'visual':'data')};
+  const snapshots=[...arr(target.snapshots),snapshot].sort((a,b)=>num(a.created_seq)-num(b.created_seq)).slice(-6);
+  target={...target,...subject,domain,context_id:target.context_id||subject.context_id,snapshots,active_snapshot_id:snapshot.snapshot_id,last_used_seq:seq,chart,chart_type:chartType,last_query_actions:operations.map(o=>({...o.args})),last_data_operation:operations.length>1?'compound':trim(operations[0]?.operation),last_data_event:trim(operations[0]?.args?.event)||trim(subject.event),last_data_events:arr(operations[0]?.args?.events),last_data_start_date:trim(operations[0]?.args?.start_date),last_data_end_date:trim(operations[0]?.args?.end_date)||trim(operations[0]?.args?.start_date)};
+  if(trim(plan?._report_mode)){target.report_mode=trim(plan._report_mode);target.report_audience=trim(plan._report_audience)||'general';target.report_event=trim(subject.event);target.last_answer_shape='report';}
+  book.set(target.context_id,target);const contexts=[...book.values()].map(v5ProjectSnapshotToLegacy).sort((a,b)=>num(a.last_used_seq)-num(b.last_used_seq)).slice(-12);
+  return{...v5ProjectSnapshotToLegacy(target),contexts,active_context_id:target.context_id,screen_event:trim(prev?.screen_event),context_id:target.context_id,active_snapshot_id:snapshot.snapshot_id};
+}
+function v5AttachResponseAndViews(frame={},written='',spoken='',charts=[],tables=[]){
+  const contexts=arr(frame?.contexts).map(c=>v5EnsureContextShape({...c,contexts:undefined},trim(frame?.screen_event),num(c?.last_used_seq))),idx=contexts.findIndex(c=>trim(c.context_id)===trim(frame?.active_context_id));if(idx<0)return frame;
+  const c=contexts[idx],ss=arr(c.snapshots),si=ss.findIndex(x=>trim(x.snapshot_id)===trim(c.active_snapshot_id));if(si<0)return frame;const snap={...ss[si]},ops=arr(snap.operations),blocks=arr(snap.response_blocks).map((r,i)=>({...r,written:i===0?trim(written).slice(0,1200):'',spoken:i===0?trim(spoken).slice(0,800):''}));
+  const source=ops.map(o=>o.operation_id),views=[{view_id:'v_text',type:'text',source_operation_ids:source}];if(arr(tables).length)views.push({view_id:'v_table',type:'table',source_operation_ids:source,count:arr(tables).length});for(let i=0;i<arr(charts).length;i++)views.push({view_id:`v_chart_${i+1}`,type:trim(charts[i]?.type)||'chart',source_operation_ids:source,title:trim(charts[i]?.title)});
+  ss[si]={...snap,response_blocks:blocks,views};contexts[idx]={...c,snapshots:ss};return{...frame,contexts,active_snapshot_id:ss[si].snapshot_id};
+}
+
+// ============================================================================
+// V5 CORE P4 · SOBERANIA C/S + VIEW ENGINE + CONTEXT PAGING
+// C decide el dominio. S fija el estado semántico. O solo aporta evidencia. V solo presenta.
+// El planner recibe únicamente el C/S relevante y un índice compacto del resto.
+// ============================================================================
+function v5CompactPlannerOperation(o={}){
+  const a={...(o?.args||{})};delete a._user_prompt;delete a.view_filters;delete a.hidden_columns;delete a.visible_columns;
+  return{operation:trim(o?.operation||a.operation),args:a};
+}
+function v5CompactPlannerContext(c={}){
+  const s=v5ActiveSnapshot(c),ops=arr(s?.operations).map(v5CompactPlannerOperation).slice(0,8);
+  return{context_id:trim(c.context_id),domain:trim(c.domain),event:trim(c.event),events:arr(c.events).map(trim).filter(Boolean).slice(0,4),person:trim(c.person||c.responsible),responsible:trim(c.responsible||c.person),donor:trim(c.donor),active_snapshot_id:trim(c.active_snapshot_id),snapshot:{domain:trim(s?.domain||c.domain),event:trim(s?.event||c.event),events:arr(s?.events).map(trim).filter(Boolean).slice(0,4),person:trim(s?.person),operations:ops,presentation:{chart:s?.presentation?.chart===true,chart_type:trim(s?.presentation?.chart_type)},answer_shape:trim(s?.answer_shape)},last_used_seq:num(c.last_used_seq)};
+}
+function v5PlannerContextPage(history=[],state={},selectedEventId='',userPrompt=''){
+  const book=v5ConversationBookFromHistory(history,state,selectedEventId),chosen=v5SelectContextFromBook(book,userPrompt),active=chosen||book.contexts.find(c=>trim(c.context_id)===trim(book.active_context_id))||null;
+  const index=arr(book.contexts).map(c=>({context_id:trim(c.context_id),domain:trim(c.domain),event:trim(c.event),events:arr(c.events).map(trim).filter(Boolean).slice(0,3),person:trim(c.person||c.responsible),last_used_seq:num(c.last_used_seq),active:trim(c.context_id)===trim(active?.context_id)})).slice(-12);
+  return{screen_event:trim(book.screen_event),active:v5CompactPlannerContext(active||{}),available:index};
+}
+function v5RequestedWeatherRange(prompt='',nowLike=''){
+  const raw=String(prompt||''),p=vnextP17LooseNorm(raw),base=vnextP2IsoDateParts(nowLike).iso;
+  const toIso=(d,m,y)=>{d=Number(d);m=Number(m);y=Number(y);if(y<100)y+=2000;const iso=`${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;return /^\d{4}-\d{2}-\d{2}$/.test(iso)?iso:'';};
+  // Fechas explícitas: una o varias. El rango solicitado va de la menor a la mayor.
+  const dates=[];for(const m of raw.matchAll(/\b(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})\b/g)){const iso=toIso(m[1],m[2],m[3]);if(iso)dates.push(iso);}if(dates.length){dates.sort();return{start_date:dates[0],end_date:dates[dates.length-1],requested_dates:[...new Set(dates)]};}
+  // Cantidad temporal genérica: acepta cifra o palabra española sin ligar el runtime a una frase de prueba.
+  const wordNums={un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14};
+  const nm=p.match(/\b(?:proximos?\s+)?(\d{1,2}|un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|catorce)\s+dias?\b/);if(nm){const parsed=/^\d+$/.test(nm[1])?Number(nm[1]):wordNums[nm[1]],n=Math.max(1,Math.min(14,parsed||1));return{start_date:base,end_date:vnextP2AddDaysIso(base,n-1),requested_days:n};}
+  if(/\bhoy\b/.test(p)&&/\bmanana\b/.test(p)&&/\bpasado\s+manana\b/.test(p))return{start_date:base,end_date:vnextP2AddDaysIso(base,2),requested_days:3};
+  if(/\bmanana\b/.test(p)&&/\bpasado\s+manana\b/.test(p))return{start_date:vnextP2AddDaysIso(base,1),end_date:vnextP2AddDaysIso(base,2),requested_days:2};
+  return null;
+}
+function v5CompactEvidence(result={}){
+  const keep=new Set(['weather','by_responsible','by_product','donors','by_donor','economics_chart','income_status','income_status_all_events','comparison','event_comparison','summary_by_event','income_by_event']);
+  let picked=arr(result?.tables).filter(t=>keep.has(trim(t?.key)));
+  // Memoria y otras capacidades sin tabla canónica conocida conservan unas pocas filas de evidencia.
+  // No se envían al planner; solo quedan asociadas a O para poder responder continuaciones verificables.
+  if(!picked.length&&/memory|recall/i.test(`${trim(result?.name)} ${trim(result?.facts?.action)} ${trim(result?.title)}`))picked=arr(result?.tables).slice(0,3);
+  const tables=picked.map(t=>({key:trim(t.key),title:trim(t.title),rows:arr(t.rows).slice(0,40).map(r=>({...r}))}));
+  return{facts:{...(result?.facts||{})},tables,charts:arr(result?.charts).slice(0,4).map(c=>({...c,labels:arr(c.labels).slice(0,40),values:arr(c.values).slice(0,40),series:arr(c.series).slice(0,6).map(x=>({...x,values:arr(x.values).slice(0,40)}))}))};
+}
+
+
+// ============================================================================
+// V5 CORE P9 · CONTRACT AUTHORITY
+// Orden de autoridad: FACTUAL CONTRACT -> C/S -> O -> VIEW CONTRACT -> R.
+// Ninguna vista puede decidir el dominio factual y ninguna ruta legacy puede
+// rebajar un contrato ya explícito. Taxonomía estructural, sin entidades de negocio.
+// ============================================================================
+function v5P9ViewRegistry(){
+  return [
+    {type:'bar',label:'barras'},
+    {type:'line',label:'líneas'},
+    {type:'pie',label:'queso'},
+    {type:'donut',label:'donut'}
+  ];
+}
+function v5P9ViewCapabilityCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);
+  return /\b(?:cuantos?|cuántos?|que|qué|cuales?|cuáles?)\b.{0,30}\b(?:tipos?|clases?|graficas?|gráficas?|representaciones?)\b/.test(p)||/\b(?:que|qué)\s+(?:graficas?|gráficas?)\s+(?:puedes|sabes|eres\s+capaz)\b/.test(p);
+}
+function v5P9UnsupportedViewCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);if(/\b(?:dispersion|dispersión|scatter)\b/.test(p))return'dispersión';return'';
+}
+function v5P10MaskResolvedEntityLabels(prompt='',labels=[]){
+  let p=vnextP17LooseNorm(prompt);
+  // P10 · Las palabras que forman parte de una ENTIDAD YA RESUELTA (sobre todo el nombre
+  // de un evento) no pueden convertirse en intención. Ej.: «gastos» dentro del título de
+  // un evento no significa por sí mismo COMPRAS. Es aislamiento léxico de entidad, NHC.
+  for(const raw of arr(labels)){const n=vnextP17LooseNorm(raw);if(n&&n.length>=3)p=p.split(n).join(' ');}
+  return p.replace(/\s{2,}/g,' ').trim();
+}
+function v5P9FactualContract(prompt='',activeCtx={},resolvedLabels=[]){
+  const p=v5P10MaskResolvedEntityLabels(prompt,[...arr(resolvedLabels),trim(activeCtx?.event),...arr(activeCtx?.events)]),sem=v4BrainLitePromptSemantics(p),additive=v5ContinuationAddsOperations(prompt),groupResponsible=/\bresponsabl\w*\b/.test(p)&&(sem.responsibleBreakdown||/\b(?:por|segun|según)\s+responsabl\w*\b/.test(p));
+  const explicit={
+    comparison:sem.explicitCompare||/\b(?:comparar|compara|comparativa)\b/.test(p),
+    purchases:sem.purchase||groupResponsible||/\bcompras?\b/.test(p),
+    donations:sem.donation||/\bdonaci\w*|donante\w*\b/.test(p),
+    bank:sem.bank||/\b(?:banco|bancari\w*|cuadre|flujo\s+neto|saldo\s+calculad\w*)\b/.test(p),
+    income:sem.attendeeIncome||sem.income||/\b(?:pendiente\s+de\s+ingreso|bizum|efectivo|ingres\w*)\b/.test(p),
+    weather:sem.explicitWeather,
+    attendance:sem.attendanceAll||/\basistenc\w*\b/.test(p),
+    summary:sem.summary
+  };
+  let domain='';
+  if(v5SynthesisCue(prompt))domain='synthesis';
+  // «resumen económico/general/del evento» es intención primaria aunque el nombre de la
+  // entidad o el propio resumen cite compras/ingresos. No se hard-codean eventos concretos.
+  else if(explicit.summary&&/\bresumen\b/.test(p)&&!/\bresumen\s+(?:de|sobre)\s+compras?\b/.test(p))domain='summary';
+  else for(const d of ['comparison','purchases','donations','bank','income','weather','attendance','summary'])if(explicit[d]){domain=d;break;}
+  // Una continuación aditiva amplía el C activo si el nuevo concepto es una faceta de ese C.
+  if(additive&&trim(activeCtx?.domain)==='bank'&&domain==='income')domain='bank';
+  if(additive&&trim(activeCtx?.domain)==='summary'&&['bank','income'].includes(domain))domain='summary';
+  const priorResponsible=trim(activeCtx?.domain)==='purchases'&&arr(activeCtx?.last_query_actions).some(a=>trim(a?.operation)==='event_purchases'&&trim(a?.group_by)==='responsible');
+  const inheritResponsible=priorResponsible&&!groupResponsible&&!/\b(?:producto|tienda|segmento|destino|fecha)\b/.test(p)&&/\b(?:agrup\w*|orden\w*|ranking|lista|mayor|menor|importe|gastad\w*)\b/.test(p);
+  // Una continuación elíptica de orden/lista sobre un S de compras por responsable sigue
+  // siendo PURCHASES aunque no repita la palabra «compras».
+  if(!domain&&inheritResponsible)domain='purchases';
+  return{domain,additive,group_by:(groupResponsible||inheritResponsible)?'responsible':'',sort_amount_desc:/\b(?:mayor\s+a\s+menor|descendente|decreciente)\b/.test(p),view_requested:sem.chartFollow,view_type:sem.chartType||'',view_capability:v5P9ViewCapabilityCue(prompt),unsupported_view:v5P9UnsupportedViewCue(prompt)};
+}
+/* FIX38 CLEAN AUTHORITY: legacy semantic mutator v5P9ApplyContract removed. */
+
+// ============================================================================
+// V5 CORE P10 · SUBJECT / ENTITY AUTHORITY
+// El sujeto explícito del MENSAJE ACTUAL sustituye filtros personales anteriores. Un filtro
+// solo se hereda cuando el usuario lo referencia anafóricamente. No contiene nombres propios.
+// ============================================================================
+function v5P10SelfPersonCue(prompt=''){const p=vnextP17LooseNorm(prompt);return /^(?:y\s+)?yo\b|\b(?:sobre|de)\s+mi\b/.test(p);}
+function v5P10MemoryRefreshCue(prompt=''){const p=vnextP17LooseNorm(prompt);return /\b(?:actualiz\w*|datos\s+actuales|ahora\s+ya|repite\w*.{0,35}actualiz\w*)\b/.test(p);}
+function v5P10GeneralPersonCue(prompt=''){const p=vnextP17LooseNorm(prompt);return /\b(?:info(?:rmacion)?\s+general|cuentame|cuéntame|que\s+fue\s+de|qué\s+fue\s+de)\b/.test(p)||/^\s*y\s+[^?]{1,60}\??\s*$/.test(p);}
+function v5P10ForgetEntityCue(prompt=''){return /\b(?:olvida|olvidate|olvídate|ignora|sin\s+tener\s+en\s+cuenta|deja\s+fuera)\b/.test(vnextP17LooseNorm(prompt));}
+
+// ============================================================================
+// V5 CORE P11 · MEMORY MODE + SUBJECT/EVENT REFINEMENTS
+// Presentación de recuerdos, comparación entonces/ahora y pequeñas reglas de
+// autoridad semántica basadas en catálogos reales. Sin nombres/importes de negocio.
+// ============================================================================
+function v5P11DateFromAny(value=''){
+  const raw=trim(value);if(!raw)return null;
+  let d=new Date(raw);if(Number.isFinite(d.getTime()))return d;
+  const m=raw.match(/\b(\d{1,2})[\/.-](\d{1,2})[\/.-](20\d{2})\b/);if(m){d=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]));if(Number.isFinite(d.getTime()))return d;}
+  return null;
+}
+function v5P11MemoryDateRaw(result={}){
+  const f=result?.facts||{},candidates=[f.started_at,f.start_date,f.created_at,f.matched_created_at,f.ended_at];
+  for(const k of ['memory_turns','memory_evidence','memory_matches'])for(const r of arr(v4BrainLiteTable(result,k)?.rows))for(const key of ['Fecha','fecha','created_at','Creado','Inicio'])candidates.push(r?.[key]);
+  for(const v of candidates){if(v5P11DateFromAny(v))return trim(v);}
+  return'';
+}
+function v5P11MemoryAgeText(result={},nowIso=''){
+  const d=v5P11DateFromAny(v5P11MemoryDateRaw(result)),now=v5P11DateFromAny(nowIso)||new Date();if(!d)return'';
+  const days=Math.max(0,Math.floor((now.getTime()-d.getTime())/86400000));
+  if(days===0)return'hoy';if(days===1)return'hace 1 día';if(days<14)return`hace ${days} días`;
+  if(days<60){const w=Math.round(days/7);return`hace ${w} ${w===1?'semana':'semanas'}`;}
+  if(days<730){const m=Math.max(1,Math.round(days/30.44));return`hace ${m} ${m===1?'mes':'meses'}`;}
+  const y=Math.max(1,Math.round(days/365.25));return`hace ${y} ${y===1?'año':'años'}`;
+}
+function v5P11MemoryPresentation(result={},person='',historicalAnswer='',nowIso='',historicalContract=null){
+  const ageText=v5P11MemoryAgeText(result,nowIso),occurredAt=v5P11MemoryDateRaw(result),hc=historicalContract&&typeof historicalContract==='object'?JSON.parse(JSON.stringify(historicalContract)):null;
+  return{active:true,mode:'memory',ageText,occurredAt,subject:trim(person),historicalAnswer:trim(historicalAnswer),historicalContract:hc,canRefresh:!!hc};
+}
+function v5P11LastMemoryTurn(history=[]){
+  for(let i=arr(history).length-1;i>=0;i--){const t=arr(history)[i]||{},rc=t.resultContext||{},m=t.memoryPresentation||t?.meta?.memoryPresentation,mc=t.memoryComparison||t?.meta?.memoryComparison;
+    if(mc?.active&&trim(mc.historicalAnswer)){
+      const mp={active:true,mode:'memory',ageText:trim(mc.ageText),occurredAt:trim(mc.occurredAt),subject:trim(mc.subject),historicalAnswer:trim(mc.historicalAnswer),canRefresh:!!(mc.historicalContract&&typeof mc.historicalContract==='object'),historicalContract:(mc.historicalContract&&typeof mc.historicalContract==='object')?mc.historicalContract:null};
+      return{answer:trim(mc.historicalAnswer),person:trim(mc.subject),event:trim(rc.event),memoryPresentation:mp,resultContext:{...rc,memory_historical_contract:mp.historicalContract||rc.memory_historical_contract||null}};
+    }
+    if(trim(rc.domain)==='memory'||trim(rc.operation)==='recall_memory'||m?.active){
+      const hc=(m?.historicalContract&&typeof m.historicalContract==='object')?m.historicalContract:((rc.memory_historical_contract&&typeof rc.memory_historical_contract==='object')?rc.memory_historical_contract:null),mp=m&&typeof m==='object'?{...m,historicalContract:hc,canRefresh:!!hc}:(hc?{active:true,mode:'memory',ageText:trim(rc.memory_age_text),occurredAt:trim(rc.memory_occurred_at),subject:trim(rc.person),historicalAnswer:trim(t.assistantWritten||t.assistant||''),historicalContract:hc,canRefresh:true}:null);
+      return{answer:trim(mp?.historicalAnswer||t.assistantWritten||t.assistant||''),person:trim(rc.person||mp?.subject),event:trim(rc.event),memoryPresentation:mp,resultContext:rc};
+    }
+  }
+  return null;
+}
+function v5P11MemoryReturnCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);return /\b(?:vuelve|vuelva|volver|retoma|retome|regresa|regrese|repite)\b.{0,45}\b(?:recuerdo|respuesta\s+del\s+recuerdo|conversacion\s+recordada)\b/.test(p)||/\b(?:dame|muestra)\b.{0,30}\b(?:otra\s+vez|de\s+nuevo)\b.{0,25}\brecuerdo\b/.test(p)||/^\s*(?:al|a\s+ese|a\+aquel)\s+recuerdo\s*$/.test(p);
+}
+function v5P11AllViewsCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);return /\b(?:una|1)\s+de\s+cada\s+(?:tipo|clase)\b/.test(p)||/\b(?:todos|todas)\s+(?:los\s+)?(?:tipos|graficas|gráficas|representaciones)\b/.test(p);
+}
+function v5P11EventGeneralCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);return /\b(?:como|cómo|que|qué)\s+(?:ha\s+ido|tal\s+va|tal\s+fue|fue|va)\b|\b(?:info|informacion|información|resumen|estado|situacion|situación)\b/.test(p);
+}
+function v5P11ProductFamilyFromCatalog(state={},prompt=''){
+  const stop=new Set(['cuanto','cuánto','hemos','gastado','gastos','estos','estas','evento','pantalla','compras','compra','dame','solo','ahora','responsable','responsables','importe','total','estos']);
+  const words=(vnextP17LooseNorm(prompt).match(/[a-záéíóúüñ0-9]{4,}/g)||[]).filter(w=>!stop.has(w));
+  if(!words.length)return'';
+  const products=arr(state?.productos).map(x=>trim(x?.nombre||x?.Nombre||x?.descripcion||x?.Descripción)).filter(Boolean);
+  let best='',score=0;
+  for(const w of words){let hits=0;for(const name of products){const n=vnextP17LooseNorm(name);if(new RegExp(`(?:^|\\s)${w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}(?:\\s|$)`).test(n)||n.includes(w))hits++;}
+    if(hits>score&&hits>=2){best=w;score=hits;}
+  }
+  return best;
+}
+/* FIX38 CLEAN AUTHORITY: legacy semantic mutator v5P10ApplyStateAuthority removed. */
+
+
+
+// V5 P14 · SCOPE AUTHORITY. El alcance es soberano igual que dominio/sujeto.
+// No contiene nombres de eventos ni reglas de negocio específicas: sólo interpreta el ámbito pedido.
+function v5P14ScopeContract(prompt=''){
+  const p=vnextP17LooseNorm(prompt);
+  const all=/\b(?:todos?|todas?)\s+(?:los\s+)?eventos\b|\b(?:cualquier|cualquiera\s+de\s+los)\s+eventos\b|\ben\s+otros\s+eventos\b|\bnivel\s+(?:mas\s+)?alto\b/.test(p);
+  const current=/\b(?:este|ese|el)\s+evento\b|\bevento\s+(?:actual|en\s+pantalla|activo)\b/.test(p);
+  return{kind:all?'all_events':current?'current_event':'inherited',explicit:all||current};
+}
+function v5P14SocialReactionCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);
+  const factual=/\b(?:ingres\w*|compr\w*|donaci\w*|banco|cuadre|tiempo|meteorolog\w*|asistenc\w*|evento|pendient\w*|graf\w*|persona|responsabl\w*)\b/.test(p);
+  if(factual)return false;
+  return /\b(?:que\s+fumas|qué\s+fumas|vaya\s+mierda|que\s+locura|qué\s+locura|esto\s+no\s+es\s+serio|te\s+has\s+desviado|te\s+quedas\s+enganchado|te\s+estas\s+liando|te\s+estás\s+liando|te\s+has\s+liado|te\s+lias\s+otra\s+vez|te\s+lías\s+otra\s+vez|que\s+coño|qué\s+coño|y\s+esto\s+que\s+es|y\s+esto\s+qué\s+es)\b/.test(p);
+}
+function v5P14SocialReactionReply(prompt='',history=[]){
+  const p=vnextP17LooseNorm(prompt),last=arr(history).slice(-1)[0],lastOp=trim(last?.resultContext?.operation),lastEvent=trim(last?.resultContext?.event);
+  if(/\b(?:y\s+esto\s+que\s+es|y\s+esto\s+qué\s+es)\b/.test(p))return lastOp?`Eso que te acabo de dar pertenece a ${lastOp}${lastEvent?` de ${lastEvent}`:''}. Si no venía a cuento, no lo tomo como nuevo hilo.`:'Esa respuesta no venía a cuento. No la tomo como nuevo hilo.';
+  return 'Sí, aquí me he desviado. Mantengo intacto el último contexto válido y no voy a convertir esta reacción en una consulta nueva.';
+}
+async function v5P14AllEventsIncomeStatus(state={},selectedEventId='',status='pending',population='all',id='p14_income_all'){
+  const events=arr(state?.eventos).map(e=>({id:trim(e?.id),name:trim(e?.titulo||e?.nombre||e?.descripcion)})).filter(e=>e.id&&e.name);
+  const chunks=[];
+  for(let i=0;i<events.length;i+=8){
+    const part=events.slice(i,i+8);
+    const got=await Promise.all(part.map(async ev=>{try{const base=await v26ToolEventPeople({id:`${id}_${i}`,name:'event_people',event:ev.name,scope:'named_event',detail:'full'},state,selectedEventId),filtered=vnextP1FilteredIncomeResult(base,status,`${id}_${i}`,population),rows=arr(vnextP1Table(filtered,'income_status')?.rows).map(r=>({Evento:ev.name,...r}));return rows;}catch(_){return[];}}));
+    chunks.push(...got.flat());
+  }
+  const total=v26Money(chunks.reduce((a,r)=>a+num(r?.['Importe total']??r?.Importe),0)),matchingEvents=new Set(chunks.map(r=>trim(r?.Evento)).filter(Boolean));
+  const schema={Evento:v26TextSchema(),Persona:v26TextSchema(),Número:v26CountSchema('personas'),Rango:v26TextSchema(),'Situación / forma registrada':v26TextSchema(),'Importe total':v26MoneySchema('Importe del ingreso')};
+  return{id,name:'query_ce',ok:true,title:`Ingresos ${status==='pending'?'pendientes':'por estado'} · todos los eventos`,facts:{operation:'event_income_status',scope:'all_events',event:'',status,population,record_count:chunks.length,event_count:events.length,matching_event_count:matchingEvents.size,amount_total:total,source_contract:'Todos los eventos registrados; filas de ingresos/colaboradores filtradas por estado. El evento activo no limita el ámbito.'},facts_schema:{record_count:v26CountSchema('registros'),event_count:v26CountSchema('eventos'),matching_event_count:v26CountSchema('eventos'),amount_total:v26MoneySchema('Importe total')},provenance:'ControlEvent · event_people.people · scope all_events',tables:[v26Table('income_status_all_events','Ingresos por estado · todos los eventos',chunks,schema)],_vnext_operation:'event_income_status'};
+}
+function v5ExplicitFactualDomain(prompt=''){
+  const sig=v5PromptRouteSignals(prompt),p=vnextP17LooseNorm(prompt);
+  if(!sig.domains.length)return'';
+  // Una mención meramente anafórica de presentación no crea dominio factual nuevo.
+  if(sig.presentation&&sig.reopen&&sig.anchor_domain)return sig.anchor_domain;
+  return sig.domains[0]||'';
+}
+function v5DomainDefaultOperation(domain=''){
+  return({summary:'event_summary',bank:'event_bank',income:'event_income_status',purchases:'event_purchases',donations:'event_donations',attendance:'event_attendance',weather:'event_weather',comparison:'compare_events'}[trim(domain)]||'');
+}
+function v5SynthesisCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);
+  const broad=/\b(?:toda|todo|conjunto|global|integral)\b.{0,35}\b(?:info|informacion|datos|evento)\b|\b(?:utilizando|usando)\b.{0,35}\b(?:toda|todo)\b.{0,20}\b(?:info|informacion|datos)\b/.test(p);
+  const transform=/\b(?:rima|poema|versos?|narracion|relato|sintesis|síntesis)\b/.test(p);
+  return broad&&transform;
+}
+function v5MemoryEvidenceRowsFromSnapshot(snapshot={},needle=''){
+  const n=norm(needle),rows=[];for(const o of arr(snapshot?.operations)){if(trim(o?.operation)!=='recall_memory')continue;for(const t of arr(o?.evidence?.tables)){for(const r of arr(t?.rows)){const hay=norm([r?.Pregunta,r?.Respuesta,r?.Resumen,r?.Título,r?.Titulo].filter(Boolean).join(' '));if(!n||hay.includes(n))rows.push({...r});}}}return rows.slice(0,12);
+}
+function v5MemoryEvidenceFollowCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);return /\b(?:donde|dónde|texto|literal|referenciad|aparece|mencion|pregunte|pregunté|dijiste|respondiste|detalle|exacto|exacta)\b/.test(p)&&/\b(?:recuerdo|conversacion|conversación|aquell|antes|texto|mencion|aparece|detalle)\b/.test(p);
+}
+function v5P13MemoryRefreshCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);return /\b(?:ejecuta|ejecutar|repite|repetir|actualiza|actualizar|haz|hacer)\b.{0,55}\b(?:misma|esa|esta|consulta|respuesta|hoy|actual|ahora)\b/.test(p)||/\b(?:misma|esa|esta)\s+consulta\b.{0,45}\b(?:hoy|actual|ahora|comparar)\b/.test(p)||/\b(?:a|al)\s+dia\s+de\s+hoy\b/.test(p);
+}
+function v5P13AffirmativeCue(prompt=''){return /^\s*(?:(?:si|sí)(?:\s*,?\s*(?:hazlo|adelante|claro|vale))?|vale|ok|de acuerdo|hazlo|adelante|claro|venga|perfecto)\s*[.!]?\s*$/i.test(String(prompt||''));}
+function v5P18HistoricalContractFromMemoryResult(result={},fallbackRows=[]){
+  const mt=result?.facts?.matched_turn&&typeof result.facts.matched_turn==='object'?result.facts.matched_turn:null;
+  if(mt&&trim(mt.question))return{source:'memory_turn',turn_id:trim(mt.turn_id),question:trim(mt.question),plan_signature:mt.plan_signature||{},domain:trim(mt.domain),scope:mt.scope||{}};
+  for(const r of arr(fallbackRows)){if(trim(r?._turn_id)||trim(r?.Pregunta))return{source:'memory_evidence',turn_id:trim(r?._turn_id),question:trim(r?.Pregunta),plan_signature:(r?._plan_signature&&typeof r._plan_signature==='object')?r._plan_signature:{},domain:trim(r?._domain),scope:(r?._scope&&typeof r._scope==='object')?r._scope:{}};}
+  return null;
+}
+function v5P18HistoricalContractFromEvidenceRows(rows=[]){
+  for(const r of arr(rows)){if(trim(r?._turn_id)||trim(r?.Pregunta))return{source:'memory_evidence',turn_id:trim(r?._turn_id),question:trim(r?.Pregunta),plan_signature:(r?._plan_signature&&typeof r._plan_signature==='object')?r._plan_signature:{},domain:trim(r?._domain),scope:(r?._scope&&typeof r._scope==='object')?r._scope:{}};}
+  return null;
+}
+async function v5P18GeminiMemoryNowPlan({userPrompt,historicalContract,state={},selectedEventId='',conversationHistory=[],clientNowIso='',clientTimeZone='',model,flowTrace=[],externalSignal=null,validationIssues=[],previousPlan=null}={}){
+  const hc=historicalContract&&typeof historicalContract==='object'?historicalContract:{},ctx=v5PlannerContextPage(conversationHistory,state,selectedEventId,userPrompt),dialogueState=v5P23ConversationState(conversationHistory,state,selectedEventId),events=arr(state?.eventos).map(e=>trim(e?.titulo||e?.nombre||e?.descripcion)).filter(Boolean).slice(0,80);
+  const sys=`Eres Gemini, ÚNICO intérprete semántico de Zuzu. El usuario quiere volver a ejecutar HOY una consulta histórica. Tu trabajo es emitir el contrato ACTUAL semánticamente equivalente a la consulta histórica, usando la API actual de ControlEvent. Devuelve SOLO JSON del esquema.\n\nREGLA SOBERANA: el software NO corregirá tu decisión después. Solo validará legalidad y ejecutará exactamente lo que decidas.\n\nREGLAS MEMORY→NOW:\n- La autoridad para saber QUÉ consulta se repite es HISTORICAL_CONTRACT: especialmente historical_question y plan_signature.\n- El texto de la RESPUESTA histórica NO es autoridad para elegir sujeto, operación ni filtros. Una persona mencionada incidentalmente en la respuesta no se convierte en person/responsible.\n- Conserva el mismo objeto factual, alcance, sujeto y filtros de la consulta histórica, salvo que CURRENT_USER pida explícitamente un cambio.\n- No uses compare_events salvo que la consulta histórica realmente fuera una comparación de eventos. Pedir \"comparar con ahora\" significa mostrar ENTONCES y HOY, no comparar dos eventos.\n- No conviertas compras de un evento en person_profile porque aparezca un responsable dentro de la respuesta antigua.\n- Si el contrato histórico usa un evento concreto, conserva ese evento. Si históricamente era current_event y el usuario solo pide repetirla hoy, usa current_event.\n- Emite un contrato LEGAL según CAPABILITY CONTRACTS. Si scope=all_events, no pongas event.\n- No inventes datos ni entidades.\n\n${cleanCapabilityContractCatalogText()}\n\nAHORA=${trim(clientNowIso)||new Date().toISOString()} zona=${trim(clientTimeZone)||'Europe/Madrid'}\nSCREEN_EVENT=${trim(selectedEventId)||''}\nCONTEXTO_BUENO=${JSON.stringify(ctx)}\nESTADO_DIALOGO=${JSON.stringify(dialogueState)}\nESTADO_DIALOGO SOLO APORTA HECHOS: pending_action, memory_frame, last_successful_action y active_context NO deciden nada por sí mismos. Decide tú qué referencia es pertinente para MENSAJE_ACTUAL. La pregunta inmediatamente anterior de Zuzu y el sentido humano del diálogo tienen prioridad semántica cuando corresponda. El runtime no seleccionará por ti una acción, un recuerdo ni un sujeto.\nEVENTOS_CANONICOS=${JSON.stringify(events)}`;
+  const input=`CURRENT_USER=${userPrompt}\nHISTORICAL_CONTRACT=${JSON.stringify(hc)}${arr(validationIssues).length?`\nCONTRATO_ANTERIOR_INVALIDO=${JSON.stringify(previousPlan||{})}\nERRORES_VALIDACION=${JSON.stringify(validationIssues)}`:''}`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,body={systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:input}]}],generationConfig:{responseMimeType:'application/json',responseSchema:v4BrainLiteSchema(),temperature:.03,maxOutputTokens:700,thinkingConfig:{thinkingBudget:0}}};
+  const {res,payload}=await geminiFetchJsonWithTimeout(url,body,geminiKey(),Number(process.env.CONTROLEVENT_ZUZU_BRAINLITE_TIMEOUT_MS||12000),externalSignal);if(!res.ok)throw new Error(payload?.error?.message||`Memory→Now HTTP ${res.status}`);
+  const raw=trim(geminiOutText(payload));let plan={};try{plan=JSON.parse(raw)}catch(_){plan=parsePlanJsonLenientHf37(raw).parsed||{}};plan.intent=['DATA','CHAT'].includes(trim(plan.intent).toUpperCase())?trim(plan.intent).toUpperCase():'DATA';plan.response_level=['BASIC','MEDIUM','HIGH'].includes(trim(plan.response_level).toUpperCase())?trim(plan.response_level).toUpperCase():'BASIC';plan.actions=arr(plan.actions).filter(x=>trim(x?.operation));zuzuTracePush(flowTrace,'V5 P18 · MEMORY→NOW · GEMINI','OK',`${plan.intent} · ${plan.actions.map(a=>trim(a.operation)).join(', ')||'sin acciones'}`,{historical_contract:hc,decision_contract:v5P15CloneDecisionPlan(plan),model,usage:usageSmall(payload,model)});return plan;
+}
+function v5P18ValidateMemoryNowPlan(plan={}){const base=v5P16ValidatePlanBeforeFreeze(plan),issues=[...arr(base.issues)];if(trim(plan?.intent).toUpperCase()!=='DATA')issues.push('MEMORY→NOW requiere intent=DATA.');if(!arr(plan?.actions).some(a=>trim(a?.operation)))issues.push('MEMORY→NOW requiere al menos una action factual.');return{ok:issues.length===0,issues};}
+function v5P13EvidenceMentionsSubject(row={},subject=''){
+  const n=norm(subject);if(!n)return true;const hay=norm([row?.Pregunta,row?.Respuesta,row?.Resumen].filter(Boolean).join(' '));if(!hay)return false;const esc=n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');return new RegExp(`(?:^|\\s|[^a-z0-9])${esc}(?:$|\\s|[^a-z0-9])`,'i').test(hay);
+}
+/* FIX41 P18: eliminada la reconstrucción local MEMORY→NOW basada en persona/eventos mencionados. Gemini decide el contrato actual. */
+function v5P13NextViewCue(prompt=''){const p=vnextP17LooseNorm(prompt);return /^\s*(?:otra|otro|siguiente)(?:\s+grafica|\s+gráfico|\s+vista)?\s*[.!]?\s*$/.test(p);}
+function v5P22CancelCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);
+  return /^\s*(?:no\s*,?\s*)?(?:espera|espere|para|pare|un\s+momento|mejor\s+no|dejalo|déjalo|no\s+lo\s+hagas)\s*[.!]?\s*$/.test(p)||/^\s*no\s*,?\s*espera\s*[.!]?\s*$/.test(p);
+}
+function v5P22ResumePendingCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);
+  return v5P13AffirmativeCue(prompt)||/^\s*(?:continua|continúa|sigue|retoma|haz\s+lo\s+de\s+antes|haz\s+eso|lo\s+de\s+antes)\s*[.!]?\s*$/.test(p);
+}
+function v5P22LastSuccessfulAction(history=[]){
+  for(let i=arr(history).length-1;i>=0;i--){
+    const t=arr(history)[i]||{},rc=t.resultContext||{},persisted=rc?.conversation_state?.last_successful_action;
+    if(persisted&&typeof persisted==='object'&&trim(persisted.operation))return JSON.parse(JSON.stringify(persisted));
+    const pa=t?.pendingAction&&typeof t.pendingAction==='object'?t.pendingAction:null;
+    if(pa&&trim(pa.status)==='completed'&&trim(pa.type)==='REEXECUTE_MEMORY_NOW'&&pa.current_contract&&typeof pa.current_contract==='object'){
+      const first=arr(pa.current_contract.actions)[0]||{};
+      return{type:'REEXECUTE_MEMORY_NOW',operation:trim(first.operation),event:trim(first.event),person:trim(first.person),contract:JSON.parse(JSON.stringify(pa.current_contract)),current_contract:JSON.parse(JSON.stringify(pa.current_contract)),historical_contract:(pa.historical_contract&&typeof pa.historical_contract==='object')?JSON.parse(JSON.stringify(pa.historical_contract)):null,subject:trim(pa.subject),source_turn_id:trim(pa.source_turn_id),source_conversation_id:trim(pa.source_conversation_id)};
+    }
+    const op=trim(rc.operation),acts=arr(rc.last_query_actions);
+    if(op&&!['recall_memory','current_time','current_date'].includes(op))return{type:'FACTUAL',operation:op,event:trim(rc.event),person:trim(rc.person),contract:(rc.memory_current_contract&&typeof rc.memory_current_contract==='object')?JSON.parse(JSON.stringify(rc.memory_current_contract)):null};
+    if(acts.length)return{type:'FACTUAL',operation:trim(acts[0]?.operation),event:trim(acts[0]?.event),person:trim(acts[0]?.person),contract:null};
+  }
+  return null;
+}
+function v5P24RepeatLastCue(prompt=''){
+  const p=vnextP17LooseNorm(prompt);
+  return /^\s*(?:haz\s+lo\s+de\s+antes|lo\s+de\s+antes|otra\s+vez|repitelo|repítelo|repite\s+lo\s+anterior|como\s+antes|vuelve\s+a\s+hacer\s+eso)\s*[.!]?\s*$/.test(p);
+}
+function v5P23PendingFromMemoryTurn(mem=null,status='pending'){
+  const mp=mem?.memoryPresentation||{};
+  if(!mem||!mp?.canRefresh||!(mp.historicalContract&&typeof mp.historicalContract==='object'))return null;
+  return{type:'REEXECUTE_MEMORY_NOW',status:trim(status)||'pending',subject:trim(mem.person||mp.subject),historical_contract:JSON.parse(JSON.stringify(mp.historicalContract)),source_turn_id:trim(mp.historicalContract?.turn_id||mem?.resultContext?.matched_turn_id),source_conversation_id:trim(mem?.resultContext?.conversation_id),memory_age_text:trim(mp.ageText),memory_occurred_at:trim(mp.occurredAt)};
+}
+function v5P23PendingStateFromHistory(history=[]){
+  for(let i=arr(history).length-1;i>=0;i--){
+    const t=arr(history)[i]||{},candidate=(t.pendingAction&&typeof t.pendingAction==='object')?t.pendingAction:((t?.resultContext?.conversation_state?.pending_action&&typeof t.resultContext.conversation_state.pending_action==='object')?t.resultContext.conversation_state.pending_action:null);
+    if(!candidate||!trim(candidate.type))continue;
+    const c=JSON.parse(JSON.stringify(candidate)),st=trim(c.status)||'pending';
+    if(['completed','cancelled'].includes(st))return{action:null,terminal:true,last:c};
+    if(['pending','suspended'].includes(st))return{action:c,terminal:false,last:c};
+  }
+  return{action:null,terminal:false,last:null};
+}
+function v5P23ConversationState(history=[],state={},selectedEventId=''){
+  const mem=v5P11LastMemoryTurn(history),last=v5P22LastSuccessfulAction(history),mp=mem?.memoryPresentation||{},ps=v5P23PendingStateFromHistory(history);
+  const pending=ps.action||(!ps.terminal?v5P23PendingFromMemoryTurn(mem,'pending'):null);
+  return{active_context:v4BrainLiteContext(history,state,selectedEventId),memory_frame:mem?{open:true,subject:trim(mem.person||mp.subject),age_text:trim(mp.ageText),historical_contract:(mp.historicalContract&&typeof mp.historicalContract==='object')?mp.historicalContract:null,source_turn_id:trim(mp.historicalContract?.turn_id||mem?.resultContext?.matched_turn_id),source_conversation_id:trim(mem?.resultContext?.conversation_id)}:null,pending_action:pending,last_successful_action:last};
+}
+function v5P22ConversationState(history=[],state={},selectedEventId=''){return v5P23ConversationState(history,state,selectedEventId);}
+function v5ChartRequestOnly(prompt=''){
+  const p=vnextP17LooseNorm(prompt),sem=v4BrainLitePromptSemantics(prompt),sig=v5PromptRouteSignals(prompt),hasView=sem.chartFollow||/\b(?:graf\w*|barras?|lineas?|donut|queso|tarta)\b/.test(p);if(!hasView)return false;
+  // P6: una reactivación/anáfora + cambio de presentación sigue siendo VIEW_ONLY.
+  // Un objeto factual NUEVO (p.ej. compras por responsable + donut) no lo es.
+  const anaphoric=/\b(?:mism\w*|es[ea]s?|aquell\w*|esos\s+datos|ese\s+desglose|ese\s+resumen|ponla|hazlo|representa(?:lo|la)?|cambia(?:lo|la)?)\b/.test(p);
+  const reportViewRef=sem.report&&sem.chartFollow&&/\b(?:el|este|ese|aquel)\s+(?:dossier|informe|resumen)\b/.test(p);
+  const factualModifier=sem.responsibleBreakdown||sem.attendeeIncome||sem.attendanceAll||sem.cashOnly||(sem.report&&!reportViewRef)||sem.topResponsible||((sem.pending||sem.realized)&&sem.purchase);
+  if(factualModifier)return false;if(!sig.domains.length)return true;if(sig.presentation&&(sig.reopen||!!sig.anchor_domain||anaphoric))return true;
+  return sig.presentation&&sig.domains.length===1&&/^(?:\s*(?:ahora\s+)?(?:de\s+)?(?:barras?|lineas?|donut|queso|tarta|graf\w*)\s*)$/i.test(p);
+}
+function v5ChartsFromSnapshot(snapshot={},chartType='bar'){
+  const charts=[];for(const o of arr(snapshot?.operations)){if(!o?.evidence)continue;const item={args:{...(o.args||{}),operation:trim(o.operation||o.args?.operation),chart:true,chart_type:chartType},result:o.evidence};charts.push(...v5GenericChartsFromItem(item));if(trim(o.operation)==='event_weather')charts.push(...v73WeatherChartFromResult(o.evidence).map(ch=>({...ch,type:chartType})));if(trim(o.operation)==='compare_events')charts.push(...v4BrainLiteCompareCharts(o.evidence).map(ch=>({...ch,type:chartType})));}
+  const uniq=[];for(const ch of charts){const k=`${trim(ch?.title)}|${chartType}|${JSON.stringify(ch?.labels||[])}`;if(!uniq.some(x=>x.k===k))uniq.push({k,ch:{...ch,type:chartType}});}return uniq.slice(0,6).map(x=>x.ch);
+}
+function v5ViewOnlyFrame(prev={},chartType='bar',charts=[]){
+  const contexts=arr(prev?.contexts).map(c=>v5EnsureContextShape({...c,contexts:undefined},trim(prev?.screen_event),num(c?.last_used_seq))),idx=contexts.findIndex(c=>trim(c.context_id)===trim(prev?.active_context_id));if(idx<0)return prev;
+  const c=contexts[idx],ps=v5ActiveSnapshot(c);if(!ps)return prev;const seq=Math.max(num(prev?.last_used_seq),...contexts.map(x=>num(x.last_used_seq)))+1,ordinal=arr(c.snapshots).length+1;
+  const ops=arr(ps.operations).map(o=>({...o,args:{...(o.args||{})},evidence:o.evidence?{...o.evidence,tables:arr(o.evidence.tables).map(t=>({...t,rows:arr(t.rows).map(r=>({...r}))}))}:undefined}));
+  const snap={...ps,snapshot_id:`s_${v5ContextHash(c.context_id).slice(0,6)}_${seq}_${ordinal}`,parent_snapshot_id:trim(ps.snapshot_id),created_seq:seq,operations:ops,response_blocks:v5ResponseBlocksFromOperations(ops),presentation:{chart:true,chart_type:chartType},views:[{view_id:'v_text',type:'text',source_operation_ids:ops.map(o=>o.operation_id)},...arr(charts).map((ch,i)=>({view_id:`v_chart_${i+1}`,type:trim(ch?.type)||chartType,source_operation_ids:ops.map(o=>o.operation_id),title:trim(ch.title)}))],answer_shape:'visual'};
+  const snapshots=[...arr(c.snapshots),snap].slice(-6);contexts[idx]={...c,snapshots,active_snapshot_id:snap.snapshot_id,last_used_seq:seq,chart:true,chart_type:chartType};return{...v5ProjectSnapshotToLegacy(contexts[idx]),contexts,active_context_id:c.context_id,active_snapshot_id:snap.snapshot_id,screen_event:trim(prev.screen_event)};
+}
+async function v4BrainLitePlan({userPrompt,state,selectedEventId,conversationHistory=[],clientNowIso,clientTimeZone,model,flowTrace=[],externalSignal=null}={}){
+  const ctx=v5PlannerContextPage(conversationHistory,state,selectedEventId,userPrompt),dialogueState=v5P22ConversationState(conversationHistory,state,selectedEventId),events=arr(state?.eventos).map(e=>trim(e?.titulo||e?.nombre||e?.descripcion)).filter(Boolean).slice(0,80);
+  const recent=arr(conversationHistory).slice(-12).map(x=>({user:trim(x?.user).slice(0,260),assistant:trim(x?.assistant).slice(0,260),context:{domain:trim(x?.resultContext?.frame?.domain||x?.resultContext?.domain),event:trim(x?.resultContext?.frame?.event||x?.resultContext?.event),operation:trim(x?.resultContext?.operation)}}));
+  const sys=`Eres el ÚNICO intérprete de CADA turno de Zuzu. Ningún código previo va a decidir si el mensaje es confirmación, cancelación, memoria, reacción social, repetición, análisis, creatividad o consulta factual. ESA DECISIÓN ES TUYA. ControlEvent ejecutará literalmente tus acciones y validará contratos; tú no inventas datos. Devuelve SOLO JSON del esquema.
+
+PRINCIPIO SOBERANO ABSOLUTO:
+- Interpreta el mensaje COMPLETO en su contexto humano, no por palabras sueltas ni por el tema aparente.
+- Primero determina user_goal: qué pretende conseguir realmente la persona con este turno.
+- Distingue DATA INTENT de RESPONSE GOAL. Obtener datos es un medio; la respuesta final debe satisfacer el objetivo real.
+- Si pide análisis, inferencia, jerarquía, causa, control, supervisión, conclusión o valoración basada en datos: turn_type=analytical, response_goal.mode=analytical, requires_synthesis=true y solicita TODA la evidencia necesaria, aunque implique varias actions. No sustituyas la conclusión pedida por un recuento técnico.
+- Si pide una historia, relato, narración o transformación creativa basada en datos: turn_type=creative, response_goal.mode=narrative, requires_synthesis=true. Las actions solo obtienen la evidencia; la salida final debe ser la narración solicitada, no una comparativa técnica.
+- Si el usuario responde «sí», «no», «adelante», «espera», «hazlo», «lo de antes», etc., resuelve A QUÉ responde usando HISTORIAL_RECIENTE y ESTADO_DIALOGO. No asumas que la acción pendiente más antigua manda.
+- Si pregunta por la conversación actual, no abras memoria histórica salvo que él lo pida.
+- Si protesta, corrige o comenta el comportamiento, trátalo como conversación/meta salvo que también pida una acción factual concreta. No conviertas la protesta en una búsqueda de memoria.
+- memory_action solo se usa porque TÚ lo decides. El código no inferirá memoria por palabras del usuario.
+- state_transition describe la transición que TÚ ordenas; el runtime no decide ninguna transición por su cuenta.
+- response_goal.instruction debe resumir exactamente qué debe contestarse al final, no qué tabla debe mostrarse.
+
+REGLAS DE DATOS:
+- Una petición factual clara => intent DATA y una o más actions. Nunca respondas con promesas de buscar.\n- Una continuación como "amplíamelo", "más detalle", "y las pendientes", "eso", "de quién son" hereda evento/operación del CONTEXTO BUENO salvo cambio explícito.\n- "más detalle/amplía/profundiza" => response_level MEDIUM y repite la operación factual anterior con detail=full. Muchísimo/exhaustivo => HIGH.\n- "visión general", "resumen", "panorama" o "qué tal va" de un evento => BASIC aunque diga "no me escondas lo importante". BASIC significa breve y suficiente; MEDIUM solo si pide ampliar/detalle/contexto adicional; HIGH solo si pide exhaustividad explícita.\n- Si el turno anterior fue event_weather y el usuario pregunta de qué fecha/día eran ESOS datos del tiempo, NO consultes CE otra vez: intent CHAT y responde con weather_date del CONTEXTO_BUENO.\n- Si el usuario pregunta qué datos/campos/columnas son útiles, responde con los CONCEPTOS humanos (donante, producto, unidades, valor, etc.) sin verbalizar nombres de tablas, datasets, filas, columnas ni estructura interna.\n- Información general de UN evento => event_summary. Compras => event_purchases. Donaciones => event_donations. Documentos/justificantes => event_documentation. Banco/cuadre => event_bank. Hitos/LG => event_management. Liquidaciones => event_liquidations. Tiempo => event_weather. Persona global => person_profile. Comparar eventos NOMBRADOS => compare_events. Panorama/tendencia/lectura global de todos los eventos => events_overview.\n- compare_events exige al menos dos eventos concretos. Si el usuario habla globalmente de todos los eventos y no nombra al menos dos, usa events_overview; no inventes una lista de events.\n- Compras pendientes => purchase_status=pending. Compras realizadas => realized. Si pide comprado/realizado Y pendiente por responsable en la misma petición, genera DOS actions event_purchases: una realized y otra pending, sin perder el responsable si está explícito.\n- Dinero pagado/aportado por asistentes, socios o no socios = INGRESOS del evento, nunca donaciones ni compras. Si pide separar banco/efectivo usa event_income_status.\n- Banco, cuenta bancaria, abonos banco, cargos banco, flujo neto bancario, saldo bancario o cuadre = event_bank. Si la petición es explícitamente bancaria, NO añadas event_donations ni event_purchases salvo que el usuario las pida también de forma separada.\n- En event_purchases, responsible debe ser una PERSONA REAL. Nunca uses etiquetas abstractas como top_buyer, max, highest o similares como si fueran nombres. Para saber quién ha comprado más consulta las compras realizadas sin filtro de responsable; ControlEvent hará el ranking local.\n- Un seguimiento corto como "¿cuánto lleva?", "¿y cuánto tiene pendiente?" o equivalente conserva la persona/responsable del CONTEXTO_BUENO si no aparece otra persona explícita.\n- Si el turno anterior fue meteorología y el usuario pide representar/graficar "eso", conserva exactamente su rango start_date/end_date y ubicación/evento; no cambies al rango del evento. chart=true.\n- Si el turno anterior fue compare_events y el usuario pide una gráfica/representación de "eso", conserva exactamente los eventos comparados y usa compare_events con chart=true.\n- Si el usuario pide una gráfica en la MISMA petición factual, marca chart=true. Una gráfica es una PRESENTACIÓN de los datos, no otro dominio.\n- FACTO antes que VISTA: si el mensaje contiene datos nuevos y además pide gráfica, decide primero dominio/operación/filtros; chart/chart_type nunca puede sustituir la acción factual.\n- Para agregaciones usa group_by: responsible para compras por responsable, donor para donaciones por donante, product para producto, date para fecha y status para situación.\n- «informe para la dirección», «informe ejecutivo» o equivalente = informe ejecutivo del evento: datos clave, conclusiones y GRÁFICAS; evita tablas exhaustivas salvo petición expresa. «informe detallado/completo para socios» = puede incluir tablas y gráficas.\n- Si el turno anterior era un informe y el usuario dice «añade gráficas», «pon gráficas a esto», conserva el MISMO evento y el MISMO informe; no cambies a compras ni a meteorología.\n- «responsables de las compras y qué importe manejó cada uno» = event_purchases realized sin filtro individual; ControlEvent agrupa por responsable.\n- Zuzu es el asistente de ControlEvent. NO inventes nombres de plataforma, empresa, fabricante ni producto. Si preguntan quién eres/cómo te llamas, responde que eres Zuzu, el asistente de ControlEvent.\n- Si el usuario dice "este evento" usa el evento del contexto. No fusiones persona y evento.\n- Fechas relativas se resuelven con AHORA. Mañana = fecha siguiente a AHORA.\n- Si no hacen falta datos, intent CHAT y reply breve/natural.\n- CAPACIDAD DE INTERFAZ: Zuzu puede recibir voz por micrófono y responder en voz con DaveFX además de texto. Si el usuario pregunta por hablar/voz/micrófono, no digas que eres solo texto ni que careces de voz; responde según esta capacidad.\n- No expongas dataset, filas, columnas, tools ni nombres internos.\n\n${cleanCapabilityContractCatalogText()}\n\nREGLA ABSOLUTA: decide directamente un contrato LEGAL. ControlEvent NO corregirá tu semántica después. Si scope=all_events, no pongas event. Si mantienes un hilo, conserva operation/scope/filtros relevantes del CONTEXTO_BUENO salvo cambio explícito.\n\nAHORA=${trim(clientNowIso)||new Date().toISOString()} zona=${trim(clientTimeZone)||'Europe/Madrid'}\nCONTEXTO_BUENO=${JSON.stringify(ctx)}\nESTADO_DIALOGO=${JSON.stringify(dialogueState)}\nESTADO_DIALOGO SOLO APORTA HECHOS: pending_action, memory_frame, last_successful_action y active_context NO deciden nada por sí mismos. Decide tú qué referencia es pertinente para MENSAJE_ACTUAL. La pregunta inmediatamente anterior de Zuzu y el sentido humano del diálogo tienen prioridad semántica cuando corresponda. El runtime no seleccionará por ti una acción, un recuerdo ni un sujeto.\nEVENTOS_CANONICOS=${JSON.stringify(events)}`;
+  const input=`HISTORIAL_RECIENTE=${JSON.stringify(recent)}\nMENSAJE_ACTUAL=${userPrompt}`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,body={systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:input}]}],generationConfig:{responseMimeType:'application/json',responseSchema:v4BrainLiteSchema(),temperature:.08,maxOutputTokens:700,thinkingConfig:{thinkingBudget:0}}};
+  const {res,payload}=await geminiFetchJsonWithTimeout(url,body,geminiKey(),Number(process.env.CONTROLEVENT_ZUZU_BRAINLITE_TIMEOUT_MS||12000),externalSignal);if(!res.ok)throw new Error(payload?.error?.message||`Brain-Lite HTTP ${res.status}`);
+  const raw=trim(geminiOutText(payload));let plan={};try{plan=JSON.parse(raw)}catch(_){plan=parsePlanJsonLenientHf37(raw).parsed||{}};plan.intent=['DATA','CHAT'].includes(trim(plan.intent).toUpperCase())?trim(plan.intent).toUpperCase():'CHAT';plan.response_level=['BASIC','MEDIUM','HIGH'].includes(trim(plan.response_level).toUpperCase())?trim(plan.response_level).toUpperCase():'BASIC';plan.actions=arr(plan.actions).filter(x=>trim(x?.operation));plan.turn_type=trim(plan.turn_type)||((plan.intent==='CHAT')?'social':'factual');plan.user_goal=trim(plan.user_goal);plan.response_goal=(plan.response_goal&&typeof plan.response_goal==='object')?plan.response_goal:{mode:'direct',instruction:''};plan.requires_synthesis=plan.requires_synthesis===true;plan.state_transition=(plan.state_transition&&typeof plan.state_transition==='object')?plan.state_transition:{kind:'keep',target:''};plan.memory_action=trim(plan.memory_action)||'none';plan.memory_query=trim(plan.memory_query);zuzuTracePush(flowTrace,'V4 BRAIN-LITE · PLAN','OK',`${plan.intent} · nivel=${plan.response_level} · acciones=${plan.actions.map(x=>trim(x.operation)).join(', ')||'ninguna'}`,{model,usage:usageSmall(payload,model)});return{plan,payload};
+}
+
+// ============================================================================
+// V5 CLEAN AUTHORITY P15 · GEMINI DECISION CONTRACT INMUTABLE
+// Gemini es el único intérprete semántico de la ruta factual ordinaria.
+// Después de su JSON, ninguna guardia legacy puede cambiar dominio, operación, scope,
+// sujeto, evento, filtros ni vista. Solo se permiten normalización de tipo/sintaxis,
+// resolución canónica de una entidad ya decidida y derivación técnica de current_event.
+// ============================================================================
+function v5P15CloneDecisionPlan(plan={}){
+  const rg=plan?.response_goal&&typeof plan.response_goal==='object'?JSON.parse(JSON.stringify(plan.response_goal)):{mode:'direct',instruction:''};
+  const st=plan?.state_transition&&typeof plan.state_transition==='object'?JSON.parse(JSON.stringify(plan.state_transition)):{kind:'keep',target:''};
+  return{intent:['DATA','CHAT'].includes(trim(plan?.intent).toUpperCase())?trim(plan.intent).toUpperCase():'CHAT',turn_type:trim(plan?.turn_type)||'factual',user_goal:trim(plan?.user_goal),response_level:['BASIC','MEDIUM','HIGH'].includes(trim(plan?.response_level).toUpperCase())?trim(plan.response_level).toUpperCase():'BASIC',response_goal:rg,requires_synthesis:plan?.requires_synthesis===true,state_transition:st,memory_action:trim(plan?.memory_action)||'none',memory_query:trim(plan?.memory_query),reply:trim(plan?.reply),actions:arr(plan?.actions).filter(x=>trim(x?.operation)).map(a=>JSON.parse(JSON.stringify(a)))};
+}
+function v5P15DecisionFingerprint(plan={}){return JSON.stringify(v5P15CloneDecisionPlan(plan));}
+function v5P15ValidateFrozenAction(action={}){
+  const checked=validateCleanDecisionContract(action);
+  if(!checked.ok){const e=new Error(checked.issues.join(' | '));e.code='CLEAN_CONTRACT_INVALID';e.contractIssues=checked.issues;throw e;}
+  return true;
+}
+function v5P16ValidatePlanBeforeFreeze(plan={}){
+  if(trim(plan?.intent).toUpperCase()!=='DATA')return{ok:true,issues:[]};
+  const actions=arr(plan?.actions).filter(x=>trim(x?.operation)),issues=[];
+  if(!actions.length)issues.push('intent=DATA requiere al menos una action.');
+  actions.forEach((a,i)=>{const v=validateCleanDecisionContract(a);for(const issue of v.issues)issues.push(`action[${i}]: ${issue}`);});
+  return{ok:issues.length===0,issues};
+}
+async function v5P16GeminiRepairInvalidPlan({plan,userPrompt,state,selectedEventId,conversationHistory=[],clientNowIso,clientTimeZone,model,flowTrace=[],externalSignal=null,issues=[]}={}){
+  const ctx=v5PlannerContextPage(conversationHistory,state,selectedEventId,userPrompt),dialogueState=v5P22ConversationState(conversationHistory,state,selectedEventId),events=arr(state?.eventos).map(e=>trim(e?.titulo||e?.nombre||e?.descripcion)).filter(Boolean).slice(0,80);
+  const sys=`Eres Gemini, ÚNICO intérprete semántico de Zuzu. Tu decisión anterior NO es legal para la API de ControlEvent. Corrige TÚ el contrato; el software no cambiará operation, scope, event, person, filtros ni vista por ti. Devuelve SOLO JSON del mismo esquema de decisión.\n\n${cleanCapabilityContractCatalogText()}\n\nREGLA DE HIERRO: después de tu respuesta válida el contrato se congela y será inalterable. scope=all_events => event ausente. No inventes entidades.`;
+  const input=`MENSAJE_ACTUAL=${userPrompt}\nCONTEXTO_BUENO=${JSON.stringify(ctx)}\nESTADO_DIALOGO=${JSON.stringify(dialogueState)}\nESTADO_DIALOGO SOLO APORTA HECHOS: pending_action, memory_frame, last_successful_action y active_context NO deciden nada por sí mismos. Decide tú qué referencia es pertinente para MENSAJE_ACTUAL. La pregunta inmediatamente anterior de Zuzu y el sentido humano del diálogo tienen prioridad semántica cuando corresponda. El runtime no seleccionará por ti una acción, un recuerdo ni un sujeto.\nEVENTOS_CANONICOS=${JSON.stringify(events)}\nPLAN_INVALIDO=${JSON.stringify(plan)}\nERRORES_DE_CONTRATO=${JSON.stringify(issues)}`;
+  const url=`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,body={systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:input}]}],generationConfig:{responseMimeType:'application/json',responseSchema:v4BrainLiteSchema(),temperature:0,maxOutputTokens:700,thinkingConfig:{thinkingBudget:0}}};
+  const {res,payload}=await geminiFetchJsonWithTimeout(url,body,geminiKey(),Number(process.env.CONTROLEVENT_ZUZU_BRAINLITE_TIMEOUT_MS||12000),externalSignal);if(!res.ok)throw new Error(payload?.error?.message||`Brain-Lite repair HTTP ${res.status}`);
+  const raw=trim(geminiOutText(payload));let repaired={};try{repaired=JSON.parse(raw)}catch(_){repaired=parsePlanJsonLenientHf37(raw).parsed||{}};repaired.intent=['DATA','CHAT'].includes(trim(repaired.intent).toUpperCase())?trim(repaired.intent).toUpperCase():'CHAT';repaired.response_level=['BASIC','MEDIUM','HIGH'].includes(trim(repaired.response_level).toUpperCase())?trim(repaired.response_level).toUpperCase():'BASIC';repaired.actions=arr(repaired.actions).filter(x=>trim(x?.operation));repaired.turn_type=trim(repaired.turn_type)||((repaired.intent==='CHAT')?'social':'factual');repaired.user_goal=trim(repaired.user_goal);repaired.response_goal=(repaired.response_goal&&typeof repaired.response_goal==='object')?repaired.response_goal:{mode:'direct',instruction:''};repaired.requires_synthesis=repaired.requires_synthesis===true;repaired.state_transition=(repaired.state_transition&&typeof repaired.state_transition==='object')?repaired.state_transition:{kind:'keep',target:''};repaired.memory_action=trim(repaired.memory_action)||'none';repaired.memory_query=trim(repaired.memory_query);
+  zuzuTracePush(flowTrace,'V5 CLEAN AUTHORITY · GEMINI CONTRACT REPAIR','OK',`Gemini reemitió el contrato tras validación: ${repaired.actions.map(a=>trim(a.operation)).join(', ')||'sin acciones'}.`,{issues,previous_plan:plan,repaired_plan:repaired,usage:usageSmall(payload,model)});return repaired;
+}
+function v5P15ExecutionArgsFromFrozenAction(action={},state={},selectedEventId='',userPrompt='',flowTrace=[]){
+  const contract=JSON.parse(JSON.stringify(action||{}));v5P15ValidateFrozenAction(contract);const exec=JSON.parse(JSON.stringify(contract));
+  const scope=trim(exec.scope),op=trim(exec.operation);
+  if(scope==='current_event'&&!trim(exec.event)){const screen=trim(v26EventById(state,selectedEventId)?.titulo||v26EventById(state,selectedEventId)?.nombre||v26EventById(state,selectedEventId)?.descripcion);if(!screen){const e=new Error('No hay evento visible para scope=current_event.');e.code='CLEAN_CONTRACT_CURRENT_EVENT_UNAVAILABLE';throw e;}exec.event=screen;exec._derived_event_from_scope='current_event';}
+  if(trim(exec.event))exec.event=vnextP1ResolveEventName(state,exec.event,selectedEventId)||exec.event;
+  if(arr(exec.events).length)exec.events=arr(exec.events).map(x=>vnextP1ResolveEventName(state,x,selectedEventId)||x).filter(Boolean);
+  if(trim(exec.person))exec.person=vnextP1ResolvePersonName(state,exec.person)||exec.person;
+  if(trim(exec.responsible)){try{exec.responsible=vnextP1ResolvePersonName(state,exec.responsible)||exec.responsible;}catch(_){}}
+  exec._user_prompt=userPrompt;zuzuTracePush(flowTrace,'V5 CLEAN AUTHORITY · CONTRATO CONGELADO','OK',`Gemini decidió ${op}${scope?` · scope=${scope}`:''}; ejecución sin reinterpretación semántica.`,{decision_contract:contract,execution_args:exec});return{contract,exec};
+}
+function v5P15FreezePlan(plan={},flowTrace=[]){const frozen=v5P15CloneDecisionPlan(plan),fingerprint=v5P15DecisionFingerprint(frozen);Object.freeze(frozen.actions);Object.freeze(frozen);zuzuTracePush(flowTrace,'V5 CLEAN AUTHORITY · FREEZE','OK',`Contrato Gemini congelado · ${frozen.intent} · ${frozen.actions.map(a=>trim(a.operation)).join(', ')||'sin operaciones'}.`,{fingerprint,decision_contract:v5P15CloneDecisionPlan(frozen)});return{plan:frozen,fingerprint};}
+
+function v4BrainLiteRepairAction(action={},state={},selectedEventId='',history=[],flowTrace=[]){
+  let a={...action},op=trim(a.operation),ctx=v4BrainLiteContext(history,state,selectedEventId);
+  // Reparación ESTRUCTURAL, no lingüística: completar claves obligatorias solo desde
+  // el último contexto certificado o convertir una comparación sin sujetos en panorama global.
+  if(op==='compare_events'){
+    let evs=arr(a.events).map(trim).filter(Boolean);
+    if(evs.length<2&&arr(ctx.events).length>=2)evs=arr(ctx.events).map(trim).filter(Boolean);
+    if(evs.length<2){a={operation:'events_overview',detail:trim(a.detail)||'brief'};op='events_overview';zuzuTracePush(flowTrace,'V4 BRAIN-LITE · REPARACIÓN ESTRUCTURAL','OK','compare_events sin dos eventos concretos → events_overview.');}
+    else a.events=evs;
+  }
+  const eventOps=new Set(['event_summary','event_purchases','event_donations','event_documentation','event_bank','event_management','event_liquidations','event_weather','event_attendance','event_income_status','event_products','event_stores_used']);
+  if(eventOps.has(op)&&!trim(a.event)&&trim(ctx.event))a.event=ctx.event;
+  return a;
+}
+function v4BrainLitePromptSemantics(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt),has=(re)=>re.test(p);
+  const attendeeIncome=has(/\b(?:asistent\w*|socios?|no\s+socios?|cuotas?)\b/)&&has(/\b(?:pagad\w*|aportad\w*|ingres\w*|dinero)\b/);
+  const attendanceAll=has(/\b(?:asistent\w*|personas?\s+asistent\w*)\b/)&&has(/\b(?:todos?|todas?|cada|detalle|complet\w*|sin\s+cortar|lista)\b/);
+  const bankExplain=has(/\b(?:calcul\w*|formula|operacion|operación|de\s+donde|de\s+dónde|salen?|sale|explica\w*|como\s+has\s+hecho|cómo\s+has\s+hecho)\b/)&&has(/\b(?:saldo|banc\w*|cuadre|impacto|flujo)\b/);
+  const graphDemo=has(/\b(?:demostracion|demostración|ejemplo|inventad\w*)\b/)&&has(/\bgraf\w*\b/);
+  const chartType=has(/\b(?:barras?|bar)\b/)?'bar':has(/\b(?:lineas?|líneas?|lineal)\b/)?'line':has(/\b(?:tarta|queso|pie)\b/)?'pie':has(/\b(?:donut|anillo)\b/)?'donut':'';
+  const chartFollow=has(/\b(?:graf\w*|represent\w*|visualiz\w*)\b/)||!!chartType;
+  const summary=has(/\b(?:resumen(?:\s+economico|\s+económico)?|panorama|vision\s+general|visión\s+general|como\s+va|cómo\s+va)\b/);
+  const report=has(/\b(?:informe|dossier|memoria)\b/);
+  const reportExecutive=report&&has(/\b(?:direccion|dirección|directiv\w*|ejecutiv\w*|gerencia|junta)\b/);
+  const reportDetailed=report&&has(/\b(?:detall\w*|complet\w*|todo\s+lujo|exhaustiv\w*|socios?)\b/);
+  const reportChartFollow=chartFollow&&has(/\b(?:esto|todo\s+esto|informe|rollo|anterior|mismo)\b/);
+  const responsibleBreakdown=has(/\bresponsabl\w*\b/)&&(has(/\b(?:importe|cuanto|cuánto|manejo|manejó|cada\s+uno|repart\w*)\b/)||has(/\b(?:agrup\w*|desglos\w*|ordenad\w*)\b/));
+  const cashOnly=has(/\bsolo\b.{0,45}\befectivo\b|\befectivo\b.{0,45}\bsolo\b/);
+  const explicitWeather=has(/\b(?:tiempo|meteorolog\w*|prevision|previsión|temperatur\w*|maximas?|máximas?|minimas?|mínimas?|lluvia)\b/);
+  const explicitCompare=has(/\b(?:compara|comparativa|comparar)\b/);
+  return{bank:has(/\b(?:banco|bancari\w*|cuadre|cuadernill\w*\s+bancari\w*|conciliacion\w*|abonos?|cargos?|flujo\s+neto|cuenta\s+bancaria|saldo\s+calculad\w*)\b/),bankExplain,income:has(/\b(?:ingres\w*|pagad\w*|aportad\w*|cuotas?|asistent\w*|socios?|no\s+socios?|efectivo)\b/),attendeeIncome,attendanceAll,donation:has(/\b(?:donacion\w*|donante\w*|donad\w*)\b/),purchase:has(/\b(?:compr\w*|gast\w*)\b/),pending:has(/\b(?:pendient\w*|falta\w*|queda\w*)\b/),realized:has(/\b(?:realizad\w*|comprad\w*|han\s+comprad\w*|ha\s+comprad\w*|lleva\s+comprad\w*|gastad\w*)\b/),allResponsible:has(/\b(?:todos?|todas?|cada)\b/)&&has(/\bresponsabl\w*\b/),topResponsible:has(/\b(?:quien|cual)\b/)&&has(/\b(?:mas|mayor)\b/)&&has(/\b(?:compr\w*|gast\w*)\b/),personFollow:has(/\b(?:cuanto\s+lleva|cuanto\s+tiene|y\s+cuanto|el\s+que|esa\s+persona|ese\s+responsable)\b/),chartFollow,chartType,graphDemo,summary,report,reportExecutive,reportDetailed,reportChartFollow,responsibleBreakdown,cashOnly,explicitWeather,explicitCompare};
+}
+function v4BrainLiteRecentContext(history=[],predicate=()=>true){
+  for(let i=arr(history).length-1;i>=0;i--){const rc=arr(history)[i]?.resultContext;if(rc&&typeof rc==='object'&&predicate(rc))return rc;}
+  return null;
+}
+function v4BrainLiteLastChartContext(history=[]){
+  for(let i=arr(history).length-1;i>=0;i--){const rc=arr(history)[i]?.resultContext;if(!rc||typeof rc!=='object')continue;const src=(rc.frame&&typeof rc.frame==='object')?rc.frame:rc;if(src.chart===true||arr(src.last_query_actions).length||['event_weather','compare_events','event_report'].includes(trim(src.operation))||trim(src.report_mode))return src;}return null;
+}
+
+/* FIX38 CLEAN AUTHORITY: legacy semantic mutator v4BrainLitePlanStructuralGuard removed. */
+
+/* FIX38 CLEAN AUTHORITY: legacy semantic mutator v4BrainLiteArgs removed. */
+
+function v4BrainLitePreviousWeatherDate(history=[]){
+  for(let i=arr(history).length-1;i>=0;i--){const rc=arr(history)[i]?.resultContext||{};if(trim(rc.operation)==='event_weather'){const d=trim(rc.weather_date||rc.date);if(d)return d;}}
+  return'';
+}
+function v4BrainLiteWeatherDateFollowup(userPrompt='',history=[]){
+  const p=vnextP17LooseNorm(userPrompt),d=v4BrainLitePreviousWeatherDate(history);if(!d)return'';
+  if(/\b(?:fecha|dia)\b/.test(p)&&/\b(?:tiempo|meteorolog|datos?)\b/.test(p)&&/\b(?:ese|esos|esa|esas|exact|correspond|eran|son)\b/.test(p))return d;
+  return'';
+}
+function v4BrainLiteWrittenNeedsHumanRewrite(value=''){
+  return /\b(?:tabla(?:s)?|dataset(?:s)?|fila(?:s)?|columna(?:s)?|source_operation|query_ce|table_key)\b/i.test(text(value));
+}
+async function v4BrainLiteHumanWrittenRewrite({userPrompt='',writtenAnswer='',model='',flowTrace=[],externalSignal=null}={}){
+  if(!v4BrainLiteWrittenNeedsHumanRewrite(writtenAnswer))return writtenAnswer;
+  const input=`PETICIÓN ORIGINAL:\n${userPrompt}\n\nRESPUESTA FACTUAL YA CERTIFICADA:\n${writtenAnswer}\n\nReescribe conservando exactamente los hechos. Si el usuario habla de columnas/campos, explica qué INFORMACIÓN es útil, pero no nombres tablas, datasets, filas, columnas ni estructuras internas. No añadas datos.`;
+  try{const payload=await v261CallInteraction({input,previousInteractionId:'',model,systemInstruction:'Eres el redactor humano final de Zuzu. Solo cambias la forma, nunca los hechos, filtros, sujetos ni cifras.',tools:[],flowTrace,stage:'V4 BRAIN-LITE · HUMAN-SAFE',externalSignal,maxCalls:1,maxOutputTokens:420,minOutputTokens:40,plainTextResponse:true});const out=trim(v261OutputText(payload));if(out){zuzuTracePush(flowTrace,'V4 BRAIN-LITE · HUMAN-SAFE','OK','Se eliminó lenguaje de interfaz sin cambiar los hechos.');return out;}}catch(error){zuzuTracePush(flowTrace,'V4 BRAIN-LITE · HUMAN-SAFE','WARN',cleanGeminiError(error));}
+  return writtenAnswer;
+}
+function v4BrainLiteVoiceSafe(value='',state={},opts={}){
+  let out=text(value);
+  // La salida hablada NO es la salida escrita: fuera Markdown, tablas, cabeceras y marcas visuales.
+  out=out.replace(/^\s*\|?\s*:?-{3,}[^\n]*$/gm,'').replace(/^\s*#{1,6}\s*/gm,'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/^\s*[*#>-]+\s*/gm,'').replace(/[*_`]+/g,'');
+  // Fechas ISO nunca llegan tal cual a DaveFX.
+  out=out.replace(/\b(20\d{2}-\d{2}-\d{2})(?:T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?Z?)?\b/g,(_,iso)=>v3142HumanDateFromIso(iso));
+  // Dinero hablado: entero truncado. La pantalla conserva el valor exacto.
+  out=out.replace(/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|EUR\b|euros?\b)/gi,(m,n)=>{const x=v416ParseEuroNumber(n);return Number.isFinite(x)?`${Math.trunc(x)} euros`:m;});
+  // Temperaturas/porcentajes: entero natural, sin símbolos ni decimales.
+  out=out.replace(/(-?\d+(?:[.,]\d+)?)\s*°?\s*C\b/gi,(m,n)=>{const x=Number(String(n).replace(',','.'));return Number.isFinite(x)?`${Math.round(x)} grados`:m;});
+  out=out.replace(/(-?\d+(?:[.,]\d+)?)\s*%/g,(m,n)=>{const x=Number(String(n).replace(',','.'));return Number.isFinite(x)?`${Math.round(x)} por ciento`:m;});
+  // Locución: transformar separadores visuales en pausas audibles. La pantalla no cambia.
+  out=out.replace(/\s*\|\s*/g,'. ').replace(/\s*[·•]\s*/g,', ').replace(/\s*;\s*/g,'. ');
+  // Registros «Persona: comprado X, pendiente Y» se oyen como una frase, no como columnas leídas.
+  out=out.replace(/\b([^.:]{2,50}):\s*comprado\s+([^,.!?]+(?:euros)?)[,.]?\s*pendiente\s+([^.!?]+)(?=\.|$)/gi,(m,n,c,p)=>`${trim(n)}. Ha comprado ${trim(c)} y tiene pendiente ${trim(p)}`);
+  out=out.replace(/\bGemini\b/gi,'Zuzu').replace(/\b(?:dataset|filas?|columnas?|source_operation|query_ce|table_key)\b/gi,'').replace(/\s{2,}/g,' ').replace(/\s+([,.;:!?])/g,'$1').trim();
+  return out;
+}
+
+function v4BrainLiteMemoryCue(text=''){
+  const p=vnextP17LooseNorm(text);
+  // Intención de recuerdo histórica: acepta toda la familia verbal recordar/recuerdo y referencias
+  // naturales a conversaciones de antes. No contiene nombres propios ni frases de negocio.
+  const recall=/\b(?:recuerd[a-z]*|record[a-z]*|acuerd[a-z]*|memoria|conversacion(?:es)?(?:\s+de)?\s+(?:antes|anteriores?|antiguas?|pasadas?)|habl[a-z]*\s+(?:tu\s+y\s+yo|conmigo).{0,45}\b(?:antes|hace\s+tiempo|otra\s+vez))\b/.test(p);
+  return recall&&!/\b(?:recuerda que|acuerdate que)\b/.test(p);
+}
+function v4BrainLiteCanonicalPersonHint(text='',state={}){
+  const words=(String(text||'').match(/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ'’-]{2,}/g)||[]).slice(-16);
+  if(!words.length)return null;
+  let best=null;
+  // Resolución TIPADA contra el catálogo real de personas. Sirve para errores ASR como añadir o
+  // quitar una sílaba a un nombre propio, sin convertir globalmente topónimos ni palabras comunes.
+  for(let n=1;n<=Math.min(3,words.length);n++)for(let i=Math.max(0,words.length-10);i+n<=words.length;i++){
+    const value=words.slice(i,i+n).join(' '),r=semanticResolveEntity(state,'person',value);
+    if(!r?.ok)continue;
+    const score=Number(r.score)||0;if(score<0.78)continue;
+    if(!best||score>best.score||(score===best.score&&value.length>best.value.length))best={...r,value,score};
+  }
+  return best;
+}
+function v4BrainLiteCanonicalizeTypedPersonArgs(a={},state={},flowTrace=[]){
+  const out={...a};
+  for(const key of ['person','responsible','donor']){
+    const raw=trim(out[key]);if(!raw)continue;
+    const r=semanticResolveEntity(state,'person',raw);
+    if(r?.ok&&trim(r.nombre)&&norm(r.nombre)!==norm(raw)){
+      out[key]=r.nombre;zuzuTracePush(flowTrace,'V4 BRAIN-LITE · IDENTIDAD PERSONA','OK',`${key}: «${raw}» → «${r.nombre}» · score=${Number(r.score||0).toFixed(2)}`);
+    }
+  }
+  return out;
+}
+function v4BrainLiteRecallTopic(text=''){
+  const raw=vnextP17LooseNorm(text),stop=new Set(['tienes','tengo','algun','alguna','alguno','recuerdo','recuerdas','recordar','haber','hemos','habeis','hablado','hablar','conversacion','conversaciones','sobre','acerca','antes','alguna vez','de','del','la','el','los','las','un','una','que','yo','tu','nosotros']);
+  const words=raw.split(/\s+/).map(x=>x.replace(/[^a-z0-9áéíóúüñ-]/gi,'')).filter(x=>x.length>2&&!stop.has(x));
+  return words.slice(-4).join(' ').trim();
+}
+async function v4BrainLiteRecallMemory({userPrompt,state,conversationId,conversationHistory,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,model,flowTrace,externalSignal,voiceConversation}={}){
+  const actor=state?.usuarioLogado||state?.ce_acceso_usuario_logado||usuarioLogado||user||authUser||ce_acceso||{};
+  const personHint=v4BrainLiteCanonicalPersonHint(userPrompt,state),topic=trim(personHint?.nombre)||v4BrainLiteRecallTopic(userPrompt),canonicalQuery=personHint?`${trim(personHint.nombre)} · ${trim(userPrompt)}`:trim(userPrompt);
+  if(personHint&&norm(personHint.nombre)!==norm(personHint.value))zuzuTracePush(flowTrace,'V4 BRAIN-LITE · MEMORIA · IDENTIDAD','OK',`Posible nombre hablado «${personHint.value}» resuelto como socio «${personHint.nombre}» · score=${Number(personHint.score||0).toFixed(2)}`);
+  let searchCall={id:`brainmem_${Date.now().toString(36)}`,name:'recall_memory',arguments:{action:'search',query:canonicalQuery,limit:8,inspect:!!topic,inspect_term:topic}};
+  let found=await vnextRecallMemory(searchCall,actor,conversationId,clientLocalDateTime||clientNowIso,conversationHistory),rows=arr(found?.tables?.[0]?.rows);
+  // P7 · la búsqueda semántica solo propone candidatos. El recuerdo NO se certifica hasta
+  // encontrar un pasaje visible en el episodio que sustente el término/persona solicitado.
+  if(topic&&found?.facts?.inspect===true&&num(found?.facts?.visible_literal_hits)===0)zuzuTracePush(flowTrace,'V5 P7 · MEMORIA · CANDIDATOS','INFO',`El resumen de candidatos no muestra «${topic}»; se inspeccionan episodios antes de concluir.`);
+  // Si la frase completa mete ruido, el segundo intento usa solo la identidad canónica ya validada.
+  if(!rows.length&&personHint){searchCall={id:`brainmem_person_${Date.now().toString(36)}`,name:'recall_memory',arguments:{action:'search',query:trim(personHint.nombre),limit:8,inspect:true,inspect_term:trim(personHint.nombre)}};found=await vnextRecallMemory(searchCall,actor,conversationId,clientLocalDateTime||clientNowIso,conversationHistory);rows=arr(found?.tables?.[0]?.rows);}
+  if(!rows.length){const answer='No encuentro un recuerdo histórico suficientemente claro sobre eso.';return{answer,spokenAnswer:answer,result:found,resultContext:{...v4BrainLiteContext(conversationHistory,state,''),operation:'recall_memory',memory_query:canonicalQuery,person:trim(personHint?.nombre)}};}
+  let result=found,top=rows[0]||{},cid='',tid='',evidenceRows=[];
+  const needle=norm(topic);
+  // Se prueban pocos candidatos por orden del buscador; es una verificación, no una nueva interpretación.
+  for(const candidate of rows.slice(0,5)){
+    const ccid=trim(candidate['Conversation ID']||candidate.conversation_id),ctid=trim(candidate['Turn ID']||candidate.turn_id);if(!ccid)continue;
+    try{const read=await vnextRecallMemory({id:`brainmemread_${Date.now().toString(36)}`,name:'recall_memory',arguments:{action:'read',conversation_id:ccid,matched_turn_id:ctid}},actor,conversationId,clientLocalDateTime||clientNowIso,conversationHistory),turnRows=arr(v4BrainLiteTable(read,'memory_turns')?.rows),hits=needle?turnRows.filter(r=>personHint?v5P13EvidenceMentionsSubject(r,trim(personHint.nombre)):norm([r?.Pregunta,r?.Respuesta,r?.Resumen].filter(Boolean).join(' ')).includes(needle)):turnRows.slice(0,1);if(hits.length||!needle){result=read;top=candidate;cid=ccid;tid=ctid;evidenceRows=hits;break;}}catch(_){ }
+  }
+  if(!cid){const answer=topic?`No encuentro una conversación en la que aparezca ${topic} con suficiente claridad.`:'No encuentro un episodio verificable sobre eso.';zuzuTracePush(flowTrace,'V5 P7 · MEMORIA · EVIDENCIA OBLIGATORIA','WARN',`Ninguno de los candidatos inspeccionados aporta pasaje visible para «${topic||'la consulta'}».`);return{answer,spokenAnswer:answer,result:found,resultContext:{...v4BrainLiteContext(conversationHistory,state,''),operation:'recall_memory',memory_query:canonicalQuery,person:trim(personHint?.nombre)}};}
+  if(evidenceRows.length)result={...result,facts:{...(result.facts||{}),matched_evidence_count:evidenceRows.length,matched_evidence_term:topic},tables:[...arr(result.tables),v26Table('memory_evidence','Pasajes que sustentan el recuerdo',evidenceRows.slice(0,12),{Fecha:v26TextSchema(),Pregunta:v26TextSchema(),Respuesta:v26TextSchema(),Resumen:v26TextSchema()})]};
+  const item={call:{name:'recall_memory'},args:{action:'read',query:trim(userPrompt),conversation_id:cid,matched_turn_id:tid},result};
+  // FIX18: la memoria NO pasa por un redactor que pueda mezclar episodios o inventar cifras. La
+  // respuesta se construye solo con metadatos/temas del recuerdo recuperado. Ganamos fiabilidad
+  // y eliminamos una Interaction de Gemini en las consultas de recuerdos.
+  let answer=v440VoiceMemoryAnswer(result,item.args,userPrompt,'',trim(clientTimeZone)||'Europe/Madrid',clientNowIso||clientLocalDateTime)||`Sí, he encontrado un recuerdo relacionado: ${trim(top.Resumen||top.Título)}.`;
+  answer=v29SanitizeAnswerMarkup(answer);
+  const historicalContract=v5P18HistoricalContractFromMemoryResult(result,evidenceRows),memoryPresentation=v5P11MemoryPresentation(result,trim(personHint?.nombre),answer,clientNowIso||clientLocalDateTime,historicalContract),age=trim(memoryPresentation.ageText);
+  let spokenAnswer=answer;
+  if(voiceConversation){
+    const lead=age?`Este recuerdo es de ${age}. `:'';
+    const offer=memoryPresentation.canRefresh?' Si quieres, puedo ejecutar hoy la misma consulta y dejarte el recuerdo y la respuesta de hoy juntos para compararlos.':'';
+    spokenAnswer=v4BrainLiteVoiceSafe(v40ConversationalPolish(`${lead}${answer}${offer}`,userPrompt,true),state,{timeZone:clientTimeZone,nowIso:clientNowIso||clientLocalDateTime});
+  }
+  return{answer,spokenAnswer,result,memoryPresentation,resultContext:{...v4BrainLiteContext(conversationHistory,state,''),operation:'recall_memory',domain:'memory',memory_query:trim(userPrompt),conversation_id:cid,matched_turn_id:tid,person:trim(personHint?.nombre),memory_age_text:age,memory_occurred_at:trim(memoryPresentation.occurredAt),memory_historical_contract:historicalContract}};
+}
+
+function v4BrainLiteTable(result={},key=''){return arr(result?.tables).find(t=>norm(t?.key)===norm(key))||null;}
+function v4BrainLiteMoneyValue(row={}){for(const k of ['Importe','Importe total','Valor','Total']){const v=row?.[k];if(v!==undefined&&v!==null&&String(v)!=='')return num(v);}return 0;}
+function v4BrainLiteResponsibleMap(item={}){const rows=arr(v4BrainLiteTable(item?.result,'by_responsible')?.rows),m=new Map();for(const r of rows){const name=trim(r?.Responsable||r?.responsable);if(name)m.set(name,v4BrainLiteMoneyValue(r));}return m;}
+function v4BrainLiteCompareCharts(result={}){
+  const t=v4BrainLiteTable(result,'comparison'),rows=arr(t?.rows);if(rows.length<2)return[];
+  const labels=rows.map(r=>trim(r?.Evento)).filter(Boolean),charts=[];
+  for(const field of ['Ingresos','Compras realizadas','Compras pendientes','Donaciones valoradas','Saldo operativo']){
+    const values=rows.map(r=>num(r?.[field]));charts.push({title:`Comparativa · ${field}`,type:'bar',labels,values,unit:'€'});
+  }
+  return charts.slice(0,5);
+}
+function v4BrainLiteIdentityReply(userPrompt=''){
+  const p=vnextP17LooseNorm(userPrompt);
+  if(/\b(?:como\s+te\s+llamas|quien\s+eres|cual\s+es\s+tu\s+nombre)\b/.test(p))return'Soy Zuzu, el asistente de ControlEvent.';
+  if(/\bzuzenberg\b/.test(p))return'Zuzenberg no es una plataforma de ControlEvent. Ese nombre no debo inventarlo: soy Zuzu, el asistente de ControlEvent.';
+  return'';
+}
+function v4BrainLiteDemoChart(userPrompt=''){
+  const sem=v4BrainLitePromptSemantics(userPrompt);if(!sem.graphDemo)return null;
+  return{answer:'Aquí tienes una demostración de una gráfica de líneas.',charts:[{title:'Demostración de gráfica',type:'line',labels:['1','2','3','4','5'],values:[2,5,3,7,4],series:[{name:'Ejemplo',values:[2,5,3,7,4]}],unit:''}]};
+}
+
+function v4BrainLiteRowsChart(table,labelField,valueField,title,type='bar',unit=''){
+  const rows=arr(table?.rows).filter(r=>trim(r?.[labelField]));if(!rows.length)return null;
+  const labels=rows.map(r=>trim(r?.[labelField])),values=rows.map(r=>num(r?.[valueField]));
+  return{title,type,labels,values,series:[{name:valueField,values}],unit};
+}
+function v4BrainLiteReportCharts(good=[],chartType='bar'){
+  const charts=[],summary=good.find(x=>trim(x?.args?.operation)==='event_summary'),purch=good.find(x=>trim(x?.args?.operation)==='event_purchases'&&trim(x?.args?.purchase_status)==='realized'),don=good.find(x=>trim(x?.args?.operation)==='event_donations');
+  const econ=v4BrainLiteTable(summary?.result||{},'economics_chart');if(econ){const ch=v4BrainLiteRowsChart(econ,'Indicador','Valor','Economía del evento',chartType,'€');if(ch)charts.push(ch);}
+  const resp=v4BrainLiteTable(purch?.result||{},'by_responsible');if(resp){const rows={...resp,rows:arr(resp.rows).filter(r=>trim(r?.Responsable)&&num(r?.Importe)>0).slice(0,10)};const ch=v4BrainLiteRowsChart(rows,'Responsable','Importe','Compras por responsable',chartType,'€');if(ch)charts.push(ch);}
+  const donors=v4BrainLiteTable(don?.result||{},'donors');if(donors){const rows={...donors,rows:arr(donors.rows).filter(r=>trim(r?.Donante)&&num(r?.Valor)>0).slice(0,10)};const ch=v4BrainLiteRowsChart(rows,'Donante','Valor','Donaciones por donante',chartType,'€');if(ch)charts.push(ch);}
+  const att=v4BrainLiteTable(summary?.result||{},'attendance_chart');if(att){const ch=v4BrainLiteRowsChart(att,'Indicador','Valor','Asistencia',chartType,'personas');if(ch)charts.push(ch);}
+  return charts.slice(0,4);
+}
+
+function v5GenericChartsFromItem(item={}){
+  const op=trim(item?.args?.operation),type=trim(item?.args?.chart_type)||'bar';if(item?.args?.chart!==true)return[];
+  const result=item?.result||{},charts=[];
+  const push=(table,label,value,title,unit='€')=>{if(!table)return;const rows={...table,rows:arr(table.rows).filter(r=>trim(r?.[label])&&Number.isFinite(Number(r?.[value]))).slice(0,14)};const ch=v4BrainLiteRowsChart(rows,label,value,title,type,unit);if(ch)charts.push(ch);};
+  // Mapeos de PRESENTACIÓN sobre tablas canónicas: no contienen entidades, importes ni frases de ITV.
+  if(op==='event_purchases'){push(v4BrainLiteTable(result,'by_responsible'),'Responsable','Importe','Compras por responsable','€');if(!charts.length)push(v4BrainLiteTable(result,'by_product'),'Producto','Importe','Compras por producto','€');}
+  else if(op==='event_donations'){push(v4BrainLiteTable(result,'donors'),'Donante','Valor','Donaciones por donante','€');if(!charts.length)push(v4BrainLiteTable(result,'by_donor'),'Donante','Valor','Donaciones por donante','€');}
+  else if(op==='event_summary'){push(v4BrainLiteTable(result,'economics_chart'),'Indicador','Valor','Economía del evento','€');}
+  else if(op==='event_income_status'){const t=v4BrainLiteTable(result,'income_status');if(t){const rows=arr(t.rows),by=new Map();for(const r of rows){const k=trim(r?.['Situación / forma registrada']||r?.Estado||r?.Situación);if(k)by.set(k,num(by.get(k))+num(r?.['Importe total']??r?.Importe));}const table={rows:[...by.entries()].map(([Forma,Importe])=>({Forma,Importe}))};push(table,'Forma','Importe','Ingresos por situación','€');}}
+  return charts.slice(0,4);
+}
+function v4BrainLiteReportText(good=[],mode='executive'){
+  const summary=good.find(x=>trim(x?.args?.operation)==='event_summary'),bank=good.find(x=>trim(x?.args?.operation)==='event_bank'),purch=good.find(x=>trim(x?.args?.operation)==='event_purchases'),don=good.find(x=>trim(x?.args?.operation)==='event_donations');
+  const f=summary?.result?.facts||{},bf=bank?.result?.facts||{},event=trim(f.event||summary?.args?.event||bank?.args?.event||purch?.args?.event||don?.args?.event)||'el evento';
+  const money=v=>v26FormatEuro(num(v)),income=num(f.income_received??f.income_total??f.ingresos??f.summary?.income),spent=num(f.purchases_realized??f.purchase_realized??f.compras_realizadas??f.summary?.expense),pending=num(f.purchases_pending??f.purchase_pending??f.compras_pendientes),donValue=num(f.donations_value??f.donation_value),attendance=num(f.attendees_canonical??f.attendees??f.asistencia),saldo=num(f.operating_balance??f.saldo_operativo??(income-spent-pending));
+  const abonos=num(bf.included_income_total??bf.summary?.income),cargos=num(bf.included_charge_total??bf.summary?.expense),net=num(bf.bank_impact??bf.summary?.eventVariation??(abonos-cargos));
+  if(mode==='executive')return`Informe para Dirección · ${event}
+
+Resumen ejecutivo
+${event} cierra con ${money(income)} de ingresos, ${money(spent)} de compras realizadas, ${money(pending)} pendientes y ${money(donValue)} en donaciones valoradas. El saldo operativo es ${money(saldo)} y la asistencia registrada es de ${attendance} personas.
+
+Situación bancaria
+Los abonos bancarios suman ${money(abonos)} y los cargos ${money(cargos)}; el impacto neto en la cuenta es ${money(net)}. El efectivo se trata aparte y no altera ese flujo bancario.
+
+Lectura de gestión
+Para Dirección interesa ver magnitudes, desviaciones y responsables principales de un vistazo. Por eso este formato prioriza gráficas y conclusiones, sin volcar tablas extensas salvo petición expresa.`;
+  return`Informe detallado · ${event}
+
+Resumen
+Ingresos: ${money(income)}. Compras realizadas: ${money(spent)}. Compras pendientes: ${money(pending)}. Donaciones valoradas: ${money(donValue)}. Saldo operativo: ${money(saldo)}. Asistencia: ${attendance} personas.
+
+Banco
+Abonos: ${money(abonos)}. Cargos: ${money(cargos)}. Flujo neto bancario: ${money(net)}.
+
+El detalle conserva los datos canónicos del evento; las tablas muestran el desglose y cada bloque relevante lleva su lectura gráfica.`;
+}
+function v4BrainLiteFriendlyText(value='',userPrompt=''){
+  let out=trim(value);
+  out=out.replace(/(\d+)\s+registros de compra\s*[·\-]\s*(\d+)\s+productos distintos\s+realizadas por\s+([0-9.,]+\s*€)\.*$/i,'Se han realizado $1 compras, correspondientes a $2 productos distintos, por un total de $3.');
+  out=out.replace(/(\d+)\s+registros de compra\s*[·\-]\s*(\d+)\s+productos distintos\s+pendientes por\s+([0-9.,]+\s*€)\.*$/i,'Quedan $1 compras pendientes, sobre $2 productos distintos, por $3.');
+  return out.replace(/\s+\.\./g,'.').replace(/\.\.+/g,'.');
+}
+
+function v4BrainLiteComposeLocal(good=[],userPrompt='',state={},plan={}){
+  const sem=v4BrainLitePromptSemantics(userPrompt),purchases=good.filter(x=>trim(x?.args?.operation)==='event_purchases'),fmt=v=>v26FormatEuro(num(v));
+  if(trim(plan?._report_mode)){const rm=trim(plan._report_audience)==='direction'?'executive':trim(plan._report_mode);return{answer:v4BrainLiteReportText(good,rm),reportMode:trim(plan._report_mode),reportAudience:trim(plan._report_audience)||'general'};}
+  const summaryItem=good.find(x=>trim(x?.args?.operation)==='event_summary');
+  if(sem.summary&&summaryItem){const f=summaryItem?.result?.facts||{},ev=trim(f.event||summaryItem?.args?.event)||'este evento',money=v=>v26FormatEuro(num(v)),income0=num(f.income_received??f.income_total??f.ingresos??f.summary?.income),spent0=num(f.purchases_realized??f.purchase_realized??f.compras_realizadas??f.summary?.expense),pending0=num(f.purchases_pending??f.purchase_pending??f.compras_pendientes),don0=num(f.donations_value??f.donation_value),saldo0=num(f.operating_balance??f.saldo_operativo??(income0-spent0-pending0)),att0=num(f.attendees_canonical??f.attendees??f.asistencia);return{answer:`${ev}: ingresos ${money(income0)}, compras realizadas ${money(spent0)}, compras pendientes ${money(pending0)}, donaciones ${money(don0)}, saldo operativo ${money(saldo0)} y asistencia ${att0} personas.`};}
+  const bank=good.find(x=>trim(x?.args?.operation)==='event_bank'),income=good.find(x=>trim(x?.args?.operation)==='event_income_status');
+  if(income&&trim(income?.args?.scope)==='all_events'){const f=income.result?.facts||{},rows=arr(v4BrainLiteTable(income.result,'income_status_all_events')?.rows),events=[...new Set(rows.map(r=>trim(r?.Evento)).filter(Boolean))];return{answer:rows.length?`He revisado ${num(f.event_count)} eventos. Hay ${num(f.record_count)} ingresos en estado Pendiente repartidos en ${num(f.matching_event_count)} eventos, por un total de ${fmt(f.amount_total)}. ${events.length?`Eventos: ${events.join(', ')}.`:''}`:`He revisado ${num(f.event_count)} eventos y no encuentro ingresos en estado Pendiente en ninguno.`};}
+  const bankFacts=bank?.result?.facts||{},event=trim(bankFacts.event||income?.result?.facts?.event||purchases[0]?.result?.facts?.event||purchases[0]?.args?.event);
+  const incomeRows=arr(v4BrainLiteTable(income?.result||{},'income_status')?.rows),methodMap=new Map();
+  for(const r of incomeRows){const method=trim(r?.['Situación / forma registrada']||r?.Situación||r?.situacion||r?.Estado||r?.estado)||'Otros';const amount=num(r?.['Importe total']??r?.Importe??r?.importe);methodMap.set(method,(methodMap.get(method)||0)+amount);}
+  const methodAmount=(re)=>[...methodMap.entries()].filter(([k])=>re.test(norm(k))).reduce((a,[,v])=>a+num(v),0);
+  const bankIncome=methodAmount(/banco/),bizumIncome=methodAmount(/bizum/),cashIncome=methodAmount(/efectivo/),pendingIncome=methodAmount(/pendient/),incomeTotal=[...methodMap.values()].reduce((a,v)=>a+num(v),0),receivedIncome=bankIncome+bizumIncome+cashIncome;
+  if(sem.cashOnly&&income){return{answer:`En efectivo constan ${fmt(cashIncome)}.`};}
+  if(sem.attendeeIncome&&income){const parts=[];if(bankIncome||methodMap.has('Banco'))parts.push(`${fmt(bankIncome)} por banco`);if(bizumIncome||[...methodMap.keys()].some(k=>/bizum/.test(norm(k))))parts.push(`${fmt(bizumIncome)} por Bizum`);if(cashIncome||[...methodMap.keys()].some(k=>/efectivo/.test(norm(k))))parts.push(`${fmt(cashIncome)} en efectivo`);if(pendingIncome>0)parts.push(`${fmt(pendingIncome)} pendientes de ingreso`);return{answer:`En ${event||'este evento'} hay ${fmt(incomeTotal)} registrados: ${parts.join(', ')}. Ya recibidos: ${fmt(receivedIncome)}.`};}
+  const attendance=good.find(x=>trim(x?.args?.operation)==='event_attendance');
+  if(sem.attendanceAll&&attendance){const t=v4BrainLiteTable(attendance.result,'attendance'),rows=arr(t?.rows),names=rows.map(r=>trim(r?.Persona||r?.Asistente)).filter(Boolean);return{answer:`En ${trim(attendance?.args?.event)||event||'este evento'} constan ${num(attendance?.result?.facts?.attendees_canonical)||names.length} asistentes. Detalle completo: ${names.join(', ')}.`};}
+  const bankAnswer=()=>{const abonos=num(bankFacts.included_income_total??bankFacts.summary?.income),cargos=num(bankFacts.included_charge_total??bankFacts.summary?.expense),net=num(bankFacts.bank_impact??bankFacts.summary?.eventVariation??(abonos-cargos));return`${event||'Este evento'}: abonos banco ${fmt(abonos)}, cargos banco ${fmt(cargos)} y flujo neto bancario ${fmt(abonos)} − ${fmt(cargos)} = ${fmt(net)}${/efectivo/.test(vnextP17LooseNorm(userPrompt))?'. El efectivo queda fuera del flujo bancario.':'.'}`;};
+  if(sem.bankExplain&&bank){const opening=num(bankFacts.opening_balance??bankFacts.summary?.opening_balance),net=num(bankFacts.bank_impact??bankFacts.summary?.eventVariation),closing=num(bankFacts.closing_balance??bankFacts.summary?.closing_balance??(opening+net));return{answer:`El saldo calculado sale de sumar al saldo inicial el impacto del evento: ${fmt(opening)} + ${fmt(net)} = ${fmt(closing)}. Ese impacto es el flujo neto bancario: abonos banco menos cargos banco.`};}
+  if(sem.bank&&bank&&!sem.purchase&&!sem.attendeeIncome)return{answer:bankAnswer()};
+  if(sem.bank&&sem.purchase&&bank&&income&&purchases.length>=2){const realized=purchases.find(x=>trim(x?.args?.purchase_status)==='realized'),pending=purchases.find(x=>trim(x?.args?.purchase_status)==='pending'),rm=v4BrainLiteResponsibleMap(realized),pm=v4BrainLiteResponsibleMap(pending),names=[...new Set([...rm.keys(),...pm.keys()])].sort((a,b)=>(rm.get(b)||0)-(rm.get(a)||0)),people=names.map(n=>`${n}: comprado ${fmt(rm.get(n)||0)}, pendiente ${fmt(pm.get(n)||0)}`).join(' | ');return{answer:`${bankAnswer()} Ingresos: banco ${fmt(bankIncome)}, Bizum ${fmt(bizumIncome)}, efectivo ${fmt(cashIncome)}${pendingIncome>0?`, pendiente de ingreso ${fmt(pendingIncome)}`:''}. Responsables: ${people||'sin responsables registrados'}.`};}
+  if(purchases.length>=2&&sem.pending&&sem.realized){const realized=purchases.find(x=>trim(x?.args?.purchase_status)==='realized'),pending=purchases.find(x=>trim(x?.args?.purchase_status)==='pending'),rm=v4BrainLiteResponsibleMap(realized),pm=v4BrainLiteResponsibleMap(pending),names=[...new Set([...rm.keys(),...pm.keys()])];if(names.length){names.sort((a,b)=>(rm.get(b)||0)-(rm.get(a)||0));const lines=names.map(n=>`${n}: comprado ${fmt(rm.get(n)||0)} · pendiente ${fmt(pm.get(n)||0)}`);return{answer:lines.join(' | '),person:trim(realized?.args?.responsible||pending?.args?.responsible),responsible:trim(realized?.args?.responsible||pending?.args?.responsible)};}}
+  if((sem.responsibleBreakdown||purchases.some(x=>trim(x?.args?.group_by)==='responsible'))&&purchases.length){const realized=purchases.find(x=>trim(x?.args?.purchase_status)==='realized')||purchases[0],rm=v4BrainLiteResponsibleMap(realized),names=[...rm.keys()].sort((a,b)=>(rm.get(b)||0)-(rm.get(a)||0));if(names.length)return{answer:`Los responsables de las compras fueron: ${names.map(n=>`${n}, ${fmt(rm.get(n)||0)}`).join('; ')}.`};}
+  const top=purchases.find(x=>trim(x?.args?._aggregate)==='top_responsible');
+  if(top){const rows=[...v4BrainLiteResponsibleMap(top).entries()].sort((a,b)=>b[1]-a[1]);if(rows.length){const [name,amount]=rows[0];return{answer:`${name} es quien más ha comprado, con ${fmt(amount)}.`,person:name,responsible:name};}}
+  return null;
+}
+
+
+// V5 P8 · contrato oral: la pantalla conserva el texto factual; la voz se recompone para ser
+// pronunciable. Estas reglas son de PRESENTACIÓN, no de negocio: no cambian cifras ni seleccionan C/O.
+function v5P8SpokenMoney(text=''){
+  return String(text||'').replace(/(-?\d{1,3}(?:\.\d{3})*(?:,\d{1,2})?|-?\d+(?:[.,]\d{1,2})?)\s*€/g,(m,n)=>{
+    const v=v26ParseLocalizedDisplayNumber(n);if(!Number.isFinite(v))return m;
+    const rounded=Math.round(v);
+    return `${rounded.toLocaleString('es-ES')} ${Math.abs(rounded)===1?'euro':'euros'}`;
+  });
+}
+function v5P8SpokenContract(text='',userPrompt=''){
+  let out=String(text||'');
+  // Nunca leer Markdown, tablas ni separadores visuales.
+  out=out.replace(/[*_#`]+/g,'').replace(/\s*\|\s*/g,'. ').replace(/\s*[·•]\s*/g,', ');
+  // Un timestamp de máquina se convierte en fecha; no se recitan milisegundos ni zona ISO.
+  out=out.replace(/\b(20\d{2}-\d{2}-\d{2})T\d{2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?/g,'$1');
+  out=v5P8SpokenMoney(out);
+  // Evitar construcciones de calculadora como «más menos» en locución.
+  out=out.replace(/\+\s*-\s*/g,' menos ').replace(/\s*=\s*/g,', resultado ');
+  // Las fechas ISO sueltas se hacen pronunciables sin tocar el escrito.
+  out=out.replace(/\b(20\d{2})-(\d{2})-(\d{2})\b/g,(_,y,m,d)=>`${Number(d)} del ${Number(m)} de ${y}`);
+  out=out.replace(/\s*;\s*/g,'. ').replace(/\s{2,}/g,' ').replace(/\.{2,}/g,'.').trim();
+  return out;
+}
+function v5P8SpokenFromEvidence(written='',good=[],plan={},userPrompt=''){
+  let out=v5BrainLiteSpokenDraft(written,good,plan,userPrompt);
+  return v5P8SpokenContract(out,userPrompt);
+}
+
+function v5BrainLiteSpokenDraft(written='',good=[],plan={},userPrompt=''){
+  const sem=v4BrainLitePromptSemantics(userPrompt),w=trim(written),summary=good.find(x=>trim(x?.args?.operation)==='event_summary'),attendance=good.find(x=>trim(x?.args?.operation)==='event_attendance'),purchases=good.filter(x=>trim(x?.args?.operation)==='event_purchases');
+  if(trim(plan?._report_mode)){const f=summary?.result?.facts||{},ev=trim(f.event||summary?.args?.event)||'el evento',inc=v26FormatEuro(num(f.income_received??f.income_total??f.ingresos??f.summary?.income)),spent=v26FormatEuro(num(f.purchases_realized??f.purchase_realized??f.compras_realizadas??f.summary?.expense)),saldo=v26FormatEuro(num(f.operating_balance??f.saldo_operativo));return`He preparado el informe de ${ev}. Para Dirección, lo esencial es esto: ingresos ${inc}, compras ${spent} y saldo operativo ${saldo}. El resto, con sus gráficas, te lo dejo completo en pantalla.`;}
+  if(sem.attendanceAll&&attendance){const total=num(attendance?.result?.facts?.attendees_canonical)||arr(v4BrainLiteTable(attendance.result,'attendance')?.rows).reduce((a,r)=>a+Math.max(1,num(r?.Personas)),0);return`Constan ${total} asistentes. Te dejo la lista completa escrita para no soltarte todos los nombres de carrerilla.`;}
+  if((sem.responsibleBreakdown||purchases.some(x=>trim(x?.args?.group_by)==='responsible'))&&purchases.length){const realized=purchases.find(x=>trim(x?.args?.purchase_status)==='realized')||purchases[0],rm=v4BrainLiteResponsibleMap(realized),names=[...rm.keys()].sort((a,b)=>(rm.get(b)||0)-(rm.get(a)||0));if(names.length){const shown=names.slice(0,7).map(n=>`${n}, ${v26FormatEuro(rm.get(n)||0)}`),tail=names.length>7?' Y hay más responsables en el detalle escrito.':'';return`Por responsable: ${shown.join('; ')}.${tail}`;}}
+  if(purchases.length>=2&&sem.pending&&sem.realized){const realized=purchases.find(x=>trim(x?.args?.purchase_status)==='realized'),pending=purchases.find(x=>trim(x?.args?.purchase_status)==='pending'),rm=v4BrainLiteResponsibleMap(realized),pm=v4BrainLiteResponsibleMap(pending),names=[...new Set([...rm.keys(),...pm.keys()])].sort((a,b)=>(rm.get(b)||0)-(rm.get(a)||0));if(names.length){const top=names[0];return`Te dejo el desglose completo escrito. El mayor importe comprado es el de ${top}, con ${v26FormatEuro(rm.get(top)||0)}, y tiene ${v26FormatEuro(pm.get(top)||0)} pendiente.`;}}
+  if(/\|\s*[-:]+\s*\||^\s*\|/m.test(w)||w.length>1100)return`Te dejo el detalle completo en pantalla. Por voz te resumo lo importante y evitamos leer una tabla entera como una máquina.`;
+  return w;
+}
+
+async function runZuzuBrainLiteAgentCore({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}={}){
+  const started=Date.now(),model=(configuredGeminiModelsForTask('zuzu-structured')[0]||'gemini-2.5-flash-lite'),stateStarted=Date.now();let state=attachLoggedUserFix10(await statePromise||{},{usuarioLogado,user,authUser,ce_acceso});const stateMs=Date.now()-stateStarted;
+  zuzuTracePush(flowTrace,'V4 BRAIN-LITE · LATENCIA · ESTADO','OK',`Carga de estado Supabase=${stateMs} ms.`);
+  // v5.0_exp · SINGLE SOVEREIGN TURN
+  // REGLA DE HIERRO: ningún texto del usuario se clasifica ni ejecuta localmente antes de Gemini.
+  // El runtime solo entrega hechos de estado/capacidades. Gemini decide el turno completo; después validamos, congelamos y obedecemos.
+  zuzuTracePush(flowTrace,'v5.0_exp · SINGLE SOVEREIGN TURN','OK','0 clasificadores lingüísticos locales antes de Gemini. Estado y capacidades son hechos; la decisión es exclusivamente de Gemini.');
+  const planStarted=Date.now();
+  let {plan}=await v4BrainLitePlan({userPrompt,state,selectedEventId,conversationHistory,clientNowIso:clientNowIso||clientLocalDateTime,clientTimeZone,model,flowTrace,externalSignal});
+  // P16: VALIDAR ANTES DEL FREEZE. Si el contrato de Gemini es ilegal, solo Gemini puede
+  // reemitirlo una vez. El runtime jamás lo corrige ni lo completa semánticamente.
+  let preFreeze=v5P16ValidatePlanBeforeFreeze(plan);
+  if(!preFreeze.ok){
+    plan=await v5P16GeminiRepairInvalidPlan({plan,userPrompt,state,selectedEventId,conversationHistory,clientNowIso:clientNowIso||clientLocalDateTime,clientTimeZone,model,flowTrace,externalSignal,issues:preFreeze.issues});
+    preFreeze=v5P16ValidatePlanBeforeFreeze(plan);
+    if(!preFreeze.ok)zuzuTracePush(flowTrace,'V5 CLEAN AUTHORITY · VALIDACIÓN','WARN','Gemini no consiguió emitir un contrato legal; no se ejecutará nada.',{issues:preFreeze.issues,decision_contract:plan});
+  }
+  // v5.0_exp · MEMORY directives are executed ONLY because Gemini requested them.
+  if(preFreeze.ok&&trim(plan.memory_action)==='reexecute_historical'){
+    const ds=v5P23ConversationState(conversationHistory,state,selectedEventId),prevMem=v5P11LastMemoryTurn(conversationHistory),hc=ds?.pending_action?.historical_contract||ds?.memory_frame?.historical_contract||prevMem?.memoryPresentation?.historicalContract||prevMem?.resultContext?.memory_historical_contract||null;
+    if(hc){
+      const repl=await v5P18GeminiMemoryNowPlan({userPrompt,historicalContract:hc,state,selectedEventId,conversationHistory,clientNowIso:clientNowIso||clientLocalDateTime,clientTimeZone,model,flowTrace,externalSignal});
+      const vv=v5P18ValidateMemoryNowPlan(repl);if(vv.ok){plan={...repl,turn_type:trim(plan.turn_type)||'memory',user_goal:trim(plan.user_goal)||userPrompt,response_goal:plan.response_goal||{mode:'memory',instruction:'Repite hoy la consulta histórica y compárala con el recuerdo.'},requires_synthesis:plan.requires_synthesis===true,state_transition:plan.state_transition||{kind:'complete_pending'},memory_action:'none',memory_query:''};preFreeze=v5P16ValidatePlanBeforeFreeze(plan);}else preFreeze={ok:false,issues:vv.issues};
+    }else preFreeze={ok:false,issues:['Gemini pidió reexecute_historical pero el estado no contiene contrato histórico verificable.']};
+  }
+  // V5 CLEAN AUTHORITY: SOLO un contrato legal de Gemini puede congelarse y ejecutarse.
+  const frozenDecision=v5P15FreezePlan(preFreeze.ok?plan:{...plan,intent:'DATA',actions:[]},flowTrace);
+  plan=frozenDecision.plan;
+  const planMs=Date.now()-planStarted;
+  if(plan.intent==='CHAT'&&!plan.actions.length&&['search','detail'].includes(trim(plan.memory_action))){
+    const q=trim(plan.memory_query)||trim(plan.user_goal)||userPrompt;
+    const mem=await v4BrainLiteRecallMemory({userPrompt:q,state,conversationId,conversationHistory,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,model,flowTrace,externalSignal,voiceConversation});
+    const rc={...(mem.resultContext||{}),operation:'recall_memory',domain:'memory'};
+    return{ok:true,rejected:false,title:'Recuerdo',answer:mem.answer,spokenAnswer:mem.spokenAnswer,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-v5.0-sovereign-memory',model,interactionId:'',conversationId:trim(conversationId),meta:{version:'v5.0_exp',architecture:'v5.0_exp · SINGLE SOVEREIGN TURN · memory by Gemini directive',brainLite:true,responseLevel:plan.response_level,sovereignDecision:v5P15CloneDecisionPlan(plan),memoryPresentation:mem.memoryPresentation||null,resultContext:rc,tools:['recall_memory'],performance:{totalMs:Date.now()-started,plannerFallbackUsed:false},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
+  if(plan.intent==='CHAT'&&!plan.actions.length&&trim(plan.memory_action)==='return_last'){
+    const prev=v5P11LastMemoryTurn(conversationHistory);if(prev){const ans=trim(prev.answer),sp=voiceConversation?v4BrainLiteVoiceSafe(ans,state,{timeZone:clientTimeZone,nowIso:clientNowIso||clientLocalDateTime}):ans;return{ok:true,rejected:false,title:'Recuerdo',answer:ans,spokenAnswer:sp,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-v5.0-sovereign-memory-return',model,interactionId:'',conversationId:trim(conversationId),meta:{version:'v5.0_exp',architecture:'v5.0_exp · SINGLE SOVEREIGN TURN · return memory by Gemini directive',brainLite:true,responseLevel:plan.response_level,sovereignDecision:v5P15CloneDecisionPlan(plan),memoryPresentation:prev.memoryPresentation||null,resultContext:prev.resultContext||v4BrainLiteContext(conversationHistory,state,selectedEventId),tools:[],performance:{totalMs:Date.now()-started,plannerFallbackUsed:false},debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};}
+  }
+  if(plan.intent==='CHAT'&&!plan.actions.length){const answer=trim(plan.reply)||'Vale.',spokenAnswer=voiceConversation?v4BrainLiteVoiceSafe(answer,state,{timeZone:clientTimeZone,nowIso:clientNowIso||clientLocalDateTime}):answer;return{ok:true,rejected:false,title:'Zuzu',answer,spokenAnswer,warnings:[],charts:[],tables:[],files:[],provider:'zuzu-v4-brain-lite-chat',model,interactionId:'',conversationId:trim(conversationId),meta:{version:'v5.0_exp',architecture:'v5.0_exp · SINGLE SOVEREIGN TURN · Gemini único intérprete · contrato inmutable',brainLite:true,responseLevel:plan.response_level,sovereignDecision:v5P15CloneDecisionPlan(plan),resultContext:v4BrainLiteContext(conversationHistory,state,selectedEventId),tools:[],performance:{totalMs:Date.now()-started,plannerFallbackUsed:false},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};}
+  const results=[],good=[],errors=[],dataStarted=Date.now();
+  for(const act of plan.actions.slice(0,6)){
+    try{
+      const resolved=v5P15ExecutionArgsFromFrozenAction(act,state,selectedEventId,userPrompt,flowTrace),args=resolved.exec,t=Date.now(),result=await vnextP19ExecuteData(args,state,selectedEventId,flowTrace,conversationHistory),item={call:{name:'query_ce'},args,result,durationMs:Date.now()-t,decisionContract:resolved.contract};
+      results.push(item);if(result?.ok!==false)good.push(item);else errors.push({code:'CE_RESULT_NOT_OK',message:trim(result?.error||result?.warnings?.[0]||'Resultado CE no válido')});
+    }catch(error){const code=trim(error?.code)||'BRAINLITE_CE_ERROR',message=cleanGeminiError(error);errors.push({code,message});zuzuTracePush(flowTrace,'V4 BRAIN-LITE · CE','WARN',`${code}: ${message}`);}
+  }
+  if(!good.length){
+    const prev=v4BrainLiteContext(conversationHistory,state,selectedEventId),codes=new Set(errors.map(x=>x.code));let answer='No he podido obtener datos válidos para esta consulta. El contexto anterior queda guardado, pero no lo voy a usar como respuesta a esta pregunta.';
+    if(codes.has('BRAINLITE_EVENT_REQUIRED'))answer='Me falta saber de qué evento hablas para poder consultar ese dato.';
+    else if(codes.has('BRAINLITE_EVENTS_REQUIRED'))answer='Para comparar necesito al menos dos eventos concretos.';
+    const spokenAnswer=voiceConversation?v4BrainLiteVoiceSafe(answer,state,{timeZone:clientTimeZone,nowIso:clientNowIso||clientLocalDateTime}):answer;
+    return{ok:true,rejected:false,title:'Zuzu',answer,spokenAnswer,warnings:['brain_lite_no_commit'],charts:[],tables:[],files:[],provider:'zuzu-v4-brain-lite-no-commit',model,interactionId:'',conversationId:trim(conversationId),meta:{version:'v5.0_exp',architecture:'V5 CLEAN AUTHORITY · contrato inválido/sin commit',brainLite:true,responseLevel:plan.response_level,resultContext:prev,errors:errors.slice(0,4),tools:[],performance:{totalMs:Date.now()-started,plannerFallbackUsed:false},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+  }
+  const dataMs=Date.now()-dataStarted;
+  // FIX16 · FAST-CLOSE. En consultas factuales ordinarias NO hacemos una segunda/tercera llamada IA
+  // para volver a redactar hechos que ControlEvent ya ha calculado. El modelo interpreta UNA vez;
+  // CE ejecuta y cierra localmente. Solo HIGH (explicación/informe exhaustivo) conserva un redactor IA.
+  const localParts=good.map(x=>trim(vnextP19LocalFinal(x.result,x.args,state)?.answer)).filter(Boolean),composed=v4BrainLiteComposeLocal(good,userPrompt,state,plan);
+  let written=trim(composed?.answer)||localParts.join(' '),narrationMs=0;
+  if((plan.response_level==='HIGH'||plan.requires_synthesis===true||['analytical','narrative','summary','comparison'].includes(trim(plan?.response_goal?.mode)))&&!trim(plan?._report_mode)){
+    const nt=Date.now();
+    try{const nar=await vnextP2NarrateResults({userPrompt:`OBJETIVO_DEL_USUARIO: ${trim(plan.user_goal)||userPrompt}\nOBJETIVO_DE_RESPUESTA: ${trim(plan?.response_goal?.mode)||'direct'} · ${trim(plan?.response_goal?.instruction)}\nPETICION_ORIGINAL: ${userPrompt}`,model,results:good,flowTrace,externalSignal,voiceConversation:false,responseLevel:plan.response_level});if(trim(nar?.answer))written=trim(nar.answer);}catch(error){zuzuTracePush(flowTrace,'V4 BRAIN-LITE · REDACTOR HIGH','WARN',cleanGeminiError(error));}
+    narrationMs=Date.now()-nt;
+  }
+  written=v29SanitizeAnswerMarkup(written||'He encontrado los datos.');
+  written=v4BrainLiteFriendlyText(written,userPrompt);
+  // La voz se deriva localmente de la MISMA respuesta factual: 0 llamadas IA adicionales.
+  const voiceStarted=Date.now();
+  let spoken=written;if(voiceConversation){spoken=v5P8SpokenFromEvidence(written,good,plan,userPrompt);spoken=v3140CleanProductSpeech(v440HumanizeMachineTime(spoken,{timeZone:trim(clientTimeZone)||'Europe/Madrid',spoken:true,nowIso:clientNowIso||clientLocalDateTime}),userPrompt);const ug=v416VoiceUnitOracle(written,spoken,state,null),hh=humanizeSpokenEntities(ug.spoken||spoken,state,{currentDate:clientLocalDateTime||clientNowIso,seed:`brainlite|${userPrompt}`});spoken=v40ConversationalPolish(hh.text,userPrompt,true);spoken=v5P8SpokenContract(spoken,userPrompt);spoken=v4BrainLiteVoiceSafe(spoken,state,{timeZone:clientTimeZone,nowIso:clientNowIso||clientLocalDateTime});}
+  let memoryComparison=null;
+  if(plan?._memory_refresh_compare===true&&plan?._memory_compare_seed){
+    const seed=plan._memory_compare_seed||{},seedMp=seed.memoryPresentation||seed?.meta?.memoryPresentation||{},ageText=trim(seedMp.ageText||seed?.resultContext?.memory_age_text),occurredAt=trim(seedMp.occurredAt||seed?.resultContext?.memory_occurred_at),subject=trim(seed.person||seedMp.subject||seed?.resultContext?.person),historicalAnswer=trim(seed.answer||seedMp.historicalAnswer);
+    if(historicalAnswer){
+      memoryComparison={active:true,mode:'memory_compare',ageText,occurredAt,subject,historicalAnswer,currentAnswer:written};
+      if(voiceConversation){const intro=ageText?`Aquella respuesta es de ${ageText}. `:'';spoken=v4BrainLiteVoiceSafe(`${intro}He ejecutado hoy la misma consulta. ${spoken} Te dejo el recuerdo y la respuesta actual juntos para que compares.`,state,{timeZone:clientTimeZone,nowIso:clientNowIso||clientLocalDateTime});}
+    }
+  }
+  const voiceMs=Date.now()-voiceStarted;
+  zuzuTracePush(flowTrace,'V4 BRAIN-LITE · LATENCIA · FAST-CLOSE','OK',`estado=${stateMs} ms · plan IA=${planMs} ms · datos=${dataMs} ms · redacción IA=${narrationMs} ms · voz local=${voiceMs} ms · llamadas IA esperadas=${plan.response_level==='HIGH'?2:1}.`);
+  const last=good[good.length-1],resultContext=vnextP19ContextFromResults(good,{})||{event:trim(last?.args?.event),operation:trim(last?.args?.operation)};const primaryOp=trim(good[0]?.args?.operation);if(primaryOp)resultContext.operation=primaryOp;if(trim(good[0]?.args?.event))resultContext.event=trim(good[0].args.event);if(trim(plan?._report_mode)){resultContext.operation='event_report';resultContext.event=trim(good[0]?.args?.event)||trim(resultContext.event);resultContext.report_event=resultContext.event;resultContext.report_mode=trim(plan._report_mode);resultContext.report_audience=trim(plan._report_audience)||'general';resultContext.chart=true;resultContext.chart_type=v4BrainLitePromptSemantics(userPrompt).chartType||'bar';}if(composed?.person){resultContext.person=composed.person;resultContext.responsible=composed.responsible||composed.person;}if(trim(last?.args?.responsible)){resultContext.person=trim(last.args.responsible);resultContext.responsible=trim(last.args.responsible);}if(good.some(x=>trim(x?.args?.operation)==='event_purchases'&&trim(x?.args?.group_by)==='responsible')){delete resultContext.person;delete resultContext.responsible;}if(trim(last?.args?.operation)==='event_weather'){const wd=trim(last?.args?.start_date).slice(0,10);if(wd)resultContext.weather_date=wd;resultContext.start_date=trim(last?.args?.start_date);resultContext.end_date=trim(last?.args?.end_date)||trim(last?.args?.start_date);resultContext.chart=last?.args?.chart===true;resultContext.chart_type=last?.args?.chart===true?(trim(last?.args?.chart_type)||'line'):'';}if(trim(last?.args?.operation)==='compare_events'){resultContext.operation='compare_events';resultContext.events=arr(last?.args?.events).map(trim).filter(Boolean);resultContext.chart=last?.args?.chart===true;resultContext.chart_type=last?.args?.chart===true?(trim(last?.args?.chart_type)||'bar'):'';}const prevFrame=v5ConversationFrameFromHistory(conversationHistory,state,selectedEventId,userPrompt),explicitDomainForCommit=v5ExplicitFactualDomain(userPrompt);if(explicitDomainForCommit&&explicitDomainForCommit!=='person'&&explicitDomainForCommit!=='memory'&&!composed?.person&&!trim(last?.args?.responsible)){delete resultContext.person;delete resultContext.responsible;delete resultContext.donor;}const newFrame=v5FrameAfterTurn(prevFrame,plan,good,resultContext,userPrompt);resultContext.frame=newFrame;resultContext.last_query_actions=newFrame.last_query_actions;resultContext.last_data_operation=newFrame.last_data_operation;
+  let tables=good.flatMap(x=>vnextP12LocalPresentation(x.result)).slice(0,8);
+  if(trim(plan?._report_audience)==='direction'||trim(plan?._report_mode)==='executive')tables=[];
+  // FIX19 · BRAIN-LITE estaba devolviendo solo result.charts, pero event_weather entrega una tabla
+  // canónica y espera que el agente materialice la gráfica. Las rutas P2 ya lo hacían; Brain-Lite no.
+  // Por eso «hazlo con gráficas de líneas» conservaba los datos pero NUNCA aparecía la gráfica.
+  const charts=[],allViewsRequested=v5P11AllViewsCue(userPrompt);if(trim(plan?._report_mode))charts.push(...v4BrainLiteReportCharts(good,v4BrainLitePromptSemantics(userPrompt).chartType||'bar'));for(const x of good){charts.push(...arr(x?.result?.charts));if(allViewsRequested){for(const view of v5P9ViewRegistry()){const xx={...x,args:{...(x.args||{}),chart:true,chart_type:view.type}};charts.push(...v5GenericChartsFromItem(xx));if(trim(xx?.args?.operation)==='event_weather')charts.push(...v73WeatherChartFromResult(xx.result).map(ch=>({...ch,type:view.type})));if(trim(xx?.args?.operation)==='compare_events')charts.push(...v4BrainLiteCompareCharts(xx.result).map(ch=>({...ch,type:view.type})));}}else{charts.push(...v5GenericChartsFromItem(x));if(trim(x?.args?.operation)==='event_weather'&&x?.args?.chart===true){const ct=trim(x?.args?.chart_type)||v4BrainLitePromptSemantics(userPrompt).chartType||'line';charts.push(...v73WeatherChartFromResult(x.result).map(ch=>({...ch,type:ct})));}if(trim(x?.args?.operation)==='compare_events'&&(x?.args?.chart===true||v4BrainLitePromptSemantics(userPrompt).chartFollow)){const ct=trim(x?.args?.chart_type)||v4BrainLitePromptSemantics(userPrompt).chartType||'bar';charts.push(...v4BrainLiteCompareCharts(x.result).map(ch=>({...ch,type:ct})));}}}
+  const uniqueCharts=[];for(const ch of charts){const key=`${trim(ch?.title)}|${trim(ch?.type)}|${JSON.stringify(ch?.labels||[])}`;if(!uniqueCharts.some(z=>z._key===key))uniqueCharts.push({...ch,_key:key});}const finalCharts=uniqueCharts.slice(0,6).map(({_key,...ch})=>ch);
+  if(finalCharts.length)zuzuTracePush(flowTrace,'V4 BRAIN-LITE · GRÁFICA','OK',`Materializadas ${finalCharts.length} gráfica(s) reales para la respuesta.`);resultContext.frame=v5AttachResponseAndViews(resultContext.frame,written,spoken,finalCharts,tables);
+  zuzuTracePush(flowTrace,'V4 BRAIN-LITE · COMMIT','OK',`Turno válido: ${good.length} consulta(s). Se publica solo el nuevo contexto certificado.`);
+  return{ok:true,rejected:false,title:trim(last?.result?.title)||'Zuzu',answer:written,spokenAnswer:spoken,warnings:[],charts:finalCharts,tables,files:[],provider:'zuzu-v4-brain-lite',model,interactionId:'',conversationId:trim(conversationId),meta:{version:'v5.0_exp',architecture:'v5.0_exp · SINGLE SOVEREIGN TURN · Gemini decide todo el lenguaje · contrato inmutable',brainLite:true,responseLevel:plan.response_level,sovereignDecision:v5P15CloneDecisionPlan(plan),memoryComparison,resultContext,executedOperations:good.map(x=>trim(x.args.operation)),capabilityCalls:good.map(x=>({tool:'query_ce',effectiveOperation:trim(x.args?.operation),decisionContract:x.decisionContract||{},rawArgs:x.args,normalizedArgs:x.args,error:''})),tools:['query_ce'],performance:{totalMs:Date.now()-started,stateMs,decisionModelMs:planMs,dataMs,narrationModelMs:narrationMs,voiceLocalMs:voiceMs,interactionCalls:plan.response_level==='HIGH'?2:1,plannerFallbackUsed:false},geminiUsageEstimate:summarizeGeminiUsageFromTrace(flowTrace),debugTrace:arr(flowTrace).slice(0,120)},debugTrace:arr(flowTrace).slice(0,120),showDebugTrace:true};
+}
+
+
+// FIX45 · P21 — Brain-Lite persistence wiring.
+// Brain-Lite is the production conversational path. Its semantic decision remains sovereign;
+// this wrapper ONLY persists the already-produced result. It never changes operation/scope/person/event.
+function v5P21LedgerPlanFromBrainLite(result={}){
+  const meta=result?.meta||{},rc=meta?.resultContext||{},calls=arr(meta?.capabilityCalls),last=[...calls].reverse().find(x=>trim(x?.effectiveOperation)||trim(x?.normalizedArgs?.operation)||trim(x?.rawArgs?.operation))||{},args=last?.normalizedArgs||last?.rawArgs||{};
+  const op=trim(last?.effectiveOperation||args?.operation||rc?.operation),tools=arr(meta?.tools||result?.tools),isFact=tools.includes('query_ce')||!!op;
+  const rawScope=trim(args?.scope||rc?.scope),event=trim(args?.event||rc?.event),person=trim(args?.person||rc?.person);
+  let scope={};
+  if(rawScope==='all_events')scope={kind:'all_events'};
+  else if(rawScope==='current_event')scope={kind:'named_event',event};
+  else if(event)scope={kind:'named_event',event};
+  const domain=trim(rc?.domain)||trim(args?.domain)||trim(op);
+  const q={domain,targets:domain?[{domain}]:[],scope,person,responsible:trim(args?.responsible),donor:trim(args?.donor),store:trim(args?.store),ticket:trim(args?.ticket),purchase_status:trim(args?.purchase_status||args?.status),operations:op?[{type:op}]:[]};
+  Object.keys(q).forEach(k=>{if(q[k]===''||(Array.isArray(q[k])&&!q[k].length)||(q[k]&&typeof q[k]==='object'&&!Array.isArray(q[k])&&!Object.keys(q[k]).length))delete q[k];});
+  const memoryHistorical=!!meta?.memoryPresentation||!!meta?.memoryComparison||/^zuzu-v5-memory/i.test(trim(result?.provider));
+  if(memoryHistorical)return{actionType:'reference',normalizedPlan:{action:'reference',response_kind:'memory',reference:{action:'recall_episode'}},execution:{domain:'memory',memory_episode:meta?.memoryPresentation||meta?.memoryComparison||{},data_provenance:'HISTORICAL_REPLAY',row_count:0}};
+  if(isFact)return{actionType:'query',normalizedPlan:{action:'query',response_kind:trim(meta?.responseLevel||'BASIC'),query:q},execution:{domain,scope,row_count:Number(meta?.presentationEvidence?.rowCount||0),focus:{person,event},operation:op}};
+  return{actionType:'conversation',normalizedPlan:{action:'conversation',response_kind:'chat',conversation:{kind:'general'}},execution:{domain:'conversation',row_count:0}};
+}
+async function runZuzuBrainLiteAgent(args={}){
+  const result=await runZuzuBrainLiteAgentCore(args);
+  if(!result||result.ok!==true)return result;
+  const actor=args?.usuarioLogado||args?.user||args?.authUser||args?.ce_acceso||{};
+  const conversation=await ensureZuzuConversation({conversationId:trim(args?.conversationId),actor,selectedEventId:args?.selectedEventId,title:'Conversación Zuzu'});
+  const p=v5P21LedgerPlanFromBrainLite(result),saved=await appendZuzuTurn({conversation,actor,userPrompt:args?.userPrompt||'',actionType:p.actionType,geminiPlan:{provider:trim(result?.provider),capabilityCalls:arr(result?.meta?.capabilityCalls)},normalizedPlan:p.normalizedPlan,execution:{...(p.execution||{}),brain_lite_provider:trim(result?.provider),result_context:result?.meta?.resultContext||{},capability_calls:arr(result?.meta?.capabilityCalls)},status:'OK',title:trim(result?.title)||'Zuzu',answer:trim(result?.answer),selectedEventId:args?.selectedEventId});
+  return{...result,conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,meta:{...(result.meta||{}),conversationId:saved.conversation.conversationId,turnId:saved.turn.turnId,turnSeq:saved.turn.seq,persistence:saved.persistence||null,memoryPersistence:'brain-lite-ledger-v1'}};
+}
+
+async function runZuzuVNextP2Agent({userPrompt,statePromise,selectedEventId,flowTrace=[],conversationHistory=[],voiceConversation=false,usuarioLogado,user,authUser,ce_acceso,clientNowIso,clientLocalDateTime,clientTimeZone,externalSignal=null,conversationId=''}={}){

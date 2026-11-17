@@ -1,0 +1,20 @@
+const fs=require('fs');
+const svc=fs.readFileSync('services/event-ai.service.js','utf8');
+const ui=fs.readFileSync('public/app/features/v11-3-zuzu-analitica-libre.js','utf8');
+const idx=fs.readFileSync('public/index.html','utf8');
+let ok=0,ko=0;function t(name,cond){if(cond){console.log('OK',name);ok++;}else{console.error('KO',name);ko++;}}
+t('P11 calcula antigüedad del recuerdo',/function v5P11MemoryAgeText/.test(svc));
+t('P11 aporta memoryPresentation',/memoryPresentation/.test(svc)&&/canRefresh/.test(svc));
+t('P11 retorno al recuerdo es local',/zuzu-v5-memory-return-local/.test(svc));
+t('P11 refresco conserva semilla histórica',/_memory_compare_seed/.test(svc));
+t('P11 genera comparación entonces-hoy',/memoryComparison=\{active:true,mode:'memory_compare'/.test(svc));
+t('P11 voz menciona antigüedad y comparación',/Aquella respuesta es de/.test(svc)&&/juntos para que compares/.test(svc));
+t('UI modo recuerdo sepia',/ce-ai-memory-card/.test(ui)&&/#fbf4df/.test(ui));
+t('UI muestra Recuerdo y Hoy',/🕰 Recuerdo/.test(ui)&&/📍 Hoy/.test(ui));
+t('Historial conserva metadata de recuerdo',/memoryPresentation:\(turn&&turn\.memoryPresentation/.test(ui));
+t('Historial conserva metadata de comparación',/memoryComparison:\(turn&&turn\.memoryComparison/.test(ui));
+t('P11 multivista todas las gráficas',/v5P11AllViewsCue/.test(svc)&&/todos los tipos disponibles/.test(svc));
+t('P11 producto genérico sale de catálogo real',/v5P11ProductFamilyFromCatalog/.test(svc)&&/state\?\.productos/.test(svc));
+t('P11 no contiene entidades manuales en bloque nuevo',!svc.slice(svc.indexOf('V5 CORE P11'),svc.indexOf('function v5P10ApplyStateAuthority')).match(/Carmelo|Cordo|FUNCION 2026|SySA 2026/i));
+t('Cache UI FIX34+',/FIX(?:34-P11-MEMORY-MODE|35-TAB-CONVERSATION-ISOLATION|37-P14-SCOPE-AUTHORITY)/.test(idx));
+console.log(`P11 ${ok}/${ok+ko} OK`);process.exitCode=ko?1:0;

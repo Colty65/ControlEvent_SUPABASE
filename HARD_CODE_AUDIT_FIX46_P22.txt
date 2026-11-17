@@ -1,0 +1,11 @@
+FIX46 P22 · HARD-CODE AUDIT
+
+No se añaden nombres de personas, eventos, importes ni preguntas concretas de la batería al runtime.
+
+Constantes añadidas y justificación:
+- Vocabulario conversacional genérico de confirmación/cancelación/retoma (sí, vale, claro, espera, continúa, etc.): protocolo de diálogo, no negocio.
+- Nombres de estado técnico: MEMORY_FRAME, PENDING_ACTION, LAST_SUCCESSFUL_ACTION, REEXECUTE_MEMORY_NOW: estructura de conversación.
+- No se decide operación, persona, evento ni filtro por estas constantes. Cuando se retoma MEMORY→NOW, Gemini sigue creando el contrato actual y P16/P18 lo validan/congelan.
+
+Regla preservada:
+La inteligencia semántica factual permanece en Gemini. El código aporta estado conversacional, valida legalidad y ejecuta exactamente el contrato congelado.

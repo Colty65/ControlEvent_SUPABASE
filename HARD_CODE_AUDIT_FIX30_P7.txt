@@ -1,0 +1,22 @@
+HARD-CODE AUDIT · FIX30 P7
+
+CLASIFICACIÓN
+A) Hard-code injustificado de negocio añadido en P7: NINGUNO detectado.
+B) Hard-code estructural justificado añadido/mantenido en P7:
+   - taxonomía de dominios y operaciones;
+   - dimensiones group_by canónicas;
+   - primitivas de vista;
+   - vocabulario lingüístico genérico;
+   - normalización de números en palabras para rangos temporales;
+   - receta canónica de fuentes para C_SYNTHESIS;
+   - heurísticas de evidencia de Memory.
+C) Hard-code de ITV:
+   - prompts de ITV AISLAMIENTO · 16 viven exclusivamente en services/zuzu-test-lab.service.js;
+   - NO se copian al runtime.
+D) Legacy:
+   - siguen existiendo ejemplos/reglas históricas anteriores al V5 en el proyecto;
+   - no son usados como fundamento de los nuevos invariantes P7;
+   - requieren auditoría separada si se persigue limpieza NHC total de la aplicación.
+
+CRITERIO DE JUSTIFICACIÓN
+Se considera justificable si expresa estructura estable del producto o del lenguaje (dominio, operación, dimensión, vista, relación semántica) y no una entidad, cifra o frase de prueba concreta.

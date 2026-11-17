@@ -1,0 +1,28 @@
+const fs=require('fs');
+const root=process.cwd();
+const ai=fs.readFileSync(root+'/services/event-ai.service.js','utf8');
+const lab=fs.readFileSync(root+'/services/zuzu-test-lab.service.js','utf8');
+const fin=fs.readFileSync(root+'/public/app/features/v12-0-finalizado-herramientas-consulta.js','utf8');
+const welcome=fs.readFileSync(root+'/public/app/features/v17-fix27-welcome-info-general.js','utf8');
+let ok=0,ko=0;function t(n,c){console.log((c?'OK  ':'KO  ')+n);c?ok++:ko++;}
+t('Finalizado habilita raíces pesadas de Cuadre Banco en lectura',/FAST_READ_ROOT_SEL[\s\S]*ceBankBalanceChartOverlay[\s\S]*ceBankHistoryOverlay/.test(fin));
+t('Finalizado no recorre root pesado en around',/if\(fastRoot\)[\s\S]{0,900}unlockFastReadRoot\(fastRoot\)[\s\S]{0,400}return;/.test(fin));
+t('Ver movimientos y cierre histórico son controles de lectura',/data-ce-bank-open-history-list/.test(fin)&&/data-ce-bank-close-history-list/.test(fin));
+t('Búsqueda/paginación banco permanecen consultables',/ceBankSearch/.test(fin)&&/ceBankPrevPage/.test(fin)&&/ceBankNextPage/.test(fin));
+t('Welcome incluye Control de la Entrega',/Control de la Entrega/.test(welcome));
+t('Welcome incluye hablar con Zuzu',/pregúntame lo que quieras/.test(welcome)&&/Habla con Zuzu/.test(welcome));
+t('Welcome incluye evolución e histórico bancario',/Evolución temporal del saldo bancario/.test(welcome)&&/Consulta histórica de movimientos bancarios/.test(welcome));
+t('Welcome incluye responsables y liquidaciones',/Responsables de Compras y Donaciones/.test(welcome)&&/Liquidaciones a responsables de Compras/.test(welcome));
+t('Todos responsables no se trata como persona',/sem\.allResponsible[\s\S]{0,250}delete a\.responsible/.test(ai));
+t('Asistencia completa fuerza event_attendance',/sem\.attendanceAll[\s\S]{0,250}event_attendance/.test(ai));
+t('Asistencia completa se redacta sin slice de 12',/Detalle completo: \$\{names\.join\(', '\)\}/.test(ai));
+t('Saldo calculado tiene explicación aritmética local',/saldo inicial el impacto del evento/.test(ai)&&/flujo neto bancario/.test(ai));
+t('Gráfica meteo se sintetiza desde contexto',/chartFollow&&trim\(ctx\.operation\)===\'event_weather\'/.test(ai)&&/chart:true/.test(ai));
+t('Gráfica comparativa se sintetiza desde contexto',/ctx\.operation\)===\'compare_events\'/.test(ai)&&/v4BrainLiteCompareCharts/.test(ai));
+t('Demostración gráfica devuelve chart real local',/v4BrainLiteDemoChart/.test(ai)&&/Demostración de gráfica/.test(ai));
+t('Identidad Zuzu anclada a ControlEvent',/Soy Zuzu, el asistente de ControlEvent/.test(ai));
+t('ITV EXPRESS examina asistentes completos',/detalle completo de todas las personas asistentes/.test(lab)&&/lista de asistentes aparece truncada/.test(lab));
+t('ITV EXPRESS exige gráfica comparativa',/comparativa pidió gráficas y no materializó ninguna/.test(lab));
+t('ITV EXPRESS exige gráfica meteorológica de líneas',/meteorología pidió gráfica de líneas y no la materializó/.test(lab));
+t('ITV EXPRESS exige explicación del saldo',/saldo inicial \+ impacto\/flujo = saldo calculado/.test(lab));
+console.log(`\nFIX20: ${ok} OK · ${ko} KO`);process.exit(ko?1:0);

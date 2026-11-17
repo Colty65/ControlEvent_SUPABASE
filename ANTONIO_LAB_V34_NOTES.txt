@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ANTONIO LAB V3.4 · TURN MANAGER
+ControlEvent v5.0_exp · ANTONIO LAB V3.4 · TURN MANAGER
 
 Objetivo de esta revisión:
 - No perder fragmentos mientras Gemini transcribe otro turno.

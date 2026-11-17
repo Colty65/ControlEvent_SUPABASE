@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · FIX13 · VOZ UNIFICADA
+ControlEvent v5.0_exp · FIX13 · VOZ UNIFICADA
 
 Objetivo: una sola entrada y una sola salida de voz en PC/iPhone/iPad/Android.
 

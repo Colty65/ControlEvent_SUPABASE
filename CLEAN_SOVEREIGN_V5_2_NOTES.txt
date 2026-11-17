@@ -1,0 +1,31 @@
+ControlEvent v5.2_exp · SINGLE SOVEREIGN PIPELINE
+=================================================
+
+OBJETIVO
+- Ningún texto humano se clasifica localmente antes de Gemini.
+- Ningún texto humano se reclasifica después de Gemini para cambiar dominio, operación, sujeto, contexto, memoria o vista.
+- Todos los turnos usan el mismo contrato soberano de Gemini, también sí/no, identidad, fecha/hora, protestas, continuaciones y cambios de representación.
+
+CAMBIOS
+1. Corregido el fallo técnico v5CompactEvidence is not defined.
+   - v5CompactEvidence solo compacta evidencia YA certificada.
+   - No recibe userPrompt ni participa en intención o routing.
+2. Historial entregado a Gemini enriquecido con contratos soberanos previos, objetivos, transiciones, acciones y vistas como HECHOS.
+3. ACTOR_CANONICO entregado al planner soberano y a la reemisión de contratos inválidos.
+4. Eliminadas como salidas activas las etiquetas/provider brain-lite-chat y brain-lite-no-commit.
+   - Provider activo unificado: zuzu-v5.2-sovereign.
+5. Si falla la ejecución CE, se conserva sovereignDecision completo. No se pierde la decisión de Gemini.
+6. Taxonomía response_goal aclarada y continuidad semántica delegada expresamente a Gemini.
+7. JSON inválido: CE no repara semántica con regex; Gemini reemite el contrato.
+8. Ejecución y commit posterior no reciben _user_prompt ni llaman clasificadores lingüísticos.
+
+AUDITORÍA AUTOMÁTICA
+- scripts/v5-2-single-sovereign-pipeline-regression.cjs
+- 24/24 controles OK en la creación de esta versión.
+- v5-1-clean-sovereignty-regression.cjs: 14/14 OK.
+- v5-0-exp-single-sovereign-turn-regression.cjs: 20/20 OK.
+- v4-1-exp-v5-p16-gemini-sovereign-contract-regression.mjs: 14/14 OK.
+
+PRINCIPIO
+CE aporta hechos, catálogo, identidad, estado certificado y capacidad de ejecución.
+Gemini decide qué significa el mensaje humano y qué debe hacerse.

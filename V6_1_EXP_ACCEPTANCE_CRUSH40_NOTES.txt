@@ -1,0 +1,59 @@
+ControlEvent v6_1-exp · cierre de PASO 1 · aceptación reforzada
+Fecha: 2026-09-12
+
+OBJETIVO DE ESTA ITERACIÓN
+- No añade capacidades nuevas fuera del PASO 1.
+- Corrige continuidad mecánica de una evidencia previa para SORT_LIMIT.
+- Materializa de verdad las gráficas EXECUTE_UI en el formato que consume el frontend.
+- Añade una ITV fija y potente de 40 turnos: "ITV v6_1 CRUSH · 40".
+
+CAMBIOS RUNTIME
+1) Evidencia con backing rows
+   - La salida visible mantiene solo las proyecciones pedidas por Gemini.
+   - CE conserva mecánicamente, dentro del evidence_store, las filas fuente del conjunto ya filtrado y schema.available_fields.
+   - Esas filas completas NO se inyectan al prompt normal de Gemini; solo se usan para operaciones compatibles posteriores de UI/SORT sobre la misma evidencia.
+   - No existe interpretación lingüística local.
+
+2) SORT_LIMIT sobre evidencia previa
+   - Si Gemini emite EXECUTE_UI + SORT_LIMIT contra una evidencia existente, CE ordena las backing_rows y vuelve a proyectar las columnas visibles.
+   - Permite ordenar por start_date aunque ese campo no estuviera visible en la tabla anterior, siempre que schema.available_fields confirme que forma parte de la evidencia física.
+
+3) Gráficas realmente materializadas
+   - VISUALIZE gráfico exige dimension_x + dimension_y en Structured Output.
+   - CE valida que ambos campos existan en la evidencia y que dimension_y sea numérica.
+   - Se convierte mecánicamente a {type, labels, values, unit}, formato que ya renderiza el frontend de Zuzu.
+   - Si no hay datos reales representables, falla; no anuncia una gráfica ficticia.
+
+GATE MANUAL ANTES DE ITV (4 preguntas)
+Ejecutar en una conversación nueva:
+1. ¿Qué eventos están finalizados?
+2. Ordénamelos por fecha de inicio.
+3. Ponlos en barras usando nombre y valoración del evento.
+4. Ahora en tarta con esos mismos datos.
+
+Criterio:
+- 1 debe devolver datos reales.
+- 2 debe ordenar de verdad y no decir que falta start_date.
+- 3 debe dibujar una gráfica de barras REAL con datos.
+- 4 debe transformar la misma evidencia a tarta sin nueva extracción innecesaria.
+Si una falla, NO pasar la ITV.
+
+ITV POTENTE
+Botón nuevo: "🧨 ITV v6_1 CRUSH · 40"
+
+La batería es fija y reproducible. Prueba exclusivamente el alcance real de v6_1-exp:
+- FETCH
+- FILTER
+- SORT_LIMIT
+- VISUALIZE
+- continuidad conversacional
+- current_screen_event
+- evidence/provenance
+- grounding anti-alucinación
+- identidad, actor, hora y fecha
+- resumen de sesión
+- cambio tabla → barras → tarta → líneas → tabla
+- recuperación de dataset previo
+- tres fronteras deliberadamente NO implementadas: JOIN, DERIVE/ROI y AGGREGATE; deben rechazarse limpiamente sin KO técnico.
+
+No incluye como requisito funcional responsabilidades por JOIN, memoria histórica profunda, agregaciones o cálculos derivados reales, porque pertenecen a pasos posteriores.

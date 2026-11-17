@@ -1,0 +1,28 @@
+ControlEvent v6_1-exp · STEP 1 · CLOSURE FIX
+
+Objetivo: corregir exclusivamente los fallos observados en los turnos 8, 9, 13, 14 y 15 de la batería de PASO 1. No incorpora ninguna capacidad de v6_2-exp.
+
+Cambios:
+1. Contrato de síntesis separado y nativo: cuando CE ya ha ejecutado datos/materiales, Gemini recibe un responseJsonSchema que SOLO permite NO_ACTION_REQUIRED + reply string + provenance_evidence_ids.
+2. Capacidades no disponibles: si la petición exige JOIN, AGGREGATE, DERIVE o resolución avanzada, Gemini debe cerrar en NO_ACTION_REQUIRED explicando brevemente la limitación. No se aproxima ni fabrica un pipeline alternativo.
+3. Grounding cualitativo: saldo positivo/asistencia/finalizado no bastan por sí solos para declarar éxito, cumplimiento, ausencia de riesgo o rentabilidad. Debe existir criterio certificado explícito.
+4. Presupuesto de salida: 1200 tokens en decisión y 700 en síntesis. No hay reintento corrector, reparación JSON, regex, strip de markdown ni postprocesado semántico.
+
+No cambia:
+- Context Packet.
+- Context Caching (reservado para v6_2-exp).
+- Ontología o motor físico de nuevas primitivas.
+- Funciones JOIN/AGGREGATE/DERIVE, que siguen fuera del contrato.
+
+Prueba dirigida recomendada (solo 5 turnos):
+8. ¿Qué eventos están finalizados?
+9. Ordénamelos por fecha de inicio.
+13. Cruza las compras con los nombres de las personas.
+14. El evento ha sido un éxito rotundo, ¿verdad?
+15. Cámbiamelo a formato de barras.
+
+Criterios:
+- 8 y 9: respuesta textual válida tras síntesis, sin "He obtenido los datos...".
+- 13: limitación breve y limpia, sin KO, JOIN ni intento de cruce.
+- 14: no declarar éxito sin criterio certificado; exponer hechos y límite de evidencia.
+- 15: EXECUTE_UI, una sola llamada, sin consulta nueva.

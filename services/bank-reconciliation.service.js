@@ -399,15 +399,17 @@ function buildEventLedger(movements){
     if(!grouped.has(key)) grouped.set(key,[]);
     grouped.get(key).push(row);
   }
-  let openingBalance=0;
+  // El saldo del banco es una fotografía global de cada cuenta (row.bankBalance).
+  // El impacto del evento es un libro independiente y siempre comienza en cero.
+  let bankOpeningReference=0;
   let actualClosingBalance=0;
   for(const rows of grouped.values()){
     const first=rows[0];
     const last=rows[rows.length-1];
-    openingBalance=cents(openingBalance + (first ? cents(first.bankBalance-first.amount) : 0));
+    bankOpeningReference=cents(bankOpeningReference + (first ? cents(first.bankBalance-first.amount) : 0));
     actualClosingBalance=cents(actualClosingBalance + (last ? cents(last.bankBalance) : 0));
   }
-  let running=openingBalance;
+  let running=0;
   const enriched=[];
   for(const row of sorted){
     const eventBalanceBefore=running;
@@ -421,11 +423,12 @@ function buildEventLedger(movements){
   return {
     movements:enriched,
     summary:{
-      openingBalance,
+      openingBalance:0,
+      bankOpeningReference,
       includedNet,
       calculatedBalance:running,
-      eventVariation:cents(running-openingBalance),
-      actualClosingBalance:sorted.length?actualClosingBalance:openingBalance,
+      eventVariation:running,
+      actualClosingBalance:sorted.length?actualClosingBalance:0,
       actualClosingAt:latest?.executedAt||'',
       movementCount:enriched.length,
       includedCount:included.length,
@@ -531,8 +534,11 @@ function reconcileMovement(row,currentLinks=[],allLinks=[],settlement=null){
 }
 function eventTicketSummary(catalog,eventId,movements=[]){
   const tickets=catalog.filter(item=>item.eventId===eventId);
-  const linked=tickets.filter(item=>item.linked).length;
+  const linkedTickets=tickets.filter(item=>item.linked),pendingTickets=tickets.filter(item=>!item.linked);
+  const linked=linkedTickets.length;
   const total=tickets.length;
+  const linkedAmount=cents(linkedTickets.reduce((sum,item)=>sum+num(item.amount),0));
+  const pendingAmount=cents(pendingTickets.reduce((sum,item)=>sum+num(item.amount),0));
   const negativeIncluded=arr(movements).filter(row=>num(row.amount)<0&&row.included);
   const movementJustified=negativeIncluded.filter(row=>row.globalReconciled===true||closedBankStatus(row.globalJustificationStatus||row.justificationStatus)).length;
   const allCatalogLinked=total===0||linked===total;
@@ -541,7 +547,7 @@ function eventTicketSummary(catalog,eventId,movements=[]){
   const ratio=total ? linked / total : (allMovementsJustified?1:0);
   const traffic=allJustified?'GREEN':(ratio>=.5?'ORANGE':'RED');
   return {
-    total,linked,pending:Math.max(0,total-linked),ratio,percentage:Math.round(ratio*100),allJustified,traffic,
+    total,linked,pending:Math.max(0,total-linked),linkedAmount,pendingAmount,ratio,percentage:Math.round(ratio*100),allJustified,traffic,
     movementTotal:negativeIncluded.length,movementJustified,movementPending:Math.max(0,negativeIncluded.length-movementJustified),
     allCatalogLinked,allMovementsJustified
   };
@@ -593,7 +599,7 @@ function buildIncomeCatalog(event,collaborators,persons,images,snapshots=[]){
     return {
       id:text(row.id),eventId:event.id,personId:text(row.persona_id),personName,
       paymentMethod:text(row.situacion),amount,imageUrl:incomeImageUrl(images,event.id,text(row.id)),createdAt:text(row.created_at),updatedAt:text(row.updated_at),
-      // v4_1_exp · La aportación interna de Peña El Arrastre puede no corresponder a un
+      // v5.1_exp · La aportación interna de Peña El Arrastre puede no corresponder a un
       // abono bancario justificable. Se conserva visible, pero NO condiciona el estado
       // completo/incompleto del Cuadre Banco ni su porcentaje de ingresos conciliados.
       ignoredForReconciliation:isPenaElArrastre(personName)
@@ -692,7 +698,7 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
   const movementReconciled=positiveRequired.filter(row=>row.incomeJustificationStatus==='CUADRADO').length;
   const allCatalogLinked=total===0||reconciled===total;
   const allMovementsReconciled=positiveRequired.length===0||movementReconciled===positiveRequired.length;
-  // v4_1_exp · Si el evento no tiene NINGÚN ingreso computable, no existe nada que
+  // v5.1_exp · Si el evento no tiene NINGÚN ingreso computable, no existe nada que
   // conciliar en este bloque. Ese 0/0 es funcionalmente un requisito cumplido, no un
   // pendiente. Las aportaciones internas de Peña El Arrastre ya están fuera del catálogo
   // computable y tampoco deben impedir el cierre del Cuadre.
@@ -707,7 +713,7 @@ function attachIncomeTraceability(rows,incomeCatalog,manualLinkRows=[]){
   }};
 }
 
-export async function listBankReconciliation({accountId='',eventId=''} = {}){
+export async function listBankReconciliation({accountId='',eventId='',readOnly=false} = {}){
   try{
     const event=await loadEvent(eventId);
     const [movementRows, allRawLinkRows, stateRows, eventRows, collaboratorRows, personRows, incomeImageRows, manualIncomeLinkRows, allIncomeLinkRows, eventPersonSnapshotRows, settlementRows] = await Promise.all([
@@ -787,8 +793,8 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       });
     }
     const eventLinkedMovements=all.filter(row=>arr(displayLinksByMovement.get(row.id)).some(link=>link.isActiveEvent));
-    const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized);
-    // v4_1_exp FIX10 · Estado REAL del Cuadre Banco.
+    const period=await ensureEventPeriod(event,eventLinkedMovements,accountMovements,!event.finalized&&!readOnly);
+    // v5.1_exp FIX10 · Estado REAL del Cuadre Banco.
     // Una fecha/periodo guardado NO significa que el cuadre haya empezado. Para considerar
     // iniciado el mantenimiento tiene que existir al menos un movimiento con una fila/evidencia
     // persistida para ESTE evento: estado En saldo/excluido, vínculo TKxx o vínculo manual de ingreso.
@@ -808,7 +814,13 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
       storedMovements:reconciliationRowCount
     };
     const hasExplicitReconciliation=reconciliationRowCount>0;
+    // BANK EVENT SCOPE: no confundir el estado global del extracto ni la foto
+    // generada masivamente al aplicar fechas con una inclusion decidida para este evento.
+    // Las decisiones MANUAL/AUTO_IMPORT/AUTO_INGRESO permanecen inalteradas.
     const stateByMovement=new Map(arr(stateRows).map(row=>[text(row.movement_id),row.included!==false]));
+    const provisionalSnapshotIds=new Set(arr(stateRows)
+      .filter(row=>/^PERIODO_APLICADO(?::|$)/i.test(text(row.updated_by)))
+      .map(row=>text(row.movement_id)).filter(Boolean));
     // EVENTO FINALIZADO = foto cerrada: jamás se reconstruye desde el histórico general ni
     // por caer dentro del periodo. Solo se cargan las filas realmente persistidas del evento.
     // EVENTO EN CURSO = se mantienen los candidatos del periodo para poder continuar el cuadre.
@@ -821,14 +833,15 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         const currentLinks=displayLinks.filter(link=>link.isActiveEvent);
         const foreignLinks=displayLinks.filter(link=>!link.isActiveEvent);
         const linkedToOtherEvent=foreignLinks.length>0&&currentLinks.length===0;
-        const eventInclusionExplicit=stateByMovement.has(row.id);
+        const eventInclusionExplicit=stateByMovement.has(row.id) && !provisionalSnapshotIds.has(row.id);
         const eventStored=storedMovementIds.has(text(row.id));
         let included;
-        if(currentLinks.length){
-          // Un TKxx del evento es evidencia directa de participación del movimiento en este evento.
+        if(currentLinks.length || incomeMovementIds.has(text(row.id))){
+          // Un ticket o ingreso asociado a ESTE evento acredita pertenencia, aunque
+          // el mismo importe se repita en otros eventos y aunque no exista estado manual.
           included=true;
         }else if(event.finalized){
-          included=eventInclusionExplicit?stateByMovement.get(row.id):incomeMovementIds.has(text(row.id));
+          included=stateByMovement.has(row.id)?stateByMovement.get(row.id):incomeMovementIds.has(text(row.id));
         }else if(eventInclusionExplicit){
           // BANK4.7 · La decisión MANUAL de este evento manda. Antes, si el mismo cargo ya tenía
           // TKxx de otro evento, este bloque se evaluaba DESPUÉS del descarte por foreignLinks y
@@ -844,7 +857,10 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
           // nace fuera del saldo local. Puede activarse expresamente si también es compartido.
           included=false;
         }else{
-          included=row.included;
+          // Un movimiento de la cuenta puede ser candidato en el periodo sin formar
+          // parte del saldo de este evento. Nunca heredar el flag GLOBAL del CSV.
+          // Las filas PERIODO_APLICADO antiguas tampoco acreditan por si solas inclusion.
+          included=false;
         }
         const reconciled=reconcileMovement({...row,included,eventInclusionExplicit,eventStored},currentLinks,displayLinks,settlementByMovement.get(text(row.id))||null);
         const foreignJustified=cents(foreignLinks.reduce((sum,link)=>sum+num(link.ticketAmountSnapshot??link.ticketAmount),0));
@@ -869,22 +885,28 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
     const movements=visibleScoped.map(row=>({...row,...(movementById.get(row.id)||{})}));
     const linkedOutsidePeriod=eventLinkedMovements.filter(row=>!inPeriod(row,period));
     const ticketSummary=eventTicketSummary(catalog,event.id,tracedScoped);
+    const cashIncome=cashIncomeTotal(event,collaboratorRows,personRows,eventPersonSnapshotRows);
     const noCountableIncomes=num(incomeTrace.summary?.total)===0;
-    // En eventos sin ingresos computables, la finalización contable se decide por la
-    // cobertura del gasto: todos los TKxx deben estar asociados. Las diferencias de
-    // efectivo que el gestor haya aceptado mediante Cuadre forzado no rebajan el estado
-    // a incompleto. Para eventos con ingresos se mantiene la exigencia estricta habitual.
-    const ticketsCompleteForLifecycle=ticketSummary.allJustified===true||(
-      noCountableIncomes&&num(ticketSummary.total)>0&&ticketSummary.allCatalogLinked===true
-    );
+    // FIX18 · El Cuadre Banco certifica SOLO el impacto en la cuenta bancaria. Un TKxx que
+    // no está ligado a ningún cargo bancario no debe dejar el Cuadre «incompleto» cuando su
+    // importe pendiente queda cubierto exactamente por ingresos registrados en EFECTIVO y,
+    // al mismo tiempo, todos los cargos bancarios sí están justificados. El fototicket sigue
+    // visible como pendiente documental, pero deja de contaminar el estado del BANCO.
+    const cashOnlyPendingTickets= ticketSummary.allMovementsJustified===true &&
+      num(ticketSummary.pending)>0 && num(ticketSummary.pendingAmount)>0 && num(cashIncome)>0 &&
+      Math.abs(num(ticketSummary.pendingAmount)-num(cashIncome))<=0.01;
+    // FIX19 · El estado del CUADRE BANCO certifica la cuenta bancaria, no el archivo documental.
+    // Un fototicket sin vínculo bancario puede seguir pendiente (por ejemplo un gasto pagado en
+    // efectivo) y NO debe dejar el banco «no totalmente realizado». Lo que sí debe estar cerrado
+    // es cada CARGO BANCARIO incluido. El KPI 43/44 TKxx continúa mostrando la incidencia documental.
+    const ticketsCompleteForLifecycle=ticketSummary.allMovementsJustified===true;
     const incomesCompleteForLifecycle=noCountableIncomes?true:incomeTrace.summary.allReconciled===true;
     const lifecycle=bankLifecycle(event,reconciliationRowCount,{
       ticketsComplete:ticketsCompleteForLifecycle,
       incomesComplete:incomesCompleteForLifecycle
     });
-    const cashIncome=cashIncomeTotal(event,collaboratorRows,personRows,eventPersonSnapshotRows);
     const eventIncome=cents(ledger.summary.income+cashIncome);
-    const economicVariation=cents(eventIncome-ledger.summary.expense);
+    const economicVariation=cents(ledger.summary.income-ledger.summary.expense); // Impacto REAL en cuenta bancaria: solo abonos Banco - cargos Banco. El efectivo no entra en la cuenta.
     return {
       ok:true,
       event:{...event,reconciliationStart:period.dateFrom,reconciliationEnd:period.dateTo},
@@ -899,6 +921,9 @@ export async function listBankReconciliation({accountId='',eventId=''} = {}){
         complete:lifecycle.complete===true,
         ticketsComplete:ticketsCompleteForLifecycle,
         incomesComplete:incomesCompleteForLifecycle,
+        cashOnlyPendingTickets,
+        cashPendingTicketAmount:cents(ticketSummary.pendingAmount),
+        cashIncomeAvailable:cents(cashIncome),
         evidence:reconciliationEvidence,
         periodSource:periodExplicit?'MANUAL':(periodAutoImport?'AUTO_IMPORTACION':(period?.saved===true?'INICIALIZACION_AUTOMATICA':'CALCULADO_NO_GUARDADO'))
       },
@@ -945,7 +970,7 @@ async function persistAppliedPeriodMovementSnapshot(eventId,accountId='',actor={
   const actorName=text(actor.identificacion||actor.nombre)||'SISTEMA';
   const snapshotTag=`PERIODO_APLICADO:${actorName}`;
 
-  // v4_1_exp FIX2 · Aplicar fechas debe congelar también la selección En saldo/excluido
+  // v5.1_exp FIX2 · Aplicar fechas debe congelar también la selección En saldo/excluido
   // del periodo. En curso la UI puede reconstruir candidatos desde el histórico, pero al
   // Finalizar solo se permite leer la foto persistida. Sin esta instantánea desaparecían
   // precisamente los cargos todavía sin TKxx, aunque el usuario los hubiera dejado En saldo.
@@ -1029,7 +1054,10 @@ async function persistAutomaticIncomeReconciliation(eventId,accountId='',actor={
     row.linkedToOtherEvent!==true &&
     text(row.incomeAssociationMode).toUpperCase()==='AUTO' &&
     text(row.incomeJustificationStatus).toUpperCase()==='CUADRADO' &&
-    arr(row.incomeLinks).length>0
+    arr(row.incomeLinks).length>0 &&
+    // Coincidencia exacta de importe NO identifica a una persona; no persistimos
+    // vínculos hipotéticos que puedan secuestrar justificantes de otros abonos.
+    arr(row.incomeLinks).every(income=>meaningfulTokens(income.personName).some(token=>normalizeWords(row.description).includes(token)))
   );
   const linkRows=[];
   const stateRows=[];
@@ -1355,7 +1383,7 @@ export async function listPaidTickets({movementId='',eventId='',q=''} = {}){
     const catalog=await ticketCatalog('','');
     const query=text(q).toLowerCase();
     const items=catalog.filter(item=>{
-      // v4.1_exp: el selector operativo solo enseña TKxx de eventos realmente En curso.
+      // v5.1_exp: el selector operativo solo enseña TKxx de eventos realmente En curso.
       // Los vínculos históricos de eventos ya Finalizados pueden seguir existiendo en BBDD,
       // pero no se ofrecen como nuevas imputaciones ni se mezclan en la búsqueda diaria.
       if(!/^EN\s+CURSO$/i.test(text(item.eventStatus).replace(/\s+/g,' ').trim())) return false;
@@ -1380,11 +1408,7 @@ export async function listBankIncomes({movementId='',eventId='',q=''} = {}){
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
       selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
-      // BANK4 · consulta histórica: conservamos también los justificantes de abonos de todos los eventos.
-      // Solo se descargan metadatos/URLs; las imágenes no se transfieren hasta que el navegador las muestra.
-      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true}),
       selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:query=>query.eq('event_id',event.id)}).catch(()=>[]),
-      listMovementSettlementsSafe()
     ]);
     const catalog=buildIncomeCatalog(event,collaboratorRows,personRows,imageRows,eventPersonSnapshotRows);
     const linkedByIncome=new Map(linkRows.map(raw=>{const link=incomeLinkFromDb(raw);return [link.incomeId,link];}));
@@ -1394,7 +1418,10 @@ export async function listBankIncomes({movementId='',eventId='',q=''} = {}){
       return normalizeWords([item.personName,item.paymentMethod,item.amount].join(' ')).includes(query);
     }).map(item=>{
       const link=linkedByIncome.get(item.id)||null;
-      return {...item,linked:!!link,linkedMovementId:link?.movementId||'',linkedId:link?.id||'',selected:!!link&&link.movementId===selectedMovement,available:!link||link.movementId===selectedMovement};
+      // El AUTO es una sugerencia revisable del MISMO evento, nunca una reserva exclusiva.
+      // Solo un vínculo confirmado por el usuario impide usar el ingreso en otro movimiento.
+      const autoSuggestion=!!link&&link.automatic===true&&link.movementId!==selectedMovement;
+      return {...item,linked:!!link,linkedMovementId:link?.movementId||'',linkedId:link?.id||'',automaticSuggestion:autoSuggestion,selected:!!link&&link.movementId===selectedMovement,available:!link||autoSuggestion||link.movementId===selectedMovement};
     });
     return {ok:true,eventId:selectedEvent,movementId:selectedMovement,items};
   }catch(error){ throw friendlyDbError(error); }
@@ -1416,17 +1443,22 @@ export async function setIncomeLinks(movementId,payload={},actor={}){
       selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
       selectPaged('ce_ticket_images',{columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
       selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true,apply:query=>query.eq('event_id',event.id)}),
-      // BANK4 · consulta histórica: conservamos también los justificantes de abonos de todos los eventos.
-      // Solo se descargan metadatos/URLs; las imágenes no se transfieren hasta que el navegador las muestra.
-      selectPaged(INCOME_LINKS_TABLE,{columns:'*',order:'created_at',ascending:true}),
       selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:query=>query.eq('event_id',event.id)}).catch(()=>[]),
-      listMovementSettlementsSafe()
     ]);
     const catalog=buildIncomeCatalog(event,collaboratorRows,personRows,imageRows,eventPersonSnapshotRows);
     const byId=new Map(catalog.map(item=>[item.id,item]));
     for(const incomeId of requested){ if(!byId.has(incomeId)) fail('Uno de los ingresos seleccionados no pertenece al evento activo o no figura como ingreso bancario.',409,'BANK_INCOME_NOT_AVAILABLE'); }
+    // No tocar otros eventos, aunque coincidan nombres, importes o fechas.
     const conflicts=existingRows.map(incomeLinkFromDb).filter(link=>requested.includes(link.incomeId)&&link.movementId!==id);
-    if(conflicts.length) fail('Uno de los ingresos seleccionados ya justifica otro movimiento bancario.',409,'BANK_INCOME_ALREADY_LINKED');
+    const manualConflicts=conflicts.filter(link=>!link.automatic);
+    if(manualConflicts.length) fail('Uno de los ingresos seleccionados ya está asociado manualmente a otro movimiento de este evento.',409,'BANK_INCOME_ALREADY_LINKED');
+    // Las asociaciones AUTO_INGRESO son propuestas revocables. Si el usuario elige
+    // expresamente otra asignación, la decisión manual prevalece sobre la heurística.
+    const supersededAutoIds=conflicts.filter(link=>link.automatic).map(link=>link.id);
+    if(supersededAutoIds.length){
+      const {error:autoError}=await db().from(INCOME_LINKS_TABLE).delete().eq('event_id',eventId).in('id',supersededAutoIds);
+      if(autoError) throw autoError;
+    }
     const {error:deleteError}=await db().from(INCOME_LINKS_TABLE).delete().eq('movement_id',id).eq('event_id',eventId);
     if(deleteError) throw deleteError;
     if(requested.length){
@@ -1464,7 +1496,7 @@ export async function addTicketLink(movementId, payload = {}, actor = {}){
     const globalBefore=cents(existing.reduce((sum,link)=>sum+num(link.ticketAmountSnapshot),0));
     const target=cents(Math.abs(num(movement.amount)));
     const attempted=cents(globalBefore+ticket.amount);
-    // v4.1_exp BANK2 · NO se impide asociar justificantes aunque la suma supere ligeramente
+    // v5.1_exp BANK2 · NO se impide asociar justificantes aunque la suma supere ligeramente
     // el movimiento bancario. La realidad humana puede producir diferencias en ambos sentidos
     // (retirada 120 € / TKxx 118,56 € o retirada 135 € / TKxx 135,68 €). CE conserva TODOS
     // los justificantes y mantiene el movimiento globalmente pendiente hasta que la diferencia
@@ -1555,7 +1587,7 @@ export async function exportBankData({accountId='',eventId=''} = {}){
     // antiguo devolvía el indicador global del movimiento y no calculaba el estado,
     // por eso aparecían registros ajenos y cargos exactos en rojo.
     if(selectedEvent){
-      const reconciliation=await listBankReconciliation({accountId:text(accountId)||'TODOS',eventId:selectedEvent});
+      const reconciliation=await listBankReconciliation({accountId:text(accountId)||'TODOS',eventId:selectedEvent,readOnly:true});
       const movements=arr(reconciliation.movements).filter(row=>row.included===true).map(row=>({
         ...row,
         links:arr(row.links).slice().sort((a,b)=>ticketNumber(a.ticketCode)-ticketNumber(b.ticketCode)||String(a.ticketCode||'').localeCompare(String(b.ticketCode||''),'es'))

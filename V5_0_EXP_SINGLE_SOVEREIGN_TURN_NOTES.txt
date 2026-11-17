@@ -1,0 +1,20 @@
+ControlEvent v5.0_exp · SINGLE SOVEREIGN TURN
+
+Objetivo
+- Eliminar cualquier interpretación lingüística local previa a Gemini.
+- Gemini interpreta CADA turno completo y decide intención, objetivo humano, acciones, memoria, transición conversacional y objetivo de respuesta.
+- El runtime solo entrega hechos de estado/capacidades, valida legalidad, congela y ejecuta exactamente.
+
+Cambios principales
+1. Se elimina de la ruta Brain-Lite previa a Gemini la clasificación local de: sí/no, espera/cancelación, reacción social, volver a recuerdo, repetir/antes, identidad, fecha/hora, gráfica/view-only y retry lingüístico.
+2. Nuevo Decision Turn: turn_type, user_goal, response_goal, requires_synthesis, state_transition y memory_action forman parte de la decisión soberana.
+3. v5P15CloneDecisionPlan conserva esos campos dentro del contrato congelado/trazable.
+4. ANALYTICAL/NARRATIVE/SUMMARY/COMPARISON fuerzan síntesis sobre evidencia CE para contestar al objetivo humano, no limitarse al resumen técnico del dataset.
+5. Memory solo se ejecuta cuando Gemini emite memory_action. MEMORY→NOW sigue usando un segundo contrato Gemini para construir la consulta actual equivalente.
+6. sovereignDecision se devuelve en meta para ITV/auditoría.
+7. Nueva ITV SOBERANA · 30, adversarial, enfocada en continuidad coloquial, análisis, creatividad, memoria, sí/no, protestas, gráficas y cambio de foco.
+8. Versión global renombrada a v5.0_exp, incluidos títulos, metadatos, INFOEVENTO, BACKUP y package metadata.
+
+Regla de hierro
+Ningún texto del usuario puede provocar una transición conversacional o decisión semántica antes de una Decision Turn de Gemini.
+Después de Gemini: validar -> congelar -> ejecutar. Nunca corregir semántica en JavaScript.

@@ -1,0 +1,25 @@
+const fs=require('fs');
+const path=require('path');
+const root=path.join(__dirname,'..');
+const bank=fs.readFileSync(path.join(root,'services','bank-reconciliation.service.js'),'utf8');
+const bankUi=fs.readFileSync(path.join(root,'public','app','features','v24-cuadre-banco.js'),'utf8');
+const zuzu=fs.readFileSync(path.join(root,'public','app','features','v11-3-zuzu-analitica-libre.js'),'utf8');
+const ai=fs.readFileSync(path.join(root,'services','event-ai.service.js'),'utf8');
+const index=fs.readFileSync(path.join(root,'public','index.html'),'utf8');
+let ok=0,ko=0;function t(name,cond){if(cond){console.log('OK ',name);ok++;}else{console.error('KO ',name);ko++;}}
+t('Flujo servicio excluye efectivo',bank.includes('economicVariation=cents(ledger.summary.income-ledger.summary.expense)'));
+t('Flujo UI excluye efectivo',bankUi.includes('const economicVariation=bankIncome-num(s.expense)'));
+t('Prompt bloquea gestos de selección',zuzu.includes("'pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','selectstart','selectionchange','click','dblclick'"));
+t('Prompt enviado se limpia al foco',zuzu.includes("p.dataset.ceSubmittedPrompt==='1'"));
+t('Hablar limpia prompt ya enviado',zuzu.includes("promptBox.dataset.ceSubmittedPrompt==='1'"));
+t('Nueva voz CarlFM',zuzu.includes("return saved||'es_ES-carlfm-x_low'"));
+t('Migración de voz única',zuzu.includes('ceZuzuVoiceMigrationCarlV1'));
+t('Oralizador cliente elimina céntimos de €',zuzu.includes("Math.trunc(n))+' euros'"));
+t('Oralizador servidor elimina céntimos de €',ai.includes('function v416OralizeEuroIntegers'));
+t('Pantalla exige símbolo euro',ai.includes('DEBE ESCRIBIR EL SÍMBOLO € EN CADA IMPORTE'));
+t('Traza PDF no marcada por defecto',zuzu.includes('<input type="checkbox" id="ceAiPdfTrace"> Incluir traza técnica'));
+t('PDF espera fuentes',zuzu.includes('document.fonts.ready.then(go)'));
+t('Cache bust banco',index.includes('20260908-FIX-FLUJO-BANCO'));
+t('Cache bust Zuzu',index.includes('20260908-FIX-PROMPT-VOICE-PDF'));
+t('NHC FIX14 usa reglas estructurales/unidad/DOM, no entidades de prueba',bankUi.includes('bankIncome-num(s.expense)')&&zuzu.includes('ceSubmittedPrompt')&&ai.includes('v416OralizeEuroIntegers'));
+console.log(`FIX14: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;

@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · VNext P1.15 · ITV Decision Map · NHC
+# ControlEvent v5.0_exp · VNext P1.15 · ITV Decision Map · NHC
 
 ## Objetivo
 Convertir cada resultado de las baterías de lenguaje en una decisión de ingeniería: dónde tocar y por qué, sin añadir interpretación lingüística al runtime de Zuzu.

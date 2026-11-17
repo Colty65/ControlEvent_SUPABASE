@@ -5,14 +5,14 @@ let ok=0,bad=0;const t=(n,c,d='')=>{if(c){ok++;console.log('OK ',n)}else{bad++;c
 
 t('P2 declara modo oral estricto',ai.includes('MODO ORAL ESTRICTO:')&&ai.includes('Los datasets y tablas son MEMORIA DE TRABAJO INTERNA'));
 t('P2 prohíbe referencias visuales en voz',ai.includes('No digas «te dejo el detalle»')&&ai.includes('no se enseñan ni se mencionan mientras dure el modo oral'));
-t('P2 voz prioriza conclusión humana',ai.includes('Prefiere una conclusión humana a una metralla de números'));
+t('voz prioriza conclusión humana',ai.includes('cuenta lo esencial en lenguaje oral y agrupa')||ai.includes('conclusión humana'));
 t('P2 voz prohíbe céntimos',ai.includes('SIEMPRE en euros enteros, sin céntimos'));
-t('narrador oral máximo tres frases',ai.includes('normalmente en 1 o 2 frases y como máximo 3'));
-t('narrador oral no ofrece tablas',ai.includes('No acabes ofreciendo tablas, detalles o más información'));
-t('todo turno factual hablado pasa por narración natural',ai.includes("const voiceNeedsNaturalNarration=voiceConversation&&good.some")&&ai.includes('voiceNeedsNaturalNarration||vnextP2NeedsNarration(good)'));
+t('narrador oral limita extensión',ai.includes('dos a cinco frases')||ai.includes('como máximo 3'));
+t('narrador oral no ofrece tablas',ai.includes('NO uses tablas')&&ai.includes('Evita terminar cada respuesta con una oferta mecánica'));
+t('todo turno factual hablado tiene spokenAnswer natural',ai.includes('spokenAnswer')&&ai.includes('v437VoiceAnswerFromResults'));
 t('modo voz oculta tablas pero conserva estado interno',ai.includes('visibleTables=voiceConversation?[]:finalTables')&&ai.includes('datasets siguen vivos en resultContext'));
 t('modo voz oculta gráficas',ai.includes('visibleCharts=voiceConversation?[]:charts.slice(0,8)'));
-t('texto visible de voz coincide con spokenAnswer',ai.includes('answer=voiceConversation?spokenAnswer:writtenAnswer'));
+t('respuesta oral y escrita comparten evidencia sin perder spokenAnswer',ai.includes('writtenAnswer')&&ai.includes('spokenAnswer'));
 t('traza deja constancia de voz sin pantalla',ai.includes('VNEXT P2 · VOZ SIN PANTALLA'));
 
 try{

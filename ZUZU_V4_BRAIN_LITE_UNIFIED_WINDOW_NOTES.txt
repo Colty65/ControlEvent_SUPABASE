@@ -1,0 +1,14 @@
+V4 BRAIN-LITE · UNIFIED VOICE + WRITING WINDOW · 2026-09-07
+
+Base: TARGET25 HUMAN CALIBRATION (live ITV: 28.9/30, 23 OK, 1 KO).
+
+Changes:
+1. ITV artifact authority: a simulator textual inference cannot override a materialized table row count.
+2. BRAIN-LITE telemetry: planner usage is attached to trace and geminiUsageEstimate is exported by BRAIN-LITE responses.
+3. Unified Zuzu window: same prompt/history/context for typed and spoken turns.
+4. Mic button records audio and reuses /api/zuzu-voice/transcribe; transcription is placed in the same prompt and submitted through BRAIN-LITE.
+5. Voice ON/OFF controls local spokenAnswer playback; written answer/tables remain visible in the same window.
+6. Both typed and spoken requests route to BRAIN-LITE. No return to P2-R.
+7. Closing the window stops microphone and speech playback.
+
+NHC: no question-specific business answer hardcodes were added.

@@ -1,0 +1,19 @@
+HARD-CODE AUDIT · ControlEvent v5.0_exp
+
+NO se añaden reglas de negocio, personas, eventos, importes ni prompts ITV al runtime.
+
+Hard-code permitido:
+- nombres de operaciones/capacidades CE y sus contratos técnicos;
+- enums de turn_type/response_goal/state_transition/memory_action;
+- mensajes técnicos de validación;
+- frases y prompts adversariales exclusivamente dentro de ITV SOBERANA 30;
+- conversión técnica current_event -> evento visible después del contrato congelado.
+
+Prohibido por arquitectura:
+- clasificar localmente lenguaje natural antes de Gemini;
+- decidir localmente a qué se refiere «sí», «adelante», «espera», «antes», etc.;
+- elegir localmente un recuerdo, sujeto, operación o scope por palabras del usuario;
+- corregir o completar semánticamente el contrato congelado;
+- sustituir una decisión inválida por otra acción legacy.
+
+La única reparación de un contrato inválido la realiza Gemini mediante reemisión explícita.

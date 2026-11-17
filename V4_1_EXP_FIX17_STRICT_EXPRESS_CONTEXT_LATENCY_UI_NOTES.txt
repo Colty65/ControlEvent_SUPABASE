@@ -1,0 +1,49 @@
+ControlEvent v5.0_exp · FIX17 · 08/09/2026
+
+OBJETIVO
+- Corregir la fragilidad observada en la conversación real y en ITV EXPRESS.
+- Evitar que la ITV marque OK respuestas materialmente incorrectas.
+- Medir latencia real de navegador y dejar espacio visible para al menos 3 registros ITV.
+
+CAMBIOS ZUZU
+1. Guardia semántica estructural:
+   - Banco/abonos/cargos/flujo/cuadre -> event_bank.
+   - Dinero pagado/aportado por asistentes -> ingresos, no donaciones.
+   - Comprado + pendiente -> dos lecturas CE (realized + pending).
+2. Responsables:
+   - top_buyer/max/highest no pueden convertirse en nombres de persona.
+   - El ranking se calcula localmente desde by_responsible.
+   - El responsable resuelto se conserva en resultContext para los follow-ups.
+   - Comprado/pendiente se fusiona localmente por responsable.
+3. Meteorología:
+   - Una petición de gráfica conserva start_date/end_date del resultado anterior.
+   - Los charts producidos por CE ya no se descartan al final de Brain-Lite.
+4. Respuestas compuestas:
+   - Conservan los bloques no-compras (p.ej. banco) y añaden el desglose de responsables.
+
+ITV EXPRESS ESTRICTA
+- Ahora exige TODAS las operaciones esperadas en turnos compuestos.
+- Rechaza top_buyer visible o usado como persona.
+- Comprueba realized + pending donde corresponda.
+- El turno bancario 7 debe usar SOLO event_bank y mostrar 599,86 € en el fixture actual.
+- Comprueba que Colty comprado/pendiente trae ambos estados.
+- El resumen combinado debe incluir banco + ingresos + compras y suficiente contenido monetario.
+
+LATENCIA
+- Se conserva la telemetría servidor (estado / plan IA / datos / voz).
+- Se añade telemetría navegador:
+  clientBeforeFetchMs, clientFetchRoundTripMs, clientAfterFetchMs y clientClickToVisibleMs.
+  Esto permite separar los latidos percibidos de la latencia interna de Zuzu.
+
+UI ITV
+- Zona superior limitada a 285 px con scroll propio.
+- Botones de baterías reducidos a 29 px y sin textos secundarios permanentes.
+- Modos y controles más compactos.
+- Resultados con mínimo 300 px de alto y scroll vertical permanente.
+- Cada registro se limita visualmente a 118 px y permite scroll interno si tiene mucho detalle.
+- Objetivo: ver aproximadamente 3 registros procesados simultáneamente y recorrerlos con rueda del ratón.
+
+PRUEBAS
+- v4-1-exp-zuzu-v4-brain-lite-regression: 21/21 OK.
+- zuzu-itv-contract-regression: OK.
+- v4-1-exp-fix17-strict-express-ui-regression: 14/14 OK.

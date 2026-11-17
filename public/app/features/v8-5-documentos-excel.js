@@ -1,8 +1,8 @@
-/* ControlEvent v4_1_exp - DOCUMENTOS en BACKUP/INFOEVENTO y restauracion desde BACKUP.
+/* ControlEvent v6_1-exp - DOCUMENTOS en BACKUP/INFOEVENTO y restauracion desde BACKUP.
    Parche aislado: no cambia la mecanica de mantenimiento DOCXX; solo extiende Excel. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v4_1_exp';
+  const VERSION = 'ControlEvent v6_1-exp';
   const INSTALLED = '__ceV85DocumentosExcel';
   if(window[INSTALLED]) return;
   window[INSTALLED] = true;

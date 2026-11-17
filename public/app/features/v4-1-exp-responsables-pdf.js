@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp BANK4.2 · informes por responsable con situación real de compras y donaciones. */
+/* ControlEvent v6_1-exp BANK4.2 · informes por responsable con situación real de compras y donaciones. */
 (function(root){
   'use strict';
   if(root.__ceV4ResponsablesPdf) return; root.__ceV4ResponsablesPdf=true;
@@ -162,10 +162,10 @@
   function printGroups(groups,kind){
     if(!groups.length)return;const win=root.open('','_blank');if(!win)return alert('El navegador ha bloqueado la ventana de impresión.');try{win.opener=null;}catch(_){ }
     const label=kind==='combinado'?'Recursos':kind==='donacion'?'Donaciones':'Compras';
-    const title=`ControlEvent_v4_1_exp-${label}-${eventTitle()}`.replace(/[\\/:*?"<>|]+/g,'-');
+    const title=`ControlEvent_v6_1-exp-${label}-${eventTitle()}`.replace(/[\\/:*?"<>|]+/g,'-');
     const note=kind==='donacion'||kind==='combinado'?'<p class="note">Los importes de Donaciones corresponden a valoración estimada. Entregada significa género ya recibido en los almacenes de la peña.</p>':'';
     const h1=kind==='combinado'?'Compras + Donaciones por responsable':kind==='donacion'?'Donaciones por responsable':'Compras por responsable';
-    win.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#243847;margin:0}header{border-bottom:3px solid #0f766e;padding:0 0 8px;margin-bottom:10px}.headrow{display:flex;gap:14px;align-items:flex-start}.headcopy{flex:1}h1{font-size:18px;margin:0;color:#173a63}header p,.note{font-size:9px;color:#607789;margin:4px 0}.print-summary{display:flex;gap:8px;justify-content:flex-end}.sumblock{min-width:220px;border:1px solid #ccdce5;border-radius:7px;padding:5px 7px}.sumblock p{display:flex;justify-content:space-between;gap:10px;margin:0;font-size:8px;line-height:1.5}.sumblock .tot{border-top:1px solid #dce7ed;margin-top:2px;padding-top:2px;color:#0f766e}.sumblock.don .tot{color:#9a5d0c}.group{break-inside:avoid;margin:0 0 12px}.group h2{display:flex;justify-content:space-between;margin:0;padding:6px 8px;background:#edf6fa;color:#173a63;font-size:12px}.group h2 span{color:#0f766e}.group h3{margin:6px 0 3px;font-size:9px;color:#173a63;text-transform:uppercase}.group h3.don{color:#9a5d0c}.gap{height:8px}table{width:100%;border-collapse:collapse;font-size:8px}th,td{padding:4px 5px;border-bottom:1px solid #dfe8ee;text-align:left}th{background:#f8fafc;text-transform:uppercase;font-size:7px;color:#64748b}.num{text-align:right;white-space:nowrap}.empty{font-size:8px;color:#7a8b97}</style></head><body><header><div class="headrow"><div class="headcopy"><h1>${esc(h1)} · ${esc(eventTitle())}</h1><p>ControlEvent v4_1_exp · ${new Date().toLocaleString('es-ES')}</p>${note}</div>${printableSummary(kind)}</div></header>${printable(groups,kind)}<script>window.onload=function(){setTimeout(function(){window.focus();window.print()},220)}<\/script></body></html>`);win.document.close();
+    win.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#243847;margin:0}header{border-bottom:3px solid #0f766e;padding:0 0 8px;margin-bottom:10px}.headrow{display:flex;gap:14px;align-items:flex-start}.headcopy{flex:1}h1{font-size:18px;margin:0;color:#173a63}header p,.note{font-size:9px;color:#607789;margin:4px 0}.print-summary{display:flex;gap:8px;justify-content:flex-end}.sumblock{min-width:220px;border:1px solid #ccdce5;border-radius:7px;padding:5px 7px}.sumblock p{display:flex;justify-content:space-between;gap:10px;margin:0;font-size:8px;line-height:1.5}.sumblock .tot{border-top:1px solid #dce7ed;margin-top:2px;padding-top:2px;color:#0f766e}.sumblock.don .tot{color:#9a5d0c}.group{break-inside:avoid;margin:0 0 12px}.group h2{display:flex;justify-content:space-between;margin:0;padding:6px 8px;background:#edf6fa;color:#173a63;font-size:12px}.group h2 span{color:#0f766e}.group h3{margin:6px 0 3px;font-size:9px;color:#173a63;text-transform:uppercase}.group h3.don{color:#9a5d0c}.gap{height:8px}table{width:100%;border-collapse:collapse;font-size:8px}th,td{padding:4px 5px;border-bottom:1px solid #dfe8ee;text-align:left}th{background:#f8fafc;text-transform:uppercase;font-size:7px;color:#64748b}.num{text-align:right;white-space:nowrap}.empty{font-size:8px;color:#7a8b97}</style></head><body><header><div class="headrow"><div class="headcopy"><h1>${esc(h1)} · ${esc(eventTitle())}</h1><p>ControlEvent v6_1-exp · ${new Date().toLocaleString('es-ES')}</p>${note}</div>${printableSummary(kind)}</div></header>${printable(groups,kind)}<script>window.onload=function(){setTimeout(function(){window.focus();window.print()},220)}<\/script></body></html>`);win.document.close();
   }
   function buttonKind(btn){
     if(!btn)return null;
@@ -204,6 +204,6 @@
     [0,120,500,1200,2500].forEach(ms=>setTimeout(ensureEntryButtons,ms));
   }
   root.ceOpenResponsablesReport=openReport;
-  root.ControlEventResponsablesReport={open:openReport,summary:globalSummary,version:'v4_1_exp-BANK4.2'};
+  root.ControlEventResponsablesReport={open:openReport,summary:globalSummary,version:'v5.1_exp-BANK4.2'};
   ensureStyle();bind();
 })(window);

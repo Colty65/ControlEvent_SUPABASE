@@ -1,0 +1,13 @@
+ControlEvent v5.0_exp - COST FIX VERCEL + LOCAL TEST
+Base funcional: ZUZU LAB V3.12.4 STABLE BALANCED NUMBERS SETTLE
+
+Cambios de infraestructura solamente:
+1. Vercel invoca Node/Express solo para /api/*.
+2. Frontend y assets se resuelven desde /public como recursos estaticos.
+3. Se elimina includeFiles=public/** de api/index.js.
+4. server/app.js acepta serveFrontend true/false:
+   - localhost: true
+   - Vercel Function: false
+5. Launcher Windows local con Supabase real + Gemini real.
+
+No se ha cambiado la logica de Zuzu, BANK, Liquidaciones, Ejecucion, memoria ni voz.

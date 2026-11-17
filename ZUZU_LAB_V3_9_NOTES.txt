@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ZUZU LAB V3.9
+ControlEvent v5.0_exp · ZUZU LAB V3.9
 
 - Nombre visible principal: ZUZU. Antonio/Antoñito se conservan como alias de llamada.
 - Se retira el generador general de frases BAR V3.8. La respuesta oral se construye a partir de hechos CE.

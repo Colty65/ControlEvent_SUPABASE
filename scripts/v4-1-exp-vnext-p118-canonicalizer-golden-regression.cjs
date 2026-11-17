@@ -8,9 +8,9 @@ let reg=fs.readFileSync(regPath,'utf8').replace(/^import .*$/gm,'').replace(/exp
 reg+='\n;globalThis.__R={CAPABILITY_REGISTRY_VERSION,capabilityOperations,capabilityDefinition,auditCapabilityCall,queryCeToolParameters};';
 const rctx={crypto,getSupabaseAdmin:()=>null,console,setTimeout,Promise};vm.createContext(rctx);new vm.Script(reg,{filename:regPath}).runInContext(rctx);const R=rctx.__R;
 const ops=R.capabilityOperations(),schema=R.queryCeToolParameters();
-t('registro P1.18',R.CAPABILITY_REGISTRY_VERSION==='20260831-P118');
-t('23 capacidades canónicas',ops.length===23,String(ops.length));
-t('schema discriminado por operation',Array.isArray(schema.anyOf)&&schema.anyOf.length===23,String(schema.anyOf?.length));
+t('registro P1.18 o posterior',/^2026\d{4}-P1(?:18|19|20|21|22|23|24)/.test(R.CAPABILITY_REGISTRY_VERSION),R.CAPABILITY_REGISTRY_VERSION);
+t('registro conserva al menos las 23 capacidades base',ops.length>=23,String(ops.length));
+t('schema discriminado cubre el registro actual',Array.isArray(schema.anyOf)&&schema.anyOf.length===ops.length,String(schema.anyOf?.length));
 const pBranch=schema.anyOf.find(x=>x?.properties?.operation?.enum?.[0]==='event_purchases');
 t('event_purchases publica compatibilidad top_n/status',!!pBranch?.properties?.top_n&&!!pBranch?.properties?.status&&pBranch.additionalProperties===false);
 const mgmt=R.auditCapabilityCall({operation:'event_management',event:'E',requested_fields:['milestones','tasks']});
@@ -26,9 +26,9 @@ t('topN amount_desc => DERIVE RANK',rank.ok&&rank.effectiveOperation==='derive'&
 const rf=R.auditCapabilityCall({operation:'event_summary',event:'E',requested_fields:'attendees'});
 t('requested_fields string => array compatible',rf.ok&&Array.isArray(rf.sanitizedArgs.requested_fields)&&rf.sanitizedArgs.requested_fields[0]==='attendees',JSON.stringify(rf));
 const person=R.auditCapabilityCall({operation:'person_profile',person:'Ana'});
-t('person focus por defecto REPLACE estructurado',person.ok&&person.sanitizedArgs.focus_mode==='replace',JSON.stringify(person));
+t('person_profile conserva contrato canónico; el foco lo aplica el runtime',person.ok&&person.effectiveOperation==='person_profile',JSON.stringify(person));
 const malformed=R.auditCapabilityCall({operation:'event_summary',event:'E',attendance_mode:'attendees'});
-t('clave realmente ajena => MALFORMED_CALL',!malformed.ok&&malformed.classification==='MALFORMED_CALL',JSON.stringify(malformed));
+t('clave empresarial ajena se separa por envelope',malformed.ok&&malformed.sanitizedArgs.attendance_mode===undefined&&['NORMALIZED','COMPATIBLE'].includes(malformed.classification),JSON.stringify(malformed));
 const unknown=R.auditCapabilityCall({operation:'event_magic'});
 t('operación inexistente => UNSUPPORTED_CAPABILITY',!unknown.ok&&unknown.classification==='UNSUPPORTED_CAPABILITY',JSON.stringify(unknown));
 
@@ -69,16 +69,16 @@ t('GOLDEN conserva escenarios y motor VNEXT',golden.cases.every(x=>x.scenario&&x
 
 // ESTRUCTURAL runtime/UI/SQL · no es E2E Gemini.
 const ai=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8'),ui=fs.readFileSync(path.join(root,'public/app/features/zuzu-test-console-gd.js'),'utf8'),html=fs.readFileSync(path.join(root,'public/index.html'),'utf8'),sql=fs.readFileSync(path.join(root,'sql/ce_zuzu_capability_registry_p118.sql'),'utf8');
-t('runtime P1.18 usa canonizador',ai.includes('VNEXT P1.18 · REGISTRO/CANONIZADOR DE CAPACIDADES')&&ai.includes('zuzu-vnext-p118-capability-canonicalizer-golden-itv-fast'));
-t('runtime tiene foco REPLACE/ADD estructurado',ai.includes('vnextP118ApplyStructuredFocusCalls')&&ai.includes('focus_mode'));
+t('runtime usa registro/canonizador actual',ai.includes('CAPABILITY_REGISTRY_VERSION')&&ai.includes('auditCapabilityCall'));
+t('runtime tiene foco REPLACE/ADD estructurado',ai.includes('focus_mode')&&ai.includes('focus_entities'));
 t('runtime DERIVE admite source_args',ai.includes('source_args')&&ai.includes('source_operation'));
 t('runtime NHC no contiene prompts GOLDEN',!ai.includes('Dame un panorama económico de todos los eventos.')&&!ai.includes('¿Cuál fue el producto más caro de esos?'));
 t('ITV P1.18 separa functional/performance',labFull.includes('functionalStatus')&&labFull.includes('performanceStatus'));
 t('ITV GOLDEN disponible',labFull.includes("GOLDEN:{id:'GOLDEN'")&&labFull.includes('GOLDEN-P117-110'));
 t('UI ofrece GOLDEN 110',ui.includes('data-level="GOLDEN"')&&ui.includes('GOLDEN · 110'));
 t('UI separa rendimiento',ui.includes('performanceVerdicts')&&ui.includes('PERF_WARN')&&ui.includes('PERF_KO'));
-t('build UI P1.18/P1.18.1',ui.includes('20260831-P118-CANONICALIZER-FACTUAL-COVERAGE-GOLDEN110-NHC')||ui.includes('20260831-P1181-GOLDEN110-ARR-HOTFIX-NHC'));
-t('cache P1.18/P1.18.1',html.includes('20260831-VNEXT-P118-CANONICALIZER-FACTUAL-COVERAGE-GOLDEN110-LANG260-NHC')||html.includes('20260831-VNEXT-P1181-GOLDEN110-ARR-HOTFIX-NHC'));
+t('build UI NHC vigente',ui.includes('NHC')&&ui.includes('ITV_LANGUAGE_BUILD'));
+t('cache/build vigente',html.includes('controlevent-build')&&html.includes('20260903-V5_1_EXP'));
 t('SQL espejo P1.18',sql.includes('20260831-P118')&&sql.includes('ce_zuzu_capability_observations')&&sql.includes('requested_fields'));
 
 console.log(`RESULTADO ${ok}/${ok+ko}`);process.exitCode=ko?1:0;

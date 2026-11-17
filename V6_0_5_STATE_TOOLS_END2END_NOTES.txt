@@ -1,0 +1,9 @@
+ControlEvent v6.0.8_exp · STATE TOOLS END-TO-END FIX2
+
+- Sustituye emit_ce_contract único por cinco funciones contractuales mutuamente excluyentes.
+- ce_execute_data exige pipeline y no admite reply; CE reconstruye reply=null mecánicamente.
+- Síntesis solo expone ce_no_action.
+- Mantiene validación estricta del pipeline y un único reintento estructural a Gemini.
+- Actualiza hardlocks visibles/descargas a v6.0.8_exp.
+- Sustituye la banda BRAIN-LITE por COMPILADOR V6 en la ventana unificada.
+- Sin fallback cognitivo legado.

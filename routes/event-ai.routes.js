@@ -2,7 +2,7 @@ import express from 'express';
 import { asyncHandler } from './_async.js';
 import { runZuzuUserTurn, runZuzuVNextUserTurn, planificacionInicialZuzu, readZuzuLedgerTurnPresentation } from '../services/event-ai.service.js';
 import { classifyZuzuShadow } from '../services/zuzu-router-shadow.service.js';
-import { readZuzuConversation, listZuzuConversations } from '../services/zuzu-conversation-ledger.service.js';
+import { readZuzuConversation, listZuzuConversations, diagnoseZuzuMemory, diagnoseZuzuPersistence } from '../services/zuzu-conversation-ledger.service.js';
 
 const router = express.Router();
 
@@ -22,11 +22,18 @@ router.post('/event-ai/conversations/read', asyncHandler(async (req,res)=>{
 router.post('/event-ai/conversations/list', asyncHandler(async (req,res)=>{
   const body=req.body||{};res.json({ok:true,conversations:await listZuzuConversations({actor:body.usuarioLogado||body.user||body.authUser||body.ce_acceso||{},limit:body.limit||40})});
 }));
+router.post('/event-ai/memory/audit', asyncHandler(async (req,res)=>{
+  const body=req.body||{};res.json(await diagnoseZuzuMemory({actor:body.usuarioLogado||body.user||body.authUser||body.ce_acceso||{},query:body.query||'',conversationId:body.conversationId||'',nowIso:body.nowIso||'',limit:body.limit||80}));
+}));
+router.post('/event-ai/persistence/audit', asyncHandler(async (req,res)=>{
+  const body=req.body||{};res.json(await diagnoseZuzuPersistence({actor:body.usuarioLogado||body.user||body.authUser||body.ce_acceso||{},limit:body.limit||20}));
+}));
+
 router.post('/event-ai/conversations/turn', asyncHandler(async (req,res)=>{
   const body=req.body||{};const data=await readZuzuLedgerTurnPresentation({turnId:body.turnId,actor:body.usuarioLogado||body.user||body.authUser||body.ce_acceso||{}});if(!data)return res.status(404).json({ok:false,error:'Turno Zuzu no encontrado.'});res.json({ok:true,data});
 }));
 
-// v4_1_exp · nueva arquitectura en SOMBRA: clasifica la misma pregunta, pero NO interviene
+// v5.1_exp · nueva arquitectura en SOMBRA: clasifica la misma pregunta, pero NO interviene
 // en la respuesta actual ni consulta/modifica datos de ControlEvent. La UI la ejecuta después
 // de recibir la respuesta principal para no añadir latencia ni riesgo al Zuzu vigente.
 router.post('/event-ai/router-shadow', asyncHandler(async (req, res) => {

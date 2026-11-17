@@ -1,0 +1,57 @@
+ControlEvent v5.0_exp · FIX31 · V5 P8 RESPUESTA ESCRITA / VOZ
+Fecha: 09/09/2026
+
+OBJETIVO
+Continuar V5 sin tocar C→S→O→V ya estabilizado. P8 actúa únicamente sobre R:
+- la respuesta escrita conserva precisión y formato de pantalla;
+- spokenAnswer se deriva de la misma evidencia, pero se hace pronunciable y conversacional;
+- no añadir llamadas IA ni empeorar tiempos.
+
+CAMBIOS
+1. Contrato oral independiente
+   - v5P8SpokenFromEvidence parte de la misma evidencia/O que el escrito.
+   - v5P8SpokenContract se aplica solo a spokenAnswer.
+   - written/answer no se redondea ni se sustituye por la versión oral.
+
+2. Importes en voz
+   - Los importes con € se redondean a euro entero para locución y se verbaliza «euro/euros».
+   - Solo afecta a magnitudes monetarias identificadas por el símbolo €, no a temperaturas o porcentajes.
+
+3. Ruido no humano
+   - La voz no conserva Markdown (* _ # `), separadores de tabla | ni viñetas visuales.
+   - Los timestamps ISO pierden hora/milisegundos/zona y conservan la fecha.
+   - Se evita la construcción oral «+ -» / «más menos».
+   - Fechas ISO sueltas se convierten a una forma pronunciable.
+
+4. Sin coste adicional
+   - 0 llamadas IA adicionales para P8.
+   - Se conserva Brain-Lite: IA interpreta; CE trae hechos; R oral se compone localmente.
+
+5. ITV nueva
+   - ITV RESPUESTA/VOZ · 18.
+   - Prueba resumen, banco, saldo, estados de ingreso, responsables, tiempo, vistas, donaciones, informe e identidad.
+   - Comprueba que spokenAnswer no tenga Markdown, timestamps ISO, decimales monetarios ni lenguaje técnico interno.
+   - Comprueba que VIEW_ONLY no reconsulte hechos.
+
+NHC / HARD-CODE
+No se añaden nombres de personas, eventos, importes o respuestas de prueba al runtime.
+Hard-code P8 JUSTIFICADO:
+- caracteres visuales a eliminar de la locución;
+- patrón técnico ISO-8601;
+- símbolo monetario € como tipo/unidad ya existente;
+- tipos de vista y dominios ya definidos en V5;
+- límite de longitud solo dentro de ITV, no en el runtime.
+
+REGRESIONES
+- P8: 12/12 OK.
+- P7: 16/16 OK.
+- P6: 12/12 OK.
+- P5: 11/11 OK.
+- P4: 9/9 OK.
+- ITV contract: OK.
+- Sintaxis Node: OK.
+
+PRUEBA RECOMENDADA
+1) ITV AISLAMIENTO · 16 (si todavía no se ha pasado FIX30).
+2) ITV RESPUESTA/VOZ · 18.
+3) Conversación manual alternando escrito/hablado sobre el mismo dato para comparar answer vs spokenAnswer.

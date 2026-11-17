@@ -1,0 +1,17 @@
+ControlEvent v6_1-exp · PASO 1 · CONTRATO MÍNIMO CERRADO
+Fecha: 2026-09-12
+
+Base: v6.0.10 + Structured Outputs nativo ya validado en FIX2.
+
+Alcance de este build:
+- Structured Outputs nativo generateContent + responseJsonSchema.
+- Sin function calling.
+- Sin reparación/limpieza/reinterpretación del JSON antes o después de Gemini.
+- Estados disponibles: NO_ACTION_REQUIRED, EXECUTE_UI, EXECUTE_DATA, NEED_MATERIALS.
+- Primitivas disponibles: FETCH, FILTER, SORT_LIMIT, VISUALIZE.
+- JOIN, AGGREGATE, DERIVE y resolución avanzada de entidades quedan fuera del contrato.
+- FETCH tipado por entidad: Gemini solo puede seleccionar campos realmente materializables por el ejecutor actual.
+- assistant_response.provenance_evidence_ids es obligatorio en todos los estados.
+- En respuestas factuales el System Prompt exige anclaje en key_facts/resolved_materials y prohíbe afirmar ROI, expectativas, éxito, riesgos o cálculos no certificados.
+
+NO ES v6_2-exp. No incluye Context Caching ni Context Packet mínimo.

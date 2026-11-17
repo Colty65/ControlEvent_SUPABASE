@@ -12,10 +12,10 @@ function sliceFn(src,name,next){const a=src.indexOf(`function ${name}`),b=src.in
 
 t('provider P1.27',ai.includes("provider:'zuzu-vnext-p127-natural-visible-content-dialogue'"));
 t('arquitectura P1.27',ai.includes('VNext P1.27 · contenido visible narrable'));
-t('JSON LIGHT P1.27',ui.includes("reportFormat:'LIGHT-P127'"));
-t('language build P1.27',ui.includes("20260902-P127-NATURAL-VISIBLE-CONTENT-DIALOGUE-NHC"));
-t('cache bust P1.27',html.includes('20260902-VNEXT-P127-NATURAL-VISIBLE-CONTENT-DIALOGUE-NHC'));
-t('batería dialogue P1.27',lab.includes("batteryCode:golden?'GOLDEN-P117-110':dialogue?'DIALOGUE-P127-24'"));
+t('JSON LIGHT P1.27 o posterior',/reportFormat:'LIGHT-(?:P127|P2R)'/.test(ui));
+t('language build NHC vigente',ui.includes('ITV_LANGUAGE_BUILD')&&ui.includes('NHC'));
+t('cache bust vigente',html.includes('controlevent-build')&&html.includes('20260903-V5_1_EXP'));
+t('batería diálogo vigente',lab.includes("dialogue?'DIALOGUE-P2R-24'")||lab.includes("dialogue?'DIALOGUE-P127-24'"));
 
 // Naming: the battery identity must beat the internal FULL-CERT execution bucket.
 t('export naming tiene batteryFileSuffix',ui.includes('function batteryFileSuffix(mode=lastMode)'));

@@ -1,0 +1,93 @@
+ControlEvent v5.0_exp · FIX30 · V5 P7 AISLAMIENTO Y CONTRATOS
+Fecha: 09/09/2026
+
+OBJETIVO
+Cerrar fallos observados tras FIX29 sin rediseñar C→S→O→R/V:
+- impedir contaminación de persona/donante entre contextos C;
+- resolver FACT antes que VIEW;
+- hacer contractual group_by en O;
+- no heredar R como texto;
+- exigir evidencia verificable en Memory;
+- añadir identidad de SESSION fuera de C/S/O;
+- crear C_SYNTHESIS para peticiones transversales;
+- añadir ITV AISLAMIENTO · 16.
+
+CAMBIOS PRINCIPALES
+1. Aislamiento de entidad por contexto
+   - Al cambiar de dominio C se limpian person/responsible/donor.
+   - La proyección de un snapshot ya no rescata una persona del contexto padre si el S no la contiene.
+   - Un regreso a compras agrupadas no debe heredar la persona usada en un recuerdo anterior.
+
+2. FACT antes que VIEW
+   - Un dominio factual explícito manda sobre la vista solicitada en la misma frase.
+   - Ej.: “compras por responsable en donut” primero construye/activa PURCHASES y su O; después aplica V.
+   - Una petición que sea exclusivamente de presentación sigue entrando por VIEW_ONLY y no reejecuta hechos.
+
+3. Contrato de agregación
+   - group_by se incorpora al schema tipado del planner.
+   - El breakdown por responsable elimina filtros individuales previos.
+   - La evidencia de O conserva el dataset agrupado requerido para R/V.
+
+4. R fresco
+   - Los textos de respuesta no son fuente heredable para replay/view.
+   - Se heredan O/evidencias; R se recompone desde ellas.
+
+5. Memory con evidencia obligatoria
+   - La búsqueda semántica propone candidatos, no certifica el recuerdo.
+   - Solo se abre un recuerdo cuando hay pasaje verificable.
+   - Continuaciones del tipo “dónde aparece / dame el texto” consultan la O de Memory ya abierta, sin convertir la persona en filtro de otro C.
+
+6. SESSION identity
+   - Las preguntas “¿me conoces?”, “¿cómo me llamo?” se responden localmente desde el usuario autenticado de ControlEvent.
+   - SESSION identity está fuera de C/S/O y no consulta CE/Gemini.
+
+7. C_SYNTHESIS
+   - Peticiones transversales explícitas (p.ej. usar toda la información del evento para una síntesis/rima/relato) crean un C propio.
+   - Se certifican varias O factuales antes de aplicar el estilo de R.
+   - La transformación estilística no puede cambiar los hechos.
+
+8. Meteorología: cantidad temporal genérica
+   - “3 días” y “tres días” se normalizan al mismo requested_days.
+   - Límite técnico de rango: 1–14 días.
+
+ITV NUEVA
+- “ITV AISLAMIENTO · 16”.
+- Prueba fronteras C/entidad/O/R/V, multi-O, cambio factual+vista, memoria, síntesis, identidad y ausencia de reejecución en VIEW_ONLY.
+
+HARD-CODE / NHC
+NO añadido en runtime:
+- nombres de personas concretas;
+- nombres de eventos concretos;
+- importes concretos;
+- respuestas de la ITV;
+- reglas del tipo “si dice Carmelo…”.
+
+Hard-code estructural/lingüístico JUSTIFICADO que sí existe:
+- catálogo de dominios funcionales (summary, bank, income, purchases, donations, attendance, weather, comparison, synthesis);
+- operaciones canónicas asociadas a esos dominios;
+- tipos de vista (line, bar, pie, donut);
+- nombres de dimensiones canónicas como responsible/donor/product/date/status;
+- vocabulario genérico para detectar síntesis, memoria, identidad, reactivación y presentación;
+- lista genérica de números españoles uno..catorce para normalizar “N días”;
+- receta factual de C_SYNTHESIS (summary + bank + purchases + donations + attendance): se considera hard-code estructural justificado porque define fuentes canónicas de una síntesis transversal, no valores ni entidades;
+- límites técnicos de contexto/snapshot/evidencia ya existentes.
+
+Hard-code legacy fuera del nuevo P7:
+- el proyecto conserva reglas y ejemplos históricos previos al V5 en otras zonas. FIX30 no declara el conjunto de la app “NHC limpio”.
+- deben seguir tratándose por separado en la auditoría general; P7 no depende de entidades concretas legacy.
+
+REGRESIONES EJECUTADAS
+- V5 P7 isolation/contracts: 16/16 OK.
+- V5 P6 snapshot replay: 12/12 OK.
+- V5 P5 O contracts: 11/11 OK.
+- V5 P4 sovereign view: 9/9 OK.
+- V5 C/S/O/R/V P3: 17/17 OK.
+- Zuzu ITV contract: OK (actualizado cache-bust FIX30).
+- Node syntax services/event-ai.service.js: OK.
+- Node syntax services/zuzu-test-lab.service.js: OK.
+
+IMPORTANTE
+Estas son regresiones locales/estructurales. La validación real debe hacerse con:
+1) ITV AISLAMIENTO · 16;
+2) ITV C/S/O · 36;
+3) conversación manual libre, especialmente Memory→Compras, Tiempo+V→Compras+V, identidad y síntesis transversal.

@@ -59,6 +59,6 @@ ok(F.v79FastLocalPresentation({action:'query',response_kind:'table',query:{targe
 ok(lab.includes('asksCount')&&lab.includes('no devuelve el recuento bancario canónico'),'oráculo Banco valida la magnitud realmente preguntada');
 ok(lab.includes('payloadItems')&&lab.includes('result-set estructurado'),'oráculo acepta dataset estructurado aunque la respuesta oral sea breve');
 ok(/20260828-BANK41(?:0-Z1-CLOSURE-SAFEFASTLOCAL-EUR|1-Z1-FINAL-ORACLE-EUR-FAILSAFE)/.test(ui),'UI exporta BANK4_10 o sucesora BANK4_11');
-ok(/controlevent-build" content="20260828-V4_1_EXP-BANK41(?:0-Z1-CLOSURE-SAFEFASTLOCAL-EUR|1-Z1-FINAL-ORACLE-EUR-FAILSAFE)/.test(html),'build general BANK4_10/BANK4_11 actualizado');
+ok(/controlevent-build" content="20260828-V5_1_EXP-BANK41(?:0-Z1-CLOSURE-SAFEFASTLOCAL-EUR|1-Z1-FINAL-ORACLE-EUR-FAILSAFE)/.test(html),'build general BANK4_10/BANK4_11 actualizado');
 ok(/zuzu-test-console-gd\.js\?v=20260828-BANK41(?:0-Z1-CLOSURE-SAFEFASTLOCAL-EUR|1-Z1-FINAL-ORACLE-EUR-FAILSAFE)/.test(html),'cache-bust ITV BANK4_10/BANK4_11 actualizado');
 console.log(`BANK4_10 Z1 CLOSURE / EUR: ${n}/${n} OK`);

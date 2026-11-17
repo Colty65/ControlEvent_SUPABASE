@@ -1,9 +1,9 @@
-/* ControlEvent v4_1_exp - mantenimiento seguro de tablas generales y baja controlada de EVENTOS.
+/* ControlEvent v6_1-exp - mantenimiento seguro de tablas generales y baja controlada de EVENTOS.
    No toca el flujo de cambio de evento de v44.7.x. */
 (function(){
   'use strict';
-  const VERSION = 'ControlEvent v4_1_exp';
-  const VERSION_FILE = 'ControlEvent_v4_1_exp';
+  const VERSION = 'ControlEvent v6_1-exp';
+  const VERSION_FILE = 'ControlEvent_v6_1-exp';
   const BLOCK_MSG = 'No es posible, tiene dependencias.';
   const EVENT_GD_MSG = 'Solo GD puede eliminar eventos.';
   const OK_MSG = 'Se puede eliminar. No hay dependencias.';

@@ -1,0 +1,19 @@
+FIX42 · V5 P19 · MEMORY WRITE/CLASSIFY/RETRIEVE AUDIT
+
+Objetivo
+- Comprobar objetivamente si un recuerdo concreto está en Supabase, si es recuperable, su calidad, si pertenece a la conversación actual y qué puntuación recibe en el ranking.
+- No modificar todavía el algoritmo de selección: primero distinguir WRITE / CLASSIFY / RETRIEVE con evidencia.
+
+Cambios
+1. Nuevo servicio diagnoseZuzuMemory(): lee ce_zuzu_conversations y ce_zuzu_turns directamente.
+2. Para cada coincidencia muestra fecha, conversation_id, turn_id, current_conversation, memory_recallable, effective_recallable, memory_quality, memory_kind, plan_signature, score y pregunta.
+3. Nuevo endpoint POST /api/event-ai/memory/audit.
+4. Nuevo botón "🧠 MEM" en Zuzu. Si hay texto en Prompt lo usa como término; si no, pide uno. Muestra una tabla diagnóstica.
+5. La auditoría es de solo lectura y no cambia ranking, clasificación ni persistencia.
+
+Uso recomendado
+- Escribir Carmelo en Prompt y pulsar 🧠 MEM.
+- Mirar la fila más reciente y comprobar:
+  a) existe -> WRITE OK;
+  b) Recallable Sí / Q>=2 -> CLASSIFY OK;
+  c) score/rank y Actual -> RETRIEVE/ranking/current-conversation explican la selección.

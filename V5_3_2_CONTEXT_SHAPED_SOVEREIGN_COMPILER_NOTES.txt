@@ -1,0 +1,17 @@
+ControlEvent v5.3.2_exp · CONTEXT-SHAPED SOVEREIGN COMPILER
+
+Objetivo
+- Mejorar la decisión de Gemini moldeando el contexto, no añadiendo interpretación local en CE.
+
+Cambios
+- ENTITY_INDEX compacto y autoritativo: eventos/personas como [id,nombre], sin perfiles ni datos completos.
+- SESSION.actor reforzado como hecho autenticado autoritativo.
+- THREAD_GRAPH conserva last_response_mode, last_user_goal y pending_state además de dataset/evidencias/vista/última operación.
+- Contrato Gemini añade turn_result: ANSWER / EXECUTE / NEED_MATERIALS / CLARIFY.
+- Si SESSION/THREADS/RESOLVED_MATERIALS bastan, Gemini debe responder directamente; CE entrega reply sin narrador posterior.
+- Tras lazy-loading, si la evidencia materializada basta, Gemini debe contestar y no repetir la extracción.
+- Ontología marca event_summary/events_overview como overview no exhaustivo y los adaptadores de dominio como evidencia exhaustiva.
+- Para análisis multidominio, Gemini debe decidir qué evidencias de dominio necesita; CE no usa frases ni reglas lingüísticas.
+- Peticiones de continuación/presentación sobre dataset activo deben cerrarse como acción/reutilización si el Thread ya identifica dataset/vista/operación.
+- Se mantiene conversationId por usuario/navegador, recarga, idioma persistente y bifurcación de pestañas.
+- Migración de claves v5.3.1 -> v5.3.2 sin borrar sesión/preferencias.

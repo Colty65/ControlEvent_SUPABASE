@@ -1,0 +1,45 @@
+CONTROLEVENT v5.0_exp - MODO LOCAL + VERCEL COST FIX
+====================================================
+
+OBJETIVO
+- Seguir probando ControlEvent aunque Vercel este pausado.
+- Usar las tablas REALES de Supabase y la API real de Gemini.
+- Evitar consumir CPU de Vercel durante las pruebas en PC.
+- Cuando se vuelva a desplegar en Vercel, servir HTML/JS/CSS/imagenes como estaticos y dejar Node solo para /api/*.
+
+PRIMERA VEZ EN EL PC
+1) Ejecuta 00_CONFIGURAR_LOCAL.bat.
+2) Se crea .env y se abre en el Bloc de notas.
+3) Copia desde Vercel > Project > Environment Variables estos 3 valores:
+   SUPABASE_URL
+   SUPABASE_SERVICE_ROLE_KEY
+   GEMINI_API_KEY
+4) Guarda y cierra el Bloc de notas.
+5) Ejecuta 01_ARRANCAR_CONTROLEVENT_LOCAL.bat.
+
+USO NORMAL DESPUES
+- Solo doble clic en 01_ARRANCAR_CONTROLEVENT_LOCAL.bat.
+- Abre automaticamente http://localhost:3030
+- Para terminar: cierra la ventana negra del servidor o usa 02_PARAR_CONTROLEVENT_LOCAL.bat.
+
+IMPORTANTE
+- localhost NO usa Vercel Functions.
+- Zuzu SI sigue consumiendo la API de Gemini cuando se utiliza.
+- Supabase SI sigue teniendo sus consumos de base de datos/storage/egress.
+- No compartas el fichero .env ni lo metas en Git. .vercelignore ya excluye .env y .env.*.
+- En PC, http://localhost es un contexto permitido por los navegadores modernos para microfono.
+- Para probar microfono desde iPhone/iPad por la IP LAN del PC necesitaremos HTTPS; no esta incluido en este paso para no meter otra capa innecesaria.
+
+VERCEL COST FIX
+Antes:
+  /(.*) -> /api/index.js
+  Todo el frontend entraba por la Function Express.
+
+Ahora:
+  /api/* -> /api/index.js
+  /vendor/* y archivos .js/.css/.png/.jpg/... -> /public/* estatico
+  / y rutas SPA -> /public/index.html estatico
+  api/index.js crea Express con serveFrontend:false
+  public/** ya NO se incluye expresamente dentro del paquete de la Function.
+
+Esto no cambia la logica de negocio ni el comportamiento de Zuzu. Cambia el lugar desde el que se sirven los ficheros estaticos.

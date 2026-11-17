@@ -1,0 +1,18 @@
+HARD-CODE AUDIT · FIX32 P9
+
+A) Hard-code injustificado de negocio añadido: NINGUNO.
+No se añaden nombres de personas, eventos, importes, respuestas de ITV ni valores de datos reales al runtime.
+
+B) Hard-code estructural JUSTIFICADO:
+- Taxonomía de dominios funcionales (summary, bank, income, purchases, donations, weather, attendance, comparison, synthesis).
+- Operaciones canónicas de ControlEvent asociadas a esos dominios.
+- Dimensiones canónicas como responsible.
+- Tipos soportados por el renderer: bar, line, pie, donut. Es un registro técnico único y sirve tanto para render como para informar capacidades.
+- Vocabulario lingüístico genérico de continuidad/agrupación/ordenación y nombres genéricos de tipos de gráfica.
+- Receta mínima de C_SYNTHESIS: fuentes factuales que ya son capacidades existentes de ControlEvent.
+
+C) Por qué se considera justificado
+Estas constantes describen el contrato/software disponible, no hechos del negocio ni casos concretos. Eliminarlas obligaría a delegar reglas de tipo y capacidades reales al modelo, reduciendo seguridad y aumentando latencia.
+
+D) Hard-code legacy
+Sigue existiendo hard-code histórico fuera de P9. FIX32 no declara toda la aplicación NHC limpia; la auditoría se limita a lo añadido/modificado en P9.

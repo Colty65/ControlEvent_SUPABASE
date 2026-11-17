@@ -1,9 +1,9 @@
-/* ControlEvent v4_1_exp - Zuzu / Analítica libre de explotación del evento.
+/* ControlEvent v6_1-exp - Zuzu / Analítica libre de explotación del evento.
    Solo lectura. Disponible para GD/RW/RO y eventos En curso/Finalizado. */
 (function(){
   'use strict';
   if(window.__ceV113ZuzuAnalitica) return; window.__ceV113ZuzuAnalitica=true;
-  var VERSION='v4_1_exp';
+  var VERSION='v5.1_exp';
   function $(id){ return document.getElementById(id); }
   function text(v){ return v==null?'':String(v); }
   function trim(v){ return text(v).trim(); }
@@ -33,7 +33,7 @@
   }
   function ensureZuzuUserPreface(value){
     var src=stripZuzuCssLeak(value); if(!src) return src;
-    // v4_1_exp: la respuesta empieza directamente. Eliminamos también el saludo
+    // v5.1_exp: la respuesta empieza directamente. Eliminamos también el saludo
     // si llega de una conversación antigua o el modelo lo genera por inercia.
     return src.replace(/^(?:Te|Le)\s+comento\s*,\s*[^.:\n]{1,120}[.:]\s*/i,'').replace(/^(?:Respuesta|Contestaci[oó]n|Informe)\s+(?:de\s+)?Zuzu\s*[:.\-–—]*\s*/i,'').replace(/^Zuzu\s+(?:responde|contesta)\s*[:.\-–—]*\s*/i,'').trim();
   }
@@ -136,7 +136,7 @@
     data=data||{};
     var subject=questionSubject60(prompt || data.__prompt || 'consulta');
     var stamp=dateStamp(new Date());
-    return 'ControlEvent_v4_1_exp-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
+    return 'ControlEvent_v6_1-exp-responde_Zuzu_a_'+subject+'-'+stamp+'.pdf';
   }
   function responseScopeTitleHtml(data){
     var label=responseMetaLabel(data);
@@ -165,7 +165,7 @@
       '#ceGeminiLibreOverlay .ce-ai-head{display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid #fed7aa;background:linear-gradient(90deg,#fff7ed,#fff)}\n'+
       '#ceGeminiLibreOverlay .ce-ai-head h2{margin:0;color:#7c2d12;font-size:24px;flex:0 0 auto}#ceGeminiLibreOverlay .ce-ai-version-badge{font-size:12px;font-weight:950;color:#075985;background:#e0f2fe;border:1px solid #7dd3fc;border-radius:999px;padding:3px 9px;white-space:nowrap}#ceAiEventTitle{flex:1;text-align:center}#ceGeminiLibreOverlay .ce-ai-head .spacer{display:none}#ceGeminiLibreOverlay .ce-ai-close{border-radius:14px!important;background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;padding:10px 18px!important;font-weight:900!important;flex:0 0 auto}\n'+
       '#ceGeminiLibreOverlay .ce-ai-event-open{color:#15803d;font-weight:900;font-size:18px}#ceGeminiLibreOverlay .ce-ai-event-final{color:#dc2626;font-weight:900;font-size:18px}#ceGeminiLibreOverlay .ce-ai-event-warn{color:#b45309;font-weight:900}#ceGeminiLibreOverlay .ce-ai-event-state{display:inline-block;margin-left:18px;font-size:15px;color:#475569;font-weight:900;background:#f1f5f9;border-radius:999px;padding:3px 12px}\n'+
-      '#ceGeminiLibreOverlay .ce-ai-prompt{padding:10px 14px;border-bottom:1px solid #e5e7eb;background:#fff}#ceGeminiLibreOverlay .ce-ai-prompt textarea{width:100%;height:96px;min-height:82px;max-height:220px;resize:vertical;border:1px solid #fb923c;border-radius:13px;padding:10px 11px;font-size:15px;line-height:1.35;box-sizing:border-box}#ceGeminiLibreOverlay .ce-ai-toolbar{display:flex;align-items:center;gap:5px;margin-top:7px;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-run{background:#f97316!important;color:#fff!important;border:0!important;border-radius:11px!important;padding:8px 12px!important;font-size:12px!important;min-height:32px!important;font-weight:900!important;transform-origin:center;will-change:transform,box-shadow}#ceGeminiLibreOverlay .ce-ai-run.is-thinking{animation:ceZuzuHeartbeat 1.08s cubic-bezier(.4,0,.2,1) infinite!important;box-shadow:0 0 0 0 rgba(249,115,22,.34)}@keyframes ceZuzuHeartbeat{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(249,115,22,.16)}14%{transform:scale(1.12);box-shadow:0 0 0 7px rgba(249,115,22,.13)}28%{transform:scale(.985);box-shadow:0 0 0 2px rgba(249,115,22,.08)}43%{transform:scale(1.075);box-shadow:0 0 0 5px rgba(249,115,22,.10)}62%{transform:scale(1);box-shadow:0 0 0 0 rgba(249,115,22,0)}}@media (prefers-reduced-motion:reduce){#ceGeminiLibreOverlay .ce-ai-run.is-thinking{animation-duration:1.65s!important}}#ceGeminiLibreOverlay .ce-ai-secondary{background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;border-radius:10px!important;padding:7px 9px!important;font-size:11px!important;min-height:32px!important;font-weight:900!important}#ceGeminiLibreOverlay .ce-ai-status{font-weight:850;font-size:10px;margin-left:3px;flex:0 1 auto;white-space:nowrap}#ceGeminiLibreOverlay .ce-ai-status.ok{color:#15803d}#ceGeminiLibreOverlay .ce-ai-status.err{color:#b91c1c}\n'+
+      '#ceGeminiLibreOverlay .ce-ai-prompt{padding:10px 14px;border-bottom:1px solid #e5e7eb;background:#fff}#ceGeminiLibreOverlay .ce-ai-prompt textarea{width:100%;height:96px;min-height:82px;max-height:220px;resize:vertical;border:1px solid #fb923c;border-radius:13px;padding:10px 11px;font-size:15px;line-height:1.35;box-sizing:border-box}#ceGeminiLibreOverlay .ce-ai-toolbar{display:flex;align-items:center;gap:5px;margin-top:7px;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-run{background:#f97316!important;color:#fff!important;border:0!important;border-radius:11px!important;padding:8px 12px!important;font-size:12px!important;min-height:32px!important;font-weight:900!important;transform-origin:center;will-change:transform,box-shadow}#ceGeminiLibreOverlay .ce-ai-run.is-thinking{animation:ceZuzuHeartbeat 1.08s cubic-bezier(.4,0,.2,1) infinite!important;box-shadow:0 0 0 0 rgba(249,115,22,.34)}@keyframes ceZuzuHeartbeat{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(249,115,22,.16)}14%{transform:scale(1.12);box-shadow:0 0 0 7px rgba(249,115,22,.13)}28%{transform:scale(.985);box-shadow:0 0 0 2px rgba(249,115,22,.08)}43%{transform:scale(1.075);box-shadow:0 0 0 5px rgba(249,115,22,.10)}62%{transform:scale(1);box-shadow:0 0 0 0 rgba(249,115,22,0)}}@media (prefers-reduced-motion:reduce){#ceGeminiLibreOverlay .ce-ai-run.is-thinking{animation-duration:1.65s!important}}#ceGeminiLibreOverlay .ce-ai-secondary{background:#fff!important;color:#0f172a!important;border:1px solid #cbd5e1!important;border-radius:10px!important;padding:7px 9px!important;font-size:11px!important;min-height:32px!important;font-weight:900!important}#ceGeminiLibreOverlay .ce-ai-status{font-weight:900;font-size:11px;margin-left:3px;flex:1 1 260px;white-space:normal;line-height:1.25}#ceGeminiLibreOverlay .ce-ai-status.ok{color:#15803d}#ceGeminiLibreOverlay .ce-ai-status.err{color:#b91c1c}\n'+
       '#ceGeminiLibreOverlay .ce-ai-result{flex:1;overflow:auto;background:#f8fafc;padding:11px 14px}#ceGeminiLibreOverlay .ce-ai-card{background:#fff;border:1px solid #dbeafe;border-radius:16px;padding:14px;margin:0 0 14px 0;box-shadow:0 2px 10px rgba(15,23,42,.06)}#ceGeminiLibreOverlay .ce-ai-card h3{margin:0 0 10px;color:#075985}#ceGeminiLibreOverlay .ce-ai-answer{white-space:pre-wrap;line-height:1.45;font-weight:400;color:#0f172a}#ceGeminiLibreOverlay .ce-ai-answer .ce-ai-inline-table-wrap{white-space:normal;overflow:auto;margin:10px 0 8px}#ceGeminiLibreOverlay .ce-ai-answer .ce-ai-inline-md-table{min-width:620px}#ceGeminiLibreOverlay .ce-ai-warning{background:#fff7ed;border-color:#fed7aa;color:#9a3412}#ceGeminiLibreOverlay .ce-ai-rejected{background:#fef2f2;border-color:#fecaca;color:#991b1b}\n'+
       '#ceGeminiLibreOverlay .ce-ai-table-wrap{overflow:auto;border:1px solid #dbeafe;border-radius:12px;background:#fff}#ceGeminiLibreOverlay .ce-ai-table{border-collapse:separate;border-spacing:0;width:100%;font-size:13px;table-layout:auto;font-variant-numeric:tabular-nums}#ceGeminiLibreOverlay .ce-ai-table th,#ceGeminiLibreOverlay .ce-ai-table td{border:0;border-bottom:1px solid #e2e8f0;border-right:1px solid #eef2ff;padding:7px 9px;text-align:left;vertical-align:top;line-height:1.22}#ceGeminiLibreOverlay .ce-ai-table th{background:#eff6ff;color:#075985;position:sticky;top:0;z-index:1;white-space:nowrap;font-size:12px}#ceGeminiLibreOverlay .ce-ai-table tbody tr:nth-child(even){background:#f8fafc}#ceGeminiLibreOverlay .ce-ai-table tbody tr:hover{background:#fff7ed}#ceGeminiLibreOverlay .ce-ai-table .ce-col-product{min-width:170px;font-weight:750;color:#0f172a}#ceGeminiLibreOverlay .ce-ai-table .ce-col-money,#ceGeminiLibreOverlay .ce-ai-table .ce-col-number{text-align:right;white-space:nowrap}#ceGeminiLibreOverlay .ce-ai-table .ce-col-short{white-space:nowrap}#ceGeminiLibreOverlay .ce-ai-table-medium{min-width:760px}#ceGeminiLibreOverlay .ce-ai-table-wide{min-width:1120px;font-size:11.5px}#ceGeminiLibreOverlay .ce-ai-table.ce-ai-table-user-compact{min-width:0!important;width:100%!important;table-layout:fixed!important;font-size:9.5px!important}#ceGeminiLibreOverlay .ce-ai-table.ce-ai-table-user-compact th,#ceGeminiLibreOverlay .ce-ai-table.ce-ai-table-user-compact td{padding:3px 4px!important;line-height:1.08!important;white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal!important}#ceGeminiLibreOverlay .ce-ai-table.ce-ai-table-user-compact .ce-col-product{min-width:0!important}#ceGeminiLibreOverlay .ce-ai-table.ce-ai-table-user-compact .ce-col-money,#ceGeminiLibreOverlay .ce-ai-table.ce-ai-table-user-compact .ce-col-number,#ceGeminiLibreOverlay .ce-ai-table.ce-ai-table-user-compact .ce-col-short{white-space:normal!important}#ceGeminiLibreOverlay .ce-ai-bars{display:grid;gap:10px}#ceGeminiLibreOverlay .ce-ai-bar-row{display:grid;grid-template-columns:minmax(150px,300px) 1fr minmax(74px,auto);align-items:center;gap:12px}#ceGeminiLibreOverlay .ce-ai-bar-label{font-weight:650;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.16;font-size:13px}#ceGeminiLibreOverlay .ce-ai-bar-track{height:18px;background:#e8eef6;border-radius:999px;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(15,23,42,.04)}#ceGeminiLibreOverlay .ce-ai-bar-fill{height:100%;background:#38bdf8;border-radius:999px;box-shadow:0 1px 4px rgba(15,23,42,.10)}#ceGeminiLibreOverlay .ce-ai-bar-value{font-weight:650;color:#075985;min-width:74px;text-align:right;font-size:13px}#ceGeminiLibreOverlay .ce-ai-loading{background:#fff7ed;border-color:#fed7aa}#ceGeminiLibreOverlay .ce-ai-thinking{display:flex;align-items:center;gap:16px;padding:10px 4px}#ceGeminiLibreOverlay .ce-ai-thinking-orb{width:54px;height:54px;border-radius:50%;position:relative;background:radial-gradient(circle at 35% 30%,#fff 0 14%,#fdba74 15% 42%,#fb923c 43% 66%,#7c2d12 67% 100%);box-shadow:0 0 0 0 rgba(249,115,22,.45);animation:ceZuzuOrb 1.05s infinite ease-in-out}#ceGeminiLibreOverlay .ce-ai-thinking-orb:before,#ceGeminiLibreOverlay .ce-ai-thinking-orb:after{content:"";position:absolute;inset:-8px;border-radius:50%;border:3px solid rgba(249,115,22,.35);animation:ceZuzuRing 1.3s infinite ease-out}#ceGeminiLibreOverlay .ce-ai-thinking-orb:after{animation-delay:.35s}#ceGeminiLibreOverlay .ce-ai-thinking-lines{font-weight:900;color:#7c2d12}#ceGeminiLibreOverlay .ce-ai-thinking-lines small{display:block;color:#9a3412;margin-top:5px;font-weight:800}#ceGeminiLibreOverlay .ce-ai-step-title{display:block;font-weight:950;color:#7c2d12}#ceGeminiLibreOverlay .ce-ai-step-counter{color:#475569!important;font-size:12px!important;margin-top:7px!important}#ceGeminiLibreOverlay .ce-ai-progress{height:9px;background:#fed7aa;border-radius:999px;overflow:hidden;margin-top:10px;box-shadow:inset 0 0 0 1px rgba(124,45,18,.08)}#ceGeminiLibreOverlay .ce-ai-progress-fill{height:100%;width:0;background:linear-gradient(90deg,#f97316,#fb923c,#22c55e);border-radius:999px;transition:width .12s ease}#ceGeminiLibreOverlay .ce-ai-thinking-lines.is-live{min-height:58px}#ceGeminiLibreOverlay .ce-ai-spinner{display:inline-block;animation:ceZuzuPulse 1s infinite ease-in-out}@keyframes ceZuzuPulse{0%,100%{transform:scale(1);opacity:.7}50%{transform:scale(1.25);opacity:1}}@keyframes ceZuzuOrb{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-4px) scale(1.06)}}@keyframes ceZuzuRing{0%{transform:scale(.75);opacity:.65}100%{transform:scale(1.45);opacity:0}}#ceGeminiLibreOverlay .ce-ai-files{display:flex;gap:8px;flex-wrap:wrap}#ceGeminiLibreOverlay .ce-ai-file-btn{background:#e0f2fe!important;color:#075985!important;border:1px solid #7dd3fc!important;border-radius:12px!important;padding:8px 12px!important;font-weight:900!important}#ceGeminiLibreOverlay .ce-ai-preview{margin-top:10px;background:#0f172a;color:#e2e8f0;border-radius:14px;padding:12px;max-height:240px;overflow:auto;white-space:pre-wrap}\n'+
       '#ceGeminiLibreOverlay .ce-ai-vbars{height:330px;display:flex;align-items:flex-end;gap:18px;border:1px solid #e0f2fe;border-radius:16px;background:linear-gradient(180deg,#fff,#f8fafc);padding:42px 18px 70px;overflow:auto}#ceGeminiLibreOverlay .ce-ai-vbar{height:100%;min-width:82px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;position:relative}#ceGeminiLibreOverlay .ce-ai-vbar-col{width:26px;border-radius:10px 10px 0 0;box-shadow:0 5px 14px rgba(15,23,42,.10)}#ceGeminiLibreOverlay .ce-ai-vbar-value{position:absolute;bottom:calc(100% + 10px);font-size:11px;font-weight:650;color:#075985;white-space:nowrap;transform:none;transform-origin:center}#ceGeminiLibreOverlay .ce-ai-vbar-label{position:absolute;bottom:-58px;max-width:118px;text-align:center;font-size:11px;font-weight:650;color:#334155;white-space:normal;line-height:1.16;overflow-wrap:anywhere}\n'+
@@ -173,6 +173,7 @@
       '#ceGeminiLibreOverlay .ce-ai-line-svg{width:100%;height:320px;border:1px solid #e0f2fe;border-radius:16px;background:linear-gradient(180deg,#fff,#f8fafc)}#ceGeminiLibreOverlay .ce-ai-stacked-wrap{display:grid;gap:14px}#ceGeminiLibreOverlay .ce-ai-stack-row{display:grid;grid-template-columns:minmax(160px,280px) 1fr;gap:12px;align-items:center}#ceGeminiLibreOverlay .ce-ai-stack-label{font-weight:650;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:normal;line-height:1.15;font-size:13px}#ceGeminiLibreOverlay .ce-ai-stack-body{min-width:0}#ceGeminiLibreOverlay .ce-ai-stack-track{height:24px;background:#e8eef6;border-radius:999px;display:flex;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(15,23,42,.04)}#ceGeminiLibreOverlay .ce-ai-stack-part{height:100%;display:flex;align-items:center;justify-content:center;color:white;font-size:10px;font-weight:650;min-width:4px;text-shadow:0 1px 1px rgba(15,23,42,.18)}#ceGeminiLibreOverlay .ce-ai-stack-values{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:5px;font-size:11px;font-weight:750;color:#334155}#ceGeminiLibreOverlay .ce-ai-stack-values span{white-space:nowrap}#ceGeminiLibreOverlay .ce-ai-stack-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-weight:650;color:#334155;font-size:13px}#ceGeminiLibreOverlay .ce-ai-stack-legend span i{display:inline-block;width:10px;height:10px;border-radius:999px;margin-right:6px}\n'+
       '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-modal{width:98vw;height:96vh}#ceGeminiLibreOverlay .ce-ai-head h2{font-size:18px}.ce-ai-free-btn{height:42px;min-width:46px;font-size:21px}#ceGeminiLibreOverlay .ce-ai-prompt textarea{min-height:96px}#ceGeminiLibreOverlay .ce-ai-bar-row{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-bar-value{text-align:left}}\n'+
       '#ceGeminiLibreOverlay #ceAiPrompt{touch-action:manipulation!important;-webkit-user-select:text!important;user-select:text!important;contain:layout style!important;}\n'+
+      '#ceGeminiLibreOverlay .ce-ai-mic{background:#be123c!important;color:#fff!important;border:1px solid #9f1239!important;border-radius:11px!important;padding:9px 16px!important;font-size:14px!important;min-height:38px!important;font-weight:950!important;box-shadow:0 2px 8px rgba(159,18,57,.18)}#ceGeminiLibreOverlay .ce-ai-mic.is-recording{background:#be123c!important;color:#fff!important;animation:ceMicPulse 1s infinite}#ceGeminiLibreOverlay .ce-ai-voice-toggle.is-on{background:#ecfdf5!important;color:#166534!important;border-color:#86efac!important}@keyframes ceMicPulse{50%{transform:scale(1.06);box-shadow:0 0 0 6px rgba(190,18,60,.12)}}\n'+
       '#ceGeminiLibreOverlay .ce-ai-loading,#ceGeminiLibreOverlay .ce-ai-thinking,#ceGeminiLibreOverlay .ce-ai-progress,#ceGeminiLibreOverlay .ce-ai-wait-signal,#ceGeminiLibreOverlay .ce-ai-wait-copy{display:none!important}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head{display:flex;align-items:center;gap:8px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head>span:first-child{white-space:nowrap}#ceGeminiLibreOverlay .ce-ai-conversation-rail-count{margin-left:auto}#ceAiDownloadResult{pointer-events:auto!important;opacity:1!important;cursor:pointer!important}\n'+
       '#ceAiPdfPicker{position:fixed;inset:0;z-index:100080;background:rgba(15,23,42,.58);display:flex;align-items:center;justify-content:center;padding:18px}#ceAiPdfPicker .ce-ai-pdf-picker-card{width:min(920px,96vw);max-height:min(780px,92vh);background:#fff;border:2px solid #f59e0b;border-radius:20px;box-shadow:0 26px 80px rgba(15,23,42,.38);display:flex;flex-direction:column;overflow:hidden}#ceAiPdfPicker .ce-ai-pdf-picker-head{padding:14px 16px;background:linear-gradient(90deg,#fff7ed,#fff);border-bottom:1px solid #fed7aa}#ceAiPdfPicker .ce-ai-pdf-picker-head h3{margin:0 0 5px;color:#7c2d12}#ceAiPdfPicker .ce-ai-pdf-picker-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc}#ceAiPdfPicker button{border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#0f172a;padding:7px 10px;font-weight:850;cursor:pointer}#ceAiPdfPicker .ce-ai-pdf-picker-list{flex:1;min-height:160px;overflow:auto;padding:8px 12px}#ceAiPdfPicker .ce-ai-pdf-turn{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:flex-start;padding:9px 4px;border-bottom:1px solid #e2e8f0;cursor:pointer}#ceAiPdfPicker .ce-ai-pdf-turn-title{font-weight:950;color:#7c2d12;margin-bottom:3px}#ceAiPdfPicker .ce-ai-pdf-turn-line{font-size:12px;line-height:1.3;color:#334155;margin-top:2px}#ceAiPdfPicker .ce-ai-pdf-turn-badges{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px}#ceAiPdfPicker .ce-ai-pdf-badge{font-size:10px;font-weight:850;padding:2px 6px;border-radius:999px;background:#eff6ff;color:#075985;border:1px solid #bae6fd}#ceAiPdfPicker .ce-ai-pdf-picker-foot{display:flex;justify-content:flex-end;gap:8px;padding:11px 12px;border-top:1px solid #e2e8f0;background:#fff}#ceAiPdfPicker .ce-ai-pdf-primary{background:#f97316!important;color:#fff!important;border-color:#f97316!important}\n';
     css.textContent += '#ceGeminiLibreOverlay .ce-ai-trace{background:#f0f9ff;border-color:#bae6fd}#ceGeminiLibreOverlay .ce-ai-trace details{font-size:13px}#ceGeminiLibreOverlay .ce-ai-trace summary{cursor:pointer;font-weight:950;color:#075985}#ceGeminiLibreOverlay .ce-ai-trace-item{display:grid;grid-template-columns:70px 190px 1fr;gap:8px;padding:6px 0;border-top:1px dashed #bae6fd}#ceGeminiLibreOverlay .ce-ai-trace-status{font-weight:950}.ce-ai-trace-status.OK{color:#15803d}.ce-ai-trace-status.KO{color:#b91c1c}.ce-ai-trace-status.RUN{color:#b45309}.ce-ai-trace-status.RETRY{color:#a16207}.ce-ai-trace-status.WARN{color:#c2410c}.ce-ai-trace-status.INFO{color:#475569}.ce-ai-trace-detail{white-space:pre-wrap;color:#334155}#ceGeminiLibreOverlay .ce-ai-bank-justified{margin-top:14px;border-top:1px solid #dbeafe;padding-top:10px}#ceGeminiLibreOverlay .ce-ai-bank-justified h4{margin:0 0 8px;color:#075985}#ceGeminiLibreOverlay .ce-ai-bank-move{border:1px solid #dbeafe;border-left:6px solid #64748b;border-radius:10px;padding:9px 10px;margin:7px 0;background:#fff}#ceGeminiLibreOverlay .ce-ai-bank-move.INGRESO{border-left-color:#22c55e;background:#f0fdf4}#ceGeminiLibreOverlay .ce-ai-bank-move.CARGO{border-left-color:#e11d48;background:#fff1f2}#ceGeminiLibreOverlay .ce-ai-bank-move-head{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-weight:850}.ce-ai-bank-move-amount{font-weight:950}.ce-ai-bank-move.INGRESO .ce-ai-bank-move-amount{color:#15803d}.ce-ai-bank-move.CARGO .ce-ai-bank-move-amount{color:#be123c}.ce-ai-bank-move-concept{font-weight:800;margin-top:4px}.ce-ai-bank-move-why{margin-top:3px;color:#334155}.ce-ai-bank-move-balance{color:#475569}';
@@ -181,6 +182,7 @@
       '#ceGeminiLibreOverlay .ce-ai-prompt-grid{display:grid;grid-template-columns:minmax(0,13fr) minmax(290px,7fr);gap:12px;align-items:stretch}#ceGeminiLibreOverlay .ce-ai-prompt-main{min-width:0;display:flex;flex-direction:column}#ceGeminiLibreOverlay .ce-ai-conversation-rail{min-width:0;min-height:121px;max-height:145px;border:1px solid #86efac;border-radius:13px;background:linear-gradient(180deg,#f0fdf4,#ffffff);display:flex;flex-direction:column;overflow:hidden}#ceGeminiLibreOverlay .ce-ai-conversation-rail-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid #bbf7d0;color:#166534;font-size:12px;font-weight:950;background:rgba(240,253,244,.92)}#ceGeminiLibreOverlay .ce-ai-conversation-rail-count{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;border-radius:999px;background:#fff;border:1px solid #86efac;color:#166534;font-size:11px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-body{flex:1;overflow:auto;padding:6px 9px;scrollbar-width:thin}#ceGeminiLibreOverlay .ce-ai-conversation-rail-empty{padding:16px 8px;text-align:center;color:#64748b;font-size:11px;font-weight:800;line-height:1.35}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turn{padding:7px 0;border-top:1px dashed #bbf7d0;font-size:11px;line-height:1.25;color:#334155}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turn:first-child{border-top:0;padding-top:2px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-turnno{font-weight:950;color:#166534;margin-bottom:3px}#ceGeminiLibreOverlay .ce-ai-conversation-rail-line{margin-top:2px;overflow-wrap:anywhere}#ceGeminiLibreOverlay .ce-ai-conversation-rail-line b{color:#14532d}\n'+
       '@media(max-width:760px){#ceGeminiLibreOverlay .ce-ai-mode-strip{padding:8px 12px;gap:7px}#ceGeminiLibreOverlay .ce-ai-mode-help{min-width:100%;font-size:11px}#ceGeminiLibreOverlay .ce-ai-prompt-grid{grid-template-columns:1fr}#ceGeminiLibreOverlay .ce-ai-conversation-rail{min-height:118px;max-height:160px}}';
     css.textContent += '#ceGeminiLibreOverlay .ce-ai-vnext-toggle{border-color:#7c3aed;color:#6d28d9;background:#faf5ff}#ceGeminiLibreOverlay .ce-ai-vnext-toggle.is-active{background:#6d28d9!important;color:#fff!important;border-color:#6d28d9!important;box-shadow:0 0 0 3px rgba(109,40,217,.14)}';
+    css.textContent += '\n#ceGeminiLibreOverlay .ce-ai-memory-card{position:relative;overflow:hidden;background:linear-gradient(135deg,#fbf4df 0%,#f1e4c4 54%,#e9dcc0 100%);border-color:#c9a96a!important;box-shadow:0 10px 28px rgba(120,88,42,.16)}#ceGeminiLibreOverlay .ce-ai-memory-card:before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 86% 12%,rgba(255,255,255,.55),transparent 28%),linear-gradient(90deg,rgba(110,78,35,.035),transparent 28%,rgba(110,78,35,.025));}#ceGeminiLibreOverlay .ce-ai-memory-card h3{color:#6b4f2a}#ceGeminiLibreOverlay .ce-ai-memory-badge{display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:3px 8px;border-radius:999px;background:rgba(120,88,42,.10);border:1px solid rgba(120,88,42,.20);color:#775a32;font-size:11px;font-weight:900}#ceGeminiLibreOverlay .ce-ai-memory-hint{margin-top:8px;color:#725d3e;font-size:12px;font-style:italic}#ceGeminiLibreOverlay .ce-ai-memory-compare{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}#ceGeminiLibreOverlay .ce-ai-now-card{background:linear-gradient(135deg,#f0fdf4,#ecfdf5);border-color:#86efac!important;box-shadow:0 10px 26px rgba(22,101,52,.10)}#ceGeminiLibreOverlay .ce-ai-now-card h3{color:#166534}@media(max-width:820px){#ceGeminiLibreOverlay .ce-ai-memory-compare{grid-template-columns:1fr}}';
     document.head.appendChild(css);
   }
 
@@ -208,13 +210,13 @@
   function modalHtml(){
     return '<div class="ce-ai-overlay" id="ceGeminiLibreOverlay" role="dialog" aria-modal="true">'+
       '<div class="ce-ai-modal">'+
-        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v4_1_exp</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
+        '<div class="ce-ai-head"><h2>✨ Soy Zuzu, pregúntame lo que quieras...</h2><span class="ce-ai-version-badge">v5.1_exp</span><div id="ceAiEventTitle">'+eventTitleHtml()+'</div><div class="spacer"></div><button type="button" class="ce-ai-close" id="ceAiClose">Cerrar</button></div>'+
         '<div class="ce-ai-mode-strip is-new" id="ceAiConversationMode"></div>'+
         '<div class="ce-ai-prompt">'+
           '<div class="ce-ai-prompt-grid">'+
             '<div class="ce-ai-prompt-main">'+
               '<textarea id="ceAiPrompt" placeholder="Ejemplos: Sácame una gráfica de barras por artículos más utilizados y separa comprado/donado.\nCompara la III Jornada Solidaria vs ELA con la IV Jornada Solidaria vs ELA en compras, donaciones, ingresos y valoración.\nHazme un CSV con productos más consumidos por coste."></textarea>'+
-              '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-run" id="ceAiRun">🧡 Zuzu</button><button type="button" class="ce-ai-secondary" id="ceAiRestorePrompt" title="Recuperar el último prompt escrito/enviado">↶ Prompt</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
+              '<div class="ce-ai-toolbar"><button type="button" class="ce-ai-mic" id="ceAiMic" title="Hablar a Zuzu">🎙 HABLAR</button><button type="button" class="ce-ai-run" id="ceAiRun">⌨ ENVIAR TEXTO</button><button type="button" class="ce-ai-secondary ce-ai-voice-toggle is-on" id="ceAiVoiceToggle" aria-pressed="true" title="Leer en voz alta las respuestas">🔊 Voz ON</button><button type="button" class="ce-ai-secondary" id="ceAiReplayVoice" title="Volver a escuchar la última respuesta hablada">↻ ESCUCHAR</button><select id="ceAiLanguageSelect" class="ce-ai-secondary" title="Idioma de conversación de Zuzu"><option value="es-ES">Español (España)</option><option value="en-GB">English</option><option value="de-DE">Deutsch</option><option value="fr-FR">Français</option><option value="it-IT">Italiano</option><option value="ca-ES">Català</option><option value="ca-ES-valencia">Valencià</option><option value="gl-ES">Galego</option><option value="eu-ES">Euskara</option><option value="ast-ES">Asturianu</option></select><select id="ceAiVoiceSelect" class="ce-ai-secondary" title="Voz local de Zuzu"><option value="system-natural-es">Natural del sistema</option><option value="es_ES-davefx-medium">DaveFX</option><option value="es_ES-carlfm-x_low">CarlFM</option></select><button type="button" class="ce-ai-secondary" id="ceAiRestorePrompt" title="Recuperar el último prompt escrito/enviado">↶ Prompt</button><button type="button" class="ce-ai-secondary" id="ceAiClear">🧹</button><button type="button" class="ce-ai-secondary" id="ceAiDownloadResult" title="Imprimir / guardar en PDF">🖨️ PDF</button><button type="button" class="ce-ai-secondary" id="ceAiMemoryAudit" title="Auditar qué recuerdos están realmente guardados y recuperables">🧠 MEM</button><span class="ce-ai-status" id="ceAiStatus"></span></div>'+
             '</div>'+
             '<aside class="ce-ai-conversation-rail" aria-label="Rastro de la conversación">'+
               '<div class="ce-ai-conversation-rail-head"><span>💬 Rastro de conversación</span><span class="ce-ai-conversation-rail-count" id="ceAiConversationRailCount">0</span></div>'+
@@ -376,7 +378,7 @@
     try{win=window.open('','_blank');}catch(_){win=null;}
     if(!win){try{document.dispatchEvent(new CustomEvent('ce:zuzu-pdf-print-finished'));}catch(_){ }setStatus('El navegador ha bloqueado la ventana de impresión.','err');return;}
     try{win.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Preparando conversación Zuzu…</title></head><body style="font-family:Arial;padding:24px">Recuperando del servidor los turnos seleccionados…</body></html>');win.document.close();}catch(_){ }
-    var title=selected.length===1?responsePdfTitle({__prompt:selected[0].turn.user},selected[0].turn.user):('ControlEvent_v4_1_exp-conversacion_Zuzu-'+dateStamp(now)+'.pdf');
+    var title=selected.length===1?responsePdfTitle({__prompt:selected[0].turn.user},selected[0].turn.user):('ControlEvent_v6_1-exp-conversacion_Zuzu-'+dateStamp(now)+'.pdf');
     var userName=loggedUserDisplayName(),chunks=[];
     for(var k=0;k<selected.length;k++){
       var item=selected[k],turn=item.turn||{},n=zuzuTurnNumber(turn,item.idx+1),serverData=await fetchArchivedTurnPresentation(turn),answerHtml='',trace='';
@@ -386,7 +388,7 @@
     }
     var body=chunks.join('');
     win.document.open();
-    win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body><main class="ce-print-wrap"><header class="ce-print-head"><div class="ce-print-top"><div><h1>✨ Conversación Zuzu · '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'</h1><div class="ce-print-meta">Usuario: '+esc(userName)+'</div></div><div class="ce-print-datetime">'+esc(prettyDateTime(now))+'</div></div></header>'+body+'</main><script>window.onload=function(){setTimeout(function(){try{document.querySelectorAll(".ce-ai-trace details").forEach(function(d){d.open=true;d.setAttribute("open","open");});document.title='+JSON.stringify(title)+';window.focus();window.print();}catch(e){}},250)};window.onafterprint=function(){try{window.opener&&window.opener.document&&window.opener.document.dispatchEvent(new CustomEvent("ce:zuzu-pdf-print-finished"));}catch(e){}}<\/script></body></html>');
+    win.document.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+zuzuPrintableCss()+'</head><body><main class="ce-print-wrap"><header class="ce-print-head"><div class="ce-print-top"><div><h1>✨ Conversación Zuzu · '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'</h1><div class="ce-print-meta">Usuario: '+esc(userName)+'</div></div><div class="ce-print-datetime">'+esc(prettyDateTime(now))+'</div></div></header>'+body+'</main><script>window.onload=function(){var go=function(){setTimeout(function(){try{document.querySelectorAll(".ce-ai-trace details").forEach(function(d){d.open=true;d.setAttribute("open","open");});document.title='+JSON.stringify(title)+';window.focus();window.print();}catch(e){}},500)};try{if(document.fonts&&document.fonts.ready){document.fonts.ready.then(go).catch(go);}else go();}catch(e){go();}};window.onafterprint=function(){try{window.opener&&window.opener.document&&window.opener.document.dispatchEvent(new CustomEvent("ce:zuzu-pdf-print-finished"));}catch(e){}}<\/script></body></html>');
     win.document.close();closeZuzuPdfPicker();setStatus('Abierta impresión con '+selected.length+' respuesta'+(selected.length===1?'':'s')+' seleccionada'+(selected.length===1?'':'s')+'.','ok');
   }
   async function openZuzuPdfPicker(){
@@ -401,7 +403,7 @@
       var q=conversationTrailExcerpt(turn&&turn.user||''),a=conversationTrailExcerpt(turn&&turn.assistant||'');
       return '<label class="ce-ai-pdf-turn"><input type="checkbox" class="ce-ai-pdf-turn-check" value="'+idx+'" checked><span><div class="ce-ai-pdf-turn-title">Turno '+zuzuTurnNumber(turn,idx+1)+'</div><div class="ce-ai-pdf-turn-line"><b>P:</b> '+esc(q||'—')+'</div><div class="ce-ai-pdf-turn-line"><b>R:</b> '+esc(a||'—')+'</div><div class="ce-ai-pdf-turn-badges">'+pdfPickerTurnBadges(turn)+'</div></span></label>';
     }).join('');
-    document.body.insertAdjacentHTML('beforeend','<div id="ceAiPdfPicker"><div class="ce-ai-pdf-picker-card"><div class="ce-ai-pdf-picker-head"><h3>🖨️ Preparar PDF de la conversación</h3><div>Están marcadas todas las preguntas/respuestas. Desmarca únicamente lo que no quieras conservar.</div></div><div class="ce-ai-pdf-picker-tools"><button type="button" id="ceAiPdfAll">Marcar todo</button><button type="button" id="ceAiPdfNone">Desmarcar todo</button><label class="ce-ai-pdf-trace-label"><input type="checkbox" id="ceAiPdfTrace" checked> Incluir traza técnica</label><span style="margin-left:auto;font-size:11px;color:#64748b">Se conservan texto, tablas y gráficas de cada turno.</span></div><div class="ce-ai-pdf-picker-list">'+rows+'</div><div class="ce-ai-pdf-picker-foot"><button type="button" id="ceAiPdfCancel">Cancelar</button><button type="button" class="ce-ai-pdf-primary" id="ceAiPdfPrint">Imprimir / Guardar PDF</button></div></div></div>');
+    document.body.insertAdjacentHTML('beforeend','<div id="ceAiPdfPicker"><div class="ce-ai-pdf-picker-card"><div class="ce-ai-pdf-picker-head"><h3>🖨️ Preparar PDF de la conversación</h3><div>Están marcadas todas las preguntas/respuestas. Desmarca únicamente lo que no quieras conservar.</div></div><div class="ce-ai-pdf-picker-tools"><button type="button" id="ceAiPdfAll">Marcar todo</button><button type="button" id="ceAiPdfNone">Desmarcar todo</button><label class="ce-ai-pdf-trace-label"><input type="checkbox" id="ceAiPdfTrace"> Incluir traza técnica</label><span style="margin-left:auto;font-size:11px;color:#64748b">PDF compatible: texto, tablas y gráficas. La traza técnica queda desmarcada por defecto para evitar archivos innecesariamente pesados.</span></div><div class="ce-ai-pdf-picker-list">'+rows+'</div><div class="ce-ai-pdf-picker-foot"><button type="button" id="ceAiPdfCancel">Cancelar</button><button type="button" class="ce-ai-pdf-primary" id="ceAiPdfPrint">Imprimir / Guardar PDF</button></div></div></div>');
     $('ceAiPdfAll').onclick=function(){document.querySelectorAll('#ceAiPdfPicker .ce-ai-pdf-turn-check').forEach(function(x){x.checked=true;});};
     $('ceAiPdfNone').onclick=function(){document.querySelectorAll('#ceAiPdfPicker .ce-ai-pdf-turn-check').forEach(function(x){x.checked=false;});};
     $('ceAiPdfCancel').onclick=closeZuzuPdfPicker;
@@ -422,8 +424,8 @@
     window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
     saveZuzuInteractionId('');
     saveZuzuServerConversationId('');
-    try{ ['ControlEvent_v4_1_exp','ControlEvent_v3_0_exp','ControlEvent_'+'v30'+'_prod','ControlEvent_v29_prod','ControlEvent_v28.3_prod','ControlEvent_v28.2_prod','ControlEvent_v28.1_prod','ControlEvent_v27_prod_1.0','ControlEvent_v26_prod_1.1','ControlEvent_v26_prod_1.0'].forEach(function(v){ sessionStorage.removeItem(v+'_zuzu_conversation'); sessionStorage.removeItem(v+'_zuzu_context'); sessionStorage.removeItem(v+'_zuzu_interaction_id'); sessionStorage.removeItem(v+'_zuzu_usage_total'); }); }catch(_){ }
-    try{localStorage.removeItem(zuzuVoiceRecoveryKey());localStorage.removeItem(zuzuVoiceRecoveryFlagKey());}catch(_){ }
+    try{ ['conversation','context','interaction_id','usage_total','server_conversation_id'].forEach(function(sfx){sessionStorage.removeItem(zuzuStorageKey(sfx));sessionStorage.removeItem(zuzuLegacyStorageKey(sfx));}); }catch(_){ }
+    try{localStorage.removeItem(zuzuVoiceRecoveryKey());localStorage.removeItem(zuzuVoiceRecoveryFlagKey());localStorage.removeItem(zuzuLanguageKey());}catch(_){ }
     var r=$('ceAiResult'); if(r){ r.removeAttribute('data-ce-resume-only'); r.innerHTML='<div class="ce-ai-card"><h3>Zuzu está listo</h3><div class="ce-ai-answer">Escribe una pregunta sobre los eventos y pulsa Zuzu.</div></div>'; }
     updateConversationMode();
     updateConversationTrail();
@@ -443,10 +445,19 @@
   function bindPromptDraftPersistence(){var p=$('ceAiPrompt');if(!p||p.dataset.ceP16Draft==='1')return;p.dataset.ceP16Draft='1';var saved=loadPromptBackup();if(saved&&!p.value)p.value=saved;autoSizePrompt(p);p.addEventListener('input',function(ev){if(ev&&ev.isTrusted===false){autoSizePrompt(p);return;}savePromptDraftValue(p.value);autoSizePrompt(p);},{passive:true});p.addEventListener('paste',function(ev){setTimeout(function(){if(!ev||ev.isTrusted!==false)savePromptDraftValue(p.value);autoSizePrompt(p);},0);},{passive:true});}
   function installPromptEventShield(){
     var p=$('ceAiPrompt');if(!p||p.dataset.cePromptShieldP16==='1')return;p.dataset.cePromptShieldP16='1';
-    // P1.6: el escudo vive EN el textarea. No bloquea beforeinput/input en window capture,
-    // porque eso impedía al protector de borrador enterarse de que el usuario estaba escribiendo.
+    // El textarea aísla también los gestos de selección. Sin este escudo, arrastrar una selección
+    // (especialmente de derecha a izquierda) podía llegar a los listeners globales de GRÁFICAS y
+    // cerrar/reubicar Zuzu. beforeinput/input siguen llegando al propio textarea para guardar borrador.
     var block=function(ev){if(ev.type==='keydown'&&ev.key==='Escape'){closeModal();try{ev.preventDefault();ev.stopPropagation();}catch(_){}return false;}try{ev.stopPropagation();}catch(_){}return undefined;};
-    ['keydown','keyup','keypress','beforeinput','input','paste','compositionstart','compositionupdate','compositionend'].forEach(function(type){p.addEventListener(type,block,{capture:true,passive:false});});
+    ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','selectstart','selectionchange','click','dblclick','keydown','keyup','keypress','beforeinput','input','paste','compositionstart','compositionupdate','compositionend'].forEach(function(type){p.addEventListener(type,block,{capture:true,passive:false});});
+    p.addEventListener('focus',function(){
+      try{
+        // Solo se limpia el prompt ya ENVIADO. Un borrador nuevo nunca se borra al recuperar foco.
+        if(p.dataset.ceSubmittedPrompt==='1'){
+          p.value='';p.textContent='';p.dataset.ceSubmittedPrompt='0';savePromptDraftValue('');autoSizePrompt(p);
+        }
+      }catch(_){ }
+    },{capture:true});
   }
   function closeGraphInfoBubble(){
     try{
@@ -458,9 +469,149 @@
 
   function zuzuVNextKey(){ return 'ce_zuzu_vnext_p1_mode'; }
   function isZuzuVNextMode(){ return true; }
-  function renderZuzuVNextMode(){ var on=true,b=$('ceAiVNextMode'); if(b){b.classList.add('is-active');b.setAttribute('aria-pressed','true');b.textContent='VNext';} var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🎙 Zuzu</span><span class="ce-ai-mode-help">Conversación ControlEvent · VNext permanente.</span>';}}
+  async function runMemoryAudit(){
+    var p=$('ceAiPrompt'),query=String((p&&p.value)||'').trim();
+    if(!query){query=window.prompt('Texto o persona a buscar en la memoria (por ejemplo: Carmelo):','Carmelo')||'';query=String(query).trim();}
+    if(!query){setStatus('Escribe un término para auditar la memoria.','');return;}
+    setStatus('Auditando memoria persistente…','');
+    try{
+      var payload={query:query,conversationId:loadZuzuServerConversationId(),usuarioLogado:loggedUserPayload(),nowIso:new Date().toISOString(),limit:120};
+      var pair=await Promise.all([fetch('/api/event-ai/memory/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),fetch('/api/event-ai/persistence/audit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuarioLogado:loggedUserPayload(),limit:20})})]);
+      var data=await pair[0].json(),persist=await pair[1].json();if(!pair[0].ok||!data||data.ok===false)throw new Error((data&&data.error)||'No se pudo auditar la memoria.');
+      var rows=Array.isArray(data.rows)?data.rows:[],sum=data.summary||{},html='<div class="ce-ai-card"><h3>🧠 Auditoría de memoria · '+escapeHtml(query)+'</h3><div class="ce-ai-answer"><b>Conversaciones:</b> '+(sum.conversations||0)+' · <b>Turnos:</b> '+(sum.turns||0)+' · <b>Coincidencias:</b> '+(sum.matchingTurns||0)+' · <b>Recuperables:</b> '+(sum.recallable||0)+' · <b>En conversación actual:</b> '+(sum.currentConversationMatches||0)+(sum.newestMatch?' · <b>Más reciente:</b> '+escapeHtml(sum.newestMatch):'')+'</div>';
+      if(pair[1].ok&&persist&&persist.ok){var lc=persist.latestConversation||{},lt=persist.latestTurn||{};html+='<div class="ce-ai-answer" style="margin-top:8px"><b>💾 Persistencia BBDD</b> · último turno: '+escapeHtml(String(lt.created_at||'—'))+' · última conversación actualizada: '+escapeHtml(String(lc.updated_at||'—'))+' · turnos en últimas 24 h: '+escapeHtml(String(persist.recent24hCount||0))+'<br><small>'+escapeHtml(String(persist.note||''))+'</small></div>';}else{html+='<div class="ce-ai-answer" style="margin-top:8px"><b>⚠ Persistencia BBDD</b> · auditoría no disponible: '+escapeHtml(String((persist&&persist.error)||('HTTP '+pair[1].status)))+'</div>'; }
+      if(rows.length){html+='<div style="overflow:auto;max-height:430px"><table class="ce-ai-table"><thead><tr><th>#</th><th>Fecha</th><th>Actual</th><th>Recallable</th><th>Q</th><th>Score</th><th>Pregunta</th><th>Conversation ID</th></tr></thead><tbody>';rows.forEach(function(x){html+='<tr><td>'+escapeHtml(String(x.rank||''))+'</td><td>'+escapeHtml(String(x.created_at||''))+'</td><td>'+(x.current_conversation?'Sí':'No')+'</td><td>'+(x.effective_recallable?'Sí':'No')+'</td><td>'+escapeHtml(String(x.memory_quality||0))+'</td><td>'+escapeHtml(String(x.ranking_score||0))+'</td><td>'+escapeHtml(String(x.prompt||''))+'</td><td style="font-size:10px">'+escapeHtml(String(x.conversation_id||''))+'</td></tr>';});html+='</tbody></table></div>';}
+      else html+='<div class="ce-ai-answer">No hay coincidencias almacenadas para ese término.</div>';
+      html+='</div>';var out=$('ceAiResult');if(out){out.removeAttribute('data-ce-resume-only');out.innerHTML=html;}setStatus('Auditoría de memoria terminada.','ok');
+    }catch(e){setStatus('Error de auditoría: '+String(e&&e.message||e),'err');}
+  }
+  function renderZuzuVNextMode(){ var on=true,b=$('ceAiVNextMode'); if(b){b.classList.add('is-active');b.setAttribute('aria-pressed','true');b.textContent='VNext';} var strip=$('ceAiConversationMode'); if(strip&&on){strip.className='ce-ai-mode-strip is-conversation';strip.innerHTML='<span class="ce-ai-mode-pill">🧠 COMPILADOR V6</span><span class="ce-ai-mode-help">Una sola conversación: Gemini interpreta; ControlEvent valida y ejecuta. Mismo hilo y contexto certificado.</span>';}}
   function toggleZuzuVNextMode(ev){ if(ev){try{ev.preventDefault();ev.stopPropagation();}catch(_){}} try{sessionStorage.setItem(zuzuVNextKey(),'1');}catch(_){} renderZuzuVNextMode(); }
 
+  var __ceUnifiedRecorder=null,__ceUnifiedStream=null,__ceUnifiedChunks=[],__ceUnifiedVoiceReply=true,__ceUnifiedVoiceTurn=false;
+  var __ceUnifiedVadCtx=null,__ceUnifiedVadAnalyser=null,__ceUnifiedVadSource=null,__ceUnifiedVadRaf=0,__ceUnifiedVadSpeech=false,__ceUnifiedVadSilenceSince=0,__ceUnifiedVadStartedAt=0;
+  // La ventana unificada usa EXACTAMENTE la boca que ya funcionaba en ZUZU LAB: DaveFX VITS local.
+  // No hay fallback automático a speechSynthesis: si DaveFX falla, se muestra el error y Zuzu no habla con otra voz.
+  var __ceDaveFx=null,__ceDaveFxPromise=null,__ceDaveAudioCtx=null,__ceDaveSources=new Set(),__ceDaveGen=0;
+  var __ceDaveVoiceId=(function(){var saved=localStorage.getItem('ceZuzuVoiceId')||'';var migrated=localStorage.getItem('ceZuzuVoiceMigrationNaturalV2')==='1';if(!migrated){saved='system-natural-es';localStorage.setItem('ceZuzuVoiceId',saved);localStorage.setItem('ceZuzuVoiceMigrationNaturalV2','1');}return saved||'system-natural-es';})();
+  var __ceDaveUrls=['https://cdn.jsdelivr.net/npm/@diffusionstudio/vits-web@1.0.3/+esm','https://esm.sh/@diffusionstudio/vits-web@1.0.3'];
+  function ceBase64FromBlob(blob){return new Promise(function(resolve,reject){var r=new FileReader();r.onload=function(){resolve(String(r.result||'').split(',').pop()||'');};r.onerror=reject;r.readAsDataURL(blob);});}
+  function ceDaveReadable(text){var out=String(text||'').replace(/[*_#`>]+/g,' ').replace(/\s*\|\s*/g,'. ').replace(/\s*·\s*/g,', ');/* La pantalla conserva céntimos; la boca NO. Todo importe monetario se trunca hacia cero y se verbaliza como euros enteros. */out=out.replace(/(-?\d{1,3}(?:\.\d{3})*(?:,\d+)?|-?\d+(?:[.,]\d+)?)\s*(?:€|EUR\b|euros?\b)/gi,function(_,raw){var t=String(raw).replace(/\./g,'').replace(',','.');var n=Number(t);if(!Number.isFinite(n))return _;return String(Math.trunc(n))+' euros';});out=out.replace(/([A-ZÁÉÍÓÚÜÑ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ .'-]{1,40}):\s+(comprado|pendiente|ingresos?|gastos?)/g,'$1. $2');return out.replace(/\s+/g,' ').replace(/\.\s*\./g,'.').trim();}
+  async function ceSystemVoice(){if(!('speechSynthesis' in window)||typeof SpeechSynthesisUtterance==='undefined')return null;var voices=window.speechSynthesis.getVoices?window.speechSynthesis.getVoices():[];if(!voices.length)await new Promise(function(resolve){var done=false,finish=function(){if(done)return;done=true;resolve();};try{window.speechSynthesis.addEventListener('voiceschanged',finish,{once:true});}catch(_){}setTimeout(finish,450);});voices=window.speechSynthesis.getVoices?window.speechSynthesis.getVoices():[];var es=voices.filter(function(v){return /^es(?:-|_)/i.test(v.lang||'')||/spanish|español/i.test(v.name||'');});var score=function(v){var n=String(v.name||'').toLowerCase(),x=0;if(/natural|neural|online/.test(n))x+=80;if(/alvaro|álvaro|pablo|jorge|raul|raúl|google español|microsoft/.test(n))x+=45;if(/^es-es/i.test(v.lang||''))x+=25;if(v.localService)x+=5;return x;};return es.sort(function(a,b){return score(b)-score(a);})[0]||voices[0]||null;}
+  async function ceSpeakSystemNatural(text){var voice=await ceSystemVoice();if(!voice)throw new Error('No hay una voz española del sistema disponible');var u=new SpeechSynthesisUtterance(ceDaveReadable(text));u.voice=voice;u.lang=voice.lang||'es-ES';u.rate=.96;u.pitch=.98;u.volume=1;return new Promise(function(resolve,reject){u.onend=resolve;u.onerror=function(e){var m=String(e&&e.error||'error de voz');if(/canceled|interrupted/i.test(m))resolve();else reject(new Error(m));};try{window.speechSynthesis.cancel();window.speechSynthesis.speak(u);}catch(e){reject(e);}});}
+  function ceDaveChunks(text){var t=ceDaveReadable(text);if(t.length<=190)return[t];var raw=(t.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[t]).map(function(x){return x.trim();}).filter(Boolean),out=[],cur='';function push(){if(cur.trim())out.push(cur.trim());cur='';}raw.forEach(function(sentence){if(sentence.length>250){push();var words=sentence.split(/\s+/),part='';words.forEach(function(w){if(part&&((part+' '+w).length>155)){out.push(part);part=w;}else part=part?part+' '+w:w;});if(part)out.push(part);return;}if(cur&&((cur+' '+sentence).length>220))push();cur=cur?cur+' '+sentence:sentence;if(cur.length>=220)push();});push();return out;}
+  async function ceDaveEngine(){if(__ceDaveFx)return __ceDaveFx;if(__ceDaveFxPromise)return __ceDaveFxPromise;__ceDaveFxPromise=(async function(){var last=null;for(var i=0;i<__ceDaveUrls.length;i++){try{var m=await import(__ceDaveUrls[i]);if(typeof m.predict==='function'){var stored=[];try{stored=await m.stored();}catch(_){}if(!Array.isArray(stored)||stored.indexOf(__ceDaveVoiceId)<0){setStatus('Preparando DaveFX…','ok');await m.download(__ceDaveVoiceId,function(){});}__ceDaveFx=m;return m;}}catch(e){last=e;}}throw new Error('No pude cargar DaveFX: '+String(last&&last.message||last||'sin detalle'));})().finally(function(){__ceDaveFxPromise=null;});return __ceDaveFxPromise;}
+  function ceDaveStop(){__ceDaveGen++;__ceDaveSources.forEach(function(src){try{src.onended=null;src.stop(0);}catch(_){}try{src.disconnect();}catch(_){}});__ceDaveSources.clear();}
+  async function cePrepareDaveFx(){try{if(!__ceDaveAudioCtx||__ceDaveAudioCtx.state==='closed')__ceDaveAudioCtx=new (window.AudioContext||window.webkitAudioContext)();if(__ceDaveAudioCtx.state==='suspended')await __ceDaveAudioCtx.resume();await ceDaveEngine();return true;}catch(e){setStatus('DaveFX no disponible: '+String(e&&e.message||e),'err');return false;}}
+  async function ceSpeakLocal(text,force){text=ceDaveReadable(text);if(!text||(!force&&!__ceUnifiedVoiceReply))return;ceDaveStop();var myGen=__ceDaveGen;try{if(__ceDaveVoiceId==='system-natural-es'){setStatus('Zuzu habla · voz natural','ok');await ceSpeakSystemNatural(text);return;}if(!await cePrepareDaveFx())return;var chunks=ceDaveChunks(text),when=Math.max(__ceDaveAudioCtx.currentTime+.03,0);setStatus('Zuzu habla · '+(__ceDaveVoiceId.indexOf('carlfm')>=0?'CarlFM':'DaveFX'),'ok');for(var i=0;i<chunks.length;i++){if(myGen!==__ceDaveGen)return;var blob=await __ceDaveFx.predict({text:chunks[i],voiceId:__ceDaveVoiceId});var ab=await blob.arrayBuffer();var decoded=await __ceDaveAudioCtx.decodeAudioData(ab.slice(0));if(myGen!==__ceDaveGen)return;var src=__ceDaveAudioCtx.createBufferSource();src.buffer=decoded;src.playbackRate.value=.98;src.connect(__ceDaveAudioCtx.destination);var start=Math.max(__ceDaveAudioCtx.currentTime+.04,when);when=start+(decoded.duration/.98);__ceDaveSources.add(src);src.onended=function(){__ceDaveSources.delete(this);try{this.disconnect();}catch(_){}};src.start(start);}}catch(e){setStatus('La voz no ha podido hablar: '+String(e&&e.message||e),'err');}}
+  function cePreferredRecorderMime(){
+    var prefs=['audio/mp4','audio/webm;codecs=opus','audio/webm','audio/ogg;codecs=opus','audio/ogg'];
+    if(!window.MediaRecorder)return '';
+    for(var i=0;i<prefs.length;i++){try{if(!MediaRecorder.isTypeSupported||MediaRecorder.isTypeSupported(prefs[i]))return prefs[i];}catch(_){}}
+    return '';
+  }
+  function ceStopVad(){
+    if(__ceUnifiedVadRaf){try{cancelAnimationFrame(__ceUnifiedVadRaf);}catch(_){}__ceUnifiedVadRaf=0;}
+    try{if(__ceUnifiedVadSource)__ceUnifiedVadSource.disconnect();}catch(_){}
+    __ceUnifiedVadSource=null;__ceUnifiedVadAnalyser=null;
+    try{if(__ceUnifiedVadCtx&&__ceUnifiedVadCtx.state!=='closed')__ceUnifiedVadCtx.close();}catch(_){}
+    __ceUnifiedVadCtx=null;__ceUnifiedVadSpeech=false;__ceUnifiedVadSilenceSince=0;__ceUnifiedVadStartedAt=0;
+  }
+  function ceStartVad(stream){
+    ceStopVad();
+    try{
+      var AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;
+      __ceUnifiedVadCtx=new AC();__ceUnifiedVadAnalyser=__ceUnifiedVadCtx.createAnalyser();__ceUnifiedVadAnalyser.fftSize=1024;__ceUnifiedVadAnalyser.smoothingTimeConstant=.55;
+      __ceUnifiedVadSource=__ceUnifiedVadCtx.createMediaStreamSource(stream);__ceUnifiedVadSource.connect(__ceUnifiedVadAnalyser);
+      var buf=new Uint8Array(__ceUnifiedVadAnalyser.fftSize);__ceUnifiedVadStartedAt=performance.now();
+      function loop(){
+        if(!__ceUnifiedRecorder||!__ceUnifiedVadAnalyser)return;
+        __ceUnifiedVadAnalyser.getByteTimeDomainData(buf);
+        var sum=0;for(var i=0;i<buf.length;i++){var v=(buf[i]-128)/128;sum+=v*v;}var rms=Math.sqrt(sum/buf.length),now=performance.now();
+        if(rms>.022){__ceUnifiedVadSpeech=true;__ceUnifiedVadSilenceSince=0;}
+        else if(__ceUnifiedVadSpeech){if(!__ceUnifiedVadSilenceSince)__ceUnifiedVadSilenceSince=now;if(now-__ceUnifiedVadSilenceSince>1100&&now-__ceUnifiedVadStartedAt>900){ceStopMicAndSend();return;}}
+        if(now-__ceUnifiedVadStartedAt>18000){ceStopMicAndSend();return;}
+        __ceUnifiedVadRaf=requestAnimationFrame(loop);
+      }
+      __ceUnifiedVadRaf=requestAnimationFrame(loop);
+    }catch(_){}
+  }
+  function ceSetMicUi(mode,msg){
+    var b=$('ceAiMic');
+    if(b){
+      b.classList.toggle('is-recording',mode==='recording');
+      b.textContent=mode==='recording'?'⏹ TERMINAR':'🎙 HABLAR';
+      b.title=mode==='recording'?'Pulsa para terminar ahora. Si callas, se envía solo.':'Hablar a Zuzu';
+    }
+    if(msg)setStatus(msg,mode==='error'?'err':'ok');
+  }
+  async function ceStopMicAndSend(){
+    if(!__ceUnifiedRecorder)return;
+    var rec=__ceUnifiedRecorder;__ceUnifiedRecorder=null;ceStopVad();
+    try{if(rec.state!=='inactive')rec.stop();}catch(_){}
+    ceSetMicUi('idle');setStatus('Transcribiendo lo que has dicho…','');
+  }
+  async function ceToggleMic(ev){
+    var promptBox=$('ceAiPrompt');if(promptBox&&promptBox.dataset.ceSubmittedPrompt==='1'){promptBox.value='';promptBox.textContent='';promptBox.dataset.ceSubmittedPrompt='0';savePromptDraftValue('');autoSizePrompt(promptBox);}
+    if(ev){ev.preventDefault();ev.stopPropagation();}
+    if(__ceUnifiedRecorder){await ceStopMicAndSend();return;}
+    if(!window.isSecureContext && location.hostname!=='localhost' && location.hostname!=='127.0.0.1'){
+      ceSetMicUi('error','El micro necesita HTTPS. En iPhone entra por la URL https que da npm run iphone:https.');return;
+    }
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ceSetMicUi('error','Este navegador no ofrece micrófono a la página. En iPhone usa Safari y una URL HTTPS.');return;}
+    if(!window.MediaRecorder){ceSetMicUi('error','Este navegador no permite grabar audio. Actualiza Safari/Chrome.');return;}
+    try{
+      ceDaveStop();
+      __ceUnifiedStream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      __ceUnifiedChunks=[];
+      var mime=cePreferredRecorderMime(),opts=mime?{mimeType:mime}:undefined;
+      var rec=opts?new MediaRecorder(__ceUnifiedStream,opts):new MediaRecorder(__ceUnifiedStream);__ceUnifiedRecorder=rec;
+      rec.ondataavailable=function(e){if(e.data&&e.data.size)__ceUnifiedChunks.push(e.data);};
+      rec.onerror=function(e){ceSetMicUi('error','Error de micrófono: '+String(e&&e.error&&e.error.message||'grabación'));};
+      rec.onstop=async function(){
+        try{
+          ceStopVad();
+          var finalType=rec.mimeType||mime||'audio/mp4';
+          var blob=new Blob(__ceUnifiedChunks,{type:finalType});__ceUnifiedChunks=[];
+          if(__ceUnifiedStream){__ceUnifiedStream.getTracks().forEach(function(t){t.stop();});__ceUnifiedStream=null;}
+          if(blob.size<900){setStatus('No he captado suficiente voz. Pulsa HABLAR y repite.','err');return;}
+          var audioBase64=await ceBase64FromBlob(blob),r=await fetch('/api/zuzu-voice/transcribe',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({audioBase64:audioBase64,mimeType:blob.type||finalType,mode:'user'})}),d=await r.json();
+          if(!r.ok)throw new Error(d.error||('STT HTTP '+r.status));
+          var txt=ceExtractSttText(d.text);if(!txt){setStatus('No he entendido nada. Pulsa HABLAR y repite.','err');return;}
+          var p=$('ceAiPrompt');if(p){p.value=txt;p.dispatchEvent(new Event('input',{bubbles:true}));}
+          __ceUnifiedVoiceTurn=true;setStatus('He oído: «'+txt+'». Enviando a Zuzu…','ok');
+          setTimeout(function(){var run=$('ceAiRun');if(run)run.click();},80);
+        }catch(e){
+          try{if(__ceUnifiedStream)__ceUnifiedStream.getTracks().forEach(function(t){t.stop();});}catch(_){}__ceUnifiedStream=null;
+          setStatus('No he podido transcribir: '+String(e&&e.message||e),'err');
+        }
+      };
+      rec.start(250);ceStartVad(__ceUnifiedStream);
+      ceSetMicUi('recording','🔴 ESCUCHANDO… habla ahora. Cuando calles, lo envío solo.');
+    }catch(e){
+      try{if(__ceUnifiedStream)__ceUnifiedStream.getTracks().forEach(function(t){t.stop();});}catch(_){}__ceUnifiedStream=null;ceStopVad();__ceUnifiedRecorder=null;
+      var msg=String(e&&e.message||e);
+      if(e&&e.name==='NotAllowedError')msg='Permiso de micrófono denegado. Autoriza el micro para esta web y vuelve a pulsar HABLAR.';
+      ceSetMicUi('error','No puedo abrir el micrófono: '+msg);
+    }
+  }
+
+  function ceExtractSttText(raw){
+    var s=String(raw==null?'':raw).trim();if(!s)return'';
+    // Gemini STT puede devolver accidentalmente JSON serializado seguido de ecos parciales.
+    // La conversación solo recibe el campo humano `text` una vez.
+    try{var j=JSON.parse(s);if(j&&typeof j.text==='string')s=j.text.trim();}catch(_){
+      var m=s.match(/^\s*\{\s*["']text["']\s*:\s*["']([\s\S]*?)["']\s*\}/);if(m)s=m[1].replace(/\\"/g,'"').trim();
+    }
+    s=s.replace(/^\s*\{\s*"text"\s*:\s*"/,'').replace(/"\s*\}\s*$/,'').trim();
+    var lines=s.split(/\r?\n/).map(function(x){return x.trim();}).filter(Boolean),out=[];
+    lines.forEach(function(x){var nx=x.replace(/^[}"']+|[}"']+$/g,'').trim();if(!nx)return;var n=nx.toLocaleLowerCase('es-ES');if(out.some(function(y){var q=y.toLocaleLowerCase('es-ES');return q===n||q.endsWith(n)||n.endsWith(q);} ))return;out.push(nx);});
+    return (out[0]||s).replace(/\s+/g,' ').trim();
+  }
+  function ceChangeVoice(){var sel=$('ceAiVoiceSelect');if(!sel)return;var id=String(sel.value||'').trim();if(!id||id===__ceDaveVoiceId)return;ceDaveStop();try{window.speechSynthesis&&window.speechSynthesis.cancel();}catch(_){}__ceDaveVoiceId=id;localStorage.setItem('ceZuzuVoiceId',id);__ceDaveFx=null;__ceDaveFxPromise=null;if(id==='system-natural-es'){setStatus('Voz natural del sistema seleccionada','ok');return;}setStatus('Preparando voz '+(id.indexOf('carlfm')>=0?'CarlFM':'DaveFX')+'…','ok');cePrepareDaveFx();}
+
+  function ceToggleVoiceReply(ev){if(ev){ev.preventDefault();ev.stopPropagation();}__ceUnifiedVoiceReply=!__ceUnifiedVoiceReply;if(!__ceUnifiedVoiceReply)ceDaveStop();else cePrepareDaveFx();var b=$('ceAiVoiceToggle');if(b){b.classList.toggle('is-on',__ceUnifiedVoiceReply);b.setAttribute('aria-pressed',__ceUnifiedVoiceReply?'true':'false');b.textContent=__ceUnifiedVoiceReply?'🔊 Voz ON':'🔇 Voz OFF';}}
+  function ceReplayLastSpoken(ev){if(ev){ev.preventDefault();ev.stopPropagation();}var say=String(window.__ceZuzuLastSpokenAnswer||'').trim();if(!say){setStatus('Todavía no hay una respuesta hablada para repetir.','');return;}setStatus('Repitiendo la última respuesta…','ok');ceSpeakLocal(say,true);}
   function openModal(){
     closeGraphInfoBubble();
     injectStyle();
@@ -473,9 +624,11 @@
     $('ceGeminiLibreOverlay').addEventListener('click',function(ev){ if(ev.target.id==='ceGeminiLibreOverlay') closeModal(); });
     document.addEventListener('keydown',function escClose(ev){ if(ev.key==='Escape' && $('ceGeminiLibreOverlay')){ closeModal(); document.removeEventListener('keydown', escClose, true); } }, true);
     $('ceAiRun').onclick=runAi;
+    var micBtn=$('ceAiMic');if(micBtn)micBtn.onclick=ceToggleMic;var voiceBtn=$('ceAiVoiceToggle');if(voiceBtn)voiceBtn.onclick=ceToggleVoiceReply;var langSel=$('ceAiLanguageSelect');if(langSel){langSel.value=getZuzuConversationLanguage();langSel.onchange=ceChangeConversationLanguage;}var voiceSel=$('ceAiVoiceSelect');if(voiceSel){voiceSel.value=__ceDaveVoiceId;voiceSel.onchange=ceChangeVoice;}
     var vnextBtn=$('ceAiVNextMode'); if(vnextBtn)vnextBtn.onclick=toggleZuzuVNextMode;
     $('ceAiClear').onclick=function(ev){ clearZuzu(ev);savePromptDraftValue(''); };
     var restoreBtn=$('ceAiRestorePrompt');if(restoreBtn)restoreBtn.onclick=function(ev){if(ev){ev.preventDefault();ev.stopPropagation();}restorePromptBackup();};
+    var memBtn=$('ceAiMemoryAudit');if(memBtn)memBtn.onclick=function(ev){if(ev){ev.preventDefault();ev.stopPropagation();}runMemoryAudit();};
     var pdfBtn=$('ceAiDownloadResult');
     if(pdfBtn){
       pdfBtn.disabled=false;
@@ -491,6 +644,7 @@
   }
   function closeModal(){
     closeZuzuPdfPicker(); clearZuzuThinkingTimer();
+    try{if(__ceUnifiedRecorder)__ceUnifiedRecorder.stop();}catch(_){}__ceUnifiedRecorder=null;ceStopVad();try{if(__ceUnifiedStream)__ceUnifiedStream.getTracks().forEach(function(t){t.stop();});}catch(_){}__ceUnifiedStream=null;ceDaveStop();
     var o=$('ceGeminiLibreOverlay'), had=!!o; if(o) o.remove();
     if(had){ try{ window.dispatchEvent(new CustomEvent('controlevent:zuzu-closed',{detail:{source:'zuzu-modal',fromGesture:true}})); }catch(_){ } }
   }
@@ -515,25 +669,88 @@
   }
   function finishZuzuThinkingFast(){ setZuzuButtonHeartbeat(false); if(window.__ceZuzuRunBusy)setStatus('Redactando la respuesta…',''); return Promise.resolve(); }
   function stopZuzuThinking(){ clearZuzuThinkingTimer(); setZuzuButtonHeartbeat(false); window.__ceZuzuThinkingState=null; }
-  function zuzuStoragePrefix(){ var v=String(window.__ceVersionLabel||'v4_1_exp').trim(); return 'ControlEvent_'+v+'_zuzu_'; }
+  // FIX35 · aislamiento físico de conversación por usuario + pestaña.
+  // sessionStorage ya separa pestañas normales, pero una pestaña DUPLICADA puede heredar su contenido.
+  // Por eso cada pestaña mantiene un conversationSessionId y, si detecta otra pestaña viva con el mismo ID,
+  // bifurca automáticamente el ID. El historial/contexto puede clonarse como punto de partida, pero desde ese
+  // momento ambas pestañas escriben en claves distintas y sus IDs de servidor/Interaction quedan separados.
+  var ZUZU_TAB_SESSION_SLOT='ControlEvent_zuzu_tab_conversation_session_v1';
+  var ZUZU_TAB_INSTANCE_ID=(function(){try{return (crypto&&crypto.randomUUID)?crypto.randomUUID():'tab_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2);}catch(_){return 'tab_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2);}})();
+  var __ceZuzuTabSessionId='';
+  var __ceZuzuTabForked=false;
+  function zuzuTinyHash(value){var s=String(value||''),h=2166136261>>>0;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);}
+  function zuzuNewConversationSessionId(){try{return (crypto&&crypto.randomUUID)?crypto.randomUUID():'zs_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2);}catch(_){return 'zs_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2);}}
+  function zuzuCurrentConversationSessionId(){
+    if(__ceZuzuTabSessionId)return __ceZuzuTabSessionId;
+    try{__ceZuzuTabSessionId=String(sessionStorage.getItem(ZUZU_TAB_SESSION_SLOT)||'').trim();}catch(_){__ceZuzuTabSessionId='';}
+    if(!__ceZuzuTabSessionId){__ceZuzuTabSessionId=zuzuNewConversationSessionId();try{sessionStorage.setItem(ZUZU_TAB_SESSION_SLOT,__ceZuzuTabSessionId);}catch(_){}}
+    return __ceZuzuTabSessionId;
+  }
+  function zuzuUserStorageScope(){var u=loggedUserPayload()||{},raw=trim(u.identificacion||u.nombre||'anonymous').toLowerCase();return 'u_'+zuzuTinyHash(raw||'anonymous');}
+  function zuzuStorageBasePrefix(sessionId){var v=String(window.__ceVersionLabel||'v5.1_exp').trim(),sid=String(sessionId||zuzuCurrentConversationSessionId()).trim();return 'ControlEvent_'+v+'_zuzu_'+zuzuUserStorageScope()+'_c_'+sid+'_';}
+  function zuzuStoragePrefix(){return zuzuStorageBasePrefix(zuzuCurrentConversationSessionId());}
   function zuzuStorageKey(suffix){ return zuzuStoragePrefix()+suffix; }
-  var ZUZU_RUNTIME_BUILD='20260830-VNEXT-P110-GENERIC-TABLE-VIEW'; // compat: VNext P1.9
+  function zuzuLanguageKey(){return zuzuStorageKey('conversation_language_v53');}
+  function normalizeZuzuConversationLanguage(value){var allowed=['es-ES','en-GB','de-DE','fr-FR','it-IT','ca-ES','ca-ES-valencia','gl-ES','eu-ES','ast-ES'];var v=String(value||'').trim();return allowed.indexOf(v)>=0?v:'es-ES';}
+  function getZuzuConversationLanguage(){try{return normalizeZuzuConversationLanguage(localStorage.getItem(zuzuLanguageKey())||'es-ES');}catch(_){return'es-ES';}}
+  function setZuzuConversationLanguage(value){var v=normalizeZuzuConversationLanguage(value);try{localStorage.setItem(zuzuLanguageKey(),v);}catch(_){}return v;}
+  function ceChangeConversationLanguage(){var sel=$('ceAiLanguageSelect');if(!sel)return;var v=setZuzuConversationLanguage(sel.value);sel.value=v;setStatus('Idioma de conversación: '+(sel.options[sel.selectedIndex]?sel.options[sel.selectedIndex].text:v)+'. El hilo continúa sin reiniciarse.','ok');}
+
+  function zuzuLegacyStorageKey(suffix){var v=String(window.__ceVersionLabel||'v5.1_exp').trim();return 'ControlEvent_'+v+'_zuzu_'+suffix;}
+  function zuzuForkConversationSession(){
+    if(__ceZuzuTabForked)return;__ceZuzuTabForked=true;
+    var oldId=zuzuCurrentConversationSessionId(),oldPrefix=zuzuStorageBasePrefix(oldId),newId=zuzuNewConversationSessionId(),newPrefix=zuzuStorageBasePrefix(newId);
+    // En una pestaña duplicada copiamos solo el estado conversacional local. No copiamos IDs de servidor
+    // ni Interaction: la nueva pestaña se convierte en una rama independiente desde el primer turno nuevo.
+    var cloneSuffixes=['conversation','context','usage_total','prompt_draft_p16','prompt_last_p16','runtime_build'];
+    try{cloneSuffixes.forEach(function(sfx){var val=sessionStorage.getItem(oldPrefix+sfx);if(val!=null)sessionStorage.setItem(newPrefix+sfx,val);});var lang=localStorage.getItem(oldPrefix+'conversation_language_v53');if(lang!=null)localStorage.setItem(newPrefix+'conversation_language_v53',lang);sessionStorage.setItem(ZUZU_TAB_SESSION_SLOT,newId);}catch(_){ }
+    __ceZuzuTabSessionId=newId;
+    try{sessionStorage.removeItem(newPrefix+'interaction_id');sessionStorage.removeItem(newPrefix+'server_conversation_id');}catch(_){ }
+    window.__ceZuzuInteractionIdV261='';
+    // Si el estado ya llegó a memoria antes de detectar la duplicación, puede seguir utilizándose porque es una
+    // copia local de la pestaña; las siguientes persistencias ya irán al nuevo namespace.
+    try{window.dispatchEvent(new CustomEvent('ce:zuzu-conversation-session-forked',{detail:{oldSessionId:oldId,newSessionId:newId}}));}catch(_){ }
+  }
+  function zuzuTabLeaseKey(sessionId){return 'controlevent:zuzu:tab-lease:v2:'+zuzuUserStorageScope()+':'+String(sessionId||zuzuCurrentConversationSessionId());}
+  function zuzuClaimTabLease(){
+    var sid=zuzuCurrentConversationSessionId(),key=zuzuTabLeaseKey(sid),now=Date.now(),ttl=15000,prior=null;
+    try{prior=JSON.parse(localStorage.getItem(key)||'null');}catch(_){prior=null;}
+    if(prior&&prior.instanceId&&prior.instanceId!==ZUZU_TAB_INSTANCE_ID&&(now-Number(prior.ts||0))<ttl){zuzuForkConversationSession();sid=zuzuCurrentConversationSessionId();key=zuzuTabLeaseKey(sid);}
+    try{localStorage.setItem(key,JSON.stringify({instanceId:ZUZU_TAB_INSTANCE_ID,ts:now}));}catch(_){ }
+  }
+  function initZuzuTabConversationIsolation(){
+    // P13 · doble defensa. BroadcastChannel es rápido en desktop; el lease de localStorage cubre
+    // Safari/iOS y pestañas duplicadas donde el canal puede llegar tarde o quedar suspendido.
+    zuzuClaimTabLease();
+    try{window.__ceZuzuTabLeaseTimer=setInterval(zuzuClaimTabLease,5000);}catch(_){ }
+    var sid=zuzuCurrentConversationSessionId();
+    if(typeof BroadcastChannel!=='function')return;
+    try{
+      var channel=new BroadcastChannel('controlevent:zuzu:tab-session:v2'),requestId=ZUZU_TAB_INSTANCE_ID+'_'+Date.now().toString(36);
+      channel.onmessage=function(ev){var m=ev&&ev.data||{};if(!m||m.sessionId!==zuzuCurrentConversationSessionId())return;if(m.type==='probe'&&m.instanceId!==ZUZU_TAB_INSTANCE_ID){try{channel.postMessage({type:'alive',sessionId:m.sessionId,requestId:m.requestId,instanceId:ZUZU_TAB_INSTANCE_ID});}catch(_){}}else if(m.type==='alive'&&m.requestId===requestId&&m.instanceId!==ZUZU_TAB_INSTANCE_ID){zuzuForkConversationSession();zuzuClaimTabLease();}};
+      channel.postMessage({type:'probe',sessionId:sid,requestId:requestId,instanceId:ZUZU_TAB_INSTANCE_ID});
+      window.__ceZuzuTabSessionChannel=channel;
+    }catch(_){ }
+  }
+  initZuzuTabConversationIsolation();
+  var ZUZU_RUNTIME_BUILD='20260911-V53-SEMANTIC-COMPILER-THREADS-LAZY-EVIDENCE';
   function zuzuRuntimeBuildKey(){ return zuzuStorageKey('runtime_build'); }
   function ensureZuzuRuntimeBuild(){
     var prev='';try{prev=String(sessionStorage.getItem(zuzuRuntimeBuildKey())||'');}catch(_){ }
     if(prev===ZUZU_RUNTIME_BUILD)return;
-    window.__ceZuzuConversationV26=[];window.__ceZuzuConversationContextV26=null;window.__ceZuzuUsageTotalV285=emptyZuzuUsageTotal();window.__ceLastZuzuResult=null;window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
-    saveZuzuInteractionId('');saveZuzuServerConversationId('');
-    try{sessionStorage.removeItem(zuzuConversationKey());sessionStorage.removeItem(zuzuContextKey());sessionStorage.removeItem(zuzuInteractionKey());sessionStorage.removeItem(zuzuUsageTotalKey());sessionStorage.setItem(zuzuRuntimeBuildKey(),ZUZU_RUNTIME_BUILD);localStorage.removeItem(zuzuServerConversationIdKey());}catch(_){ }
+    // v5.3: cambio de arquitectura cognitiva SIN romper la identidad de conversación del navegador.
+    // Conservamos historial local + conversationId servidor + idioma; solo invalidamos contexto derivado
+    // e Interaction efímera para que el Semantic Compiler reconstruya Threads/Evidence desde hechos persistidos.
+    window.__ceZuzuConversationContextV26=null;window.__ceLastZuzuResult=null;window.__ceZuzuResetNonce=(Number(window.__ceZuzuResetNonce||0)+1);
+    saveZuzuInteractionId('');
+    try{sessionStorage.removeItem(zuzuContextKey());sessionStorage.removeItem(zuzuInteractionKey());sessionStorage.setItem(zuzuRuntimeBuildKey(),ZUZU_RUNTIME_BUILD);}catch(_){ }
   }
   function zuzuMigratedStorageValue(suffix){
     var key=zuzuStorageKey(suffix),raw='';
     try{ raw=sessionStorage.getItem(key)||''; if(raw) return raw; }catch(_){ return ''; }
-    try{
-      var ending='_zuzu_'+suffix,candidate='';
-      for(var i=0;i<sessionStorage.length;i+=1){ var k=sessionStorage.key(i); if(k&&k!==key&&k.endsWith(ending)){ var value=sessionStorage.getItem(k); if(value)candidate=value; } }
-      if(candidate){ sessionStorage.setItem(key,candidate); return candidate; }
-    }catch(_){ }
+    // Migración única desde la clave histórica exacta de ESTA versión. Nunca rastreamos otras claves Zuzu,
+    // porque con varias pestañas eso podría importar por accidente una conversación ajena.
+    try{var legacy=zuzuLegacyStorageKey(suffix),candidate=sessionStorage.getItem(legacy)||'';if(candidate){sessionStorage.setItem(key,candidate);sessionStorage.removeItem(legacy);return candidate;}}catch(_){ }
     return '';
   }
   function zuzuConversationKey(){ return zuzuStorageKey('conversation'); }
@@ -646,7 +863,7 @@
   }
   function conversationHistoryForApi(){
     return loadZuzuConversation().slice(-30).map(function(turn){
-      return {turnId:String(turn&&turn.turnId||''),user:String(turn&&turn.user||'').slice(0,700),assistant:String(turn&&turn.assistant||'').slice(0,1200),assistantTail:String(turn&&turn.assistantTail||'').slice(-1000),title:String(turn&&turn.title||'').slice(0,160),provider:String(turn&&turn.provider||'').slice(0,80),intent:String(turn&&turn.intent||'').slice(0,120),tools:Array.isArray(turn&&turn.tools)?turn.tools.slice(0,6):[],selectedEventId:String(turn&&turn.selectedEventId||'').slice(0,120),conversationContext:(turn&&turn.conversationContext&&typeof turn.conversationContext==='object')?turn.conversationContext:null,pendingAction:(turn&&turn.pendingAction&&typeof turn.pendingAction==='object')?turn.pendingAction:null,resultContext:(turn&&turn.resultContext&&typeof turn.resultContext==='object')?turn.resultContext:null,routerShadow:(turn&&turn.routerShadow&&typeof turn.routerShadow==='object')?turn.routerShadow:null};
+      return {turnId:String(turn&&turn.turnId||''),user:String(turn&&turn.user||'').slice(0,700),assistant:String(turn&&turn.assistant||'').slice(0,1200),assistantTail:String(turn&&turn.assistantTail||'').slice(-1000),title:String(turn&&turn.title||'').slice(0,160),provider:String(turn&&turn.provider||'').slice(0,80),intent:String(turn&&turn.intent||'').slice(0,120),tools:Array.isArray(turn&&turn.tools)?turn.tools.slice(0,6):[],selectedEventId:String(turn&&turn.selectedEventId||'').slice(0,120),conversationContext:(turn&&turn.conversationContext&&typeof turn.conversationContext==='object')?turn.conversationContext:null,pendingAction:(turn&&turn.pendingAction&&typeof turn.pendingAction==='object')?turn.pendingAction:null,resultContext:(turn&&turn.resultContext&&typeof turn.resultContext==='object')?turn.resultContext:null,memoryPresentation:(turn&&turn.memoryPresentation&&typeof turn.memoryPresentation==='object')?turn.memoryPresentation:null,memoryComparison:(turn&&turn.memoryComparison&&typeof turn.memoryComparison==='object')?turn.memoryComparison:null,routerShadow:(turn&&turn.routerShadow&&typeof turn.routerShadow==='object')?turn.routerShadow:null};
     });
   }
   function conversationDigestForApi(){
@@ -662,8 +879,16 @@
   function resultCoreHtml(data,options){
     data=data||{};options=options||{};
     var promptText=trim(data.__prompt||''); var allowTechnical=explicitTechnicalView(promptText),html='',cls=data.rejected?' ce-ai-rejected':'';
-    var mainTitle=userFacingTitle(data,promptText);
-    html+='<div class="ce-ai-card ce-ai-answer-card'+cls+'">'+(mainTitle?'<h3>'+esc(mainTitle)+'</h3>':'')+'<div class="ce-ai-answer">'+answerDisplayHtml(data.answer||'')+'</div></div>';
+    var mainTitle=userFacingTitle(data,promptText),mp=(data.meta&&data.meta.memoryPresentation&&typeof data.meta.memoryPresentation==='object')?data.meta.memoryPresentation:null,mc=(data.meta&&data.meta.memoryComparison&&typeof data.meta.memoryComparison==='object')?data.meta.memoryComparison:null;
+    if(mc&&mc.active){
+      var age=trim(mc.ageText||''),oldAnswer=String(mc.historicalAnswer||''),nowAnswer=String(mc.currentAnswer||data.answer||'');
+      html+='<div class="ce-ai-memory-compare"><div class="ce-ai-card ce-ai-answer-card ce-ai-memory-card"><h3>🕰 Recuerdo'+(age?'<span class="ce-ai-memory-badge">'+esc(age)+'</span>':'')+'</h3><div class="ce-ai-answer">'+answerDisplayHtml(oldAnswer)+'</div><div class="ce-ai-memory-hint">Respuesta conservada de aquella conversación.</div></div><div class="ce-ai-card ce-ai-answer-card ce-ai-now-card"><h3>📍 Hoy</h3><div class="ce-ai-answer">'+answerDisplayHtml(nowAnswer)+'</div></div></div>';
+    }else if(mp&&mp.active){
+      var mAge=trim(mp.ageText||'');
+      html+='<div class="ce-ai-card ce-ai-answer-card ce-ai-memory-card'+cls+'">'+(mainTitle?'<h3>'+esc(mainTitle)+(mAge?'<span class="ce-ai-memory-badge">'+esc(mAge)+'</span>':'')+'</h3>':'')+'<div class="ce-ai-answer">'+answerDisplayHtml(data.answer||'')+'</div>'+(mp.canRefresh?'<div class="ce-ai-memory-hint">Es un recuerdo. Puedes pedirme que ejecute hoy la misma consulta para comparar.</div>':'')+'</div>';
+    }else{
+      html+='<div class="ce-ai-card ce-ai-answer-card'+cls+'">'+(mainTitle?'<h3>'+esc(mainTitle)+'</h3>':'')+'<div class="ce-ai-answer">'+answerDisplayHtml(data.answer||'')+'</div></div>';
+    }
     var visibleWarnings=userFacingWarnings(data.warnings,allowTechnical);
     if((data.rejected||data.showWarnings===true||data.provider==='gemini-rest-json-fallback')&&visibleWarnings.length)html+='<div class="ce-ai-card ce-ai-warning"><h3>Avisos</h3><ul>'+visibleWarnings.map(function(w){return '<li>'+esc(w)+'</li>';}).join('')+'</ul></div>';
     (data.charts||[]).forEach(function(ch){if(allowTechnical||!isTechnicalHeading(ch&&ch.title))html+=chartHtml(ch);});
@@ -712,17 +937,18 @@
     }
   }
   async function runAi(){
+    var __ceClientStarted=(window.performance&&performance.now)?performance.now():Date.now(),__ceFetchStarted=0,__ceFetchEnded=0;
     var prompt=trim(($('ceAiPrompt')||{}).value||'');
     if(!prompt){ setStatus('Escribe primero la petición.', 'err'); return; }
     // P1.6: snapshot doble antes de tocar voz/red/estado. Un prompt largo nunca depende del textarea vivo.
     savePromptDraftValue(prompt);saveLastPromptValue(prompt);window.__ceZuzuLastPromptSnapshot=prompt;
     if(window.__ceZuzuRunBusy){setStatus('Zuzu todavía está cerrando la consulta anterior.','');return;}
-    window.__ceZuzuRunBusy=true;var requestController=null,requestWatchdog=null;
-    // v4_1_exp: la conversación nativa de Gemini es el hilo principal. El evento de pantalla
+    window.__ceZuzuRunBusy=true;var submittedPromptBox=$('ceAiPrompt');if(submittedPromptBox)submittedPromptBox.dataset.ceSubmittedPrompt='1';var requestController=null,requestWatchdog=null;
+    // v5.1_exp: la conversación nativa de Gemini es el hilo principal. El evento de pantalla
     // sigue siendo contexto ambiental y ControlEvent aporta herramientas/hechos canónicos.
     setStatus('', '');
     var resEl=$('ceAiResult');
-    var voiceConversation=!!(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.isConversationalMode==='function'&&window.ControlEventV22Voz4.isConversationalMode());
+    var voiceConversation=true; // Ventana unificada: voz y escritura comparten el compilador v6 y generan spokenAnswer; solo el micrófono decide si se reproduce.
     var conversationTurnNumber=zuzuConversationTurnCount()+1;
     try{document.dispatchEvent(new CustomEvent('ce:zuzu-request-started',{detail:{prompt:prompt,voiceConversation:voiceConversation,turnNumber:conversationTurnNumber}}));}catch(_){ }
     startZuzuThinking(prompt);
@@ -733,8 +959,8 @@
       var now=new Date(); var tz=''; var localNow=''; try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){} try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();}
       requestController=typeof AbortController!=='undefined'?new AbortController():null;
       if(requestController)requestWatchdog=setTimeout(function(){try{requestController.abort();}catch(_){}},75000);
-      var vnext=isZuzuVNextMode(); var endpoint=vnext?'/api/event-ai/analyze-vnext':'/api/event-ai/analyze'; var res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationId:vnext?'':loadZuzuServerConversationId(),previousInteractionId:vnext?loadZuzuInteractionId():'',conversationHistory:vnext?history:[],conversationDigest:'',conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,conversationContext:null,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
-      var raw=await res.text();
+      var vnext=isZuzuVNextMode(); var endpoint=vnext?'/api/event-ai/analyze-vnext':'/api/event-ai/analyze'; __ceFetchStarted=(window.performance&&performance.now)?performance.now():Date.now(); var res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},signal:requestController?requestController.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedEventId(),usuarioLogado:loggedUserPayload(),conversationId:loadZuzuServerConversationId(),previousInteractionId:vnext?loadZuzuInteractionId():'',conversationHistory:vnext?history:[],conversationDigest:'',conversationTurnNumber:conversationTurnNumber,voiceConversation:voiceConversation,brainLite:vnext,conversationContext:null,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz,conversationLanguage:getZuzuConversationLanguage()})});
+      var raw=await res.text(); __ceFetchEnded=(window.performance&&performance.now)?performance.now():Date.now();
       var data={};
       try{ data=raw?JSON.parse(raw):{}; }catch(parseError){ data={ok:false,title:'Respuesta no legible de Zuzu',answer:raw||'',warnings:['La API respondió HTTP '+res.status+' pero no devolvió JSON válido.']}; }
       if(!res.ok) throw new Error(data.error || data.answer || raw || ('HTTP '+res.status));
@@ -779,7 +1005,7 @@
       var fullAnswer=String(data.answer||'');
       if(!(data.meta&&data.meta.doNotArchiveTurn===true)){
         // Ledger v1: el navegador guarda solo el índice ligero. Tablas, trazas, DATASET y VIEW se recuperan del servidor bajo demanda (PDF/recuerdo).
-        window.__ceZuzuConversationV26.push({turnId:turnId,turnSeq:Number(data.turnSeq||(data.meta&&data.meta.turnSeq)||conversationTurnNumber)||conversationTurnNumber,user:prompt.slice(0,700),assistant:fullAnswer.slice(0,vnext?1200:420),assistantTail:fullAnswer.slice(-(vnext?700:300)),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:null,pendingAction:pendingAction,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:'',archiveMeta:archiveMetaForData(data)});
+        window.__ceZuzuConversationV26.push({turnId:turnId,turnSeq:Number(data.turnSeq||(data.meta&&data.meta.turnSeq)||conversationTurnNumber)||conversationTurnNumber,user:prompt.slice(0,700),assistant:fullAnswer.slice(0,vnext?1200:420),assistantTail:fullAnswer.slice(-(vnext?700:300)),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:selectedEventId(),conversationContext:null,pendingAction:pendingAction,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null,memoryPresentation:(data.meta&&data.meta.memoryPresentation&&typeof data.meta.memoryPresentation==='object')?data.meta.memoryPresentation:null,memoryComparison:(data.meta&&data.meta.memoryComparison&&typeof data.meta.memoryComparison==='object')?data.meta.memoryComparison:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:traceHtml(data),archiveMeta:archiveMetaForData(data)});
         if(window.__ceZuzuConversationV26.length>ZUZU_LOCAL_HISTORY_LIMIT)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-ZUZU_LOCAL_HISTORY_LIMIT);
         saveZuzuConversation();
       }
@@ -787,11 +1013,13 @@
       updateConversationTrail();
       await finishZuzuThinkingFast();
       stopZuzuThinking();
+      var __ceVisibleAt=(window.performance&&performance.now)?performance.now():Date.now();if(!data.meta||typeof data.meta!=='object')data.meta={};if(!data.meta.performance||typeof data.meta.performance!=='object')data.meta.performance={};data.meta.performance.clientClickToVisibleMs=Math.round(__ceVisibleAt-__ceClientStarted);data.meta.performance.clientFetchRoundTripMs=Math.round((__ceFetchEnded||__ceVisibleAt)-(__ceFetchStarted||__ceClientStarted));data.meta.performance.clientBeforeFetchMs=Math.round((__ceFetchStarted||__ceClientStarted)-__ceClientStarted);data.meta.performance.clientAfterFetchMs=Math.round(__ceVisibleAt-(__ceFetchEnded||__ceVisibleAt));
       renderResult(data);
       setStatus(data.rejected?'Petición rechazada por ámbito.':'', data.rejected?'err':'');
       try{
         document.dispatchEvent(new CustomEvent('ce:zuzu-response-rendered',{detail:{turnId:turnId,voiceConversation:voiceConversation,answer:String(data.answer||''),spokenAnswer:String(data.spokenAnswer||data.answer||''),title:String(data.title||'')}}));
-        if(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.maybeAutoRead==='function'){
+        if(__ceUnifiedVoiceReply){var say=String(data.spokenAnswer||data.answer||'');__ceUnifiedVoiceTurn=false;setTimeout(function(){ceSpeakLocal(say);},80);}
+        else if(window.ControlEventV22Voz4&&typeof window.ControlEventV22Voz4.maybeAutoRead==='function'){
           setTimeout(function(){ try{window.ControlEventV22Voz4.maybeAutoRead();}catch(_){ } },80);
         }
       }catch(_){ }
@@ -814,7 +1042,7 @@
     return '<div class="ce-ai-card ce-ai-usage"><h3>💶 Consumo IA</h3><div class="ce-ai-answer">'+esc(String(usage.calls||0))+' '+(Number(usage.calls||0)===1?'llamada':'llamadas')+' · '+esc(tokens)+' tokens · <strong>coste estimado '+esc(cost)+' €</strong><br><small>Estimación ControlEvent según tokens facturables y tarifa contractual configurada.</small></div></div>';
   }
   function traceHtml(data){
-    // v4_1_exp: la traza está SIEMPRE disponible en pantalla, plegada por defecto.
+    // v5.1_exp: la traza está SIEMPRE disponible en pantalla, plegada por defecto.
     // Los totales Gemini forman parte de la traza: no aparecen fuera de ella.
     var trace=(data && (data.debugTrace || (data.meta&&data.meta.debugTrace))) || [];
     if(!Array.isArray(trace)) trace=[];
@@ -970,7 +1198,7 @@
     if(!all.length) return '<div class="ce-ai-card"><h3>'+esc(ch.title||'Gráfica')+'</h3><div class="ce-ai-answer">Sin valores numéricos para representar.</div></div>';
     var globalMin=Math.min.apply(null,all),globalMax=Math.max.apply(null,all);
     if(globalMin===globalMax){globalMin-=1;globalMax+=1;}else{var gm=(globalMax-globalMin)*0.12;globalMin-=gm;globalMax+=gm;}
-    // v4_1_exp: globos completos y legibles. Se reparte la serie solo cuando hace falta,
+    // v5.1_exp: globos completos y legibles. Se reparte la serie solo cuando hace falta,
     // equilibrando los tramos para no dejar una última gráfica con uno o dos movimientos.
     var maxPerSegment=8,segmentCount=Math.max(1,Math.ceil(labels.length/maxPerSegment)),segmentSize=Math.ceil(labels.length/segmentCount),segments=[];
     for(var start=0;start<labels.length;start+=segmentSize){segments.push({start:start,end:Math.min(labels.length,start+segmentSize)});}
@@ -1093,6 +1321,7 @@
   document.addEventListener('touchend',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, { passive:false, capture:true });
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceGeminiLibreBtn'); if(b) openFromButton(ev); }, true);
   document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceAiClear'); if(b){ clearZuzu(ev); } }, true);
+  document.addEventListener('click',function(ev){ var b=ev.target&&ev.target.closest&&ev.target.closest('#ceAiReplayVoice'); if(b){ ceReplayLastSpoken(ev); } }, true);
   var __ceAntonioVoiceAbort=null;
   var __ceAntonioPendingVoiceCommits=new Map();
   function commitAntonioVoiceData(rec){
@@ -1101,9 +1330,17 @@
     var returnedInteractionId=String((data.meta&&data.meta.interactionId)||data.interactionId||'').trim(); if(returnedInteractionId)saveZuzuInteractionId(returnedInteractionId);
     var returnedServerConversationId=String(data.conversationId||(data.meta&&data.meta.conversationId)||'').trim(); if(returnedServerConversationId)saveZuzuServerConversationId(returnedServerConversationId);
     var returnedContext=(data.meta&&data.meta.conversationContext)||data.conversationContext||null;if(returnedContext&&typeof returnedContext==='object'){window.__ceZuzuConversationContextV26=returnedContext;saveZuzuConversationContext();}
+    var recovery=(data.meta&&data.meta.recovery&&typeof data.meta.recovery==='object')?data.meta.recovery:null;
+    if(recovery&&recovery.cleanRestart===true){
+      // V3.13 · Una recuperación no puede dejar detrás el hilo que la provocó. El servidor
+      // entrega un resultContext canónico nuevo y el cliente elimina los turnos/datasets fallidos
+      // ANTES de confirmar la respuesta recuperada. El siguiente turno parte solo del snapshot sano.
+      window.__ceZuzuConversationV26=[];window.__ceZuzuConversationContextV26=null;try{saveZuzuConversationContext();}catch(_){}try{saveZuzuInteractionId('');}catch(_){}
+      try{document.dispatchEvent(new CustomEvent('ce:zuzu-clean-restart',{detail:{trigger:String(recovery.trigger||''),finalOperation:String(recovery.finalOperation||''),preservedContext:recovery.preservedContext||null}}));}catch(_){}
+    }
     if(!Array.isArray(window.__ceZuzuConversationV26))window.__ceZuzuConversationV26=[];
     var turnId=String(data.turnId||(data.meta&&data.meta.turnId)||('antonio-'+Date.now()+'-'+Math.random().toString(36).slice(2,8))).trim();
-    window.__ceZuzuConversationV26.push({turnId:turnId,turnSeq:Number(data.turnSeq||(data.meta&&data.meta.turnSeq)||conversationTurnNumber)||conversationTurnNumber,user:prompt.slice(0,700),assistant:String(data.spokenAnswer||data.answer||'').slice(0,1200),assistantTail:String(data.spokenAnswer||data.answer||'').slice(-700),assistantWritten:String(data.answer||'').slice(0,1800),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:rec.selectedEventId||selectedEventId(),conversationContext:null,pendingAction:(data.meta&&data.meta.pendingAction&&typeof data.meta.pendingAction==='object')?data.meta.pendingAction:null,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null,routerShadow:null,archiveHtml:'',archiveTraceHtml:'',archiveMeta:archiveMetaForData(data)});
+    window.__ceZuzuConversationV26.push({turnId:turnId,turnSeq:Number(data.turnSeq||(data.meta&&data.meta.turnSeq)||conversationTurnNumber)||conversationTurnNumber,user:prompt.slice(0,700),assistant:String(data.spokenAnswer||data.answer||'').slice(0,1200),assistantTail:String(data.spokenAnswer||data.answer||'').slice(-700),assistantWritten:String(data.answer||'').slice(0,1800),title:String(data.title||'').slice(0,160),provider:String(data.provider||'').slice(0,80),intent:String(data.meta&&data.meta.intent||'').slice(0,120),tools:Array.isArray(data.meta&&data.meta.tools)?data.meta.tools.slice(0,6):[],selectedEventId:rec.selectedEventId||selectedEventId(),conversationContext:null,pendingAction:(data.meta&&data.meta.pendingAction&&typeof data.meta.pendingAction==='object')?data.meta.pendingAction:null,resultContext:(data.meta&&data.meta.resultContext&&typeof data.meta.resultContext==='object')?data.meta.resultContext:null,memoryPresentation:(data.meta&&data.meta.memoryPresentation&&typeof data.meta.memoryPresentation==='object')?data.meta.memoryPresentation:null,memoryComparison:(data.meta&&data.meta.memoryComparison&&typeof data.meta.memoryComparison==='object')?data.meta.memoryComparison:null,recovery:recovery,routerShadow:null,archiveHtml:'',archiveTraceHtml:traceHtml(data),archiveMeta:archiveMetaForData(data)});
     if(window.__ceZuzuConversationV26.length>ZUZU_LOCAL_HISTORY_LIMIT)window.__ceZuzuConversationV26=window.__ceZuzuConversationV26.slice(-ZUZU_LOCAL_HISTORY_LIMIT);
     saveZuzuConversation();window.__ceZuzuLastSpokenAnswer=data.spokenAnswer;
     try{document.dispatchEvent(new CustomEvent('ce:zuzu-voice-bridge-response',{detail:{prompt:prompt,turnId:turnId,spokenAnswer:data.spokenAnswer,answer:data.answer}}));}catch(_){ }
@@ -1124,7 +1361,7 @@
     var now=new Date(),tz='',localNow='';
     try{tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';}catch(_){}
     try{localNow=new Intl.DateTimeFormat('es-ES',{dateStyle:'full',timeStyle:'medium'}).format(now);}catch(_){localNow=now.toString();}
-    var res=await fetch('/api/event-ai/analyze-vnext',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller?controller.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedAtRequest,usuarioLogado:loggedUserPayload(),conversationId:'',previousInteractionId:loadZuzuInteractionId(),conversationHistory:history,conversationDigest:'',conversationTurnNumber:conversationTurnNumber,voiceConversation:true,conversationContext:null,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz})});
+    var res=await fetch('/api/event-ai/analyze-vnext',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller?controller.signal:undefined,body:JSON.stringify({prompt:prompt,selectedEventId:selectedAtRequest,usuarioLogado:loggedUserPayload(),conversationId:loadZuzuServerConversationId(),previousInteractionId:loadZuzuInteractionId(),conversationHistory:history,conversationDigest:'',conversationTurnNumber:conversationTurnNumber,voiceConversation:true,brainLite:true,conversationContext:null,clientNowIso:now.toISOString(),clientLocalDateTime:localNow,clientTimeZone:tz,conversationLanguage:getZuzuConversationLanguage()})});
     var raw=await res.text(),data={};
     try{data=raw?JSON.parse(raw):{};}catch(_){data={ok:false,answer:raw||'',error:'Respuesta VNext no legible'};}
     if(!res.ok)throw new Error(data.error||data.answer||raw||('HTTP '+res.status));
@@ -1134,5 +1371,5 @@
     if(options.deferCommit){var commitId='voice-'+Date.now()+'-'+Math.random().toString(36).slice(2,10);__ceAntonioPendingVoiceCommits.set(commitId,rec);data.voiceCommitId=commitId;if(!data.meta||typeof data.meta!=='object')data.meta={};data.meta.voiceCommitId=commitId;return data;}
     commitAntonioVoiceData(rec);return data;
   }
-  window.ControlEventV113ZuzuAnalitica={open:openModal,close:closeModal,install:tick,askVoice:askVoiceDirect,commitVoiceResponse:commitVoiceResponse,discardVoiceResponse:discardVoiceResponse,submitVoicePrompt:function(text){openModal();setTimeout(function(){var p=$('ceAiPrompt');if(p){p.value=String(text||'').trim();p.dispatchEvent(new Event('input',{bubbles:true}));}var b=$('ceAiRun');if(b)b.click();},90);}};
+  window.ControlEventV113ZuzuAnalitica={open:openModal,close:closeModal,install:tick,askVoice:askVoiceDirect,commitVoiceResponse:commitVoiceResponse,discardVoiceResponse:discardVoiceResponse,replayLastVoice:function(){ceReplayLastSpoken();},submitVoicePrompt:function(text){openModal();setTimeout(function(){var p=$('ceAiPrompt');if(p){p.value=String(text||'').trim();p.dispatchEvent(new Event('input',{bubbles:true}));}var b=$('ceAiRun');if(b)b.click();},90);}};
 })();

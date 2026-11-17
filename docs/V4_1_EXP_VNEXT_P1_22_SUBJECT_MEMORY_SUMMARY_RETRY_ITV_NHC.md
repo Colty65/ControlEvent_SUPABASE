@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · VNext P1.22
+# ControlEvent v5.0_exp · VNext P1.22
 
 Objetivo: cerrar tres fallos reproducibles observados manualmente sin hard-code lingüístico y rehabilitar la repetición de incidencias de ITV.
 

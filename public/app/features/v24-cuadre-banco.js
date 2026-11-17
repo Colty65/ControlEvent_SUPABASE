@@ -1,10 +1,10 @@
-/* ControlEvent v4_1_exp BANK4.9 · autoridad persistente En saldo + lupa temporal independiente. */
+/* ControlEvent v6_1-exp BANK4.9 · autoridad persistente En saldo + lupa temporal independiente. */
 (function(root){
   'use strict';
   if(root.__ceV24BankReconciliation) return;
   root.__ceV24BankReconciliation = true;
 
-  const VERSION = 'v4_1_exp';
+  const VERSION = 'v5.1_exp';
   const $ = id => document.getElementById(id);
   const text = value => value == null ? '' : String(value).trim();
   const arr = value => Array.isArray(value) ? value : [];
@@ -248,7 +248,7 @@
     }
     if(target.id==='ceBankFilter'){
       const next=text(target.value)||'TODOS';
-      // v4_1_exp · Un evento FINALIZADO es una foto definitiva: la vista queda siempre
+      // v5.1_exp · Un evento FINALIZADO es una foto definitiva: la vista queda siempre
       // en «Incluidos en saldo». El selector está además deshabilitado en solo lectura.
       store.filter=store.readOnly?'INCLUIDOS':next;
       target.value=store.filter; store.page=1; invalidateMovementCache(); scheduleBodyRender(true);
@@ -456,7 +456,7 @@
       invalidateMovementCache();
       store.accountId=data.selectedAccount||store.accountId;
       store.readOnly=data.readOnly===true;
-      // v4_1_exp · Al consultar un FINALIZADO se muestran siempre las filas «En saldo».
+      // v5.1_exp · Al consultar un FINALIZADO se muestran siempre las filas «En saldo».
       // Evita que quede heredado «Todos los movimientos» de una sesión/evento anterior.
       if(store.readOnly||data?.event?.finalized===true) store.filter='INCLUIDOS';
       store.dateFrom=text(data?.period?.dateFrom); store.dateTo=text(data?.period?.dateTo);
@@ -554,12 +554,11 @@
     ['ceBankDateFrom','ceBankDateTo','ceBankApplyPeriod'].forEach(id=>{const node=$(id);if(node){node.disabled=store.readOnly;node.setAttribute('aria-disabled',store.readOnly?'true':'false');}});
     const bankIncome=num(s.income);
     const cashIncome=num(s.cashIncome);
-    const economicVariation=Number.isFinite(Number(s.economicVariation))?num(s.economicVariation):bankIncome+cashIncome-num(s.expense);
+    const economicVariation=bankIncome-num(s.expense); // Flujo neto bancario: el efectivo se informa, pero no altera la cuenta bancaria.
     const flowMax=Math.max(Math.abs(bankIncome),Math.abs(cashIncome),Math.abs(num(s.expense)),1);
     const incomePct=Math.round(Math.abs(bankIncome)/flowMax*100);
     const cashIncomePct=Math.round(Math.abs(cashIncome)/flowMax*100);
     const expensePct=Math.round(Math.abs(num(s.expense))/flowMax*100);
-    const objective=economicVariation>=0?'El evento deja más recursos que al comenzar':'El evento reduce los recursos de partida';
     if(finalSnapshot&&!hasStoredRows){
       $('ceBankSummary').innerHTML=`
         <article class="ce-bank-kpi ce-bank-kpi-hero"><div class="ce-bank-kpi-copy"><span>Estado definitivo del Cuadre Banco</span><strong>${esc(rec.message||'CUADRE BANCARIO SIN REALIZAR')}</strong><small>El evento está cerrado y no conserva ninguna fila específica de Cuadre Banco.</small></div></article>
@@ -568,15 +567,15 @@
         <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Datos bancarios específicos del evento</span><strong>NO EXISTEN</strong><small>Para crear el cuadre hay que reabrir el evento.</small></article>`;
     }else if(finalSnapshot){
       $('ceBankSummary').innerHTML=`
-        <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo antes de la primera fila almacenada</span><strong>${money(s.openingBalance)}</strong><small>Referencia calculada únicamente desde el primer movimiento guardado del Cuadre.</small></article>
-        <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo tras la última fila almacenada</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} incluidas · ${num(s.excludedCount)} excluidas · ${storedCount} fila(s) guardada(s)</small></div></article>
-        <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal del Cuadre almacenado"><span>Movimientos almacenados incluidos</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Impacto de las filas incluidas ${money(economicVariation)}</small><em class="ce-bank-chart-hint">Ver foto temporal ↗</em></article>
+        <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Impacto inicial del evento</span><strong>${money(s.openingBalance)}</strong><small>El seguimiento propio del evento comienza en cero, independientemente del saldo bancario anterior.</small></article>
+        <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Impacto acumulado al cierre</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} incluidas · ${num(s.excludedCount)} excluidas · ${storedCount} fila(s) guardada(s). No es el saldo de la cuenta.</small></div></article>
+        <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal del Cuadre almacenado"><span>Abonos y cargos del Cuadre</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos Banco</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Flujo neto ${money(economicVariation)}</small><em class="ce-bank-chart-hint">Ver foto temporal ↗</em></article>
         <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Estado al cerrar el evento</span><strong>${esc(rec.message||'CUADRE BANCARIO')}</strong><small>TKxx asociados: ${num(tickets.linked)}/${num(tickets.total)} · ${num(incomes.total)===0?'sin ingresos computables':`ingresos computables asociados: ${num(incomes.reconciled)}/${num(incomes.total)}`}${num(incomes.ignoredTotal)>0?` · Peña El Arrastre excluido del criterio: ${num(incomes.ignoredTotal)}`:''}.</small></article>`;
     }else{
       $('ceBankSummary').innerHTML=`
-        <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Saldo bancario inicial del periodo</span><strong>${money(s.openingBalance)}</strong><small>Saldo anterior al movimiento más antiguo del periodo de trabajo</small><div class="ce-bank-kpi-formula">Saldo posterior − importe (en un cargo se suma su valor absoluto)</div></article>
-        <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Saldo calculado del periodo de trabajo</span><strong>${money(s.calculatedBalance)}</strong><small>${num(s.includedCount)} movimientos aplicados · ${num(s.excludedCount)} inactivos</small></div></article>
-        <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal de la evolución del saldo"><span>Entradas y salidas incluidas</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Variación económica ${money(economicVariation)} · ${esc(objective)}</small><em class="ce-bank-chart-hint">Ver evolución temporal ↗</em></article>
+        <article class="ce-bank-kpi ce-bank-kpi-opening"><span>Referencia bancaria al inicio</span><strong>${money(s.bankOpeningReference)}</strong><small>Saldo histórico de la cuenta antes del primer movimiento mostrado. No forma parte del saldo del evento.</small></article>
+        <article class="ce-bank-kpi ce-bank-kpi-hero ${finalClass}"><div class="ce-bank-kpi-copy"><span>Impacto acumulado del evento</span><strong>${money(s.calculatedBalance)}</strong><small>Parte de 0 € · ${num(s.includedCount)} movimientos aplicados · ${num(s.excludedCount)} inactivos</small></div></article>
+        <article class="ce-bank-kpi ce-bank-kpi-flow ce-bank-kpi-chart-trigger" role="button" tabindex="0" data-ce-bank-open-balance-chart="1" aria-label="Ver gráfica temporal de la evolución del saldo"><span>Abonos y cargos del Cuadre</span><div class="ce-bank-flow-row income"><b>Abonos Banco</b><i><u style="width:${incomePct}%"></u></i><strong>${money(bankIncome)}</strong></div><div class="ce-bank-flow-row cash"><b>Abonos efectivo</b><i><u style="width:${cashIncomePct}%"></u></i><strong>${money(cashIncome)}</strong></div><div class="ce-bank-flow-row expense"><b>Cargos Banco</b><i><u style="width:${expensePct}%"></u></i><strong>${money(s.expense)}</strong></div><small class="${economicVariation<0?'negative':'positive'}">Flujo neto ${money(economicVariation)}</small><em class="ce-bank-chart-hint">Ver evolución temporal ↗</em></article>
         <article class="ce-bank-kpi ce-bank-kpi-bank"><span>Saldo certificado por el banco</span><strong>${money(s.latestBankBalance)}</strong><small>Último movimiento global ${formatDate(s.latestAt)}</small><div class="ce-bank-actual-period">Saldo real al final del periodo: <b>${money(s.actualClosingBalance)}</b></div></article>`;
     }
     if(finalSnapshot){
@@ -895,7 +894,7 @@
     const eventAmount=num(movement.eventAppliedAmount??movement.amount);
     const history=paneId==='history';
     const displayAmount=history?bankAmount:eventAmount;
-    const balanceLabel=history?'Saldo banco':'Saldo evento';
+    const balanceLabel=history?'Saldo real banco':'Impacto acumulado evento';
     inspector.className=`ce-bank-balance-inspector ${displayAmount<0?'negative':'positive'}`;
     const allocation=!history&&(movement.sharedMovement||Math.abs(eventAmount-bankAmount)>.01)
       ?`<small>Parte del evento: <b>${esc(chartAmount(eventAmount))}</b></small>`
@@ -1209,7 +1208,7 @@
           <label class="ce-bank-include" title="${row.sharedMovement?'Movimiento compartido: este evento solo aplica su parte proporcional.':''}"><input type="checkbox" data-ce-bank-included="${esc(row.id)}" ${row.included?'checked':''} ${disabled}><span><i></i></span><b>${includeLabel}</b></label>
           <div class="ce-bank-date"><strong>${formatDate(row.executedAt)}</strong><small>Valor ${formatDate(row.valueDate,false)}</small></div>
           <div class="ce-bank-description"><div><span>${row.amount<0?'SALIDA':'ENTRADA'}</span><strong>${esc(row.description)}</strong></div></div>
-          <div class="ce-bank-amount ${amountClass}"><small>${row.amount<0?'CARGO BANCO':'ABONO'}</small><strong>${money(row.amount)}</strong>${row.amount<0&&Math.abs(num(row.eventAppliedAmount)-num(row.amount))>.01?`<span>Parte de este evento: <b>${money(row.eventAppliedAmount)}</b></span>`:''}<span>Banco: <b>${money(row.bankBalance)}</b></span><span class="ce-bank-event-running">Saldo evento: <b>${money(row.eventBalanceAfter)}</b>${row.included?'':' · sin aplicar'}</span></div>
+          <div class="ce-bank-amount ${amountClass}"><small>${row.amount<0?'CARGO BANCO':'ABONO'}</small><strong>${money(row.amount)}</strong>${row.amount<0&&Math.abs(num(row.eventAppliedAmount)-num(row.amount))>.01?`<span>Parte de este evento: <b>${money(row.eventAppliedAmount)}</b></span>`:''}<span>Banco (saldo real): <b>${money(row.bankBalance)}</b></span><span class="ce-bank-event-running">Impacto acumulado evento: <b>${money(row.eventBalanceAfter)}</b>${row.included?'':' · sin aplicar'}</span></div>
         </div>
         <div class="ce-bank-justification ${status.className}">
           <div class="ce-bank-justify-left">
@@ -1580,7 +1579,7 @@
     const button=$('ceBankTicketModal')?.querySelector('[data-ce-bank-save-tickets]');
     if(button){button.disabled=true;button.textContent='Guardando…';}
     const selectedTotal=store.tickets.filter(item=>item.selected).reduce((sum,item)=>sum+num(item.amount),0);
-    // v4.1_exp BANK2 · una diferencia en cualquiera de los dos sentidos NO impide guardar
+    // v5.1_exp BANK2 · una diferencia en cualquiera de los dos sentidos NO impide guardar
     // los justificantes reales. El movimiento seguirá pendiente globalmente hasta cuadrar o
     // hasta que el usuario acepte expresamente el residual.
     const selectedKeys=new Set(store.tickets.filter(item=>item.selected).map(item=>item.key));
@@ -1645,7 +1644,7 @@
     const node=$('ceBankIncomeChoices'); if(!node) return;
     const q=text(query).toLowerCase();
     const items=store.incomes.filter(item=>!q||[item.personName,item.paymentMethod,item.amount].join(' ').toLowerCase().includes(q));
-    node.innerHTML=items.map(item=>`<label class="ce-bank-income-choice ${item.selected?'selected':''} ${item.available===false?'linked':''}"><input type="checkbox" data-ce-bank-income-choice="${esc(item.id)}" ${item.selected?'checked':''} ${item.available===false?'disabled':''}><span class="ce-bank-income-choice-thumb">${item.imageUrl?`<img src="${esc(item.imageUrl)}" alt="Justificante de ${esc(item.personName)}">`:'<i>ING</i>'}</span><span><b>${esc(item.personName)}</b><small>${esc(item.paymentMethod||'Banco')}</small></span><strong>${money(item.amount)}</strong>${item.available===false?'<em>Usado en otro movimiento</em>':''}</label>`).join('')||'<div class="ce-bank-empty"><strong>No hay ingresos bancarios disponibles en este evento.</strong></div>';
+    node.innerHTML=items.map(item=>`<label class="ce-bank-income-choice ${item.selected?'selected':''} ${item.available===false?'linked':''}"><input type="checkbox" data-ce-bank-income-choice="${esc(item.id)}" ${item.selected?'checked':''} ${item.available===false?'disabled':''}><span class="ce-bank-income-choice-thumb">${item.imageUrl?`<img src="${esc(item.imageUrl)}" alt="Justificante de ${esc(item.personName)}">`:'<i>ING</i>'}</span><span><b>${esc(item.personName)}</b><small>${esc(item.paymentMethod||'Banco')}</small></span><strong>${money(item.amount)}</strong>${item.available===false?'<em>Asociado manualmente a otro movimiento de este evento</em>':item.automaticSuggestion?'<em>Propuesta automática en otro movimiento · puedes reasignarlo</em>':''}</label>`).join('')||'<div class="ce-bank-empty"><strong>No hay ingresos bancarios disponibles en este evento.</strong></div>';
     updateIncomePickerTotal();
   }
   function updateIncomePickerTotal(){

@@ -1,0 +1,43 @@
+ControlEvent v5.0_exp · ZUZU LAB V3.14.1
+MADUREZ HÍBRIDA + COHERENCIA TEMPORAL + RECOVERY LIMPIO
+
+OBJETIVO
+- No entregar otra versión basada solo en regresiones de presencia/código.
+- Añadir una ITV híbrida de madurez: 14 turnos dirigidos + 10 turnos exploratorios no prefijados.
+- Los 10 turnos libres se generan dinámicamente leyendo la respuesta y los artefactos reales de Zuzu.
+- Puntuar madurez 0–30 en seis dimensiones: fiabilidad 7, contexto 6, detalle 5, recuperación 4, voz 4, exploración 4.
+
+CAMBIOS ZUZU
+- Fechas relativas: hoy/mañana/ese día quedan anclados al reloj canónico y no a fechas históricas del evento.
+- event_weather recibe start_date/end_date autoritativos; una respuesta fuera del rango pedido se rechaza antes de mostrarse.
+- «Vuelve a intentarlo» reutiliza solo la petición descartada por recovery, nunca el dataset/filtro fallido.
+- Fastpaths de fecha/hora ya no secuestran preguntas compuestas.
+- Recovery reconoce más formas reales de rechazo/queja y mantiene cleanRestart/historyReset.
+- Locución: elimina decimales, fechas ISO y TKxx no pedidos; limpia ruido técnico en listados de productos.
+- Niveles BASIC/MEDIUM/HIGH se mantienen como política de evidencia/redacción.
+
+MADUREZ · 24
+- 14 controles dirigidos: resumen, profundidad, compras, pendientes, responsable, documentación, banco, fechas/tiempo, recuperación y reintento.
+- 10 turnos libres: solo el primer mensaje está prefijado. Desde el segundo, Gemini actúa como usuario sintético y decide el siguiente mensaje EXCLUSIVAMENTE a partir de lo que Zuzu acaba de responder/mostrar.
+- Sin checklist temático en la conversación libre.
+- Se ejecuta por la ruta VOZ real de Zuzu.
+- JSON LIGHT y FULL guardan maturityScore y desglose por dimensiones.
+
+CUADRE BANCO
+- «Cargos» pasa a «Cargos Banco» porque el importe es la suma de movimientos bancarios negativos incluidos, no todos los gastos realizados del evento.
+- «Variación económica» pasa a «Flujo del Cuadre» y se advierte que no equivale al SALDO ACTUAL del evento.
+- No se altera el importe bancario para hacerlo coincidir artificialmente con Operativa.
+
+LIQUIDACIONES
+- Se conserva la incorporación al PDF de todos los tickets/justificantes, grandes, proporcionales y en páginas sucesivas.
+
+VALIDACIÓN OFFLINE
+- test:zuzu-lab-v3141: 31 + 25 + 21 comprobaciones verdes.
+- test:vnext-p2r: 36/36.
+- test:liquidaciones-compras: 74/74.
+- test:v3141-bank-card: 6/6.
+- Sintaxis JS crítica: OK.
+- Control negativo: el auditor aplicado al JSON real V3.13 detecta los dos fallos temporales conocidos (fecha de agosto presentada como «mañana» y fastpath de fecha secuestrando un cálculo de días).
+
+LIMITACIÓN DE CERTIFICACIÓN
+ChatGPT no puede entrar en el localhost del PC del usuario ni usar su sesión local de Producción. La certificación con datos reales se realiza desde ITV > MADUREZ · 24 > FULL-CERT. Esa ejecución produce la nota 0–30 y el JSON que puede volver a analizarse después.

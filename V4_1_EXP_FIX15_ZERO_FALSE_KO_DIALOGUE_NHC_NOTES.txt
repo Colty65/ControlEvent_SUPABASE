@@ -1,0 +1,6 @@
+ControlEvent v5.0_exp · FIX15 · CIERRE KO HEREDADOS + CONTINUIDAD DE FOCO + NHC
+
+1. Se corrige un fallo real de continuidad: cuando el objeto activo es un dataset derivado de una persona, una pregunta factual posterior sobre esa misma persona ya no se bloquea como cambio de tema.
+2. Se actualizan las suites P1.18, P1.23, P1.27 y FIX11 para reconocer la arquitectura actual (P1.24/P2-R/BRAIN-LITE) y dejar de marcar como KO simples cambios de versión/provider/build ya superados.
+3. No se introducen frases, personas, eventos ni preguntas de la batería en el runtime. El cambio de continuidad se basa exclusivamente en active_focus/active_object/operation/person estructurados.
+4. Los tests antiguos siguen comprobando las invariantes funcionales; solo se eliminan comparaciones obsoletas de cadenas/versiones exactas.

@@ -1,0 +1,29 @@
+ControlEvent v5.0_exp · FIX34 · V5 P11 MEMORY MODE + THEN/NOW
+
+Objetivo
+- Hacer visible que una respuesta procede de un recuerdo y no de datos actuales.
+- Mantener el recuerdo en pantalla al reejecutar hoy la misma consulta y mostrar la comparación.
+- Mejorar pequeñas autoridades de sujeto/evento/producto y la petición de todas las gráficas sin añadir reglas de negocio concretas.
+
+Cambios
+1. MEMORY MODE visual
+   - Las respuestas de memoria llevan una ficha cálida tipo papel/sepia, diferenciada de la respuesta ordinaria.
+   - La ficha muestra la antigüedad aproximada cuando puede calcularse.
+2. Voz de recuerdo
+   - spokenAnswer dice de cuándo es aproximadamente el recuerdo y sugiere ejecutar la misma consulta con datos actuales cuando existe sujeto suficiente.
+3. THEN / NOW
+   - Al pedir actualizar el recuerdo, ControlEvent conserva la evidencia histórica y ejecuta la consulta factual actual.
+   - La UI muestra dos fichas: «Recuerdo» y «Hoy», sin sustituir el recuerdo.
+4. Regreso al recuerdo
+   - «vuelve/retoma la respuesta del recuerdo» recupera el último recuerdo certificado localmente; no busca esas palabras en memoria.
+5. Autoridad de evento
+   - Un evento explícito en una petición general reancla la consulta a ese evento.
+   - «el/este evento» conserva el evento del contexto conversacional activo.
+6. Producto/familia
+   - Un término genérico de producto se valida contra el catálogo real de productos; no se codifican familias concretas.
+7. Multivista
+   - «una de cada tipo / todos los tipos» materializa todas las vistas registradas sobre el mismo snapshot sin reconsultar CE.
+
+Rendimiento
+- El color de recuerdo, el replay histórico y los cambios de vista son locales.
+- El refresco THEN/NOW solo ejecuta la consulta factual actual necesaria.

@@ -1,0 +1,12 @@
+HARD-CODE AUDIT · FIX48 P24
+
+No se han añadido nombres de personas, eventos, importes ni preguntas concretas de las pruebas al runtime.
+
+Constantes lingüísticas añadidas:
+- Expresiones anafóricas genéricas de repetición: "haz lo de antes", "lo de antes", "otra vez", "repítelo", "repite lo anterior", "como antes", "vuelve a hacer eso".
+Justificación: clasifican un acto conversacional de referencia a una acción previa. No deciden operación, persona, evento, scope ni filtros.
+
+Constantes técnicas:
+- type=REEXECUTE_MEMORY_NOW y estados pending/suspended/completed/cancelled, ya existentes en la máquina de conversación.
+
+P24 NO modifica después de Gemini operation/event/person/scope/filtros. Cuando debe repetir una comparación histórica, entrega historical_contract y estado conversacional a Gemini; después se valida, FREEZE y CE ejecuta literalmente.

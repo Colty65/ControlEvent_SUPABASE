@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path');
+const src=fs.readFileSync(path.join(__dirname,'..','services','event-ai.service.js'),'utf8');
+const ui=fs.readFileSync(path.join(__dirname,'..','public','app','features','zuzu-test-console-gd.js'),'utf8');
+const lab=fs.readFileSync(path.join(__dirname,'..','services','zuzu-test-lab.service.js'),'utf8');
+let ok=0,fail=0;const check=(n,c)=>{if(c){console.log('OK',n);ok++;}else{console.error('KO',n);fail++;}};
+check('scope helper',src.includes("function v5P14ScopeContract"));
+check('todos/otros eventos reconocidos',src.includes("scope=all_events")&&src.includes("en\\s+otros\\s+eventos"));
+check('schema admite scope',/scope:\{type:'string',enum:\['current_event','all_events','selected_events'\]\}/.test(src));
+check('ALL_EVENTS evita event required',src.includes("allEventsIncome=op==='event_income_status'&&trim(decision?.scope)==='all_events'")&&src.includes('validateCleanDecisionContract(action)'));
+check('executor global existe',src.includes('async function v5P14AllEventsIncomeStatus'));
+check('executor global no hereda evento activo',src.includes("scope:'all_events',event:''"));
+check('context key diferencia all_events',src.includes("scope==='all_events'?'all_events'"));
+check('frame no rellena pantalla en all_events',src.includes("trim(frame.scope)!=='all_events'"));
+check('social aislado',src.includes('V5 P23 · SOCIAL REACTION')||src.includes('V5 P22 · SOCIAL REACTION')||src.includes('V5 P14 · SOCIAL REACTION'));
+check('soft failure no reutiliza respuesta anterior',src.includes('El contexto anterior queda guardado, pero no lo voy a usar como respuesta a esta pregunta.'));
+check('ITV SCOPE12 backend',lab.includes("SCOPE12:{id:'SCOPE12'"));
+check('ITV SCOPE12 UI',ui.includes('ITV SCOPE · 12'));
+console.log(`P14 ${ok}/${ok+fail} OK`);process.exit(fail?1:0);

@@ -1,0 +1,42 @@
+ControlEvent v5.0_exp · FIX36 · V5 P13 MEMORY / GRAPH / TAB HARDEN
+Fecha: 10/09/2026
+
+OBJETIVO
+Cerrar sobresaltos observados en cuatro conversaciones simultáneas antes de entrar en la fase de personaje/voz humana. P13 no cambia la arquitectura C→S→O→R/V: endurece sus contratos.
+
+CAMBIOS
+1) RECUERDO → HOY autoritativo
+- «ejecuta/repite/actualiza la misma consulta hoy/ahora» sobre un recuerdo ya abierto NO puede convertirse en compare_events.
+- Se reutiliza la receta factual acreditada del recuerdo.
+- Se conserva la respuesta histórica y se devuelve meta.memoryComparison con historicalAnswer + currentAnswer.
+- La UI mantiene dos fichas simultáneas: 🕰 Recuerdo (sepia) y 📍 Hoy.
+- Una respuesta afirmativa corta (sí/vale/ok/hazlo) acepta la sugerencia de refresco cuando el recuerdo tiene receta ejecutable.
+- «vuelve al recuerdo» recupera localmente la R histórica incluso después de haber mostrado Recuerdo/Hoy.
+
+2) Evidencia de memoria más estricta
+- La búsqueda semántica solo propone candidatos.
+- Si el usuario nombra una persona canónica, el episodio no se certifica hasta que exista un pasaje visible que mencione realmente a esa persona.
+- El seguimiento «dame el texto/detalle exacto de aquel recuerdo» usa primero el sujeto guardado en C_MEMORY, no las palabras de la orden como nueva búsqueda.
+- Se corrige la frontera regex de nombres para evitar falsos positivos por subcadenas.
+
+3) Gráficas resistentes
+- «una de cada tipo» materializa barras, líneas, queso y donut desde el registro real de vistas sobre el MISMO snapshot.
+- «otra / siguiente gráfica» cicla por el registro de vistas, sin Gemini y sin CE.
+- Un cambio de V no reinterpreta el dominio factual.
+
+4) Ingresos pendientes de persona
+- Si se pregunta por pendientes de una persona, el sujeto explícito manda sobre el evento de pantalla.
+- Si se pide detalle/desglose, se usa el dossier global de esa persona y se responde por evento desde income_pending_by_event.
+- Evita el fallo visto donde preguntar por los pendientes de una persona devolvía el pendiente de otra persona del evento activo.
+
+5) Multipestaña/iOS endurecido
+- Se conserva conversationSessionId por pestaña y namespace usuario+sesión.
+- Además de BroadcastChannel se añade lease corto en localStorage para detectar copias de sessionStorage en Safari/iOS o pestañas duplicadas donde BroadcastChannel pueda llegar tarde/suspenderse.
+- Una colisión bifurca la conversación y limpia interaction_id/server_conversation_id en la rama nueva.
+
+LECTURA DE LAS CUATRO PRUEBAS
+- Las dos conversaciones de PC (SySA/FUNCION) muestran historiales diferenciados; no hay evidencia textual de cruce entre ellas.
+- Los dos PDF de iPhone aportados contienen prácticamente la misma secuencia de conversación. Eso no permite certificar por sí solo que fueran dos conversaciones independientes: pueden ser dos exportaciones del mismo diálogo. P13 endurece igualmente la detección de pestañas duplicadas en iOS.
+
+RENDIMIENTO
+Las rutas nuevas de Recuerdo→Hoy y VIEW_ONLY son locales salvo la única consulta factual necesaria para «Hoy». No se añade una segunda llamada de narración para resolver estas rutas.

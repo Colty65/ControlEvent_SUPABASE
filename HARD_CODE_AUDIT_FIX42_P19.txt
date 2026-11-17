@@ -1,0 +1,5 @@
+FIX42 P19 Hard-code audit
+- No se añaden personas, eventos, importes ni consultas de negocio al runtime.
+- "Carmelo" aparece solo como ejemplo de placeholder en el cuadro de diagnóstico de desarrollo; no participa en ninguna decisión ni búsqueda automática.
+- La auditoría solo lee datos persistentes y calcula métricas ya existentes (tokens/historyScore/memoryProjectionForTurn).
+- No se altera Gemini Sovereign, contratos, ranking, persistencia ni selección de recuerdos.

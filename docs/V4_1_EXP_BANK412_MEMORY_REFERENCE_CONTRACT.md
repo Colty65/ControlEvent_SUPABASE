@@ -1,4 +1,4 @@
-# v4_1_exp · BANK4_12 · MEMORY REFERENCE CONTRACT
+# v5.0_exp · BANK4_12 · MEMORY REFERENCE CONTRACT
 
 ## Motivo
 En la prueba de recuerdo de 29/08/2026 la memoria episódica resolvió correctamente la primera conversación y su follow-up. Sin embargo, una petición de recuerdo por persona (Clara Alvarez García-Brazales) llegó a `ce_reference` con acciones libres (`restore` / `reattempt`). El normalizador CE solo admite las acciones canónicas del protocolo y, correctamente, rechazó esas acciones inventadas.

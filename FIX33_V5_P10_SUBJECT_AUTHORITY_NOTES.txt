@@ -1,0 +1,62 @@
+ControlEvent v5.0_exp · FIX33 · V5 P10 SUBJECT AUTHORITY + REPLAY VOICE
+
+Base: FIX32 · V5 P9 CONTRACT AUTHORITY.
+Fuentes de ajuste: ITV AUTORIDAD · 18 del 10/09/2026 y conversación manual de 39 turnos.
+
+OBJETIVO
+Cerrar fugas de sujeto/entidad y distinguir definitivamente el objeto factual actual de palabras que pertenecen al nombre del evento o al estado anterior. Añadir repetición local de la última respuesta hablada.
+
+CAMBIOS P10
+1) ENTITY LABEL MASKING
+- Antes de clasificar la intención léxica se enmascaran las etiquetas de entidades ya resueltas (p.ej. el título canónico del evento).
+- Evita que palabras que forman parte del NOMBRE del evento se interpreten como intención funcional del usuario.
+- Caso detectado por ITV: «resumen económico de <evento cuyo título contiene gastos>» no puede convertirse en Compras por la palabra «gastos» del título.
+
+2) SUBJECT AUTHORITY
+- La persona explícita del turno actual sustituye a personas heredadas salvo petición explícitamente compositiva.
+- Un cambio a compras agrupadas por responsable limpia person/responsible en C/S/O.
+- Un producto explícito (p.ej. una familia de producto) limpia un filtro personal obsoleto en Compras si el usuario no nombra una persona en ese mismo turno.
+- Una orden explícita de olvidar/dejar fuera un sujeto limpia el filtro de sujeto en Compras.
+
+3) HERENCIA DE DIMENSIÓN
+- Una continuación de ranking/ordenación conserva group_by=responsible cuando el S activo está agrupado por responsable.
+- El orden por importe no debe transformar responsables en productos ni reintroducir una persona individual.
+
+4) MEMORY -> CURRENT FACTS
+- El C de memoria conserva la persona canónica que sustentó el recuerdo.
+- «Repite/actualiza esta respuesta con datos actuales» sobre un recuerdo de persona reejecuta person_profile para esa persona (y el evento si el C lo conserva), en vez de caer a event_summary genérico.
+
+5) PERSON FOLLOW-UPS
+- «y Emiliano?», «y Pana?», etc. se resuelven contra la(s) persona(s) nombrada(s) AHORA; no se concatena automáticamente la lista de personas de turnos anteriores.
+- «yo» puede resolverse al display name de sesión únicamente si ese display name existe en el catálogo canónico de personas.
+
+6) PRODUCTO VS PERSONA
+- En Compras, un producto explícito tiene autoridad sobre un filtro personal heredado cuando el turno actual no vuelve a nombrar a esa persona.
+- Corrige el caso observado de preguntar por cerveza y seguir recibiendo «0 compras asignadas a Cordo».
+
+7) VIEW DE DOSSIER/INFORME
+- «representa en gráfica ... el dossier/informe/resumen» puede ser VIEW_ONLY del snapshot actual; no fuerza por sí mismo un nuevo informe.
+
+8) SÍNTESIS
+- Una síntesis general no fuerza HIGH por defecto. MEDIUM si pide síntesis; HIGH solo para rima/poema/relato/narración o detalle/exhaustividad explícita.
+- Se evita cortar respuestas largas innecesariamente sin reducir las O que sustentan la síntesis.
+
+9) BOTÓN ESCUCHAR
+- Nuevo botón «↻ ESCUCHAR» en la barra de Zuzu.
+- Reproduce de nuevo window.__ceZuzuLastSpokenAnswer, es decir, exactamente la última versión oral ya preparada.
+- No consulta CE, no llama a Gemini y no altera C/S/O/R/V.
+- El replay explícito funciona aunque la lectura automática esté en Voz OFF; Voz OFF solo impide la reproducción automática de nuevas respuestas.
+- Usa la voz actualmente seleccionada.
+
+CACHE
+- v11-3-zuzu-analitica-libre.js cambia a ?v=20260910-FIX33-P10-REPLAY.
+
+REGRESIONES
+- P10 Subject Authority: 13/13 OK.
+- P9 Contract Authority: 12/12 OK.
+- P8 Response/Voice: 12/12 OK.
+- P7 Isolation Contracts: 16/16 OK.
+- Node syntax service/UI: OK.
+
+NOTA
+Estas son regresiones locales/estructurales. La prueba real sigue siendo ITV + conversación manual con datos vivos.

@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · FIX10
+ControlEvent v5.0_exp · FIX10
 P2-R GROUNDED CONTINUITY / TRUST / VOICE DATE RANGE
 
 Origen
@@ -83,7 +83,7 @@ Regresiones
 - Ejecución Controlada:               76/76
 - Liquidaciones Compras:              70/70
 - Intérprete Gemini V2.3:             51/51
-- Versionado v4_1_exp:                10/10
+- Versionado v5.0_exp:                10/10
 
 No se cambia la arquitectura general ni se añaden respuestas factuales hard-codeadas.
 Los cambios son de continuidad estructurada, normalización de contrato, grounding y

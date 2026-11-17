@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4
+# ControlEvent v5.0_exp · BANK4
 
 Remate visual y funcional solicitado el 27/08/2026 sobre BANK3.
 
@@ -32,5 +32,5 @@ Remate visual y funcional solicitado el 27/08/2026 sobre BANK3.
 - BANK4: 34/34.
 - BANK2 multi-TK: 21/21.
 - Cuadre multievento RAW14W: 31/31.
-- v4.1_exp Memory Flashback + Bank: 31/31.
+- v5.0_exp Memory Flashback + Bank: 31/31.
 - Comprobación sintáctica paralela de JS/CJS/MJS: OK.

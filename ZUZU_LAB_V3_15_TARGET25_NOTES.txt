@@ -1,0 +1,10 @@
+ControlEvent v5.0_exp · ZUZU V3.15 TARGET25
+
+Objetivo: que un 25/30 signifique conversación humana fiable, no contrato técnico verde.
+
+- P2-R usa generateContent v1beta + JSON schema como planner PRIMARIO; elimina dependencia de function calling/Interactions para decidir el plan.
+- Interactions restante pasa a v1beta.
+- view_current/summarize_current responden con contenido humano (nombres/elementos), no «dataset/filas/columnas».
+- MEDIUM event_summary abre contexto narrativo/evidencias; donaciones MEDIUM usa detalle real.
+- ITV añade oráculo humano sobre answer + spokenAnswer y suspende soft-failure, lenguaje interno, promesas de detalle y ampliaciones superficiales.
+- Scoring 25+ tiene puertas duras: conversación libre, voz, contexto, detalle, recovery y ausencia de fallback deben superar mínimos.

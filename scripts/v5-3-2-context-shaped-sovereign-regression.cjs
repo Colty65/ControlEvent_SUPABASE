@@ -1,0 +1,20 @@
+const fs=require('fs'),path=require('path');
+const root=path.resolve(__dirname,'..');
+const core=fs.readFileSync(path.join(root,'services/event-ai.service.js'),'utf8');
+const ver=fs.readFileSync(path.join(root,'public/app/version.js'),'utf8');
+let ok=0,ko=0;function t(n,v){console.log((v?'OK':'KO')+' · '+n);v?ok++:ko++;}
+t('provider v5.3.2 activo',/zuzu-v5\.3\.2-context-shaped-compiler/.test(core));
+t('versión v5.3.2',/v5\.3\.2_exp/.test(ver));
+t('turn_result estructurado',/ANSWER','EXECUTE','NEED_MATERIALS','CLARIFY/.test(core));
+t('entity index compacto',/function v532CompactEntityIndex/.test(core)&&/entity_index:entityIndex/.test(core));
+t('actor autoritativo',/authoritative:true/.test(core));
+t('overview no exhaustivo',/event_summary'.*coverage:'overview'.*exhaustive:false/.test(core));
+t('dominios exhaustivos',/event_bank'.*coverage:'domain'.*exhaustive:true/.test(core));
+t('lazy material responde sin reconsulta',/RESOLVED_MATERIALS llegue y sea suficiente, responde directamente con ANSWER/.test(core));
+t('thread conserva decisión',/last_response_mode/.test(core)&&/last_user_goal/.test(core)&&/pending_state/.test(core));
+t('3 turnos recientes',/slice\(-3\)/.test(core));
+t('sin catálogo de perfiles en entity index',/format:'\[id,name\]'/.test(core));
+t('migración navegador desde v5.3.1',/ControlEvent_v5\.3\.1_exp/.test(ver)&&/ControlEvent_v5\.3\.2_exp/.test(ver));
+t('planner no clasifica prompt con v4BrainLitePromptSemantics',!/async function v4BrainLitePlan[\s\S]{0,10000}v4BrainLitePromptSemantics\(userPrompt\)/.test(core));
+t('planner no usa v5PromptRouteSignals',!/async function v4BrainLitePlan[\s\S]{0,10000}v5PromptRouteSignals\(userPrompt\)/.test(core));
+console.log(`\nV5.3.2 CONTEXT-SHAPED: ${ok} OK · ${ko} KO`);process.exitCode=ko?1:0;

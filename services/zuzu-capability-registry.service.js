@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp · VNext P1.23 · DIALOGUE STATE AUTHORITY + ADAPTIVE CONVERSATION ITV
+/* ControlEvent v6_1-exp · VNext P1.23 · DIALOGUE STATE AUTHORITY + ADAPTIVE CONVERSATION ITV
    Registro + canonizador estructural de capacidades query_ce.
    NHC: describe/normaliza JSON y semántica de contratos; nunca interpreta frases del usuario. */
 import crypto from 'node:crypto';
@@ -7,12 +7,12 @@ const text=v=>v==null?'':String(v);
 const trim=v=>text(v).trim();
 const arr=v=>Array.isArray(v)?v:[];
 
-export const CAPABILITY_REGISTRY_VERSION='20260903-P124-LIQUIDACIONES';
+export const CAPABILITY_REGISTRY_VERSION='20260911-V5.0-SINGLE-SOVEREIGN-CONTRACTS';
 
 const P={
   operation:{type:'string'},
   event:{type:'string'},events:{type:'array',items:{type:'string'}},person:{type:'string'},store:{type:'string'},product:{type:'string'},ticket:{type:'string'},responsible:{type:'string'},
-  scope:{type:'string',enum:['active_event','named_event','all_events']},
+  scope:{type:'string',enum:['active_event','named_event','current_event','selected_events','all_events']},
   status:{type:'string',enum:['pending','received','realized','all']},purchase_status:{type:'string',enum:['pending','realized','all']},settlement_status:{type:'string',enum:['open','closed','all']},population:{type:'string',enum:['socios','all']},attendance_mode:{type:'string',enum:['attendees','attending_members','attending_non_members','non_attending_members','attendance_full']},
   detail:{type:'string',enum:['brief','standard','full']},start_date:{type:'string'},end_date:{type:'string'},chart:{type:'boolean'},chart_type:{type:'string',enum:['line','bar','horizontalBar']},metric:{type:'string',enum:['all','purchases','income','donations','attendance']},
   tone:{type:'string',enum:['friendly','banter','neutral']},register:{type:'string',enum:['normal','close','banter']},tease:{type:'boolean'},narrate:{type:'boolean'},
@@ -54,7 +54,7 @@ export const CAPABILITY_REGISTRY=Object.freeze({
   person_events:def('PERSONAS',['person'],[],'person_events'),
   person_income_status:def('INGRESOS',['person','event'],[],'person_income_status'),
   person_event_status:def('PERSONAS',['person','event'],[],'person_event_status'),
-  event_income_status:def('INGRESOS',['event'],['status','population'],'income_status',[],{status:'pending',population:'all'}),
+  event_income_status:def('INGRESOS',[],['event','scope','status','population'],'income_status',[],{status:'pending',population:'all'}),
   event_income_lines:def('INGRESOS',['event'],[],'income_lines'),
   event_attendance:def('ASISTENCIA',['event'],['attendance_mode','scope'],'attendance',[],{attendance_mode:'attendees'}),
   event_summary:def('EVENTO',['event'],['scope'],'event_dossier'),
@@ -151,6 +151,86 @@ export function capabilityCatalogText(){
 export function capabilityCatalogTextCompact(){
   const common=new Set([...PRESENT,...META]);
   return capabilityOperations().map(op=>{const d=CAPABILITY_REGISTRY[op],req=d.required.length?`req=${d.required.join(',')}`:'req=—',shown=d.schemaOptional||d.optional,business=shown.filter(x=>!common.has(x)),opt=business.length?`opt=${business.join(',')}`:'opt=—',desc=OP_DESCRIPTIONS[op]?` · ${OP_DESCRIPTIONS[op]}`:'';return`- ${op} ${req}; ${opt}${desc}`;}).join('\n');
+}
+
+
+
+// ============================================================================
+// V5 CLEAN AUTHORITY P16 · CAPABILITY CONTRACT REGISTRY
+// Este registro NO interpreta lenguaje y NO corrige decisiones. Describe a Gemini
+// qué contratos son legales y permite validarlos sin alterar un solo valor semántico.
+// Regla de hierro: Gemini decide -> validar -> congelar -> ejecutar exactamente.
+// ============================================================================
+const CLEAN_SCOPE_VALUES=Object.freeze(['current_event','all_events','selected_events']);
+const CLEAN_EVENT_SCOPED=Object.freeze(new Set([
+  'event_summary','event_purchases','event_donations','event_documentation','event_bank',
+  'event_management','event_liquidations','event_weather','event_attendance',
+  'event_income_status','event_products','event_stores_used'
+]));
+const CLEAN_CAPABILITY_CONTRACTS=Object.freeze({
+  event_income_status:Object.freeze({
+    purpose:'Ingresos recibidos o pendientes. Puede trabajar en el evento actual, un evento nombrado o TODOS los eventos.',
+    scopes:Object.freeze(['current_event','all_events']),
+    rules:Object.freeze([
+      'scope=all_events: event debe estar vacío/ausente; status es el filtro de estado.',
+      'scope=current_event: event puede omitirse; el ejecutor deriva solo el evento visible como dato técnico.',
+      'sin scope: event debe venir decidido explícitamente por Gemini.'
+    ])
+  }),
+  event_summary:Object.freeze({purpose:'Resumen de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_purchases:Object.freeze({purpose:'Compras de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_donations:Object.freeze({purpose:'Donaciones de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_documentation:Object.freeze({purpose:'Documentación/justificantes de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_bank:Object.freeze({purpose:'Cuadre y movimientos bancarios de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_management:Object.freeze({purpose:'Hitos y LG de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_liquidations:Object.freeze({purpose:'Liquidaciones de compras de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_weather:Object.freeze({purpose:'Meteorología de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_attendance:Object.freeze({purpose:'Asistencia de un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_products:Object.freeze({purpose:'Productos comprados en un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  event_stores_used:Object.freeze({purpose:'Tiendas realmente usadas en un evento.',scopes:Object.freeze(['current_event']),rules:Object.freeze(['scope=current_event permite omitir event; sin scope requiere event explícito.'])}),
+  person_profile:Object.freeze({purpose:'Dossier global de una persona.',scopes:Object.freeze(['all_events']),rules:Object.freeze(['person es obligatorio; event solo si Gemini decide limitarlo a un evento concreto.'])}),
+  person_events:Object.freeze({purpose:'Eventos acreditados de una persona.',scopes:Object.freeze(['all_events']),rules:Object.freeze(['person es obligatorio.'])}),
+  person_income_status:Object.freeze({purpose:'Estado de ingreso de una persona dentro de un evento concreto.',scopes:Object.freeze([]),rules:Object.freeze(['person y event son obligatorios.'])}),
+  compare_events:Object.freeze({purpose:'Comparación entre eventos concretos.',scopes:Object.freeze(['selected_events']),rules:Object.freeze(['events debe contener al menos dos eventos concretos.'])}),
+  events_overview:Object.freeze({purpose:'Panorama global homogéneo del conjunto de eventos.',scopes:Object.freeze(['all_events']),rules:Object.freeze(['No requiere event ni events.'])}),
+  people_catalog:Object.freeze({purpose:'Catálogo de personas.',scopes:Object.freeze(['all_events']),rules:Object.freeze([])}),
+  events_catalog:Object.freeze({purpose:'Catálogo de eventos.',scopes:Object.freeze(['all_events']),rules:Object.freeze([])})
+});
+export function cleanCapabilityContractCatalogText(){
+  const lines=['CONTRATOS LEGALES DE CONTROL EVENT (la decisión debe encajar ANTES de congelarse):'];
+  for(const op of capabilityOperations()){
+    const c=CLEAN_CAPABILITY_CONTRACTS[op];if(!c)continue;
+    const scopes=arr(c.scopes).length?arr(c.scopes).join('|'):'—';
+    lines.push(`- ${op}: ${c.purpose} scopes=${scopes}${arr(c.rules).length?` · ${arr(c.rules).join(' ')}`:''}`);
+  }
+  lines.push('INVARIANTE: scope=all_events significa event AUSENTE. Nunca inventes ni heredes un evento en ese scope.');
+  lines.push('INVARIANTE: si una continuación conserva un contexto, conserva también su scope salvo cambio explícito del usuario.');
+  return lines.join('\n');
+}
+export function validateCleanDecisionContract(action={}){
+  const a=action&&typeof action==='object'?action:{},op=trim(a.operation),issues=[];
+  if(!op)return{ok:false,issues:['Falta operation.']};
+  if(!capabilityDefinition(op))issues.push(`Operación no registrada: ${op}.`);
+  const scope=trim(a.scope);
+  if(scope&&!CLEAN_SCOPE_VALUES.includes(scope))issues.push(`Scope no registrado: ${scope}.`);
+  const c=CLEAN_CAPABILITY_CONTRACTS[op];
+  if(c&&scope&&arr(c.scopes).length&&!arr(c.scopes).includes(scope))issues.push(`${op} no admite scope=${scope}.`);
+  if(scope==='all_events'&&trim(a.event))issues.push('scope=all_events prohíbe event.');
+  if(scope==='selected_events'&&arr(a.events).filter(Boolean).length<2)issues.push('scope=selected_events requiere al menos dos events.');
+  if(CLEAN_EVENT_SCOPED.has(op)){
+    if(scope==='all_events'){
+      if(op!=='event_income_status')issues.push(`${op} no tiene contrato multi-evento all_events.`);
+    }else if(scope==='selected_events'){
+      issues.push(`${op} no usa selected_events; usa compare_events cuando corresponda.`);
+    }else if(scope==='current_event'){
+      // Legal: el ejecutor puede derivar el evento visible sin alterar el contrato congelado.
+    }else if(!trim(a.event))issues.push(`${op} requiere event explícito o scope=current_event${op==='event_income_status'?' / all_events':''}.`);
+  }
+  if(op==='person_profile'&&!trim(a.person))issues.push('person_profile requiere person.');
+  if(op==='person_events'&&!trim(a.person))issues.push('person_events requiere person.');
+  if(op==='person_income_status'&&(!trim(a.person)||!trim(a.event)))issues.push('person_income_status requiere person y event.');
+  if(op==='compare_events'&&arr(a.events).filter(Boolean).length<2)issues.push('compare_events requiere al menos dos events.');
+  return{ok:issues.length===0,issues};
 }
 
 const SUBJECT_KEYS=['event','events','person','store','product','ticket','responsible'];

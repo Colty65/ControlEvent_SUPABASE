@@ -1,0 +1,13 @@
+FIX44 P20 · HARD-CODE AUDIT
+
+Hard-code de negocio añadido: NINGUNO.
+No hay nombres de personas, eventos, productos, importes ni preguntas ITV en la lógica de persistencia.
+
+Constantes técnicas justificadas:
+- nombres de tablas ce_zuzu_conversations / ce_zuzu_turns ya existentes;
+- ventana diagnóstica de 24 horas;
+- límites máximos de lectura diagnóstica para evitar consultas descontroladas;
+- códigos técnicos ZUZU_PERSISTENCE_WRITE_* y ZUZU_PERSISTENCE_VERIFY_FAILED.
+
+Principio:
+la persistencia no interpreta lenguaje ni modifica contratos Gemini. Solo escribe y verifica identidad/integridad del turno.

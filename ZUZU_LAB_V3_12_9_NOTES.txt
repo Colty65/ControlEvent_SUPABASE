@@ -1,0 +1,24 @@
+ControlEvent v5.0_exp · ZUZU LAB V3.12.9 · SINGLE AUTHORITY
+
+Objetivo
+- Eliminar autoridades semánticas competidoras en la conversación oral.
+- Mantener DaveFX masculino local y TTS de pago bloqueado (0 €).
+
+Arquitectura oral
+Usuario -> Gemini STT -> un único plan_turn P2-R -> validación estructural -> CE factual -> DaveFX.
+
+Cambios
+1. El mensaje actual es la autoridad del turno. Historial y dataset actual son sólo contexto.
+2. El plan tipa context_mode (CONTINUE/REPLACE), source_mode (FRESH/CURRENT_DATASET/MEMORY) y subject_type.
+3. Un cambio de dominio abre fuente nueva. Un dataset previo no puede imponerse a una petición factual explícita.
+4. Si se pide más detalle de un dataset incompleto, se reabre automáticamente su fuente con los argumentos originales (incluido purchase_status) y detail=full.
+5. event_purchases normaliza status -> purchase_status antes de ejecutar CE.
+6. MEMORY search nunca se ejecuta sin query: el validador completa el contrato desde el turno actual si el planner no lo hizo.
+7. Identidad del usuario e identidad de Zuzu se separan antes del router general.
+8. En voz se elimina v281TryDirectRoute y no se ejecuta el reparador semántico posterior al planner.
+9. El diagnóstico registra turnAuthority y executedOperations para saber exactamente qué decidió y qué ejecutó el único plan.
+10. DaveFX es la boca local masculina. Gemini TTS continúa bloqueado.
+
+NHC
+- No se añaden nombres, eventos ni equivalencias particulares como Cordo/Nines.
+- La reparación posterior sólo valida estructura del contrato; no reinterpreta frases de negocio.

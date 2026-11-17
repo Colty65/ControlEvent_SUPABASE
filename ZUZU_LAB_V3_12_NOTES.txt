@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ZUZU LAB V3.12
+ControlEvent v5.0_exp · ZUZU LAB V3.12
 TTS INTERACTIONS STREAM + CLOSE FIX + FIRST-AUDIO WATCHDOG
 
 Motivo

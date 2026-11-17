@@ -17,9 +17,11 @@ import bankReconciliationRoutes from '../routes/bank-reconciliation.routes.js';
 import purchaseSettlementsRoutes from '../routes/purchase-settlements.routes.js';
 import zuzuTestsRoutes from '../routes/zuzu-tests.routes.js';
 import antonioLabRoutes from '../routes/antonio-lab.routes.js';
+import zuzuVoiceRoutes from '../routes/zuzu-voice.routes.js';
+import zisAuthorizationRoutes from '../routes/zis-authorization.routes.js';
 import { BACKEND_NAME, NODE_MODULES_DIR, PUBLIC_DIR, ROOT } from './paths.js';
 
-export function createApp() {
+export function createApp({ serveFrontend = true } = {}) {
   const app = express();
 
   app.disable('x-powered-by');
@@ -29,22 +31,26 @@ export function createApp() {
     next();
   });
 
-  app.get('/vendor/exceljs.min.js', async (req, res) => {
-    const candidates = [
-      path.join(PUBLIC_DIR, 'vendor', 'exceljs.min.js'),
-      path.join(NODE_MODULES_DIR, 'exceljs', 'dist', 'exceljs.min.js')
-    ];
-    const file = candidates.find(candidate => fsSync.existsSync(candidate));
-    if (!file) {
-      return res.status(404).type('text/plain').send('Falta ExcelJS. Ejecuta npm install y reinicia.');
-    }
-    res.type('application/javascript; charset=utf-8');
-    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-    res.sendFile(file);
-  });
+  if (serveFrontend) {
+    app.get('/vendor/exceljs.min.js', async (req, res) => {
+      const candidates = [
+        path.join(PUBLIC_DIR, 'vendor', 'exceljs.min.js'),
+        path.join(NODE_MODULES_DIR, 'exceljs', 'dist', 'exceljs.min.js')
+      ];
+      const file = candidates.find(candidate => fsSync.existsSync(candidate));
+      if (!file) {
+        return res.status(404).type('text/plain').send('Falta ExcelJS. Ejecuta npm install y reinicia.');
+      }
+      res.type('application/javascript; charset=utf-8');
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+      res.sendFile(file);
+    });
 
-  app.use('/uploads', express.static(path.join(ROOT, 'uploads'), { etag: false, maxAge: 0 }));
-  app.use(express.static(PUBLIC_DIR, { etag: false, maxAge: 0 }));
+    // LOCALHOST: los estáticos se sirven desde Express para poder probar sin Vercel.
+    // En Vercel serveFrontend=false y estos ficheros los entrega la capa estática/CDN.
+    app.use('/uploads', express.static(path.join(ROOT, 'uploads'), { etag: false, maxAge: 0 }));
+    app.use(express.static(PUBLIC_DIR, { etag: false, maxAge: 0 }));
+  }
 
   // FIX23: cortafuegos de servidor antes de cualquier ruta de datos.
   // La BBDD no se actualiza por navegación, render, refresco ni estado completo.
@@ -79,11 +85,13 @@ export function createApp() {
   app.use('/api', purchaseSettlementsRoutes);
   app.use('/api', zuzuTestsRoutes);
   app.use('/api', antonioLabRoutes);
+  app.use('/api', zuzuVoiceRoutes);
+  app.use('/api', zisAuthorizationRoutes);
   app.use('/api', crudRoutes);
   app.use('/api', exportRoutes);
   app.use('/api', healthRoutes);
 
-  app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
+  if (serveFrontend) app.get('*', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'index.html')));
 
   app.use((err, req, res, next) => {
     const status = err?.status || (/clave/i.test(err?.message || '') ? 401 : 500);
@@ -94,5 +102,3 @@ export function createApp() {
   return app;
 }
 
-const app = createApp();
-export default app;

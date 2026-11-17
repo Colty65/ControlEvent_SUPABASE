@@ -1,0 +1,14 @@
+AUDITORÍA HARD-CODE · FIX34 / P11
+
+Hard-code de negocio añadido: NINGUNO.
+No se han incorporado al runtime nombres concretos de personas, eventos, importes, productos ni frases de la ITV.
+
+Hard-code/constantes estructurales añadidas y justificación:
+- Paleta visual sepia/papel de MEMORY MODE: hard-code de presentación UI. Justificado; no afecta a datos, enrutamiento ni decisiones de negocio.
+- Umbral >= 2 coincidencias para aceptar una familia/término de producto desde el catálogo: heurística técnica para evitar tomar palabras casuales como productos. No contiene productos concretos.
+- Umbral de confianza >= 0,90 para resolver una persona no exacta mediante el catálogo canónico: heurística técnica conservadora; no contiene personas concretas.
+- Vocabulario genérico de retorno al recuerdo, actualización, evento general y «una de cada tipo»: hard-code lingüístico estructural. Justificado para evitar una segunda llamada IA y mantener latencia; no prescribe respuestas ni entidades de negocio.
+- Tipos de vista: proceden del registro de vistas soportadas por el renderer. La petición «todos» recorre ese registro; no existe una lista de datos/eventos para aprobar ITV.
+
+Hard-code legacy:
+- P11 no elimina automáticamente el hard-code histórico ya auditado en otras áreas del proyecto. Debe seguir tratándose por separado cuando se modifiquen esos módulos.

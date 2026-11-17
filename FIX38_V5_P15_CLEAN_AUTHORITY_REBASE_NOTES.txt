@@ -1,0 +1,57 @@
+ControlEvent v5.0_exp · FIX38 · V5 P15 CLEAN AUTHORITY REBASE
+
+OBJETIVO
+-------
+Gemini vuelve a ser el único intérprete semántico de la ruta factual ordinaria.
+Su JSON se considera DECISION CONTRACT y queda congelado antes de ejecutar datos.
+
+PRINCIPIO
+---------
+Si Gemini decide:
+  operation = event_income_status
+  scope = all_events
+  status = pending
+  event = (vacío)
+ninguna capa posterior puede convertirlo en FUNCION 2026, Carmelo, Weather ni otra operación.
+
+RUTA ACTIVA
+-----------
+Usuario -> Contexto compacto -> Gemini -> FREEZE -> VALIDACIÓN -> copia técnica de ejecución -> CE -> R/V
+
+ELIMINADO DE LA RUTA ACTIVA DESPUÉS DE GEMINI
+----------------------------------------------
+- v4BrainLitePlanStructuralGuard
+- v5P9ApplyContract
+- v5P10ApplyStateAuthority
+- v4BrainLiteArgs / v4BrainLiteRepairAction
+
+Esas cuatro funciones mutadoras legacy se han eliminado físicamente del runtime de event-ai.service.js.
+No quedan disponibles para modificar el contrato Gemini de la ruta Brain-Lite.
+
+ÚNICAS TRANSFORMACIONES PERMITIDAS TRAS FREEZE
+-----------------------------------------------
+1. Validación de que el contrato es ejecutable.
+2. Canonización de una entidad YA DECIDIDA (alias/nombre -> nombre canónico).
+3. Derivación técnica de event cuando scope=current_event, exclusivamente en una copia de ejecución.
+4. Eliminación técnica de event en la copia de ejecución cuando scope=all_events.
+
+La decisión original se conserva en capabilityCalls[].decisionContract y en la traza
+"V5 CLEAN AUTHORITY · FREEZE" / "CONTRATO CONGELADO" para comparar DECISIÓN vs EJECUCIÓN.
+
+FALLO LIMPIO
+------------
+Si Gemini entrega un contrato insuficiente, se rechaza sin commit. No se rescata una persona,
+evento, operación o dataset antiguo para responder otra cosa.
+
+SCOPE
+-----
+El prompt del intérprete deja explícito que:
+- todos/cualquier/otros eventos => scope=all_events, sin event.
+- este/evento actual => scope=current_event.
+- evento concreto => event.
+Scope se valida ANTES de exigir event.
+
+NHC
+---
+No se añaden nombres de personas, nombres de eventos, importes ni frases de ITV al runtime.
+Las únicas constantes nuevas son enums técnicos del contrato y códigos de validación.

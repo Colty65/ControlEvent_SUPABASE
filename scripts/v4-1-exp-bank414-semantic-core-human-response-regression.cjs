@@ -5,7 +5,7 @@ const voice=fs.readFileSync('public/app/features/v22-voz3-zuzu.js','utf8');
 const index=fs.readFileSync('public/index.html','utf8');
 let ok=0,ko=0;function t(name,cond){if(cond){ok++;console.log('OK · '+name);}else{ko++;console.error('KO · '+name);}}
 function segment(a,b){const i=ai.indexOf(a),j=ai.indexOf(b,i+1);return i>=0&&j>i?ai.slice(i,j):'';}
-const compiler=segment('async function v73CompileTurn(','// v4_1_exp · ESCAPE LIBRE');
+const compiler=segment('async function v73CompileTurn(','// v5.1_exp · ESCAPE LIBRE');
 const run=segment('async function runZuzuV73Ledger(','// Entrada ÚNICA del turno Zuzu');
 const final=segment('function v79RawFinalInstructionCompact()','function v73RawFinalInstruction()');
 

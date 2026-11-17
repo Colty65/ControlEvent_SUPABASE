@@ -1,4 +1,4 @@
-# ControlEvent v4_1_exp · BANK4_9 · Zuzu Z1 cierre quirúrgico
+# ControlEvent v5.0_exp · BANK4_9 · Zuzu Z1 cierre quirúrgico
 
 BANK4_9 parte de BANK4_8 y ataca los fallos detectados por la ITV ORACLE_ACTIVE del 28/08/2026 (50 OK / 12 WARN / 16 KO).
 

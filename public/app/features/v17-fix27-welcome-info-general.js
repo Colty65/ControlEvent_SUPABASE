@@ -1,4 +1,4 @@
-/* ControlEvent v4_1_exp
+/* ControlEvent v6_1-exp
    - Mantiene FIX26: solo móviles tipo teléfono con doble pulsación rápida para globos de RESUMEN PRESUPUESTARIO (en budget-tooltips-lite.js).
    - Sin evento: ColtyLAB muestra ficha informativa/version.
    - Con evento elegido: ColtyLAB deja paso a AVANCE DEL EVENTO. */
@@ -9,7 +9,7 @@
 
   const STYLE_ID = 'ceV17Fix26WelcomeInfoStyle';
   const LAYER_ID = 'ceV17Fix26WelcomeInfoLayer';
-  const DEFAULT_VERSION_LABEL = 'v4_1_exp';
+  const DEFAULT_VERSION_LABEL = 'v5.1_exp';
   function currentVersionLabel(){
     try{
       const value = String(window.__ceVersionLabel || window.ControlEventVersion?.label || window.__ceVersionInfo?.label || DEFAULT_VERSION_LABEL).trim();
@@ -127,7 +127,7 @@
             <ul>
               <li>Ingresos, colaboradores y justificantes.</li>
               <li>Compras, tickets y gastos pendientes.</li>
-              <li>Donaciones de producto y valoración.</li>
+              <li>Donaciones de producto, valoración y Control de la Entrega.</li>
               <li>Documentos, tiendas, productos y personas.</li>
               <li>Control de hitos (tareas).</li>
             </ul>
@@ -136,9 +136,10 @@
             <h2>IA · Zuzu</h2>
             <ul>
               <li>Automatización de tickets de compra.</li>
+              <li>“Zuzu, pregúntame lo que quieras…”. Habla con Zuzu.</li>
               <li>Información detallada y gráfica a demanda.</li>
               <li>Comparativas y consultas sobre eventos.</li>
-              <li>Ayuda para planificación inicial.</li>
+              <li>Ayuda para planificación inicial del evento.</li>
             </ul>
           </section>
           <section class="modal-col">
@@ -146,7 +147,11 @@
             <ul>
               <li>Resumen presupuestario y saldos.</li>
               <li>Cuadre bancario.</li>
+              <li>Evolución temporal del saldo bancario.</li>
+              <li>Consulta histórica de movimientos bancarios.</li>
               <li>Mapa de recursos y vista aérea.</li>
+              <li>Responsables de Compras y Donaciones.</li>
+              <li>Liquidaciones a responsables de Compras.</li>
               <li>INFOEVENTO, BACKUP y archivos de control.</li>
               <li>Roles GD, RW y RO con permisos.</li>
             </ul>

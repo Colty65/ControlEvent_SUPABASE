@@ -1,0 +1,9 @@
+ControlEvent v6.0.8_exp · TYPED PIPELINE STAGES
+
+- Elimina steps[] genérico de ce_execute_data.
+- FETCH sigue tipado y obligatorio.
+- FILTER, JOIN, AGGREGATE, DERIVE, SORT_LIMIT y VISUALIZE tienen esquemas cerrados propios.
+- CE recompone mecánicamente el pipeline interno en orden canónico.
+- No se añaden reglas lingüísticas ni fallback cognitivo.
+- EXECUTE_UI también usa sort_limit/visualize tipados, sin pipeline libre.
+- Versionado externo saneado a v6.0.8_exp.

@@ -1,4 +1,4 @@
-# v4.1_exp · BANK2 · varios TKxx del mismo evento en un movimiento
+# v5.0_exp · BANK2 · varios TKxx del mismo evento en un movimiento
 
 ## Problema real detectado
 Un movimiento ya podía compartirse entre eventos, pero una combinación real mostró que al existir un TKxx ya asociado no se podía guardar otro TKxx del mismo evento. Además, la UI bloqueaba cualquier suma de justificantes que superase aunque fuese mínimamente el importe del movimiento bancario.

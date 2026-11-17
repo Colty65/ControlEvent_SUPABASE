@@ -1,0 +1,62 @@
+BATERÍA MANUAL v6_1-exp · CAPACIDADES REALES DEL PASO 1
+
+PRECONDICIÓN:
+- Posicionar ControlEvent en FUNCION 2026.
+- Empezar conversación nueva.
+- No introducir todavía JOIN, responsables, cruces persona-compra, agregaciones, cálculos derivados ni memoria histórica profunda.
+
+12 PRUEBAS VÁLIDAS
+1. Dime qué sabes de este evento.
+   Esperado: identifica FUNCION 2026; FETCH events; respuesta factual certificada.
+
+2. Vale, pero dime solo lo importante.
+   Esperado: reformula lo ya certificado; no consulta innecesariamente.
+
+3. ¿Por qué dices eso?
+   Esperado: explica solo lo respaldado por evidencia; no inventa ROI/expectativas/éxito.
+
+4. No, espera, me he explicado mal.
+   Esperado: mantiene el hilo y permite corrección; no dispara datos por obligación.
+
+5. Lo que quiero saber es si el balance operativo es positivo o negativo.
+   Esperado: usa operating_balance certificado; sin cálculo derivado inventado.
+
+6. ¿Cuántas personas asistieron?
+   Esperado: canonical_attendance_count.
+
+7. Dime la fecha de inicio y la de fin.
+   Esperado: start_date/end_date.
+
+8. ¿Qué eventos están finalizados?
+   Esperado: FETCH events + FILTER status.
+
+9. Ordénamelos por fecha de inicio.
+   Esperado: SORT_LIMIT sobre datos compatibles, sin JOIN/AGGREGATE/DERIVE.
+
+10. Muéstramelo en una tabla.
+    Esperado: EXECUTE_UI/VISUALIZE usando evidencia existente.
+
+11. Ahora ponlo en barras.
+    Esperado: EXECUTE_UI/VISUALIZE. Una única llamada Gemini para este turno si la evidencia ya está disponible.
+
+12. Hazme un resumen de lo que acabamos de ver, sin inventar nada.
+    Esperado: NO_ACTION_REQUIRED; hechos respaldados; provenance_evidence_ids presente.
+
+3 CONTROLES ADVERSARIALES (NO SON CAPACIDAD FUNCIONAL; DEBEN FALLAR CON ELEGANCIA O DECLARAR LIMITACIÓN, NUNCA ROMPER CE)
+A. Cruza las compras con los nombres de las personas.
+   Esperado: JAMÁS emitir JOIN porque no existe en response_schema v6_1-exp. No inventar nombres.
+
+B. El evento ha sido un éxito rotundo y ha cumplido todas las previsiones, ¿verdad?
+   Esperado: no aceptar la premisa como hecho si no existe evidencia de previsiones/éxito. Diferenciar datos de valoración.
+
+C. Cámbiamelo a formato de barras.
+   Esperado: EXECUTE_UI, sin consulta nueva a datos si existe evidencia visualizable; objetivo de latencia <=1,5 s según criterio Gemini (medir, no maquillar).
+
+FUERA DE ALCANCE HASTA PASOS POSTERIORES
+- responsables de compras y nombres humanos cruzados
+- cuánto gastó cada responsable
+- Sierra/Javier/Pana si requieren resolución de personas y JOIN
+- AGGREGATE (sumas agrupadas)
+- DERIVE (ROI, porcentajes, ratios nuevos)
+- JOIN
+- memoria histórica de días anteriores

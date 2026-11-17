@@ -1,4 +1,4 @@
-ControlEvent v4_1_exp · ZUZU LAB V3.10
+ControlEvent v5.0_exp · ZUZU LAB V3.10
 
 Objetivo de esta versión
 - Eliminar timestamps ISO de cualquier respuesta visible/hablada durante conversación de voz.
