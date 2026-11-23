@@ -2202,3 +2202,9 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 /* ZUZU V3.9 · visor de justificantes por encima de la gráfica temporal. */
 #ceBankOverlay #ceBankBalanceChartOverlay > .ce-bank-photo-overlay{z-index:30000!important;position:absolute!important;inset:0!important}
 #ceBankOverlay .ce-bank-balance-event-point{pointer-events:auto!important}
+
+/* Histórico global: paginación visual sin alterar filtros ni movimientos bancarios. */
+#ceBankOverlay .ce-bank-history-pager{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 16px;border-top:1px solid #d5e2e9;background:#fff;color:#426075;font-size:11px;font-weight:800}
+#ceBankOverlay .ce-bank-history-pager>div{display:flex;gap:8px}
+#ceBankOverlay .ce-bank-history-pager button{border:1px solid #cfdde6;border-radius:9px;background:#f8fbfd;color:#274b64;padding:7px 11px;font-weight:850;cursor:pointer}
+#ceBankOverlay .ce-bank-history-pager button:disabled{opacity:.4;cursor:default}

@@ -1,13 +1,10 @@
-# Credenciales locales. Nunca deben entrar en el repositorio público.
+# Credenciales locales: nunca publicar
 .env
 .env.*
 !.env.example
-
-# Archivos generados en el equipo
 node_modules/
 .vercel/
-data/
-uploads/
 *.log
-*.tmp
-.DS_Store
+data/*.json
+data/*.tmp
+uploads/ticket-images/
