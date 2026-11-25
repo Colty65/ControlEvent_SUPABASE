@@ -1744,3 +1744,22 @@ body.ce-budget-tips-lite-active-v307 #budgetLayout .budget-panel.donantes .budge
   .ce-fix23-edit-row .rowline.compra .ce-maint-responsable select{min-width:320px !important;}
   .ce-fix23-edit-row .rowline.compra .ce-maint-actions{grid-column:5 / -1 !important;}
 }
+
+/* CE v6.1 · 25/11: donaciones — Responsable sin desbordar el panel.
+   El botón Añadir queda en su propia fila para liberar ancho al selector. */
+@media (min-width:901px){
+  #tabDonaciones .row-purchase-form.entry-zone{
+    grid-template-columns:minmax(175px,1.55fr) minmax(70px,.50fr) minmax(85px,.55fr)
+      minmax(85px,.60fr) minmax(135px,.95fr) minmax(140px,1fr)
+      minmax(160px,1.15fr) minmax(180px,1.35fr)!important;
+    width:100%;box-sizing:border-box;align-items:end;gap:10px;
+  }
+  #tabDonaciones .row-purchase-form.entry-zone>.field{min-width:0}
+  #tabDonaciones .row-purchase-form.entry-zone>.field select,
+  #tabDonaciones .row-purchase-form.entry-zone>.field input{max-width:100%;min-width:0;width:100%;box-sizing:border-box}
+  #tabDonaciones .row-purchase-form.entry-zone>.field:last-child{grid-column:1 / -1;justify-self:start}
+}
+@media (min-width:901px) and (max-width:1450px){
+  #tabDonaciones .row-purchase-form.entry-zone{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  #tabDonaciones .row-purchase-form.entry-zone>.field:last-child{grid-column:1/-1}
+}

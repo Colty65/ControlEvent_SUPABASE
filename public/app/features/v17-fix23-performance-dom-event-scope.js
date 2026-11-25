@@ -187,7 +187,7 @@
     const statusKey=statusRaw.toLowerCase();
     const deliveryStatus=statusKey==='supuesta'?'Supuesta':statusKey==='entregada'?'Entregada':statusKey==='comprometida'?'Comprometida':
       (r.donacionEntregada===true||r.entregadoDonacion===true||r.entregado===true?'Entregada':'Comprometida');
-    const deliveryLabel=kind==='donacion'?`<span class="ce-fix23-delivery-status" data-delivery-status="${deliveryStatus}">Situación entrega: <b>${deliveryStatus}</b></span>`:'';
+    const deliveryLabel=kind==='donacion'?`<span class="ce-fix23-delivery-status" data-delivery-status="${deliveryStatus}"><b>${deliveryStatus}</b></span>`:'';
     const meta = kind === 'donacion'
       ? `<div class="ce-fix23-meta">${metaSpan('ce-fix23-donor', i.don || i.tienda)}${metaSpan('ce-fix23-resp', i.responsable)}${metaSpan('ce-fix23-dtype', i.tk)}</div>`
       : `<div class="ce-fix23-meta">${metaSpan('ce-fix23-store', i.tienda)}${metaSpan(pending?'ce-fix23-ticket ce-fix23-ticket-pending':'ce-fix23-ticket', i.tk)}${metaSpan('ce-fix23-bresp', i.responsable)}</div>`;

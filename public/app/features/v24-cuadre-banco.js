@@ -1072,7 +1072,7 @@
         if(entry.target.matches('img[data-ce-history-lazy-src]'))hydrateIncome(entry.target);
         else hydrate(entry.target);
       }
-    },{root:list||null,rootMargin:'32px 0px'});
+    },{root:list||null,rootMargin:'0px 0px'});
     buttons.forEach(button=>observer.observe(button));
     images.forEach(image=>observer.observe(image));
     store.bankHistoryImageObserver=observer;
@@ -1393,7 +1393,7 @@
     const stores=arr(detail?.stores).length?arr(detail.stores):arr(link?.stores);
     const responsibles=arr(detail?.responsibles).length?arr(detail.responsibles):arr(link?.responsibles);
     const total=detail?.total!=null?num(detail.total):num(link?.ticketAmount||link?.ticketAmountSnapshot||0);
-    const body=visibleRows.length?visibleRows.map(row=>`<tr><td>${esc(row.product||'Producto')}</td><td>${esc(unitsText(row.units))}</td><td>${money(row.unitPrice)}</td><td>${money(row.amount)}</td></tr>`).join(''):`<tr><td colspan="4">${esc(error||'No hay líneas contables disponibles para este ticket.')}</td></tr>`;
+    const body=rows.length?rows.map(row=>`<tr><td>${esc(row.product||'Producto')}</td><td>${esc(unitsText(row.units))}</td><td>${money(row.unitPrice)}</td><td>${money(row.amount)}</td></tr>`).join(''):`<tr><td colspan="4">${esc(error||'No hay líneas contables disponibles para este ticket.')}</td></tr>`;
     return `<section class="ce-bank-accounting-panel" aria-label="Información contable"><div class="ce-bank-accounting-section-title">Información contable</div><div class="ce-bank-accounting-ticket-head"><div><span>${esc(eventInfo?.title||'Evento')}</span><strong>${esc(ticketCode)}</strong></div><div class="ce-bank-accounting-total"><span>Total contabilizado</span><strong>${money(total)}</strong></div></div><div class="ce-bank-accounting-meta"><div><span>Tienda</span><b>${esc(stores.join(', ')||'Sin tienda')}</b></div><div><span>Responsable</span><b>${esc(responsibles.join(', ')||'Sin responsable')}</b></div><div><span>Líneas</span><b>${esc(detail?.lineCount??rows.length??0)}</b></div></div>${accountingMovementHtml(movement)}<div class="ce-bank-accounting-table-wrap"><table><thead><tr><th>Producto</th><th>Uds.</th><th>Precio</th><th>Importe</th></tr></thead><tbody>${body}</tbody></table></div></section>`;
   }
   function incomeAccountingHtml(link,movement,eventInfo){
@@ -1455,7 +1455,7 @@
     const leftSlot=viewer.querySelector('[data-ce-bank-accounting-left]');
     const rightSlot=viewer.querySelector('[data-ce-bank-accounting-right]');
     const detailPromise=api(`/api/bank-reconciliation/ticket-detail?eventId=${encodeURIComponent(eventId)}&ticketCode=${encodeURIComponent(ticketCode)}`);
-    const imagePromise=fetch(`/api/ticket-images?eventId=${encodeURIComponent(eventId)}`,{cache:'no-store'}).then(async response=>{const json=await response.json().catch(()=>({}));if(!response.ok) throw new Error(json.error||`HTTP ${response.status}`);return ticketImageFromBag(json.images||{},eventId,ticketCode);});
+    const imagePromise=balanceTicketImages(eventId).then(images=>ticketImageFromBag(images,eventId,ticketCode));
     const [detailResult,imageResult]=await Promise.allSettled([detailPromise,imagePromise]);
     if(!viewer.isConnected) return;
     if(leftSlot){
