@@ -150,6 +150,7 @@
     const stl=document.createElement('style');
     stl.id='ceFix41CompactMetaStyles';
     stl.textContent='.ce-fix23-meta{display:flex!important;gap:6px!important;align-items:center!important;flex-wrap:wrap!important}.ce-fix23-meta span{display:inline-flex!important;align-items:center!important}.ce-fix23-store,.ce-fix23-donor{color:#15803d!important;font-weight:900!important}.ce-fix23-ticket{color:#111827!important;font-weight:900!important}.ce-fix23-ticket-pending{color:#dc2626!important}.ce-fix23-bresp{color:#1d4ed8!important;font-weight:900!important}.ce-fix23-resp{color:#111827!important;font-weight:900!important}.ce-fix23-dtype{color:#1d4ed8!important;font-weight:900!important}.ce-fix23-qtyline{margin-top:3px!important;font-size:12px!important;color:#475569!important;display:flex!important;gap:10px!important;flex-wrap:wrap!important}.ce-fix23-qtyline span{white-space:nowrap!important}.ce-fix23-compact-text{min-width:0!important}';
+    stl.textContent += '.ce-fix23-delivery-status{display:inline-flex;margin:4px 0 2px;padding:3px 8px;border:1px solid #cbd5e1;border-radius:8px;color:#334155;background:#f8fafc;font-size:11px;font-weight:700}.ce-fix23-delivery-status[data-delivery-status="Entregada"]{background:#ecfdf5;color:#047857;border-color:#a7f3d0}.ce-fix23-delivery-status[data-delivery-status="Supuesta"]{background:#f1f5f9;color:#475569}.ce-fix23-delivery-status[data-delivery-status="Comprometida"]{background:#fffbeb;color:#92400e;border-color:#fde68a}';
     document.head.appendChild(stl);
   }
   ensureFix41CompactStyles();
@@ -180,6 +181,13 @@
     const pending = kind !== 'donacion' && !txt(r.ticketDonacion);
     const writable = canWrite();
     const qtyLine = `<div class="ce-fix23-qtyline"><span>Unid. ${esc(String(i.unidades).replace('.',','))}</span><span>Precio ${esc(money(i.precio))}</span><span>${kind==='donacion'?'Valor':'Importe'} ${esc(money(i.amount))}</span></div>`;
+    // Situación real guardada en la donación; el valor por defecto histórico
+    // se mantiene coherente con los formularios existentes.
+    const statusRaw=txt(r.donacionSituacion ?? r.donacion_situacion);
+    const statusKey=statusRaw.toLowerCase();
+    const deliveryStatus=statusKey==='supuesta'?'Supuesta':statusKey==='entregada'?'Entregada':statusKey==='comprometida'?'Comprometida':
+      (r.donacionEntregada===true||r.entregadoDonacion===true||r.entregado===true?'Entregada':'Comprometida');
+    const deliveryLabel=kind==='donacion'?`<span class="ce-fix23-delivery-status" data-delivery-status="${deliveryStatus}">Situación entrega: <b>${deliveryStatus}</b></span>`:'';
     const meta = kind === 'donacion'
       ? `<div class="ce-fix23-meta">${metaSpan('ce-fix23-donor', i.don || i.tienda)}${metaSpan('ce-fix23-resp', i.responsable)}${metaSpan('ce-fix23-dtype', i.tk)}</div>`
       : `<div class="ce-fix23-meta">${metaSpan('ce-fix23-store', i.tienda)}${metaSpan(pending?'ce-fix23-ticket ce-fix23-ticket-pending':'ce-fix23-ticket', i.tk)}${metaSpan('ce-fix23-bresp', i.responsable)}</div>`;
@@ -188,6 +196,7 @@
         <div class="ce-fix23-compact-text">
           <div class="ce-fix23-title">${esc(i.producto)}</div>
           ${meta}
+          ${deliveryLabel}
           ${qtyLine}
         </div>
         <div class="ce-fix23-amount">${money(i.amount)}</div>

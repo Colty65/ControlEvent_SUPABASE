@@ -2208,3 +2208,11 @@ body.ce-bank-open > :not(#ceBankOverlay){pointer-events:none!important}
 #ceBankOverlay .ce-bank-history-pager>div{display:flex;gap:8px}
 #ceBankOverlay .ce-bank-history-pager button{border:1px solid #cfdde6;border-radius:9px;background:#f8fbfd;color:#274b64;padding:7px 11px;font-weight:850;cursor:pointer}
 #ceBankOverlay .ce-bank-history-pager button:disabled{opacity:.4;cursor:default}
+
+/* CE 2026-11-25: desplazar 60 filas sin repintar las que están fuera de pantalla.
+   Evitar el filtro blur sobre todo el histórico, especialmente costoso al hacer scroll. */
+#ceBankOverlay .ce-bank-history-overlay{backdrop-filter:none!important;-webkit-backdrop-filter:none!important}
+#ceBankOverlay .ce-bank-history-list{overscroll-behavior:contain;scroll-behavior:auto;contain:layout style}
+#ceBankOverlay .ce-bank-history-row{content-visibility:auto;contain-intrinsic-size:auto 70px;box-shadow:none}
+#ceBankOverlay .ce-bank-history-row:hover{box-shadow:none}
+#ceBankOverlay .ce-bank-history-overlay > .ce-bank-photo-overlay{z-index:30000!important;position:absolute!important;inset:0!important}

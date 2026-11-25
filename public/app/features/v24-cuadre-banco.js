@@ -1019,7 +1019,7 @@
       const shown=incomes.slice(0,5);
       return `<div class="ce-bank-history-ticket-strip">${shown.map(link=>{
         const label=link.inferred?'AUTO':text(link.personName&&link.personName!=='Ingreso'?link.personName:'ING');
-        return `<button type="button" class="ce-bank-history-ticket-mini ce-bank-history-income-mini ${text(link.imageUrl)?'has-image':''}" data-ce-bank-history-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id||link.incomeId||'')}" data-event-id="${esc(link.eventId||'')}" data-event-title="${esc(link.eventTitle||'Evento')}" data-person-name="${esc(link.personName||'Ingreso')}" data-income-amount="${esc(link.amount??link.incomeAmountSnapshot??0)}" data-payment-method="${esc(link.paymentMethod||'Banco')}" data-movement-id="${esc(row.id)}" title="${link.inferred?'Posible conciliación automática (no guardada)':'Justificante de ingreso'} · ${esc(link.eventTitle||'Evento')}">${text(link.imageUrl)?`<img loading="lazy" decoding="async" src="${esc(link.imageUrl)}" alt="Justificante de ingreso">`:``}<span>${esc(label)}</span></button>`;
+        return `<button type="button" class="ce-bank-history-ticket-mini ce-bank-history-income-mini ${text(link.imageUrl)?'has-image':''}" data-ce-bank-history-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id||link.incomeId||'')}" data-event-id="${esc(link.eventId||'')}" data-event-title="${esc(link.eventTitle||'Evento')}" data-person-name="${esc(link.personName||'Ingreso')}" data-income-amount="${esc(link.amount??link.incomeAmountSnapshot??0)}" data-payment-method="${esc(link.paymentMethod||'Banco')}" data-movement-id="${esc(row.id)}" title="${link.inferred?'Posible conciliación automática (no guardada)':'Justificante de ingreso'} · ${esc(link.eventTitle||'Evento')}">${text(link.imageUrl)?`<img loading="lazy" decoding="async" data-ce-history-lazy-src="${esc(link.imageUrl)}" alt="Justificante de ingreso">`:``}<span>${esc(label)}</span></button>`;
       }).join('')}${incomes.length>shown.length?`<i>+${incomes.length-shown.length}</i>`:''}</div>`;
     }
     const links=bankHistoryLinks(row);
@@ -1033,10 +1033,8 @@
   function hydrateBankHistoryThumbnails(container){
     if(!container?.isConnected)return;
     const buttons=[...container.querySelectorAll('[data-ce-bank-history-ticket="1"]')];
-    if(!buttons.length)return;
+    const images=[...container.querySelectorAll('img[data-ce-history-lazy-src]')];
     const list=container.querySelector('.ce-bank-history-list');
-    // Solo solicitar los justificantes cuyos iconos se van a mostrar.
-    // balanceTicketImages ya memoriza por eventId durante esta sesión.
     const hydrate=async button=>{
       if(!button.isConnected||!container.contains(button))return;
       const eventId=text(button.dataset.eventId),code=text(button.dataset.ticketCode);
@@ -1045,23 +1043,38 @@
         const bag=await balanceTicketImages(eventId);
         if(!button.isConnected||!container.contains(button))return;
         const src=ticketImageFromBag(bag,eventId,code);
-        if(src){button.classList.add('has-image');button.innerHTML=`<img loading="lazy" decoding="async" src="${esc(src)}" alt="${esc(code)}"><span>${esc(code)}</span>`;}
-      }catch(_){/* Mantener código TKxx visible si la miniatura no está disponible. */}
+        if(src){
+          button.classList.add('has-image');
+          // Evitar recrear el botón: menos trabajo DOM durante el desplazamiento.
+          let img=button.querySelector('img');
+          if(!img){img=document.createElement('img');img.loading='lazy';img.decoding='async';img.alt=code;button.prepend(img);}
+          img.src=src;
+        }
+      }catch(_){/* Mantener código TKxx visible si no hay miniatura. */}
     };
+    const hydrateIncome=image=>{
+      if(!image.isConnected||!container.contains(image))return;
+      const src=image.getAttribute('data-ce-history-lazy-src');
+      if(!src)return;
+      image.removeAttribute('data-ce-history-lazy-src');
+      image.src=src;
+    };
+    store.bankHistoryImageObserver?.disconnect?.();
     if(typeof IntersectionObserver==='undefined'){
       buttons.slice(0,12).forEach(hydrate);
+      images.slice(0,12).forEach(hydrateIncome);
       return;
     }
     const observer=new IntersectionObserver(entries=>{
       for(const entry of entries){
         if(!entry.isIntersecting)continue;
         observer.unobserve(entry.target);
-        hydrate(entry.target);
+        if(entry.target.matches('img[data-ce-history-lazy-src]'))hydrateIncome(entry.target);
+        else hydrate(entry.target);
       }
-    },{root:list||null,rootMargin:'160px 0px'});
+    },{root:list||null,rootMargin:'32px 0px'});
     buttons.forEach(button=>observer.observe(button));
-    // Desconectar al cerrar o reconstruir la lista, sin dejar observadores vivos.
-    if(store.bankHistoryImageObserver)store.bankHistoryImageObserver.disconnect();
+    images.forEach(image=>observer.observe(image));
     store.bankHistoryImageObserver=observer;
   }
   function closeBankHistory(){
@@ -1083,18 +1096,23 @@
     const last=rows.reduce((best,row)=>!best||parseMoment(row.executedAt)>parseMoment(best.executedAt)?row:best,null);
     const account=chartAccountLabel();
     let view=$('ceBankHistoryOverlay');
+    const previousScroll=view?.querySelector('.ce-bank-history-list')?.scrollTop||0;
     if(!view){view=document.createElement('div');view.id='ceBankHistoryOverlay';view.className='ce-bank-history-overlay';chartOverlay.appendChild(view);}
     const body=visibleRows.length?visibleRows.map(row=>`<article class="ce-bank-history-row" data-movement-id="${esc(row.id)}"><div class="date"><b>${esc(formatDate(row.executedAt))}</b><span>Valor ${esc(formatDate(row.valueDate,false))}</span></div><div class="concept">${esc(row.description||'Movimiento bancario')}</div><div class="amount ${num(row.amount)<0?'negative':'positive'}">${esc(money(row.amount))}</div><div class="balance">${esc(money(row.bankBalance))}</div><div class="tickets">${bankHistoryTicketHtml(row)}</div></article>`).join(''):'<div class="ce-bank-history-empty">No hay movimientos históricos para esta cuenta.</div>';
     const iban=chartAccountIban();
     const range=first&&last?`${formatDate(first.executedAt,false)} — ${formatDate(last.executedAt,false)}`:'Sin histórico';
     view.innerHTML=`<section class="ce-bank-history-card" role="dialog" aria-modal="true" aria-label="Consulta histórica del banco"><header><div class="ce-bank-history-account"><img src="./assets/icons/eurocaja-rural-user.png" alt="Eurocaja Rural"><div><strong>PEÑA EL ARRASTRE</strong><span class="iban">${esc(iban)}</span><small>${esc(range)}</small></div></div><div class="ce-bank-history-title"><span>CONSULTA HISTÓRICA DE MOVIMIENTOS</span><b>${rows.length} movimiento${rows.length===1?'':'s'}</b></div><button type="button" data-ce-bank-close-history-list aria-label="Cerrar histórico">×</button></header><div class="ce-bank-history-sortbar"><span>Ordenar por</span><button type="button" data-ce-bank-history-sort="executedAt">Fecha${bankHistorySortIndicator('executedAt')}</button><button type="button" data-ce-bank-history-sort="description">Concepto${bankHistorySortIndicator('description')}</button><button type="button" data-ce-bank-history-sort="amount">Importe${bankHistorySortIndicator('amount')}</button><button type="button" data-ce-bank-history-sort="bankBalance">Saldo${bankHistorySortIndicator('bankBalance')}</button></div><div class="ce-bank-history-head"><span>Fecha</span><span>Concepto del movimiento</span><span>Importe</span><span>Saldo</span><span>Justificantes</span></div><main class="ce-bank-history-list">${body}</main><footer class="ce-bank-history-pager"><span>Mostrando ${rows.length?pageStart+1:0}–${Math.min(rows.length,pageStart+visibleRows.length)} de ${rows.length} movimientos · Página ${store.bankHistoryPage}/${totalPages}</span><div><button type="button" data-ce-bank-history-page="prev" ${store.bankHistoryPage===1?'disabled':''}>← Anterior</button><button type="button" data-ce-bank-history-page="next" ${store.bankHistoryPage===totalPages?'disabled':''}>Siguiente →</button></div></footer></section>`;
     store.bankHistoryOpen=true;
+    if(previousScroll)view.querySelector('.ce-bank-history-list').scrollTop=previousScroll;
     hydrateBankHistoryThumbnails(view);
     // Consulta global bajo demanda y solo de los abonos visibles sin vínculo.
     // No se consulta durante el arranque ni al navegar por otras pantallas.
     const request=++store.historyIncomeRequest;
     enrichBankHistoryPage(visibleRows).then(changed=>{
-      if(changed&&store.bankHistoryOpen&&request===store.historyIncomeRequest)renderBankHistory();
+      if(changed&&store.bankHistoryOpen&&request===store.historyIncomeRequest){
+        if($('ceBankTicketPhoto'))store.bankHistoryPendingRender=true;
+        else renderBankHistory();
+      }
     });
   }
   function openBankHistory(event){stopEvent(event);store.bankHistoryPage=1;renderBankHistory();}
@@ -1385,6 +1403,10 @@
     return `<section class="ce-bank-accounting-panel" aria-label="Información contable"><div class="ce-bank-accounting-section-title">Información contable</div><div class="ce-bank-accounting-ticket-head"><div><span>${esc(eventInfo?.title||'Evento')}</span><strong>${esc(link?.personName||'Ingreso')}</strong></div><div class="ce-bank-accounting-total"><span>Importe contabilizado</span><strong>${money(link?.amount)}</strong></div></div><div class="ce-bank-accounting-meta"><div><span>Forma de pago</span><b>${esc(link?.paymentMethod||'Banco')}</b></div><div><span>Asociación</span><b>${manual?'Manual':'Automática'}</b></div><div><span>Conciliación</span><b>${money(justified)} de ${money(target)}</b></div></div>${accountingMovementHtml(movement)}<div class="ce-bank-income-accounting-note"><b>Comprobación visual</b><span>Contrasta el nombre y el importe contabilizado con el justificante mostrado a la derecha.</span></div></section>`;
   }
   function bankPhotoHost(){
+    // El visor es hijo del histórico cuando se abre desde sus miniaturas:
+    // cerrar el visor nunca implica abandonar la lista ni volver a gráficas.
+    const history=$('ceBankHistoryOverlay');
+    if(store.bankHistoryOpen && history?.isConnected) return history;
     const chart=$('ceBankBalanceChartOverlay');
     if(chart&&chart.classList.contains('visible')&&!chart.classList.contains('hidden'))return chart;
     return $('ceBankOverlay');
@@ -1399,7 +1421,15 @@
     bankPhotoHost()?.appendChild(viewer);
     return viewer;
   }
-  function closeBankTicketPhoto(){ $('ceBankTicketPhoto')?.remove(); }
+  function closeBankTicketPhoto(){
+    $('ceBankTicketPhoto')?.remove();
+    // Si llegaron conciliaciones automáticas mientras se veía la foto,
+    // refrescar solo al cerrar para no destruir el visor ni perder el histórico.
+    if(store.bankHistoryOpen && store.bankHistoryPendingRender){
+      store.bankHistoryPendingRender=false;
+      renderBankHistory();
+    }
+  }
   function openBankIncomePhoto(chip,event){
     stopEvent(event);
     const src=text(chip?.dataset?.imageSrc);
@@ -1837,9 +1867,9 @@
   },true);
   document.addEventListener('keydown',event=>{
     if(event.key==='Escape'&&!$('ceBankOverlay')?.classList.contains('hidden')){
-      if(store.bankHistoryOpen){closeBankHistory();return;}
-      if(store.balanceChartOpen){closeBalanceChart();return;}
-      if($('ceBankTicketPhoto')){closeBankTicketPhoto();return;}
+      if($('ceBankTicketPhoto')){event.preventDefault();event.stopImmediatePropagation();closeBankTicketPhoto();return;}
+      if(store.bankHistoryOpen){event.preventDefault();closeBankHistory();return;}
+      if(store.balanceChartOpen){event.preventDefault();closeBalanceChart();return;}
       if(!$('ceBankTicketModal')?.classList.contains('hidden')){const movement=store.incomeMovement||store.ticketMovement;$('ceBankTicketModal').classList.add('hidden');store.incomeMovement=null;store.ticketMovement=null;restorePosition(movement,false);}else close();
       return;
     }
