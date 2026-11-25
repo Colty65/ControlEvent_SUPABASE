@@ -44,7 +44,8 @@
     lastBodyScroll:0, pendingFocusId:'', noticeLocked:false, sort:'DESC', dateFrom:'', dateTo:'',
     page:1, pageSize:60, dataRevision:0, filteredCacheKey:'', filteredCacheRows:[], searchTimer:0, renderFrame:0,
     loadSeq:0, loadController:null, totalPages:1, balanceChartOpen:false, bankHistoryOpen:false, bankHistoryPage:1, bankHistoryPageSize:60, bankHistorySortField:'executedAt', bankHistorySortDirection:'desc',
-    balanceChartMagnifier:{key:'',panes:{history:null,zoom:null}}
+    balanceChartMagnifier:{key:'',panes:{history:null,zoom:null}},
+    historyIncomeCache:new Map(),historyIncomeRequest:0
   };
   const TIP_ATTRS = ['title','data-ce-tip-v21','data-ce-tip-v196','data-ce-tip-v1952','data-ce-tip','data-v181-tip','data-tip','data-ce-tip-layout-v21','data-tip-bg-v21'];
 
@@ -452,6 +453,8 @@
       const data=await api(`/api/bank-reconciliation?${queryString(force)}`,controller?{signal:controller.signal}:{});
       if(seq!==store.loadSeq) return;
       store.data=data;
+      store.historyIncomeRequest+=1;
+      store.historyIncomeCache.clear(); // Evitar sugerencias obsoletas tras recargar/modificar conciliación.
       store.dataRevision+=1;
       invalidateMovementCache();
       store.accountId=data.selectedAccount||store.accountId;
@@ -957,14 +960,33 @@
     }
     return [...merged.values()];
   }
+  async function enrichBankHistoryPage(rows){
+    const positive=rows.filter(row=>num(row.amount)>0 && !arr(row.incomeLinks).length);
+    const missing=positive.filter(row=>!store.historyIncomeCache.has(String(row.id))).map(row=>String(row.id));
+    if(!missing.length)return false;
+    const seq=store.historyIncomeRequest;
+    try{
+      const result=await api('/api/bank-reconciliation/history-income-suggestions',{
+        method:'POST',body:JSON.stringify({movementIds:missing})
+      });
+      if(seq!==store.historyIncomeRequest)return false;
+      for(const id of missing)store.historyIncomeCache.set(id,arr(result.byMovement?.[id]));
+      return true;
+    }catch(error){
+      // No convertir el fallo de una consulta auxiliar en fallo del histórico bancario.
+      console.warn('Histórico: no se pudieron recuperar sugerencias de ingresos',error?.message||error);
+      if(seq===store.historyIncomeRequest)for(const id of missing)store.historyIncomeCache.set(id,[]);
+      return false;
+    }
+  }
   function bankHistoryRows(){
     const currentById=new Map(arr(store.data?.movements).map(row=>[String(row.id),row]));
     return arr(store.data?.balanceTimeline).filter(row=>parseMoment(row.executedAt)>0).map(row=>{
       const current=currentById.get(String(row.id));
-      if(!current)return row;
+      if(!current)return {...row,incomeLinks:mergeHistoryLinks(row.incomeLinks,store.historyIncomeCache.get(String(row.id)),link=>`${text(link?.eventId)}|${text(link?.id||link?.incomeId)}`)};
       return {...row,
         displayLinks:mergeHistoryLinks(row.displayLinks,current.displayLinks||current.links,link=>`${text(link?.eventId)}|${text(link?.ticketCode)}`),
-        incomeLinks:mergeHistoryLinks(row.incomeLinks,current.incomeLinks,link=>`${text(link?.eventId)}|${text(link?.id||link?.incomeId)}`)
+        incomeLinks:mergeHistoryLinks(mergeHistoryLinks(row.incomeLinks,current.incomeLinks,link=>`${text(link?.eventId)}|${text(link?.id||link?.incomeId)}`),store.historyIncomeCache.get(String(row.id)),link=>`${text(link?.eventId)}|${text(link?.id||link?.incomeId)}`)
       };
     });
   }
@@ -996,8 +1018,8 @@
       if(!incomes.length)return '<span class="ce-bank-history-no-ticket">—</span>';
       const shown=incomes.slice(0,5);
       return `<div class="ce-bank-history-ticket-strip">${shown.map(link=>{
-        const label=text(link.personName&&link.personName!=='Ingreso'?link.personName:'ING');
-        return `<button type="button" class="ce-bank-history-ticket-mini ce-bank-history-income-mini ${text(link.imageUrl)?'has-image':''}" data-ce-bank-history-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id||link.incomeId||'')}" data-event-id="${esc(link.eventId||'')}" data-event-title="${esc(link.eventTitle||'Evento')}" data-person-name="${esc(link.personName||'Ingreso')}" data-income-amount="${esc(link.amount??link.incomeAmountSnapshot??0)}" data-payment-method="${esc(link.paymentMethod||'Banco')}" data-movement-id="${esc(row.id)}" title="Justificante de ingreso · ${esc(link.eventTitle||'Evento')}">${text(link.imageUrl)?`<img loading="lazy" decoding="async" src="${esc(link.imageUrl)}" alt="Justificante de ingreso">`:``}<span>${esc(label)}</span></button>`;
+        const label=link.inferred?'AUTO':text(link.personName&&link.personName!=='Ingreso'?link.personName:'ING');
+        return `<button type="button" class="ce-bank-history-ticket-mini ce-bank-history-income-mini ${text(link.imageUrl)?'has-image':''}" data-ce-bank-history-income="1" data-image-src="${esc(link.imageUrl)}" data-income-id="${esc(link.id||link.incomeId||'')}" data-event-id="${esc(link.eventId||'')}" data-event-title="${esc(link.eventTitle||'Evento')}" data-person-name="${esc(link.personName||'Ingreso')}" data-income-amount="${esc(link.amount??link.incomeAmountSnapshot??0)}" data-payment-method="${esc(link.paymentMethod||'Banco')}" data-movement-id="${esc(row.id)}" title="${link.inferred?'Posible conciliación automática (no guardada)':'Justificante de ingreso'} · ${esc(link.eventTitle||'Evento')}">${text(link.imageUrl)?`<img loading="lazy" decoding="async" src="${esc(link.imageUrl)}" alt="Justificante de ingreso">`:``}<span>${esc(label)}</span></button>`;
       }).join('')}${incomes.length>shown.length?`<i>+${incomes.length-shown.length}</i>`:''}</div>`;
     }
     const links=bankHistoryLinks(row);
@@ -1045,6 +1067,7 @@
   function closeBankHistory(){
     const view=$('ceBankHistoryOverlay');
     store.bankHistoryOpen=false;
+    store.historyIncomeRequest+=1;
     store.bankHistoryImageObserver?.disconnect?.();
     store.bankHistoryImageObserver=null;
     if(view)view.remove();
@@ -1067,6 +1090,12 @@
     view.innerHTML=`<section class="ce-bank-history-card" role="dialog" aria-modal="true" aria-label="Consulta histórica del banco"><header><div class="ce-bank-history-account"><img src="./assets/icons/eurocaja-rural-user.png" alt="Eurocaja Rural"><div><strong>PEÑA EL ARRASTRE</strong><span class="iban">${esc(iban)}</span><small>${esc(range)}</small></div></div><div class="ce-bank-history-title"><span>CONSULTA HISTÓRICA DE MOVIMIENTOS</span><b>${rows.length} movimiento${rows.length===1?'':'s'}</b></div><button type="button" data-ce-bank-close-history-list aria-label="Cerrar histórico">×</button></header><div class="ce-bank-history-sortbar"><span>Ordenar por</span><button type="button" data-ce-bank-history-sort="executedAt">Fecha${bankHistorySortIndicator('executedAt')}</button><button type="button" data-ce-bank-history-sort="description">Concepto${bankHistorySortIndicator('description')}</button><button type="button" data-ce-bank-history-sort="amount">Importe${bankHistorySortIndicator('amount')}</button><button type="button" data-ce-bank-history-sort="bankBalance">Saldo${bankHistorySortIndicator('bankBalance')}</button></div><div class="ce-bank-history-head"><span>Fecha</span><span>Concepto del movimiento</span><span>Importe</span><span>Saldo</span><span>Justificantes</span></div><main class="ce-bank-history-list">${body}</main><footer class="ce-bank-history-pager"><span>Mostrando ${rows.length?pageStart+1:0}–${Math.min(rows.length,pageStart+visibleRows.length)} de ${rows.length} movimientos · Página ${store.bankHistoryPage}/${totalPages}</span><div><button type="button" data-ce-bank-history-page="prev" ${store.bankHistoryPage===1?'disabled':''}>← Anterior</button><button type="button" data-ce-bank-history-page="next" ${store.bankHistoryPage===totalPages?'disabled':''}>Siguiente →</button></div></footer></section>`;
     store.bankHistoryOpen=true;
     hydrateBankHistoryThumbnails(view);
+    // Consulta global bajo demanda y solo de los abonos visibles sin vínculo.
+    // No se consulta durante el arranque ni al navegar por otras pantallas.
+    const request=++store.historyIncomeRequest;
+    enrichBankHistoryPage(visibleRows).then(changed=>{
+      if(changed&&store.bankHistoryOpen&&request===store.historyIncomeRequest)renderBankHistory();
+    });
   }
   function openBankHistory(event){stopEvent(event);store.bankHistoryPage=1;renderBankHistory();}
   function changeBankHistorySort(field){

@@ -8,6 +8,7 @@ import {
   exportBankData,
   importBankCsv,
   listBankReconciliation,
+  listBankHistoryIncomeSuggestions,
   listPaidTickets,
   listBankIncomes,
   getBankTicketDetail,
@@ -53,6 +54,11 @@ function eventIdFrom(req){
 router.get('/bank-reconciliation', asyncHandler(async (req,res) => {
   await requireBankReadRole(req);
   res.json(await listBankReconciliation({accountId:req.query.accountId,eventId:req.query.eventId}));
+}));
+router.post('/bank-reconciliation/history-income-suggestions', asyncHandler(async (req,res) => {
+  // Este endpoint es de lectura global; no autorizarlo a roles limitados a un evento.
+  requireBankRole(req);
+  res.json(await listBankHistoryIncomeSuggestions(req.body?.movementIds));
 }));
 router.get('/bank-reconciliation/ticket-detail', asyncHandler(async (req,res) => {
   await requireBankReadRole(req);

@@ -964,6 +964,77 @@ export async function listBankReconciliation({accountId='',eventId='',readOnly=f
   }catch(error){ throw friendlyDbError(error); }
 }
 
+// Histórico global: consulta perezosa, exclusivamente de lectura. Resuelve ingresos
+// que Cuadre Banco puede mostrar por conciliación automática SIN vínculo persistido.
+// Solo usa pertenencia al evento guardada en ce_bank_event_movement_state; ante
+// ambigüedad (mismo importe, varios candidatos), no inventa una asociación.
+export async function listBankHistoryIncomeSuggestions(movementIds=[]){
+  const ids=[...new Set(arr(movementIds).map(text).filter(Boolean))];
+  if(!ids.length || ids.length>60) fail('Selecciona entre 1 y 60 movimientos para consultar justificantes.');
+  const [movements,states,existingLinks]=await Promise.all([
+    selectPaged(MOVEMENTS_TABLE,{columns:'id,executed_at,description,amount',order:'executed_at',ascending:false,apply:q=>q.in('id',ids)}),
+    selectPaged(EVENT_MOVEMENT_STATE_TABLE,{columns:'event_id,movement_id,included,updated_by',order:'movement_id',ascending:true,apply:q=>q.in('movement_id',ids).eq('included',true)}),
+    selectPaged(INCOME_LINKS_TABLE,{columns:'id,event_id,movement_id,income_id',order:'created_at',ascending:true,apply:q=>q.in('movement_id',ids)})
+  ]);
+  const movementLookup=new Map(movements.filter(row=>num(row.amount)>0).map(row=>[text(row.id),row]));
+  const candidates=states.filter(row=>movementLookup.has(text(row.movement_id)));
+  const eventIds=[...new Set(candidates.map(row=>text(row.event_id)).filter(Boolean))];
+  if(!eventIds.length)return {ok:true,byMovement:{}};
+  const [events,collaborators,people,snapshots,usedLinks]=await Promise.all([
+    selectPaged('ce_eventos',{columns:'id,titulo,precio,fecha_ini,fecha_fin,situacion',order:'fecha_ini',ascending:true,apply:q=>q.in('id',eventIds)}),
+    selectPaged('ce_colaboradores',{columns:'id,event_id,persona_id,numero,situacion,importe,created_at,updated_at',order:'created_at',ascending:true,apply:q=>q.in('event_id',eventIds)}),
+    selectPaged('ce_personas',{columns:'id,nombre,rango,created_at',order:'nombre',ascending:true}),
+    selectPaged('ce_event_person_snapshots',{columns:'event_id,persona_id,nombre_snapshot,rango_snapshot,captured_at,updated_at',order:'persona_id',ascending:true,apply:q=>q.in('event_id',eventIds)}).catch(()=>[]),
+    selectPaged(INCOME_LINKS_TABLE,{columns:'event_id,income_id,movement_id',order:'created_at',ascending:true,apply:q=>q.in('event_id',eventIds)})
+  ]);
+  const alreadyLinked=new Set(usedLinks.map(row=>`${text(row.event_id)}|${text(row.income_id)}`));
+  const alreadyOnMovement=new Set(existingLinks.map(row=>`${text(row.movement_id)}|${text(row.event_id)}`));
+  const catalogs=new Map();
+  for(const rawEvent of events){
+    const event=eventFromDb(rawEvent);
+    catalogs.set(event.id,buildIncomeCatalog(event,collaborators,people,[],snapshots)
+      .filter(income=>!alreadyLinked.has(`${event.id}|${income.id}`)));
+  }
+  const proposed=[];
+  for(const state of candidates){
+    const movement=movementLookup.get(text(state.movement_id));
+    const eventId=text(state.event_id);
+    if(!movement||alreadyOnMovement.has(`${text(movement.id)}|${eventId}`))continue;
+    const target=cents(movement.amount);
+    const exact=arr(catalogs.get(eventId)).filter(income=>Math.abs(cents(income.amount)-target)<=.01);
+    if(!exact.length)continue;
+    const scored=exact.map(income=>({income,points:meaningfulTokens(income.personName)
+      .filter(token=>normalizeWords(movement.description).includes(token)).length}));
+    const named=scored.filter(entry=>entry.points>0).sort((a,b)=>b.points-a.points);
+    // Importe único para el evento o nombre inequívoco. Nunca decidir solo por
+    // una cifra si el evento dispone de varios ingresos por ese importe.
+    const chosen=exact.length===1?exact[0]:(named.length===1?named[0].income:(named.length>1&&named[0].points>named[1].points?named[0].income:null));
+    if(chosen)proposed.push({movementId:text(movement.id),eventId,income:chosen});
+  }
+  // Una aportación no puede asignarse automáticamente a dos apuntes bancarios.
+  const usage=new Map();
+  for(const row of proposed){const key=`${row.eventId}|${row.income.id}`;usage.set(key,(usage.get(key)||0)+1);}
+  const safe=proposed.filter(row=>usage.get(`${row.eventId}|${row.income.id}`)===1);
+  if(!safe.length)return {ok:true,byMovement:{}};
+  const imageEventIds=[...new Set(safe.map(row=>row.eventId))];
+  const imageRows=await selectPaged('ce_ticket_images',{
+    columns:'image_key,event_id,label,public_url,pathname,storage_path,created_at',
+    order:'created_at',ascending:true,apply:q=>q.in('event_id',imageEventIds)
+  });
+  const eventNames=new Map(events.map(row=>[text(row.id),text(row.titulo)]));
+  const byMovement={};
+  for(const row of safe){
+    const income=row.income;
+    const item={id:income.id,incomeId:income.id,movementId:row.movementId,eventId:row.eventId,
+      eventTitle:eventNames.get(row.eventId)||row.eventId,personName:income.personName,
+      amount:income.amount,paymentMethod:income.paymentMethod,
+      imageUrl:incomeImageUrl(imageRows,row.eventId,income.id),
+      inferred:true,manual:false};
+    (byMovement[row.movementId]??=[]).push(item);
+  }
+  return {ok:true,byMovement};
+}
+
 async function persistAppliedPeriodMovementSnapshot(eventId,accountId='',actor={}){
   const selectedEvent=text(eventId);
   if(!selectedEvent) return {removed:0,created:0,keptExplicit:0};
